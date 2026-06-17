@@ -1,0 +1,35 @@
+{
+  "name": "nanda-v2.5-probe-corpus",
+  "cases": [
+    {
+      "id": "negative-lane-shifts-customs-to-certification-review",
+      "path": "triad-packet.negative-shortcut-lanes.json",
+      "expected_decision": "SHIFTED_TO_REVIEW",
+      "expected_plain_peak": "customs",
+      "expected_negative_peak": "certification"
+    },
+    {
+      "id": "no-negative-lanes-stays-unchanged",
+      "path": "triad-packet.negative-shortcut-base.json",
+      "expected_decision": "UNCHANGED",
+      "expected_plain_peak": "customs",
+      "expected_negative_peak": "customs"
+    },
+    {
+      "id": "group-negative-lane-shifts-customs-shortcut",
+      "path": "triad-packet.negative-shortcut-lanes.json",
+      "group_by": "group",
+      "expected_decision": "SHIFTED_TO_REVIEW",
+      "expected_plain_peak": "customs-shortcut",
+      "expected_negative_peak": "certification-route"
+    },
+    {
+      "id": "external-negative-lanes-shift-base-packet",
+      "path": "triad-packet.negative-shortcut-base.json",
+      "negative": ["triad-packet.negative-shortcut-lanes.json"],
+      "expected_decision": "SHIFTED_TO_REVIEW",
+      "expected_plain_peak": "customs",
+      "expected_negative_peak": "certification"
+    }
+  ]
+}

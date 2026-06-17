@@ -102,6 +102,7 @@ scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-for
 scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
 scripts/nanda-probe examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
+scripts/nanda-probe --suite examples/probe-corpus.json --input-format json --top-k 3
 scripts/nanda-feedback .nanda/search.json --decision reject --note "false shortcut" --out .nanda/reject.json
 scripts/nanda-index memory.json .nanda/reject.json --out .nanda/index-with-negative-lanes.json
 scripts/nanda-eval --suite examples/eval-corpus.json
@@ -164,7 +165,8 @@ was useful. It writes an accept/reject/WATCH memory trace that can be kept next
 to the task index. Reject feedback emits `negative_shortcuts`; include that
 feedback JSON in `nanda-index` to suppress the same false shortcut later.
 Use `nanda-probe` before claiming that destructive interference helped. It
-compares plain search with negative-lane search. Treat `IMPROVED` as usable
+compares plain search with negative-lane search. Use `nanda probe --suite`
+before changing probe or negative-lane behavior. Treat `IMPROVED` as usable
 evidence, `SHIFTED_TO_REVIEW` as "the shortcut moved but support still needs
 inspection", and `UNCHANGED` as no proven benefit.
 Use `nanda-eval` before trusting a changed interference rule. It checks expected

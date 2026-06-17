@@ -234,7 +234,9 @@ struct SearchArgs {
 
 #[derive(Parser)]
 struct ProbeArgs {
-    input: PathBuf,
+    input: Option<PathBuf>,
+    #[arg(long)]
+    suite: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "auto")]
     input_format: InputFormat,
     #[arg(long = "negative")]
@@ -567,6 +569,31 @@ struct WawSuite {
     name: String,
     #[serde(default)]
     cases: Vec<WawSuiteCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ProbeSuite {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    cases: Vec<ProbeSuiteCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ProbeSuiteCase {
+    #[serde(default)]
+    id: String,
+    path: PathBuf,
+    #[serde(default)]
+    negative: Vec<PathBuf>,
+    #[serde(default)]
+    expected_decision: String,
+    #[serde(default)]
+    expected_plain_peak: String,
+    #[serde(default)]
+    expected_negative_peak: String,
+    #[serde(default)]
+    group_by: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -2387,50 +2414,95 @@ fn search_cmd(args: SearchArgs) -> Result<u8> {
 }
 
 fn probe_cmd(args: ProbeArgs) -> Result<u8> {
-    let mut packet = load_packet_auto(
-        &args.input,
+    if let Some(suite_path) = &args.suite {
+        return probe_suite_cmd(&args, suite_path);
+    }
+    let input = args
+        .input
+        .as_ref()
+        .ok_or_else(|| anyhow!("nanda probe requires an input path or --suite"))?;
+    let out = run_probe_once(
+        input,
         &args.input_format,
+        &args.negative_inputs,
         &args.task_id,
         &args.domain,
         &args.query,
+        args.query_file.as_ref(),
+        &args.query_format,
+        args.top_k,
+        args.route_cap,
+        args.route_triad_cap,
+        &args.group_by,
         args.normalize_paths,
     )?;
-    let mut negative_shortcuts = if args.negative_inputs.is_empty() {
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_probe_text(&out),
+        OutputFormat::Md => print_probe_md(&out),
+    }
+    Ok(EXIT_PASS)
+}
+
+fn run_probe_once(
+    input: &Path,
+    input_format: &InputFormat,
+    negative_inputs: &[PathBuf],
+    task_id: &str,
+    domain: &str,
+    query_arg: &str,
+    query_file: Option<&PathBuf>,
+    query_format: &InputFormat,
+    top_k: usize,
+    route_cap: usize,
+    route_triad_cap: usize,
+    group_by: &PeakGroupBy,
+    normalize_paths: bool,
+) -> Result<Value> {
+    let mut packet = load_packet_auto(
+        input,
+        input_format,
+        task_id,
+        domain,
+        query_arg,
+        normalize_paths,
+    )?;
+    let mut negative_shortcuts = if negative_inputs.is_empty() {
         packet.negative_shortcuts.clone()
     } else {
         vec![]
     };
-    for input in &args.negative_inputs {
-        if let Some(shortcuts) = load_feedback_negative_shortcuts(input)? {
+    for negative_input in negative_inputs {
+        if let Some(shortcuts) = load_feedback_negative_shortcuts(negative_input)? {
             negative_shortcuts.extend(shortcuts);
             continue;
         }
         let negative_packet = load_packet_auto(
-            input,
-            &args.input_format,
-            &args.task_id,
-            &args.domain,
-            &args.query,
-            args.normalize_paths,
+            negative_input,
+            input_format,
+            task_id,
+            domain,
+            query_arg,
+            normalize_paths,
         )?;
         negative_shortcuts.extend(negative_packet.negative_shortcuts);
     }
     negative_shortcuts = merge_negative_shortcuts(negative_shortcuts);
 
-    let query_packet = if let Some(query_file) = &args.query_file {
+    let query_packet = if let Some(query_file) = query_file {
         load_packet_auto(
             query_file,
-            &args.query_format,
-            &args.task_id,
-            &args.domain,
-            &args.query,
-            args.normalize_paths,
+            query_format,
+            task_id,
+            domain,
+            query_arg,
+            normalize_paths,
         )?
     } else {
         packet.clone()
     };
-    let query_text = if !args.query.trim().is_empty() {
-        args.query.clone()
+    let query_text = if !query_arg.trim().is_empty() {
+        query_arg.to_string()
     } else if !query_packet.query.trim().is_empty() {
         query_packet.query.clone()
     } else {
@@ -2439,7 +2511,7 @@ fn probe_cmd(args: ProbeArgs) -> Result<u8> {
     packet.query = query_text.clone();
     let (query, query_source) = search_query_triads(&query_packet, &query_text);
     let memory = normalize_ids(packet.triads.clone(), "m");
-    let focus = route_balanced_focus(&memory, &query, args.route_cap, args.route_triad_cap);
+    let focus = route_balanced_focus(&memory, &query, route_cap, route_triad_cap);
 
     let mut plain_packet = packet.clone();
     plain_packet.negative_shortcuts.clear();
@@ -2447,8 +2519,8 @@ fn probe_cmd(args: ProbeArgs) -> Result<u8> {
         &plain_packet,
         &focus.memory,
         &query,
-        args.top_k,
-        &args.group_by,
+        top_k,
+        group_by,
         query_source,
         focus.metadata.clone(),
     );
@@ -2459,19 +2531,106 @@ fn probe_cmd(args: ProbeArgs) -> Result<u8> {
         &negative_packet,
         &focus.memory,
         &query,
-        args.top_k,
-        &args.group_by,
+        top_k,
+        group_by,
         query_source,
         focus.metadata,
     );
 
-    let out = probe_report(&plain, &negative, negative_shortcuts.len());
+    Ok(probe_report(&plain, &negative, negative_shortcuts.len()))
+}
+
+fn probe_suite_cmd(args: &ProbeArgs, suite_path: &Path) -> Result<u8> {
+    let text =
+        fs::read_to_string(suite_path).with_context(|| format!("read {}", suite_path.display()))?;
+    let suite: ProbeSuite =
+        serde_json::from_str(&text).with_context(|| format!("parse {}", suite_path.display()))?;
+    if suite.cases.is_empty() {
+        return Err(anyhow!("nanda probe --suite requires at least one case"));
+    }
+    let base = suite_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut rows = vec![];
+    let mut passed = 0usize;
+    for case in &suite.cases {
+        let path = resolve_suite_path(base, &case.path);
+        let negative_inputs = case
+            .negative
+            .iter()
+            .map(|path| resolve_suite_path(base, path))
+            .collect::<Vec<_>>();
+        let group_by = match case.group_by.as_str() {
+            "" => args.group_by.clone(),
+            "group" => PeakGroupBy::Group,
+            "route" => PeakGroupBy::Route,
+            other => return Err(anyhow!("unsupported probe suite group_by: {other}")),
+        };
+        let result = run_probe_once(
+            &path,
+            &args.input_format,
+            &negative_inputs,
+            &args.task_id,
+            &args.domain,
+            &args.query,
+            args.query_file.as_ref(),
+            &args.query_format,
+            args.top_k,
+            args.route_cap,
+            args.route_triad_cap,
+            &group_by,
+            args.normalize_paths,
+        )?;
+        let decision_ok = case.expected_decision.is_empty()
+            || result["decision"].as_str() == Some(&case.expected_decision);
+        let plain_ok = case.expected_plain_peak.is_empty()
+            || result["plain"]["top_peak"].as_str() == Some(&case.expected_plain_peak);
+        let negative_ok = case.expected_negative_peak.is_empty()
+            || result["negative"]["top_peak"].as_str() == Some(&case.expected_negative_peak);
+        let ok = decision_ok && plain_ok && negative_ok;
+        if ok {
+            passed += 1;
+        }
+        rows.push(json!({
+            "id": if case.id.is_empty() { path.display().to_string() } else { case.id.clone() },
+            "path": path.display().to_string(),
+            "expected_decision": case.expected_decision,
+            "actual_decision": result["decision"],
+            "expected_plain_peak": case.expected_plain_peak,
+            "actual_plain_peak": result["plain"]["top_peak"],
+            "expected_negative_peak": case.expected_negative_peak,
+            "actual_negative_peak": result["negative"]["top_peak"],
+            "ok": ok,
+            "delta": result["delta"],
+            "recommended_action": result["recommended_action"]
+        }));
+    }
+    let out = json!({
+        "core_version": CORE_VERSION,
+        "wave_dim": WAVE_DIM,
+        "mode": "probe-suite",
+        "name": suite.name,
+        "passed": passed,
+        "total": rows.len(),
+        "accuracy": round4(passed as f64 / rows.len().max(1) as f64),
+        "cases": rows
+    });
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
-        OutputFormat::Text => print_probe_text(&out),
-        OutputFormat::Md => print_probe_md(&out),
+        OutputFormat::Text => print_probe_suite_text(&out),
+        OutputFormat::Md => print_probe_suite_md(&out),
     }
-    Ok(EXIT_PASS)
+    if passed == out["total"].as_u64().unwrap_or(0) as usize {
+        Ok(EXIT_PASS)
+    } else {
+        Ok(EXIT_VETO)
+    }
+}
+
+fn resolve_suite_path(base: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        base.join(path)
+    }
 }
 
 fn dataset_doctor_cmd(args: DatasetDoctorArgs) -> Result<u8> {
@@ -6268,6 +6427,34 @@ fn print_probe_text(out: &Value) {
     );
 }
 
+fn print_probe_suite_text(out: &Value) {
+    println!(
+        "core_version: {}",
+        out["core_version"].as_str().unwrap_or("")
+    );
+    println!("mode: {}", out["mode"].as_str().unwrap_or("probe-suite"));
+    println!(
+        "passed: {}/{}",
+        out["passed"].as_u64().unwrap_or(0),
+        out["total"].as_u64().unwrap_or(0)
+    );
+    if let Some(cases) = out["cases"].as_array() {
+        for case in cases {
+            println!(
+                "- {}: {} plain={} negative={}",
+                case["id"].as_str().unwrap_or(""),
+                if case["ok"].as_bool().unwrap_or(false) {
+                    "ok"
+                } else {
+                    "fail"
+                },
+                case["actual_plain_peak"].as_str().unwrap_or(""),
+                case["actual_negative_peak"].as_str().unwrap_or("")
+            );
+        }
+    }
+}
+
 fn print_search_md(out: &Value) {
     println!("# NANDA Interference Search\n");
     println!(
@@ -6338,6 +6525,34 @@ fn print_probe_md(out: &Value) {
         out["delta"]["score_delta"].as_f64().unwrap_or(0.0),
         out["delta"]["suppression_count"].as_u64().unwrap_or(0)
     );
+}
+
+fn print_probe_suite_md(out: &Value) {
+    println!("# NANDA Probe Suite\n");
+    println!(
+        "- core_version: `{}`",
+        out["core_version"].as_str().unwrap_or("")
+    );
+    println!(
+        "- passed: `{}/{}`",
+        out["passed"].as_u64().unwrap_or(0),
+        out["total"].as_u64().unwrap_or(0)
+    );
+    if let Some(cases) = out["cases"].as_array() {
+        for case in cases {
+            println!(
+                "- `{}`: `{}` plain `{}` negative `{}`",
+                case["id"].as_str().unwrap_or(""),
+                if case["ok"].as_bool().unwrap_or(false) {
+                    "ok"
+                } else {
+                    "fail"
+                },
+                case["actual_plain_peak"].as_str().unwrap_or(""),
+                case["actual_negative_peak"].as_str().unwrap_or("")
+            );
+        }
+    }
 }
 
 fn print_dogfood_text(out: &Value) {

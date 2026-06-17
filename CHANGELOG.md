@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.5.1 - 2026-06-17
+
+Probe-suite completion release.
+
+### Added
+
+- `nanda probe --suite` for regression suites of probe decisions.
+- Probe corpus fixture covering `SHIFTED_TO_REVIEW`, `UNCHANGED`, grouped
+  negative-lane suppression, and external negative-lane input.
+- Linux and Windows CI smoke coverage for `nanda probe --suite`.
+
+### Changed
+
+- Cargo package version is now `2.5.1`.
+- Core version remains `sparse-triad-v2.5-probe-report`.
+
 ## v2.5.0 - 2026-06-17
 
 Probe-report release.
@@ -7,10 +23,13 @@ Probe-report release.
 ### Added
 
 - `nanda probe` and `nanda-probe` wrapper for before/after search checks.
+- `nanda probe --suite` for regression suites of probe decisions.
 - Probe output compares plain search with negative-lane search and reports
   `plain`, `negative`, `delta`, `decision`, and `recommended_action`.
 - `SHIFTED_TO_REVIEW` decision for cases where destructive interference moves
   the top peak but the new field is still not safe to answer from.
+- Probe corpus fixture covering `SHIFTED_TO_REVIEW`, `UNCHANGED`, grouped
+  negative-lane suppression, and external negative-lane input.
 - Linux and Windows CI smoke coverage for probe reports.
 
 ### Changed

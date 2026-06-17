@@ -49,6 +49,7 @@ jq empty "$root/examples/triad-packet.polarization-role-swap.json"
 jq empty "$root/examples/triad-packet.polarization-reversed-stop.json"
 jq empty "$root/examples/triad-packet.route-balanced-focus.json"
 jq empty "$root/examples/eval-corpus.json"
+jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"
 
 pass_json="$("$checker" --triads "$root/examples/triad-packet.example.json" --format json)"
@@ -355,6 +356,8 @@ jq -e '.plain.top_peak == "customs" and .negative.top_peak == "certification"' <
 jq -e '.delta.top_changed == true and .delta.suppression_count == 1' <<<"$probe_json" >/dev/null
 probe_external_json="$("$probe" "$root/examples/triad-packet.negative-shortcut-base.json" --input-format json --negative "$root/examples/triad-packet.negative-shortcut-lanes.json" --top-k 3)"
 jq -e '.decision == "SHIFTED_TO_REVIEW" and .plain.top_peak == "customs" and .negative.top_peak == "certification"' <<<"$probe_external_json" >/dev/null
+probe_suite_json="$("$probe" --suite "$root/examples/probe-corpus.json" --input-format json --top-k 3)"
+jq -e '.mode == "probe-suite" and .passed == 4 and .total == 4 and .accuracy == 1' <<<"$probe_suite_json" >/dev/null
 tmp_negative_search="$(mktemp)"
 tmp_negative_feedback="$(mktemp)"
 tmp_negative_index="$(mktemp)"

@@ -214,6 +214,7 @@ nanda-search examples/triad-packet.route-balanced-focus.json --input-format json
 nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
 nanda-search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
 nanda-probe examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
+nanda-probe --suite examples/probe-corpus.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 > .nanda/search.json
 nanda-feedback .nanda/search.json --decision accept --note "accepted focused peak"
 nanda-eval --case examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED --case examples/triad-packet.interference-search-noisy.json:certification:WATCH
@@ -283,9 +284,9 @@ peak was accepted, rejected, or kept under WATCH, together with margin, support
 ids, anti ids, and a compact memory patch. Reject feedback emits
 `negative_shortcuts`, which `nanda-index` can carry into future search.
 `nanda-probe` compares the same search before and after negative lanes. Use it
-before claiming destructive interference helped. `SHIFTED_TO_REVIEW` means the
-false shortcut moved, but the replacement peak is still a review target rather
-than a final answer.
+before claiming destructive interference helped. `nanda probe --suite` runs a
+probe regression corpus. `SHIFTED_TO_REVIEW` means the false shortcut moved,
+but the replacement peak is still a review target rather than a final answer.
 `nanda-eval` is the regression surface. It checks expected peak/state pairs
 from `--case` or `--suite`, so interference changes are measured before they
 are trusted.
@@ -471,7 +472,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v2.5.0`.
+Current release: `v2.5.1`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -486,6 +487,7 @@ nanda-waw --suite examples/waw-corpus.json
 nanda-dataset-doctor examples/triad-packet.dataset-noise.json --input-format json --route-cap 8 || test "$?" -eq 3
 nanda-search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 nanda-probe examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
+nanda-probe --suite examples/probe-corpus.json --input-format json --top-k 3
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
