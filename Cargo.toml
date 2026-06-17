@@ -5,6 +5,8 @@ edition = "2021"
 license = "MIT"
 description = "Sparse-triad structural gate for agent relation checks"
 readme = "README.md"
+repository = "https://github.com/radislabus-star/nanda-structural-gate-skill"
+homepage = "https://github.com/radislabus-star/nanda-structural-gate-skill"
 keywords = ["agent", "structural", "retrieval", "vsa", "codex"]
 categories = ["command-line-utilities", "development-tools"]
 
