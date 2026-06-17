@@ -331,6 +331,10 @@ jq -e '.projection.summary.nonzero > 0 and .projection.summary.energy > 0' <<<"$
 jq -e '.projection.sample | length == 8' <<<"$pack6m_json" >/dev/null
 jq -e '.centroids.record_bytes == 1024 and .centroids.route_count == 4 and .centroids.group_count == 4' <<<"$pack6m_json" >/dev/null
 jq -e '.centroids.total_count == 8 and .centroids.route[0].summary.energy > 0' <<<"$pack6m_json" >/dev/null
+jq -e '.centroids.route[0].score.cosine > 0' <<<"$pack6m_json" >/dev/null
+jq -e '.peaks.mode == "packed-query-vs-centroid-cosine"' <<<"$pack6m_json" >/dev/null
+jq -e '.peaks.route.state == "PEAK_FOUND" and .peaks.route.top_score > 0 and .peaks.route.margin >= 0' <<<"$pack6m_json" >/dev/null
+jq -e '.peaks.group.state == "PEAK_FOUND" and .peaks.group.top_score > 0 and .peaks.group.margin >= 0' <<<"$pack6m_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null

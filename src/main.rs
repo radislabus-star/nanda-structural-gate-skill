@@ -3202,8 +3202,12 @@ fn nanda_6m_pack_report(
 
     let projection = nanda_6m::project_triads(&packed);
     let projection_summary = projection.summary();
-    let route_centroids = packed_centroid_report(&packed, CentroidAxis6m::Route, sample);
-    let group_centroids = packed_centroid_report(&packed, CentroidAxis6m::Group, sample);
+    let route_centroids =
+        packed_centroid_report(&packed, &projection, CentroidAxis6m::Route, sample);
+    let group_centroids =
+        packed_centroid_report(&packed, &projection, CentroidAxis6m::Group, sample);
+    let route_peak = packed_peak_summary(&route_centroids);
+    let group_peak = packed_peak_summary(&group_centroids);
     let dictionary_ok = blockers.is_empty()
         && relations.len() <= u16::MAX as usize
         && routes.len() <= u16::MAX as usize
@@ -3248,6 +3252,11 @@ fn nanda_6m_pack_report(
             "route": route_centroids,
             "group": group_centroids
         },
+        "peaks": {
+            "mode": "packed-query-vs-centroid-cosine",
+            "route": route_peak,
+            "group": group_peak
+        },
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
             "relations": dictionary_summary(&relations, u16::MAX as usize),
@@ -3269,6 +3278,7 @@ enum CentroidAxis6m {
 
 fn packed_centroid_report(
     packed: &[nanda_6m::PackedTriad32],
+    query: &nanda_6m::PackedWave1024,
     axis: CentroidAxis6m,
     sample: usize,
 ) -> Vec<Value> {
@@ -3280,15 +3290,21 @@ fn packed_centroid_report(
         };
         by_id.entry(id).or_default().push(*triad);
     }
-    by_id
+    let mut rows = by_id
         .iter()
-        .take(sample)
         .map(|(id, triads)| {
             let centroid = nanda_6m::centroid_from_triads(triads);
             let summary = centroid.summary();
+            let score = nanda_6m::score_centroid(query, &centroid);
             json!({
                 "id": id,
                 "triads": triads.len(),
+                "score": {
+                    "cosine": round4(score.cosine),
+                    "dot": score.dot,
+                    "query_energy": score.query_energy,
+                    "centroid_energy": score.centroid_energy
+                },
                 "summary": {
                     "l1": summary.l1,
                     "energy": summary.energy,
@@ -3298,7 +3314,35 @@ fn packed_centroid_report(
                 "sample": centroid.values.iter().take(8).copied().collect::<Vec<_>>()
             })
         })
-        .collect()
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["score"]["cosine"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"]["cosine"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    rows.truncate(sample);
+    rows
+}
+
+fn packed_peak_summary(rows: &[Value]) -> Value {
+    let top = rows.first();
+    let second = rows.get(1);
+    let top_score = top
+        .and_then(|item| item["score"]["cosine"].as_f64())
+        .unwrap_or(0.0);
+    let second_score = second
+        .and_then(|item| item["score"]["cosine"].as_f64())
+        .unwrap_or(0.0);
+    json!({
+        "top_id": top.and_then(|item| item["id"].as_u64()).unwrap_or(0),
+        "top_score": round4(top_score),
+        "second_id": second.and_then(|item| item["id"].as_u64()).unwrap_or(0),
+        "second_score": round4(second_score),
+        "margin": round4(top_score - second_score),
+        "state": if top_score > 0.0 { "PEAK_FOUND" } else { "NO_PEAK" }
+    })
 }
 
 #[derive(Default)]
@@ -3493,6 +3537,13 @@ fn print_pack6m_text(out: &Value) {
         out["centroids"]["group_count"].as_u64().unwrap_or(0)
     );
     println!(
+        "peaks: route {} score {} / group {} score {}",
+        out["peaks"]["route"]["top_id"].as_u64().unwrap_or(0),
+        out["peaks"]["route"]["top_score"].as_f64().unwrap_or(0.0),
+        out["peaks"]["group"]["top_id"].as_u64().unwrap_or(0),
+        out["peaks"]["group"]["top_score"].as_f64().unwrap_or(0.0)
+    );
+    println!(
         "budget: {} / {}",
         out["budget"]["estimated_hot_bytes"].as_u64().unwrap_or(0),
         out["budget"]["hard_budget_bytes"].as_u64().unwrap_or(0)
@@ -3522,6 +3573,11 @@ fn print_pack6m_md(out: &Value) {
         "- centroids: route `{}` / group `{}`",
         out["centroids"]["route_count"].as_u64().unwrap_or(0),
         out["centroids"]["group_count"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- route_peak: `{}` / score `{}`",
+        out["peaks"]["route"]["top_id"].as_u64().unwrap_or(0),
+        out["peaks"]["route"]["top_score"].as_f64().unwrap_or(0.0)
     );
     println!(
         "- budget: `{}/{}`",

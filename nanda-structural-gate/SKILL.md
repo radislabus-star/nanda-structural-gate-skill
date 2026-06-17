@@ -152,7 +152,8 @@ means the packet fits the 6 MiB packed layout; `FOCUS_REQUIRED`,
 Use `nanda-pack6m` when you need to verify the cold-to-hot bridge. It produces
 deterministic dictionaries, sample `PackedTriad32` records, and a fixed
 1024-dimensional packed projection summary with first route/group centroids,
-but it still does not execute packed interference search.
+including a first packed query-vs-centroid peak score. It still does not
+execute full packed interference search.
 Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with

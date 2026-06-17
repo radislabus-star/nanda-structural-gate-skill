@@ -136,6 +136,28 @@ impl PackedCentroid1024 {
     }
 }
 
+impl PackedWave1024 {
+    pub fn score_centroid(&self, centroid: &PackedCentroid1024) -> PeakScore {
+        let mut dot: i64 = 0;
+        let mut query_energy: i64 = 0;
+        let mut centroid_energy: i64 = 0;
+        for (query, center) in self.values.iter().zip(centroid.values.iter()) {
+            let query = i64::from(*query);
+            let center = i64::from(*center);
+            dot += query * center;
+            query_energy += query * query;
+            centroid_energy += center * center;
+        }
+        let denom = ((query_energy as f64).sqrt() * (centroid_energy as f64).sqrt()).max(1.0);
+        PeakScore {
+            dot,
+            query_energy,
+            centroid_energy,
+            cosine: dot as f64 / denom,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PackedLane64 {
@@ -255,6 +277,14 @@ pub struct CentroidSummary {
     pub max_abs: i8,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PeakScore {
+    pub dot: i64,
+    pub query_energy: i64,
+    pub centroid_energy: i64,
+    pub cosine: f64,
+}
+
 pub fn project_triads(triads: &[PackedTriad32]) -> PackedWave1024 {
     PackedWave1024::from_triads(triads)
 }
@@ -262,6 +292,10 @@ pub fn project_triads(triads: &[PackedTriad32]) -> PackedWave1024 {
 pub fn centroid_from_triads(triads: &[PackedTriad32]) -> PackedCentroid1024 {
     let wave = project_triads(triads);
     PackedCentroid1024::from_wave(&wave, triads.len())
+}
+
+pub fn score_centroid(query: &PackedWave1024, centroid: &PackedCentroid1024) -> PeakScore {
+    query.score_centroid(centroid)
 }
 
 fn projection_seed(triad: &PackedTriad32) -> u64 {
@@ -395,5 +429,46 @@ mod tests {
         assert!(summary.nonzero > 0);
         assert!(summary.energy > 0);
         assert!(summary.max_abs > 0);
+    }
+
+    #[test]
+    fn packed_peak_score_prefers_matching_centroid() {
+        let triad_a = PackedTriad32::new(PackedTriadInput {
+            subject_id: 1,
+            object_id: 2,
+            evidence_ref: 3,
+            wave_seed: 4,
+            relation_id: 5,
+            route_id: 6,
+            group_id: 7,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 9,
+        });
+        let triad_b = PackedTriad32::new(PackedTriadInput {
+            subject_id: 100,
+            object_id: 200,
+            evidence_ref: 300,
+            wave_seed: 400,
+            relation_id: 50,
+            route_id: 60,
+            group_id: 70,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 80,
+            confidence: 230,
+            polarity: 9,
+        });
+        let query = project_triads(&[triad_a]);
+        let matching = centroid_from_triads(&[triad_a]);
+        let foreign = centroid_from_triads(&[triad_b]);
+        let matching_score = score_centroid(&query, &matching);
+        let foreign_score = score_centroid(&query, &foreign);
+        assert!(matching_score.cosine > foreign_score.cosine);
+        assert!(matching_score.cosine > 0.5);
     }
 }
