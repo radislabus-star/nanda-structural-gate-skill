@@ -14,6 +14,11 @@ The current version includes a small deterministic Rust V0 checker. It is not
 a full NANDA runtime yet, but it can already compare source triads against
 candidate triads and return `PASS`, `WATCH`, or `VETO`.
 
+For the planned cache-resident runtime, see
+[`ARCHITECTURE_NANDA_6M.md`](ARCHITECTURE_NANDA_6M.md). NANDA-6M is specified
+as a separate 6 MiB packed hot core, not as another command bolted onto the
+current dynamic reference engine.
+
 ## Why
 
 LLMs can read individual facts correctly and still confuse the relation shape:
