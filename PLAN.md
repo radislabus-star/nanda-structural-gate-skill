@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v2.4-rust
-core_version: sparse-triad-v2.4-local-negative-lanes
+engine: nanda-check sparse-triad-v2.5-rust
+core_version: sparse-triad-v2.5-probe-report
 ```
 
 ## Build Order
@@ -68,6 +68,8 @@ core_version: sparse-triad-v2.4-local-negative-lanes
     signals into explicit agent actions before drafting.
 37. Add local negative lanes. Done in `v2.4`: destructive interference matches
     route/group/support shape and search exposes top-level verdict fields.
+38. Add probe report. Done in `v2.5`: compare plain search against negative-lane
+    search before claiming destructive interference improved the result.
 
 ## Engineering Constraints
 

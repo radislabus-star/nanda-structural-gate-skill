@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.5.0 - 2026-06-17
+
+Probe-report release.
+
+### Added
+
+- `nanda probe` and `nanda-probe` wrapper for before/after search checks.
+- Probe output compares plain search with negative-lane search and reports
+  `plain`, `negative`, `delta`, `decision`, and `recommended_action`.
+- `SHIFTED_TO_REVIEW` decision for cases where destructive interference moves
+  the top peak but the new field is still not safe to answer from.
+- Linux and Windows CI smoke coverage for probe reports.
+
+### Changed
+
+- Core version is now `sparse-triad-v2.5-probe-report`.
+- Cargo package version is now `2.5.0`.
+
 ## v2.4.0 - 2026-06-17
 
 Local destructive-interference release.

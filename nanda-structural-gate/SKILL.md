@@ -101,6 +101,7 @@ scripts/nanda-search .nanda/index.json --input-format json --query "lower operat
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
+scripts/nanda-probe examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 scripts/nanda-feedback .nanda/search.json --decision reject --note "false shortcut" --out .nanda/reject.json
 scripts/nanda-index memory.json .nanda/reject.json --out .nanda/index-with-negative-lanes.json
 scripts/nanda-eval --suite examples/eval-corpus.json
@@ -115,7 +116,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v2.4-local-negative-lanes`, prefer `foreign_pull` when deciding what to
+In `v2.5-probe-report`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-dogfood .` inside a repository that has
@@ -162,6 +163,10 @@ Use `nanda-feedback` after search when the agent has decided whether the peak
 was useful. It writes an accept/reject/WATCH memory trace that can be kept next
 to the task index. Reject feedback emits `negative_shortcuts`; include that
 feedback JSON in `nanda-index` to suppress the same false shortcut later.
+Use `nanda-probe` before claiming that destructive interference helped. It
+compares plain search with negative-lane search. Treat `IMPROVED` as usable
+evidence, `SHIFTED_TO_REVIEW` as "the shortcut moved but support still needs
+inspection", and `UNCHANGED` as no proven benefit.
 Use `nanda-eval` before trusting a changed interference rule. It checks expected
 peak/state pairs from `--case` or `--suite` and exits non-zero on regression.
 Use `nanda-waw` before claiming WAW behavior. It requires the structural peak
@@ -184,7 +189,7 @@ it names corpus-level noise such as route imbalance, hub dominance,
 duplicate-current facts, and weak query activation.
 Check `destructive_interference` after search when negative lanes exist: it
 lists which peak was suppressed, penalty, match ratio, preferred peak, and
-reason. In v2.4, negative lanes are route/group/support aware: a route-level
+reason. Negative lanes are route/group/support aware: a route-level
 lane can suppress a grouped peak, but support terms keep suppression local to
 the rejected reading shape. Repeated reject feedback is learned by
 `nanda-index`: duplicate negative shortcuts accumulate `rejected_count` and
@@ -244,6 +249,7 @@ scripts/nanda-dataset-doctor .nanda/index.json --input-format json
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --route-cap 256 --route-triad-cap 32 --top-k 5
 scripts/nanda-feedback .nanda/search.json --decision reject --note "false shortcut" --out .nanda/reject.json
 scripts/nanda-index code-flow.json .nanda/reject.json --input-format json --out .nanda/index-with-negative-lanes.json
+scripts/nanda-probe .nanda/index-with-negative-lanes.json --input-format json --top-k 5
 scripts/nanda-eval --suite examples/eval-corpus.json
 scripts/nanda-waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | scripts/nanda-serve
@@ -268,7 +274,7 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v2.4 indexed route finder: use its top-level
+- `nanda-search` is the v2.5 indexed route finder: use its top-level
   `verdict`, `field_state`, `safe_to_answer`, and `top_peak` as the agent
   decision contract; use its top peak as a structural
   candidate route, then verify evidence before final prose.

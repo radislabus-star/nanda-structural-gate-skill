@@ -17,6 +17,7 @@ waw="$root/nanda-structural-gate/scripts/nanda-waw"
 feedback="$root/nanda-structural-gate/scripts/nanda-feedback"
 indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
+probe="$root/nanda-structural-gate/scripts/nanda-probe"
 dataset_doctor="$root/nanda-structural-gate/scripts/nanda-dataset-doctor"
 serve="$root/nanda-structural-gate/scripts/nanda-serve"
 dogfood="$root/nanda-structural-gate/scripts/nanda-dogfood"
@@ -148,7 +149,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v2.4-local-negative-lanes"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v2.5-probe-report"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -348,6 +349,12 @@ jq -e '.top_peak == "certification-route"' <<<"$negative_lanes_group_json" >/dev
 jq -e '.destructive_interference.applied == true' <<<"$negative_lanes_group_json" >/dev/null
 jq -e '.destructive_interference.suppressions[0].suppressed_peak == "customs-shortcut"' <<<"$negative_lanes_group_json" >/dev/null
 jq -e '.destructive_interference.suppressions[0].suppress_peak == "customs-shortcut"' <<<"$negative_lanes_group_json" >/dev/null
+probe_json="$("$probe" "$root/examples/triad-packet.negative-shortcut-lanes.json" --input-format json --top-k 3)"
+jq -e '.mode == "probe-report" and .decision == "SHIFTED_TO_REVIEW"' <<<"$probe_json" >/dev/null
+jq -e '.plain.top_peak == "customs" and .negative.top_peak == "certification"' <<<"$probe_json" >/dev/null
+jq -e '.delta.top_changed == true and .delta.suppression_count == 1' <<<"$probe_json" >/dev/null
+probe_external_json="$("$probe" "$root/examples/triad-packet.negative-shortcut-base.json" --input-format json --negative "$root/examples/triad-packet.negative-shortcut-lanes.json" --top-k 3)"
+jq -e '.decision == "SHIFTED_TO_REVIEW" and .plain.top_peak == "customs" and .negative.top_peak == "certification"' <<<"$probe_external_json" >/dev/null
 tmp_negative_search="$(mktemp)"
 tmp_negative_feedback="$(mktemp)"
 tmp_negative_index="$(mktemp)"
@@ -452,6 +459,7 @@ fi
 "$extractor" --help | grep -q "Usage: nanda extract"
 "$indexer" --help | grep -q "Usage: nanda index"
 "$search" --help | grep -q "Usage: nanda search"
+"$probe" --help | grep -q "Usage: nanda probe"
 "$serve" --help | grep -q "Usage: nanda serve"
 "$dogfood" --help | grep -q "Usage: nanda dogfood"
 "$split_packet" --help | grep -q "Usage: nanda split"

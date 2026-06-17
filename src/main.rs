@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.4-local-negative-lanes";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.4-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.5-probe-report";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.5-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -40,6 +40,7 @@ enum Command {
     Extract(ExtractArgs),
     Index(IndexArgs),
     Search(SearchArgs),
+    Probe(ProbeArgs),
     DatasetDoctor(DatasetDoctorArgs),
     Feedback(FeedbackArgs),
     Eval(EvalArgs),
@@ -208,6 +209,37 @@ struct SearchArgs {
     #[arg(long, value_enum, default_value = "auto")]
     input_format: InputFormat,
     #[arg(long, default_value = "search")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long)]
+    query_file: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "auto")]
+    query_format: InputFormat,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, default_value_t = 256)]
+    route_cap: usize,
+    #[arg(long, default_value_t = 32)]
+    route_triad_cap: usize,
+    #[arg(long, value_enum, default_value = "route")]
+    group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct ProbeArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long = "negative")]
+    negative_inputs: Vec<PathBuf>,
+    #[arg(long, default_value = "probe")]
     task_id: String,
     #[arg(long, default_value = "general")]
     domain: String,
@@ -622,6 +654,7 @@ fn run() -> Result<u8> {
         Command::Extract(args) => extract_cmd(args),
         Command::Index(args) => index_cmd(args),
         Command::Search(args) => search_cmd(args),
+        Command::Probe(args) => probe_cmd(args),
         Command::DatasetDoctor(args) => dataset_doctor_cmd(args),
         Command::Feedback(args) => feedback_cmd(args),
         Command::Eval(args) => eval_cmd(args),
@@ -2353,6 +2386,94 @@ fn search_cmd(args: SearchArgs) -> Result<u8> {
     Ok(EXIT_PASS)
 }
 
+fn probe_cmd(args: ProbeArgs) -> Result<u8> {
+    let mut packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.query,
+        args.normalize_paths,
+    )?;
+    let mut negative_shortcuts = if args.negative_inputs.is_empty() {
+        packet.negative_shortcuts.clone()
+    } else {
+        vec![]
+    };
+    for input in &args.negative_inputs {
+        if let Some(shortcuts) = load_feedback_negative_shortcuts(input)? {
+            negative_shortcuts.extend(shortcuts);
+            continue;
+        }
+        let negative_packet = load_packet_auto(
+            input,
+            &args.input_format,
+            &args.task_id,
+            &args.domain,
+            &args.query,
+            args.normalize_paths,
+        )?;
+        negative_shortcuts.extend(negative_packet.negative_shortcuts);
+    }
+    negative_shortcuts = merge_negative_shortcuts(negative_shortcuts);
+
+    let query_packet = if let Some(query_file) = &args.query_file {
+        load_packet_auto(
+            query_file,
+            &args.query_format,
+            &args.task_id,
+            &args.domain,
+            &args.query,
+            args.normalize_paths,
+        )?
+    } else {
+        packet.clone()
+    };
+    let query_text = if !args.query.trim().is_empty() {
+        args.query.clone()
+    } else if !query_packet.query.trim().is_empty() {
+        query_packet.query.clone()
+    } else {
+        packet.query.clone()
+    };
+    packet.query = query_text.clone();
+    let (query, query_source) = search_query_triads(&query_packet, &query_text);
+    let memory = normalize_ids(packet.triads.clone(), "m");
+    let focus = route_balanced_focus(&memory, &query, args.route_cap, args.route_triad_cap);
+
+    let mut plain_packet = packet.clone();
+    plain_packet.negative_shortcuts.clear();
+    let plain = interference_search(
+        &plain_packet,
+        &focus.memory,
+        &query,
+        args.top_k,
+        &args.group_by,
+        query_source,
+        focus.metadata.clone(),
+    );
+
+    let mut negative_packet = packet;
+    negative_packet.negative_shortcuts = negative_shortcuts.clone();
+    let negative = interference_search(
+        &negative_packet,
+        &focus.memory,
+        &query,
+        args.top_k,
+        &args.group_by,
+        query_source,
+        focus.metadata,
+    );
+
+    let out = probe_report(&plain, &negative, negative_shortcuts.len());
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_probe_text(&out),
+        OutputFormat::Md => print_probe_md(&out),
+    }
+    Ok(EXIT_PASS)
+}
+
 fn dataset_doctor_cmd(args: DatasetDoctorArgs) -> Result<u8> {
     let packet = load_packet_auto(
         &args.input,
@@ -2377,6 +2498,93 @@ fn dataset_doctor_cmd(args: DatasetDoctorArgs) -> Result<u8> {
         "WATCH" => EXIT_WATCH,
         _ => EXIT_WATCH,
     })
+}
+
+fn probe_report(plain: &Value, negative: &Value, negative_lanes: usize) -> Value {
+    let plain_top = plain["top_peak"].as_str().unwrap_or("");
+    let negative_top = negative["top_peak"].as_str().unwrap_or("");
+    let plain_score = top_peak_score(plain);
+    let negative_score = top_peak_score(negative);
+    let plain_safe = plain["safe_to_answer"].as_bool().unwrap_or(false);
+    let negative_safe = negative["safe_to_answer"].as_bool().unwrap_or(false);
+    let suppression_count = negative["destructive_interference"]["suppressions"]
+        .as_array()
+        .map(|items| items.len())
+        .unwrap_or(0);
+    let top_changed = plain_top != negative_top;
+    let became_safer = !plain_safe && negative_safe;
+    let used_negative_lane = suppression_count > 0;
+    let (decision, recommended_action) =
+        if used_negative_lane && (became_safer || (top_changed && negative_safe)) {
+            ("IMPROVED", "USE_NEGATIVE_RESULT")
+        } else if used_negative_lane && top_changed {
+            (
+                "SHIFTED_TO_REVIEW",
+                "INSPECT_NEGATIVE_SUPPORT_BEFORE_ANSWER",
+            )
+        } else if used_negative_lane {
+            ("SUPPRESSED_WITHOUT_TOP_CHANGE", "COMPARE_SUPPORT_AND_SCORE")
+        } else if !used_negative_lane && top_changed {
+            ("CHANGED_WITHOUT_SUPPRESSION", "CHECK_INPUTS_OR_ROUTE_FOCUS")
+        } else if plain_safe && !negative_safe {
+            ("REGRESSED", "DO_NOT_USE_NEGATIVE_RESULT")
+        } else {
+            ("UNCHANGED", "NO_PROVEN_NEGATIVE_LANE_BENEFIT")
+        };
+    let legacy_improved = if used_negative_lane && (top_changed || became_safer) {
+        "IMPROVED"
+    } else {
+        "UNCHANGED"
+    };
+    json!({
+        "core_version": CORE_VERSION,
+        "wave_dim": WAVE_DIM,
+        "mode": "probe-report",
+        "decision": decision,
+        "legacy_decision": legacy_improved,
+        "recommended_action": recommended_action,
+        "negative_lanes": negative_lanes,
+        "plain": probe_search_summary(plain),
+        "negative": probe_search_summary(negative),
+        "delta": {
+            "top_changed": top_changed,
+            "verdict_changed": plain["verdict"] != negative["verdict"],
+            "field_state_changed": plain["field_state"] != negative["field_state"],
+            "safe_to_answer_changed": plain["safe_to_answer"] != negative["safe_to_answer"],
+            "score_delta": round4(negative_score - plain_score),
+            "suppression_count": suppression_count,
+            "suppressed_peaks": negative["destructive_interference"]["suppressions"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|item| item["suppressed_peak"].as_str().map(str::to_string))
+                .collect::<Vec<_>>()
+        },
+        "destructive_interference": negative["destructive_interference"].clone(),
+        "read_as": "Probe compares the same search before and after negative lanes. Treat IMPROVED as evidence that destructive interference repaired a shortcut; treat UNCHANGED as no proof of benefit."
+    })
+}
+
+fn probe_search_summary(search: &Value) -> Value {
+    json!({
+        "verdict": search["verdict"],
+        "field_state": search["field_state"],
+        "safe_to_answer": search["safe_to_answer"],
+        "top_peak": search["top_peak"],
+        "top_score": round4(top_peak_score(search)),
+        "peak_margin": search["peak_margin"],
+        "lexical_baseline_top": search["lexical_baseline"]["top_peak"],
+        "wins_over_lexical_baseline": search["wins_over_lexical_baseline"]
+    })
+}
+
+fn top_peak_score(search: &Value) -> f64 {
+    search["peaks"]
+        .as_array()
+        .and_then(|peaks| peaks.first())
+        .and_then(|peak| peak["score"].as_f64())
+        .unwrap_or(0.0)
 }
 
 fn index_cmd(args: IndexArgs) -> Result<u8> {
@@ -6030,6 +6238,36 @@ fn print_search_text(out: &Value) {
     }
 }
 
+fn print_probe_text(out: &Value) {
+    println!(
+        "core_version: {}",
+        out["core_version"].as_str().unwrap_or("")
+    );
+    println!("decision: {}", out["decision"].as_str().unwrap_or(""));
+    println!(
+        "plain: top={} verdict={} field={} safe={} score={}",
+        out["plain"]["top_peak"].as_str().unwrap_or(""),
+        out["plain"]["verdict"].as_str().unwrap_or(""),
+        out["plain"]["field_state"].as_str().unwrap_or(""),
+        out["plain"]["safe_to_answer"].as_bool().unwrap_or(false),
+        out["plain"]["top_score"].as_f64().unwrap_or(0.0)
+    );
+    println!(
+        "negative: top={} verdict={} field={} safe={} score={}",
+        out["negative"]["top_peak"].as_str().unwrap_or(""),
+        out["negative"]["verdict"].as_str().unwrap_or(""),
+        out["negative"]["field_state"].as_str().unwrap_or(""),
+        out["negative"]["safe_to_answer"].as_bool().unwrap_or(false),
+        out["negative"]["top_score"].as_f64().unwrap_or(0.0)
+    );
+    println!(
+        "delta: top_changed={} score_delta={} suppression_count={}",
+        out["delta"]["top_changed"].as_bool().unwrap_or(false),
+        out["delta"]["score_delta"].as_f64().unwrap_or(0.0),
+        out["delta"]["suppression_count"].as_u64().unwrap_or(0)
+    );
+}
+
 fn print_search_md(out: &Value) {
     println!("# NANDA Interference Search\n");
     println!(
@@ -6071,6 +6309,35 @@ fn print_search_md(out: &Value) {
             }
         }
     }
+}
+
+fn print_probe_md(out: &Value) {
+    println!("# NANDA Probe\n");
+    println!(
+        "- core_version: `{}`",
+        out["core_version"].as_str().unwrap_or("")
+    );
+    println!("- decision: `{}`", out["decision"].as_str().unwrap_or(""));
+    println!(
+        "- plain: `{}` / `{}` / safe `{}` / score `{}`",
+        out["plain"]["top_peak"].as_str().unwrap_or(""),
+        out["plain"]["field_state"].as_str().unwrap_or(""),
+        out["plain"]["safe_to_answer"].as_bool().unwrap_or(false),
+        out["plain"]["top_score"].as_f64().unwrap_or(0.0)
+    );
+    println!(
+        "- negative: `{}` / `{}` / safe `{}` / score `{}`",
+        out["negative"]["top_peak"].as_str().unwrap_or(""),
+        out["negative"]["field_state"].as_str().unwrap_or(""),
+        out["negative"]["safe_to_answer"].as_bool().unwrap_or(false),
+        out["negative"]["top_score"].as_f64().unwrap_or(0.0)
+    );
+    println!(
+        "- delta: top_changed `{}` / score_delta `{}` / suppressions `{}`",
+        out["delta"]["top_changed"].as_bool().unwrap_or(false),
+        out["delta"]["score_delta"].as_f64().unwrap_or(0.0),
+        out["delta"]["suppression_count"].as_u64().unwrap_or(0)
+    );
 }
 
 fn print_dogfood_text(out: &Value) {

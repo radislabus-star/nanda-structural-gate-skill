@@ -118,11 +118,11 @@ No secondary scripting runtime is part of the shipped checker surface.
 Current core:
 
 ```text
-core_version: sparse-triad-v2.4-local-negative-lanes
+core_version: sparse-triad-v2.5-probe-report
 wave_dim:     1024
 ```
 
-The `v2.4-local-negative-lanes` core keeps recursive combing, structural peak search,
+The `v2.5-probe-report` core keeps recursive combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, and release doctor checks, then adds file-backed eval suites, a
 newline-delimited JSON agent API, and field interpretation for interference
@@ -131,9 +131,10 @@ interference must beat a lexical trap, plus a dataset-quality gate for noisy
 large corpora, source/confidence weighting, auto query triads, and learning
 negative lanes for rejected shortcut peaks. The current field also adds
 route-balanced focus, coarse-to-fine localization, polarization lanes, a
-polarity gate, and a field-state machine. The v2.4 layer makes negative lanes
-local to route/group/support shape so destructive interference suppresses a
-rejected reading rather than every semantically nearby peak:
+polarity gate, and a field-state machine. Local negative lanes make
+destructive interference route/group/support aware. The v2.5 layer adds probe
+reports so the agent can compare plain search against negative-lane search
+before deciding whether suppression helped:
 
 ```text
 topology graph
@@ -241,12 +242,12 @@ V0 builds a source memory from `triads` and scores each `candidate_triads`
 composite against that memory. A swapped candidate should have high token
 overlap but low composite similarity.
 
-## Core Size v2.4
+## Core Size v2.5
 
 Use fixed dimensions for the current recursive comb/search/agent-field/WAW
 dataset-immunity, source-weighted search, auto-query, and learning negative-lane
 verifier, plus route-balanced focus, coarse-to-fine trace, polarization,
-field-state-machine interpretation, and local negative lanes:
+field-state-machine interpretation, local negative lanes, and probe reports:
 
 ```text
 wave_dim:       1024 lanes
