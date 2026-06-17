@@ -148,7 +148,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v2.2-polarity-gate"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v2.3-field-state-machine"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -243,11 +243,15 @@ jq -e '.peaks[0].polarization.state == "REVERSED"' <<<"$polarity_stop_json" >/de
 jq -e '.peaks[0].polarization_penalty == 0.18' <<<"$polarity_stop_json" >/dev/null
 jq -e '.peak_decision.state == "POLARITY_REVERSED" and .peak_decision.safe_to_answer == false' <<<"$polarity_stop_json" >/dev/null
 jq -e '.field_interpretation.state == "polarity_reversed"' <<<"$polarity_stop_json" >/dev/null
+jq -e '.field_state_machine.state == "FIELD_REVERSED" and .field_state_machine.safe_to_answer == false' <<<"$polarity_stop_json" >/dev/null
+jq -e '.field_state_machine.action == "STOP_REPAIR_POLARITY"' <<<"$polarity_stop_json" >/dev/null
 balanced_json="$("$search" "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3)"
 jq -e '.route_balanced_focus.enabled == true' <<<"$balanced_json" >/dev/null
 jq -e '.route_balanced_focus.original_memory_size == 6 and .route_balanced_focus.focused_memory_size == 2' <<<"$balanced_json" >/dev/null
 jq -e '.peaks[0].peak == "lower-operator-debt-route"' <<<"$balanced_json" >/dev/null
 jq -e '.coarse_to_fine.state == "LOCALIZED"' <<<"$balanced_json" >/dev/null
+jq -e '.field_state_machine.state == "FIELD_CONTESTED" and .field_state_machine.safe_to_answer == false' <<<"$balanced_json" >/dev/null
+jq -e '.field_state_machine.signals.route_balanced == true' <<<"$balanced_json" >/dev/null
 noisy_search_json="$("$search" "$root/examples/triad-packet.interference-search-noisy.json" --input-format json --top-k 3)"
 noisy_first_peak="$(jq -r '.peaks[0].peak' <<<"$noisy_search_json")"
 if [[ "$noisy_first_peak" != "certification" ]]; then
@@ -262,6 +266,8 @@ grep -q '"anti_triads"' <<<"$noisy_search_json"
 jq -e '.field_interpretation.state == "contested"' <<<"$noisy_search_json" >/dev/null
 jq -e '.peak_decision.state == "WATCH"' <<<"$noisy_search_json" >/dev/null
 jq -e '.peak_decision.safe_to_answer == false' <<<"$noisy_search_json" >/dev/null
+jq -e '.field_state_machine.state == "FIELD_CONTESTED" and .field_state_machine.safe_to_answer == false' <<<"$noisy_search_json" >/dev/null
+jq -e '.field_state_machine.action == "SPLIT_OR_QUERY"' <<<"$noisy_search_json" >/dev/null
 eval_json="$("$evaler" \
   --case "$root/examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED" \
   --case "$root/examples/triad-packet.interference-search-noisy.json:certification:WATCH")"
@@ -288,7 +294,9 @@ jq -e '([.warnings[].kind] | index("route_imbalance") and index("hub_dominance")
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null
+jq -e '.route_trap.field_state == "FIELD_FOCUSED" and .route_trap.field_safe_to_answer == true' <<<"$doctor_json" >/dev/null
 jq -e '.noisy.state == "WATCH" and .noisy.safe_to_answer == false' <<<"$doctor_json" >/dev/null
+jq -e '.noisy.field_state == "FIELD_CONTESTED" and .noisy.field_safe_to_answer == false' <<<"$doctor_json" >/dev/null
 trap_search_json="$("$search" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3)"
 trap_first_peak="$(jq -r '.peaks[0].peak' <<<"$trap_search_json")"
 trap_lexical_peak="$(jq -r '.lexical_baseline.top_peak' <<<"$trap_search_json")"
@@ -302,6 +310,8 @@ jq -e '.peak_margin > 0.05' <<<"$trap_search_json" >/dev/null
 jq -e '.peaks[0].propagation.component_score > .peaks[1].propagation.component_score' <<<"$trap_search_json" >/dev/null
 jq -e '.peak_decision.state == "FOCUSED"' <<<"$trap_search_json" >/dev/null
 jq -e '.peak_decision.safe_to_answer == true' <<<"$trap_search_json" >/dev/null
+jq -e '.field_state_machine.state == "FIELD_FOCUSED" and .field_state_machine.safe_to_answer == true' <<<"$trap_search_json" >/dev/null
+jq -e '.field_state_machine.signals.lexical_trap_detected == true' <<<"$trap_search_json" >/dev/null
 jq -e '.field_interpretation.lexical_trap_detected == true' <<<"$trap_search_json" >/dev/null
 jq -e '.field_interpretation.centroid_drift.route.changed == true' <<<"$trap_search_json" >/dev/null
 serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"

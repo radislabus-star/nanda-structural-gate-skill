@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v2.2-rust
-core_version: sparse-triad-v2.2-polarity-gate
+engine: nanda-check sparse-triad-v2.3-rust
+core_version: sparse-triad-v2.3-field-state-machine
 ```
 
 ## Build Order
@@ -64,6 +64,8 @@ core_version: sparse-triad-v2.2-polarity-gate
     and search reports aligned/reversed/mixed polarity per peak.
 35. Add polarity gate. Done in `v2.2`: reversed top peaks receive a score
     penalty and `peak_decision` returns `POLARITY_REVERSED`.
+36. Add field state machine. Done in `v2.3`: search converts measured field
+    signals into explicit agent actions before drafting.
 
 ## Engineering Constraints
 
@@ -152,6 +154,10 @@ For role-direction traps, read `peaks[].polarization`. `ALIGNED` means the
 route has the same direction as the query; `REVERSED` is a stop signal.
 Do not draft from a search result whose `peak_decision.state` is
 `POLARITY_REVERSED`, even if the lexical facts look close.
+For final agent behavior, read `field_state_machine` after `peak_decision`.
+Only `FIELD_FOCUSED`, `FIELD_SAFE`, and carefully reviewed
+`FIELD_ROUTE_BALANCED` are draftable states. `FIELD_CONTESTED`, `FIELD_THIN`,
+`FIELD_NOISY`, and `FIELD_REVERSED` require split, focus, or repair first.
 For agent/runtime integration, prefer newline-delimited JSON through
 `nanda serve` instead of shelling one command per small check.
 

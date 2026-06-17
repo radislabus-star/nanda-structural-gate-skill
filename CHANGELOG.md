@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.3.0 - 2026-06-17
+
+Field-state-machine release.
+
+### Added
+
+- `field_state_machine` in `nanda search` output. It converts measured field
+  signals into explicit agent states such as `FIELD_FOCUSED`,
+  `FIELD_CONTESTED`, `FIELD_REVERSED`, `FIELD_NOISY`, and `FIELD_THIN`.
+- State-machine actions such as `ANSWER_WITH_SUPPORT`, `SPLIT_OR_QUERY`,
+  `FOCUS_CORPUS`, and `STOP_REPAIR_POLARITY`.
+- Regression checks proving that route traps, noisy fields, route-balanced
+  low-margin fields, and reversed polarity fields land in different states.
+
+### Changed
+
+- Core version is now `sparse-triad-v2.3-field-state-machine`.
+- Cargo package version is now `2.3.0`.
+
 ## v2.2.0 - 2026-06-17
 
 Polarity-gate release.

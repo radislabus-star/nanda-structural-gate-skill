@@ -115,7 +115,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v2.2-polarity-gate`, prefer `foreign_pull` when deciding what to
+In `v2.3-field-state-machine`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-dogfood .` inside a repository that has
@@ -151,6 +151,10 @@ When role direction matters, inspect `peaks[].polarization` and
 If `peak_decision.state` is `POLARITY_REVERSED`, do not use the peak as an
 answer route; repair the query/source direction or retrieve a correctly
 polarized route.
+After `peak_decision`, inspect `field_state_machine`. Treat
+`FIELD_FOCUSED`, `FIELD_SAFE`, and reviewed `FIELD_ROUTE_BALANCED` as draftable
+states. Treat `FIELD_CONTESTED`, `FIELD_THIN`, and `FIELD_NOISY` as retrieval
+hints only. Treat `FIELD_REVERSED` as a hard stop.
 Use `nanda-serve` when several checks/searches will run in one agent turn. It
 keeps one process alive and accepts JSONL requests, avoiding per-call process
 startup overhead.
@@ -261,13 +265,13 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v2.2 indexed route finder: use its top peak as a structural
+- `nanda-search` is the v2.3 indexed route finder: use its top peak as a structural
   candidate route, then verify evidence before final prose.
-- `nanda-dataset-doctor` is the v1.3 corpus immunity gate: run it before search
+- `nanda-dataset-doctor` is the corpus immunity gate: run it before search
   on large memory packets and focus/deduplicate when it returns WATCH.
 - `nanda-waw` is the trap benchmark: use it to verify that the interference
   peak beats lexical baseline on known hard cases before changing scoring.
-- Negative lanes are the v2.2 destructive-interference layer: reject false
+- Negative lanes are the destructive-interference layer: reject false
   peaks, index the feedback JSON, and future search will suppress that shortcut
   when the query terms match. Repeated rejects strengthen the same lane.
 

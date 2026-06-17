@@ -118,11 +118,11 @@ No secondary scripting runtime is part of the shipped checker surface.
 Current core:
 
 ```text
-core_version: sparse-triad-v2.2-polarity-gate
+core_version: sparse-triad-v2.3-field-state-machine
 wave_dim:     1024
 ```
 
-The `v2.2-polarity-gate` core keeps recursive combing, structural peak search,
+The `v2.3-field-state-machine` core keeps recursive combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, and release doctor checks, then adds file-backed eval suites, a
 newline-delimited JSON agent API, and field interpretation for interference
@@ -131,7 +131,9 @@ interference must beat a lexical trap, plus a dataset-quality gate for noisy
 large corpora, source/confidence weighting, auto query triads, and learning
 negative lanes for rejected shortcut peaks. The current field also adds
 route-balanced focus, coarse-to-fine localization, polarization lanes, and a
-polarity gate:
+polarity gate. The v2.3 layer adds `field_state_machine`, which turns the
+measured field into explicit agent actions instead of treating raw score weights
+as a final verdict:
 
 ```text
 topology graph
@@ -239,11 +241,12 @@ V0 builds a source memory from `triads` and scores each `candidate_triads`
 composite against that memory. A swapped candidate should have high token
 overlap but low composite similarity.
 
-## Core Size v2.2
+## Core Size v2.3
 
 Use fixed dimensions for the current recursive comb/search/agent-field/WAW
 dataset-immunity, source-weighted search, auto-query, and learning negative-lane
-verifier, plus route-balanced focus, coarse-to-fine trace, and polarization:
+verifier, plus route-balanced focus, coarse-to-fine trace, polarization, and
+field-state-machine interpretation:
 
 ```text
 wave_dim:       1024 lanes

@@ -262,7 +262,7 @@ line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v2.1 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the v2.3 memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, source weights, destructive
@@ -315,11 +315,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v2.2-polarity-gate
+core_version: sparse-triad-v2.3-field-state-machine
 wave_dim: 1024
 ```
 
-`v2.2-polarity-gate` keeps recursive topology combing, structural peak search,
+`v2.3-field-state-machine` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -333,6 +333,9 @@ shortcut peaks and strengthen repeated rejects. Route-balanced focus reduces
 large/noisy corpora before direct search. Coarse-to-fine output shows the local
 supporting path after the coarse peak. Polarization adds role-direction lanes
 so reversed structures can look lexically similar but resonate differently. The
+field-state machine then converts measured signals into an agent-safe action:
+answer from support, split/query more, focus the corpus, or stop for polarity
+repair. The
 `POLARITY_REVERSED` gate prevents a reversed top peak from being used as an
 answer route. The search path is intentionally small and universal: encode
 triads as slot-bound waves, superpose a partial query, score memory
@@ -351,6 +354,10 @@ lexical_baseline
 wins_over_lexical_baseline
 peak_decision.state
 peak_decision.safe_to_answer
+field_state_machine.state
+field_state_machine.safe_to_answer
+field_state_machine.action
+field_state_machine.blocking
 field_interpretation.state
 field_interpretation.lexical_trap_detected
 field_interpretation.centroid_drift
@@ -370,6 +377,9 @@ WATCH-like retrieval hint until evidence is checked.
 Use `peak_decision` as the agent-facing trust layer. `FOCUSED` means the peak
 has enough margin and component strength to draft from; `WATCH` means retrieve
 more evidence or ask the LLM to inspect support/anti-triads before answering.
+Use `field_state_machine` as the stricter action layer. `FIELD_FOCUSED` and
+`FIELD_SAFE` can be drafted from support. `FIELD_CONTESTED`, `FIELD_THIN`, and
+`FIELD_NOISY` are retrieval hints. `FIELD_REVERSED` is a hard stop.
 The strongest regression example is `triad-packet.interference-search-route-trap.json`:
 the lexical baseline selects the `customs` route, while the interference peak
 selects the connected `certification` route. The important signal is that
@@ -447,7 +457,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v2.2.0`.
+Current release: `v2.3.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:

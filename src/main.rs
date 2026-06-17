@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.2-polarity-gate";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.2-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.3-field-state-machine";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.3-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -3117,16 +3117,24 @@ fn doctor_value() -> Value {
         "candidate_triads",
         no_focus_metadata(noisy.triads.len()),
     );
+    let trap_field_state = trap_result["field_state_machine"]["state"]
+        .as_str()
+        .unwrap_or("");
+    let noisy_field_state = noisy_result["field_state_machine"]["state"]
+        .as_str()
+        .unwrap_or("");
     let trap_ok = trap_result["peaks"]
         .as_array()
         .and_then(|peaks| peaks.first())
         .and_then(|peak| peak["peak"].as_str())
         == Some("certification")
         && trap_result["peak_decision"]["state"].as_str() == Some("FOCUSED")
+        && trap_field_state == "FIELD_FOCUSED"
         && trap_result["wins_over_lexical_baseline"]
             .as_bool()
             .unwrap_or(false);
     let noisy_ok = noisy_result["peak_decision"]["state"].as_str() == Some("WATCH")
+        && noisy_field_state == "FIELD_CONTESTED"
         && !noisy_result["peak_decision"]["safe_to_answer"]
             .as_bool()
             .unwrap_or(true);
@@ -3138,12 +3146,16 @@ fn doctor_value() -> Value {
         "healthy": healthy,
         "checks": {
             "route_trap_focused": trap_ok,
-            "noisy_query_watch": noisy_ok
+            "noisy_query_watch": noisy_ok,
+            "field_state_machine": trap_field_state == "FIELD_FOCUSED" && noisy_field_state == "FIELD_CONTESTED"
         },
         "route_trap": {
             "top": trap_result["peaks"].as_array().and_then(|peaks| peaks.first()).and_then(|peak| peak["peak"].as_str()).unwrap_or(""),
             "state": trap_result["peak_decision"]["state"],
+            "field_state": trap_result["field_state_machine"]["state"],
+            "field_action": trap_result["field_state_machine"]["action"],
             "safe_to_answer": trap_result["peak_decision"]["safe_to_answer"],
+            "field_safe_to_answer": trap_result["field_state_machine"]["safe_to_answer"],
             "lexical_baseline_top": trap_result["lexical_baseline"]["top_peak"],
             "wins_over_lexical_baseline": trap_result["wins_over_lexical_baseline"],
             "peak_margin": trap_result["peak_margin"]
@@ -3151,7 +3163,10 @@ fn doctor_value() -> Value {
         "noisy": {
             "top": noisy_result["peaks"].as_array().and_then(|peaks| peaks.first()).and_then(|peak| peak["peak"].as_str()).unwrap_or(""),
             "state": noisy_result["peak_decision"]["state"],
+            "field_state": noisy_result["field_state_machine"]["state"],
+            "field_action": noisy_result["field_state_machine"]["action"],
             "safe_to_answer": noisy_result["peak_decision"]["safe_to_answer"],
+            "field_safe_to_answer": noisy_result["field_state_machine"]["safe_to_answer"],
             "peak_margin": noisy_result["peak_margin"]
         }
     })
@@ -3164,9 +3179,10 @@ fn print_doctor_text(out: &Value) {
     );
     println!("healthy: {}", out["healthy"].as_bool().unwrap_or(false));
     println!(
-        "route_trap: top={} state={} lexical={} wins={}",
+        "route_trap: top={} state={} field={} lexical={} wins={}",
         out["route_trap"]["top"].as_str().unwrap_or(""),
         out["route_trap"]["state"].as_str().unwrap_or(""),
+        out["route_trap"]["field_state"].as_str().unwrap_or(""),
         out["route_trap"]["lexical_baseline_top"]
             .as_str()
             .unwrap_or(""),
@@ -3175,9 +3191,10 @@ fn print_doctor_text(out: &Value) {
             .unwrap_or(false)
     );
     println!(
-        "noisy: top={} state={} safe={}",
+        "noisy: top={} state={} field={} safe={}",
         out["noisy"]["top"].as_str().unwrap_or(""),
         out["noisy"]["state"].as_str().unwrap_or(""),
+        out["noisy"]["field_state"].as_str().unwrap_or(""),
         out["noisy"]["safe_to_answer"].as_bool().unwrap_or(false)
     );
 }
@@ -3190,12 +3207,12 @@ fn print_doctor_md(out: &Value) {
     );
     println!("- healthy: `{}`", out["healthy"]);
     println!(
-        "- route_trap: `{}` / `{}`",
-        out["route_trap"]["top"], out["route_trap"]["state"]
+        "- route_trap: `{}` / `{}` / `{}`",
+        out["route_trap"]["top"], out["route_trap"]["state"], out["route_trap"]["field_state"]
     );
     println!(
-        "- noisy: `{}` / `{}`",
-        out["noisy"]["top"], out["noisy"]["state"]
+        "- noisy: `{}` / `{}` / `{}`",
+        out["noisy"]["top"], out["noisy"]["state"], out["noisy"]["field_state"]
     );
 }
 
@@ -3941,9 +3958,17 @@ fn interference_search(
     let peak_decision = peak_decision(&peaks, peak_margin, lexical_peak);
     let mut field_interpretation = field_interpretation(&peaks, peak_margin, &lexical_baseline);
     if let Some(object) = field_interpretation.as_object_mut() {
-        object.insert("corpus".to_string(), corpus_interpretation);
+        object.insert("corpus".to_string(), corpus_interpretation.clone());
     }
     let coarse_to_fine = coarse_to_fine_trace(&peaks, &query_terms);
+    let field_state_machine = field_state_machine(
+        &peaks,
+        peak_margin,
+        &lexical_baseline,
+        &corpus_interpretation,
+        &route_balanced_focus,
+        &coarse_to_fine,
+    );
     let mut output_peaks = peaks;
     output_peaks.truncate(top_k);
 
@@ -3974,6 +3999,7 @@ fn interference_search(
             "policy": "confidence multiplied by evidence authority: current/canon > latest/frontier > historical/archive > archive_noise"
         },
         "coarse_to_fine": coarse_to_fine,
+        "field_state_machine": field_state_machine,
         "field_interpretation": field_interpretation,
         "peaks": output_peaks,
         "interpretation": "A peak is a route/group whose triads resonate together with the partial query. Read support as the focused structure and anti_triads as similar-but-foreign pulls."
@@ -4468,6 +4494,151 @@ fn center_pair(second_center: Option<&Value>, top_center: &Value, key: &str) -> 
         "changed": second_center
             .and_then(|center| center[key].as_str())
             .unwrap_or("") != top_center[key].as_str().unwrap_or("")
+    })
+}
+
+fn field_state_machine(
+    peaks: &[Value],
+    margin: f64,
+    lexical_baseline: &Value,
+    corpus: &Value,
+    route_balanced_focus: &Value,
+    coarse_to_fine: &Value,
+) -> Value {
+    if peaks.is_empty() {
+        return json!({
+            "state": "NO_FIELD",
+            "safe_to_answer": false,
+            "action": "NO_ANSWER",
+            "blocking": ["no_peak"],
+            "signals": {
+                "margin": round4(margin),
+                "component_gap": 0.0,
+                "top_polarization": "",
+                "corpus_verdict": corpus["verdict"].as_str().unwrap_or(""),
+                "route_balanced": route_balanced_focus["enabled"].as_bool().unwrap_or(false),
+                "coarse_to_fine": coarse_to_fine["state"].as_str().unwrap_or("")
+            },
+            "read_as": "No resonance field was produced."
+        });
+    }
+
+    let top = &peaks[0];
+    let second = peaks.get(1);
+    let top_name = top["peak"].as_str().unwrap_or("");
+    let lexical_peak = lexical_baseline["top_peak"].as_str().unwrap_or("");
+    let top_polarization = top["polarization"]["state"].as_str().unwrap_or("");
+    let top_component = top["propagation"]["component_score"]
+        .as_f64()
+        .unwrap_or(0.0);
+    let second_component = second
+        .and_then(|peak| peak["propagation"]["component_score"].as_f64())
+        .unwrap_or(0.0);
+    let component_gap = round4(top_component - second_component);
+    let route_balanced = route_balanced_focus["enabled"].as_bool().unwrap_or(false);
+    let ctf_state = coarse_to_fine["state"].as_str().unwrap_or("");
+    let corpus_verdict = corpus["verdict"].as_str().unwrap_or("");
+    let warnings = corpus["warnings"].as_array().cloned().unwrap_or_default();
+    let warning_kinds = warnings
+        .iter()
+        .filter_map(|warning| warning["kind"].as_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    let noisy_warning_count = warning_kinds
+        .iter()
+        .filter(|kind| {
+            matches!(
+                kind.as_str(),
+                "large_corpus" | "route_imbalance" | "hub_dominance" | "duplicate_current"
+            )
+        })
+        .count();
+    let weak_text_query = warning_kinds.iter().any(|kind| kind == "weak_text_query");
+    let corpus_noisy = corpus_verdict == "WATCH" && (noisy_warning_count > 0 || weak_text_query);
+    let focused = margin >= 0.055 && component_gap >= 0.12 && ctf_state == "LOCALIZED";
+    let lexical_trap = !lexical_peak.is_empty() && lexical_peak != top_name;
+
+    let mut blocking: Vec<String> = vec![];
+    let (state, safe_to_answer, action, read_as) = if top_polarization == "REVERSED" {
+        blocking.push("polarity_reversed".to_string());
+        (
+            "FIELD_REVERSED",
+            false,
+            "STOP_REPAIR_POLARITY",
+            "The top peak is role-direction reversed; do not read it as the answer route.",
+        )
+    } else if corpus_noisy && !route_balanced {
+        blocking.extend(warning_kinds.iter().cloned());
+        (
+            "FIELD_NOISY",
+            false,
+            "FOCUS_CORPUS",
+            "The corpus field is noisy; run dataset-doctor or route-balanced focus before trusting the peak.",
+        )
+    } else if margin < 0.04 {
+        blocking.push("low_margin".to_string());
+        (
+            "FIELD_CONTESTED",
+            false,
+            "SPLIT_OR_QUERY",
+            "The top peaks are too close; use the result as retrieval context and split or sharpen the query.",
+        )
+    } else if !focused {
+        if component_gap < 0.12 {
+            blocking.push("weak_component_gap".to_string());
+        }
+        if ctf_state != "LOCALIZED" {
+            blocking.push("not_localized".to_string());
+        }
+        (
+            "FIELD_THIN",
+            false,
+            "USE_AS_HINT",
+            "The peak is plausible but not connected/localized enough to become an answer skeleton.",
+        )
+    } else if route_balanced {
+        (
+            "FIELD_ROUTE_BALANCED",
+            true,
+            "ANSWER_WITH_BALANCED_SUPPORT",
+            "The peak is focused after route-balanced filtering; answer from support and mention the focused packet.",
+        )
+    } else if lexical_trap {
+        (
+            "FIELD_FOCUSED",
+            true,
+            "ANSWER_WITH_SUPPORT",
+            "The structural field beats the lexical baseline and is focused enough to draft from support.",
+        )
+    } else {
+        (
+            "FIELD_SAFE",
+            true,
+            "ANSWER_WITH_SUPPORT",
+            "The field is focused, localized, and not blocked by corpus or polarity warnings.",
+        )
+    };
+
+    blocking.sort();
+    blocking.dedup();
+
+    json!({
+        "state": state,
+        "safe_to_answer": safe_to_answer,
+        "action": action,
+        "top_peak": top_name,
+        "blocking": blocking,
+        "signals": {
+            "margin": round4(margin),
+            "component_gap": component_gap,
+            "top_polarization": top_polarization,
+            "corpus_verdict": corpus_verdict,
+            "corpus_warnings": warning_kinds,
+            "route_balanced": route_balanced,
+            "coarse_to_fine": ctf_state,
+            "lexical_baseline_top": lexical_peak,
+            "lexical_trap_detected": lexical_trap
+        },
+        "read_as": read_as
     })
 }
 
