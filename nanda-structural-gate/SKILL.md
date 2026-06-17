@@ -98,12 +98,14 @@ scripts/nanda-dataset-doctor .nanda/index.json --input-format json
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
+scripts/nanda-hgate task.json --input-format json --by linked-group
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
 scripts/nanda-probe examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 scripts/nanda-probe --suite examples/probe-corpus.json --input-format json --top-k 3
 scripts/nanda-search examples/triad-packet.positive-lanes.json --input-format json --top-k 3
+scripts/nanda-hgate examples/triad-packet.hgate-size-only.json --input-format json
 scripts/nanda-feedback .nanda/search.json --decision reject --note "false shortcut" --out .nanda/reject.json
 scripts/nanda-feedback .nanda/search.json --decision accept --note "accepted route" --out .nanda/accept.json
 scripts/nanda-index memory.json .nanda/reject.json --out .nanda/index-with-negative-lanes.json
@@ -120,9 +122,14 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v2.6-feedback-memory`, prefer `foreign_pull` when deciding what to
+In `v2.7-hierarchical-gate`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
+Use `nanda-hgate` when a packet is too large for one honest global PASS. It
+returns a global verdict plus linked local branches. Treat
+`STRUCTURALLY_ACCEPTED` as "global WATCH is size-only and all local branches
+PASS"; treat `REPAIR_REQUIRED` as a hard stop; treat `SPLIT_REQUIRED` as
+unresolved.
 Use `nanda-dogfood .` inside a repository that has
 `examples/self-dogfood.nanda.json` when you need a compact agent readiness
 check. It accepts root `WATCH` only when it is size-only and all linked branches
@@ -205,6 +212,10 @@ Check `constructive_interference` after search when positive lanes exist: it
 lists which accepted route/group/support shape was reinforced, the boost,
 match ratio, support ratio, and learned `accepted_count`. Positive lanes should
 raise a specific accepted route, not a whole topic.
+Check `hierarchical_decision` after `nanda-hgate`: it is the large-packet trust
+contract. A 54-triad packet may be accepted only if the global WATCH is
+size-only, `global_foreign_pull=0`, `local_veto=0`, `local_watch=0`, and all
+linked branches PASS.
 Use `peak_decision.safe_to_answer` as the final retrieval trust gate. A found
 peak with `WATCH` state is useful context, not a final answer skeleton.
 
@@ -258,6 +269,7 @@ scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index code-flow.json --input-format json --out .nanda/index.json
 scripts/nanda-dataset-doctor .nanda/index.json --input-format json
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --route-cap 256 --route-triad-cap 32 --top-k 5
+scripts/nanda-hgate code-flow.json --input-format json --by linked-group
 scripts/nanda-feedback .nanda/search.json --decision reject --note "false shortcut" --out .nanda/reject.json
 scripts/nanda-index code-flow.json .nanda/reject.json --input-format json --out .nanda/index-with-negative-lanes.json
 scripts/nanda-probe .nanda/index-with-negative-lanes.json --input-format json --top-k 5
@@ -282,10 +294,12 @@ Interpret the result as:
 - global `foreign_pull` non-empty = repair before PASS;
 - linked split files should contain both source and candidate triads;
 - route-level PASS across split files is the practical acceptance condition.
+- `nanda-hgate` is the direct large-packet acceptance command:
+  `STRUCTURALLY_ACCEPTED` means global size-only WATCH plus local PASS.
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v2.6 indexed route finder: use its top-level
+- `nanda-search` is the v2.7 indexed route finder: use its top-level
   `verdict`, `field_state`, `safe_to_answer`, and `top_peak` as the agent
   decision contract; use its top peak as a structural
   candidate route, then verify evidence before final prose.

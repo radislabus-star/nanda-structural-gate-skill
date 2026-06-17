@@ -114,6 +114,7 @@ evidence-conflict tasks do.
         ├── nanda-split-md
         ├── nanda-report
         ├── nanda-comb
+        ├── nanda-hgate
         ├── nanda-doctor
         ├── nanda-dogfood
         ├── nanda-eval
@@ -200,6 +201,7 @@ nanda-split examples/triad-packet.route-splice.json --by linked-group --out-dir 
 nanda-split-md examples/triads.watch-large.md --by group --out-dir split/
 nanda-split-md examples/triads.code-flow-splice.md --by linked-group --out-dir split/
 nanda-map examples/triads.code-flow-splice.md --domain code
+nanda-hgate examples/triad-packet.hgate-size-only.json --input-format json
 nanda-comb examples/triads.code-flow-splice.md --domain code --depth 2
 mkdir -p .nanda
 nanda-extract examples/route-trap.raw.txt --out .nanda/route-trap.json
@@ -260,12 +262,17 @@ Use `--format md` only when a human-facing report is explicitly needed.
 `nanda-map` exposes the core structural map: source/candidate group sizes,
 interference matrix, dominant source group, mixed candidate groups, and repair
 tasks.
+`nanda-hgate` is the v2.7 hierarchical gate for large packets. It runs one
+global map/check, splits by linked group, runs local gates, and returns
+`STRUCTURALLY_ACCEPTED` only when the global `WATCH` is size-only and every
+local branch is `PASS`. If `foreign_pull`, conflicts, or any local `VETO`
+exist, it returns `REPAIR_REQUIRED`.
 `nanda-extract` converts simple arrow text into a triad packet. The supported
 line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v2.6 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the v2.7 memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, source weights, destructive
@@ -324,11 +331,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v2.6-feedback-memory
+core_version: sparse-triad-v2.7-hierarchical-gate
 wave_dim: 1024
 ```
 
-`v2.6-feedback-memory` keeps recursive topology combing, structural peak search,
+`v2.7-hierarchical-gate` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -350,6 +357,9 @@ reports compare before/after search so the agent can verify whether a negative
 lane really helped or merely moved uncertainty elsewhere. The
 feedback-memory layer adds positive lanes: accepted peaks become constructive
 reinforcement for the same route/group/support shape in later search. The
+hierarchical gate makes large packets usable without pretending one flat PASS
+is enough: a global size-only `WATCH` can become `STRUCTURALLY_ACCEPTED` only
+after every linked local branch passes.
 `POLARITY_REVERSED` gate prevents a reversed top peak from being used as an
 answer route. The search path is intentionally small and universal: encode
 triads as slot-bound waves, superpose a partial query, score memory
@@ -426,6 +436,7 @@ nanda-dogfood . --out-dir .nanda/
 nanda-extract notes.raw.txt --out .nanda/notes.json
 nanda-index memory-a.json memory-b.md --out .nanda/index.json
 nanda-dataset-doctor .nanda/index.json --input-format json
+nanda-hgate big-flow.json --input-format json --by linked-group
 nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
 nanda-feedback .nanda/search.json --decision accept --note "accepted route" --out .nanda/accept.json
@@ -452,10 +463,13 @@ done
 Interpretation:
 
 - prefer `nanda-comb --depth 2` for machine workflows;
+- prefer `nanda-hgate` when a large packet gets global WATCH because of size;
 - run `nanda-map` first to inspect `mixed_candidate_groups` and `foreign_pull`;
 - treat non-empty `foreign_pull` as a repair stop;
 - do not force one global PASS when the graph exceeds size limits;
 - use `linked-group` split to produce paired source/candidate worksheets;
+- read `STRUCTURALLY_ACCEPTED` as global size-only WATCH plus local PASS, not
+  as a flat global PASS.
 - accept only route-level PASS for each paired worksheet;
 - if the global graph is clean but too large, report it as size-stopped, not as
   structurally failed.
@@ -480,7 +494,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v2.6.0`.
+Current release: `v2.7.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -496,6 +510,7 @@ nanda-dataset-doctor examples/triad-packet.dataset-noise.json --input-format jso
 nanda-search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 nanda-probe examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 nanda-probe --suite examples/probe-corpus.json --input-format json --top-k 3
+nanda-hgate examples/triad-packet.hgate-size-only.json --input-format json
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3

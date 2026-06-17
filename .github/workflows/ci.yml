@@ -56,6 +56,9 @@ jobs:
       - name: Positive lane smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.positive-lanes.json --input-format json --top-k 3
 
+      - name: Hierarchical gate smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- hgate examples/triad-packet.hgate-size-only.json --input-format json
+
       - name: Source weighting smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 
@@ -125,6 +128,9 @@ jobs:
 
       - name: Positive lane smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.positive-lanes.json --input-format json --top-k 3
+
+      - name: Hierarchical gate smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- hgate examples/triad-packet.hgate-size-only.json --input-format json
 
       - name: Source weighting smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.source-weighting.json --input-format json --top-k 3

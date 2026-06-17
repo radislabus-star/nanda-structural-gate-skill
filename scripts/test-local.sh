@@ -48,6 +48,7 @@ jq empty "$root/examples/triad-packet.auto-query-memory.json"
 jq empty "$root/examples/triad-packet.polarization-role-swap.json"
 jq empty "$root/examples/triad-packet.polarization-reversed-stop.json"
 jq empty "$root/examples/triad-packet.route-balanced-focus.json"
+jq empty "$root/examples/triad-packet.hgate-size-only.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"
@@ -150,7 +151,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v2.6-feedback-memory"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v2.7-hierarchical-gate"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -207,6 +208,24 @@ grep -q '"setting.timeout"' <<<"$drift_comb"
 grep -q '"300ms"' <<<"$drift_comb"
 grep -q '"500ms"' <<<"$drift_comb"
 rm -f "$drift_packet"
+
+hgate_json="$("$root/nanda-structural-gate/scripts/nanda-hgate" "$root/examples/triad-packet.hgate-size-only.json" --input-format json)"
+jq -e '.mode == "hierarchical-gate"' <<<"$hgate_json" >/dev/null
+jq -e '.hierarchical_decision.action == "STRUCTURALLY_ACCEPTED"' <<<"$hgate_json" >/dev/null
+jq -e '.hierarchical_decision.global_verdict == "WATCH"' <<<"$hgate_json" >/dev/null
+jq -e '.hierarchical_decision.global_size_only == true' <<<"$hgate_json" >/dev/null
+jq -e '.hierarchical_decision.local_pass == 17 and .hierarchical_decision.branches == 17' <<<"$hgate_json" >/dev/null
+set +e
+hgate_splice_json="$("$root/nanda-structural-gate/scripts/nanda-hgate" "$root/examples/triads.code-flow-splice.md" --domain code --format json)"
+hgate_splice_status=$?
+set -e
+if [[ "$hgate_splice_status" -ne 1 ]]; then
+  echo "expected hgate splice to return VETO status" >&2
+  echo "$hgate_splice_json" >&2
+  exit 1
+fi
+jq -e '.hierarchical_decision.action == "REPAIR_REQUIRED"' <<<"$hgate_splice_json" >/dev/null
+jq -e '.hierarchical_decision.global_foreign_pull > 0' <<<"$hgate_splice_json" >/dev/null
 
 search_json="$("$search" "$root/examples/triad-packet.interference-search.json" --input-format json --top-k 3)"
 grep -q '"mode": "interference-retrieval"' <<<"$search_json"

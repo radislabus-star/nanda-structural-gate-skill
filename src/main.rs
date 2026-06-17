@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.6-feedback-memory";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.6-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.7-hierarchical-gate";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.7-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -36,6 +36,7 @@ enum Command {
     Split(SplitPacketArgs),
     SplitMd(SplitArgs),
     Map(MapArgs),
+    Hgate(HgateArgs),
     Comb(CombArgs),
     Extract(ExtractArgs),
     Index(IndexArgs),
@@ -165,6 +166,27 @@ struct MapArgs {
     #[arg(long, value_enum, default_value = "auto")]
     input_format: InputFormat,
     #[arg(long, default_value = "map")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct HgateArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, value_enum, default_value = "linked-group")]
+    by: SplitBy,
+    #[arg(long, default_value_t = 64)]
+    max_branches: usize,
+    #[arg(long, default_value = "hgate")]
     task_id: String,
     #[arg(long, default_value = "general")]
     domain: String,
@@ -711,6 +733,7 @@ fn run() -> Result<u8> {
         Command::Split(args) => split_packet(args),
         Command::SplitMd(args) => split_md(args),
         Command::Map(args) => map_cmd(args),
+        Command::Hgate(args) => hgate_cmd(args),
         Command::Comb(args) => comb_cmd(args),
         Command::Extract(args) => extract_cmd(args),
         Command::Index(args) => index_cmd(args),
@@ -2348,6 +2371,165 @@ fn map_cmd(args: MapArgs) -> Result<u8> {
         OutputFormat::Md => print_map_md(&map),
     }
     Ok(EXIT_PASS)
+}
+
+fn hgate_cmd(args: HgateArgs) -> Result<u8> {
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.query,
+        args.normalize_paths,
+    )?;
+    let source = normalize_ids(packet.triads.clone(), "t");
+    let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+    let global_report = make_report(&packet, &source, &candidates)?;
+    let global_map = structural_map(&source, &candidates);
+    let splits = match args.by {
+        SplitBy::LinkedGroup => linked_group_splits(&source, &candidates),
+        SplitBy::Group | SplitBy::Route => raw_splits(&source, &candidates, &args.by),
+    };
+    let mut branches = vec![];
+    for split in splits.items.iter().take(args.max_branches) {
+        let branch_packet = Packet {
+            task_id: format!("{}:{}", packet.task_id, split.key),
+            domain: packet.domain.clone(),
+            query: packet.query.clone(),
+            triads: split.triads.clone(),
+            candidate_triads: split.candidates.clone(),
+            candidate_answer: packet.candidate_answer.clone(),
+            negative_shortcuts: packet.negative_shortcuts.clone(),
+            positive_shortcuts: packet.positive_shortcuts.clone(),
+        };
+        let report = make_report(&branch_packet, &split.triads, &split.candidates)?;
+        branches.push(json!({
+            "key": split.key,
+            "source_triads": split.triads.len(),
+            "candidate_triads": split.candidates.len(),
+            "verdict": report.verdict,
+            "limits": report.limits,
+            "conflicts": report.conflicts,
+            "evidence_gaps": report.evidence_gaps,
+            "weak_triads": report.weak_triads,
+            "foreign_pull": report.structural_map["foreign_pull"],
+            "repair_prompt": report.repair_prompt,
+            "trace_path": report.trace_path
+        }));
+    }
+    let truncated = splits.items.len().saturating_sub(branches.len());
+    let decision = hierarchical_decision(&global_report, &global_map, &branches, truncated);
+    let out = json!({
+        "core_version": CORE_VERSION,
+        "wave_dim": WAVE_DIM,
+        "mode": "hierarchical-gate",
+        "input": args.input,
+        "split_by": split_label(&args.by),
+        "global": {
+            "verdict": global_report.verdict,
+            "complexity_score": global_report.complexity_score,
+            "limits": global_report.limits,
+            "conflicts": global_report.conflicts,
+            "evidence_gaps": global_report.evidence_gaps,
+            "weak_triads": global_report.weak_triads,
+            "foreign_pull": global_map["foreign_pull"],
+            "mixed_candidate_groups": global_map["mixed_candidate_groups"],
+            "repair_tasks": global_map["repair_tasks"],
+            "trace_path": global_report.trace_path
+        },
+        "branches": branches,
+        "split_warnings": splits.warnings,
+        "truncated_branches": truncated,
+        "hierarchical_decision": decision,
+        "interpretation": "Global WATCH caused only by size can be accepted when every linked branch passes. Global foreign_pull, conflicts, or any local VETO remain repair blockers."
+    });
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_hgate_text(&out),
+        OutputFormat::Md => print_hgate_md(&out),
+    }
+    Ok(
+        match out["hierarchical_decision"]["action"]
+            .as_str()
+            .unwrap_or("REVIEW_REQUIRED")
+        {
+            "STRUCTURALLY_ACCEPTED" => EXIT_PASS,
+            "REPAIR_REQUIRED" => EXIT_VETO,
+            _ => EXIT_WATCH,
+        },
+    )
+}
+
+fn hierarchical_decision(
+    global_report: &Report,
+    global_map: &Value,
+    branches: &[Value],
+    truncated: usize,
+) -> Value {
+    let branch_count = branches.len();
+    let local_pass = branches
+        .iter()
+        .filter(|branch| branch["verdict"].as_str() == Some("PASS"))
+        .count();
+    let local_watch = branches
+        .iter()
+        .filter(|branch| branch["verdict"].as_str() == Some("WATCH"))
+        .count();
+    let local_veto = branches
+        .iter()
+        .filter(|branch| branch["verdict"].as_str() == Some("VETO"))
+        .count();
+    let global_foreign_pull = global_map["foreign_pull"]
+        .as_array()
+        .map(|items| items.len())
+        .unwrap_or(0);
+    let global_size_only = global_report.verdict == "WATCH"
+        && !global_report.limits.is_empty()
+        && global_report.conflicts.is_empty()
+        && global_report.evidence_gaps.is_empty()
+        && global_foreign_pull == 0;
+    let all_local_pass = branch_count > 0 && local_pass == branch_count && truncated == 0;
+    let (action, accepted, next) = if global_report.verdict == "VETO"
+        || global_foreign_pull > 0
+        || local_veto > 0
+    {
+        (
+            "REPAIR_REQUIRED",
+            false,
+            "Repair global foreign pull, conflicts, or vetoed branches before accepting the structure.",
+        )
+    } else if all_local_pass && (global_size_only || global_report.verdict == "PASS") {
+        (
+            "STRUCTURALLY_ACCEPTED",
+            true,
+            "Use the local branch PASS results as the trusted acceptance surface.",
+        )
+    } else if local_watch > 0 || truncated > 0 || global_report.verdict == "WATCH" {
+        (
+            "SPLIT_REQUIRED",
+            false,
+            "Narrow unresolved WATCH branches or increase max branches before finalizing.",
+        )
+    } else {
+        (
+            "REVIEW_REQUIRED",
+            false,
+            "Review hierarchical gate output before trusting the structure.",
+        )
+    };
+    json!({
+        "action": action,
+        "structurally_accepted": accepted,
+        "global_verdict": global_report.verdict,
+        "global_size_only": global_size_only,
+        "branches": branch_count,
+        "local_pass": local_pass,
+        "local_watch": local_watch,
+        "local_veto": local_veto,
+        "global_foreign_pull": global_foreign_pull,
+        "truncated_branches": truncated,
+        "next": next
+    })
 }
 
 fn comb_cmd(args: CombArgs) -> Result<u8> {
@@ -6628,6 +6810,79 @@ fn print_comb_text(out: &Value) {
     );
     println!("depth: {}", out["depth"].as_u64().unwrap_or(0));
     println!("summary: {}", out["summary"]);
+}
+
+fn print_hgate_text(out: &Value) {
+    let decision = &out["hierarchical_decision"];
+    println!("NANDA HGATE");
+    println!(
+        "core_version: {}",
+        out["core_version"].as_str().unwrap_or("")
+    );
+    println!(
+        "ACTION: {}",
+        decision["action"].as_str().unwrap_or("REVIEW_REQUIRED")
+    );
+    println!(
+        "GLOBAL: {}{}",
+        decision["global_verdict"].as_str().unwrap_or("WATCH"),
+        if decision["global_size_only"].as_bool().unwrap_or(false) {
+            " size-only"
+        } else {
+            ""
+        }
+    );
+    println!(
+        "BRANCHES: {}/{} PASS",
+        decision["local_pass"].as_u64().unwrap_or(0),
+        decision["branches"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "BLOCKERS: local_veto={} local_watch={} foreign_pull={} truncated={}",
+        decision["local_veto"].as_u64().unwrap_or(0),
+        decision["local_watch"].as_u64().unwrap_or(0),
+        decision["global_foreign_pull"].as_u64().unwrap_or(0),
+        decision["truncated_branches"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "ACCEPTED: {}",
+        decision["structurally_accepted"].as_bool().unwrap_or(false)
+    );
+    println!("NEXT: {}", decision["next"].as_str().unwrap_or(""));
+}
+
+fn print_hgate_md(out: &Value) {
+    let decision = &out["hierarchical_decision"];
+    println!("# NANDA Hierarchical Gate\n");
+    println!(
+        "- action: `{}`",
+        decision["action"].as_str().unwrap_or("REVIEW_REQUIRED")
+    );
+    println!(
+        "- global: `{}`",
+        decision["global_verdict"].as_str().unwrap_or("WATCH")
+    );
+    println!(
+        "- global_size_only: `{}`",
+        decision["global_size_only"].as_bool().unwrap_or(false)
+    );
+    println!(
+        "- branches: `{}/{}` PASS",
+        decision["local_pass"].as_u64().unwrap_or(0),
+        decision["branches"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- blockers: `local_veto={} local_watch={} foreign_pull={} truncated={}`",
+        decision["local_veto"].as_u64().unwrap_or(0),
+        decision["local_watch"].as_u64().unwrap_or(0),
+        decision["global_foreign_pull"].as_u64().unwrap_or(0),
+        decision["truncated_branches"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- structurally_accepted: `{}`",
+        decision["structurally_accepted"].as_bool().unwrap_or(false)
+    );
+    println!("- next: {}", decision["next"].as_str().unwrap_or(""));
 }
 
 fn print_comb_md(out: &Value) {

@@ -1,0 +1,43 @@
+{
+  "task_id": "hgate-size-only",
+  "domain": "business",
+  "query": "large size-only graph with locally passing branches",
+  "triads": [
+    {"id":"t01","subject":"SKU01","relation":"binds_to","object":"DOC01","evidence":"source:1","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g01"},
+    {"id":"t02","subject":"SKU02","relation":"binds_to","object":"DOC02","evidence":"source:2","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g02"},
+    {"id":"t03","subject":"SKU03","relation":"binds_to","object":"DOC03","evidence":"source:3","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g03"},
+    {"id":"t04","subject":"SKU04","relation":"binds_to","object":"DOC04","evidence":"source:4","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g04"},
+    {"id":"t05","subject":"SKU05","relation":"binds_to","object":"DOC05","evidence":"source:5","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g05"},
+    {"id":"t06","subject":"SKU06","relation":"binds_to","object":"DOC06","evidence":"source:6","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g06"},
+    {"id":"t07","subject":"SKU07","relation":"binds_to","object":"DOC07","evidence":"source:7","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g07"},
+    {"id":"t08","subject":"SKU08","relation":"binds_to","object":"DOC08","evidence":"source:8","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g08"},
+    {"id":"t09","subject":"SKU09","relation":"binds_to","object":"DOC09","evidence":"source:9","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g09"},
+    {"id":"t10","subject":"SKU10","relation":"binds_to","object":"DOC10","evidence":"source:10","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g10"},
+    {"id":"t11","subject":"SKU11","relation":"binds_to","object":"DOC11","evidence":"source:11","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g11"},
+    {"id":"t12","subject":"SKU12","relation":"binds_to","object":"DOC12","evidence":"source:12","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g12"},
+    {"id":"t13","subject":"SKU13","relation":"binds_to","object":"DOC13","evidence":"source:13","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g13"},
+    {"id":"t14","subject":"SKU14","relation":"binds_to","object":"DOC14","evidence":"source:14","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g14"},
+    {"id":"t15","subject":"SKU15","relation":"binds_to","object":"DOC15","evidence":"source:15","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g15"},
+    {"id":"t16","subject":"SKU16","relation":"binds_to","object":"DOC16","evidence":"source:16","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g16"},
+    {"id":"t17","subject":"SKU17","relation":"binds_to","object":"DOC17","evidence":"source:17","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"g17"}
+  ],
+  "candidate_triads": [
+    {"id":"c01","subject":"SKU01","relation":"binds_to","object":"DOC01","evidence":"candidate:1","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g01"},
+    {"id":"c02","subject":"SKU02","relation":"binds_to","object":"DOC02","evidence":"candidate:2","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g02"},
+    {"id":"c03","subject":"SKU03","relation":"binds_to","object":"DOC03","evidence":"candidate:3","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g03"},
+    {"id":"c04","subject":"SKU04","relation":"binds_to","object":"DOC04","evidence":"candidate:4","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g04"},
+    {"id":"c05","subject":"SKU05","relation":"binds_to","object":"DOC05","evidence":"candidate:5","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g05"},
+    {"id":"c06","subject":"SKU06","relation":"binds_to","object":"DOC06","evidence":"candidate:6","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g06"},
+    {"id":"c07","subject":"SKU07","relation":"binds_to","object":"DOC07","evidence":"candidate:7","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g07"},
+    {"id":"c08","subject":"SKU08","relation":"binds_to","object":"DOC08","evidence":"candidate:8","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g08"},
+    {"id":"c09","subject":"SKU09","relation":"binds_to","object":"DOC09","evidence":"candidate:9","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g09"},
+    {"id":"c10","subject":"SKU10","relation":"binds_to","object":"DOC10","evidence":"candidate:10","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g10"},
+    {"id":"c11","subject":"SKU11","relation":"binds_to","object":"DOC11","evidence":"candidate:11","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g11"},
+    {"id":"c12","subject":"SKU12","relation":"binds_to","object":"DOC12","evidence":"candidate:12","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g12"},
+    {"id":"c13","subject":"SKU13","relation":"binds_to","object":"DOC13","evidence":"candidate:13","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g13"},
+    {"id":"c14","subject":"SKU14","relation":"binds_to","object":"DOC14","evidence":"candidate:14","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g14"},
+    {"id":"c15","subject":"SKU15","relation":"binds_to","object":"DOC15","evidence":"candidate:15","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g15"},
+    {"id":"c16","subject":"SKU16","relation":"binds_to","object":"DOC16","evidence":"candidate:16","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g16"},
+    {"id":"c17","subject":"SKU17","relation":"binds_to","object":"DOC17","evidence":"candidate:17","confidence":0.9,"subject_role":"sku","object_role":"document","route":"route","group":"candidate-g17"}
+  ]
+}

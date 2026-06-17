@@ -34,7 +34,8 @@ $Commands = @(
     "report",
     "split",
     "split-md",
-    "map"
+    "map",
+    "hgate"
 )
 
 New-Item -ItemType Directory -Force -Path (Join-Path $CodexHome "skills") | Out-Null

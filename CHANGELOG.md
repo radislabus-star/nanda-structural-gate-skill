@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.7.0 - 2026-06-17
+
+Hierarchical-gate release.
+
+### Added
+
+- `nanda hgate` and `nanda-hgate` wrapper for large structural packets.
+- Hierarchical gate output with `global`, `branches`, and
+  `hierarchical_decision`.
+- `STRUCTURALLY_ACCEPTED` action for the important case where the global packet
+  is `WATCH` only because of size/field dilution, while every linked local
+  branch is `PASS`.
+- `REPAIR_REQUIRED` action when the global map has `foreign_pull`, conflicts,
+  or any local branch is `VETO`.
+- Size-only hierarchical fixture covering a large global graph with 17/17
+  local branches passing.
+- Linux and Windows CI smoke coverage for `nanda hgate`.
+
+### Changed
+
+- Cargo package version is now `2.7.0`.
+- Core version is now `sparse-triad-v2.7-hierarchical-gate`.
+- Engine id is now `nanda-check sparse-triad-v2.7-rust`.
+
 ## v2.6.0 - 2026-06-17
 
 Feedback-memory release.
