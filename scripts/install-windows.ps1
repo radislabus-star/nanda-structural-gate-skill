@@ -26,6 +26,7 @@ $Commands = @(
     "feedback",
     "index",
     "search",
+    "serve",
     "dogfood",
     "report",
     "split",
@@ -85,4 +86,3 @@ Write-Host "  $BinDir"
 Write-Host ""
 Write-Host "Run:"
 Write-Host "  nanda-doctor.cmd"
-

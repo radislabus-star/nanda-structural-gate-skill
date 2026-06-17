@@ -103,6 +103,8 @@ nanda map packet.json --input-format json
 nanda comb packet.json --input-format json --depth 2 --out-dir comb/
 nanda split packet.json --input-format json --by linked-group --out-dir split/
 nanda check --triads split/route.json
+nanda eval --suite examples/eval-corpus.json
+printf '{"command":"doctor"}\n' | nanda serve
 ```
 
 Markdown worksheets remain useful for human-readable extraction and review.
@@ -112,13 +114,15 @@ No secondary scripting runtime is part of the shipped checker surface.
 Current core:
 
 ```text
-core_version: sparse-triad-v1.0-release
+core_version: sparse-triad-v1.1-agent-field
 wave_dim:     1024
 ```
 
-The `v1.0-release` core keeps recursive combing, v0.5 structural peak search,
-v0.6 reusable memory indexes, v0.7 arrow-text extraction, v0.8 feedback
-packets, and v0.9 regression evaluation, then adds a release doctor:
+The `v1.1-agent-field` core keeps recursive combing, structural peak search,
+reusable memory indexes, arrow-text extraction, feedback packets, regression
+evaluation, and release doctor checks, then adds file-backed eval suites, a
+newline-delimited JSON agent API, and field interpretation for interference
+peaks:
 
 ```text
 topology graph
@@ -128,6 +132,9 @@ memory index packet
 separate query packet
 accepted/rejected/WATCH peak feedback
 peak/state eval suite
+file-backed eval suite
+JSONL agent serve loop
+field_interpretation for search peaks
 self-contained doctor smoke
 arrow-text extraction
 source group memory
@@ -144,9 +151,9 @@ supporting_triads / anti_triads / missing_edges
 repair_tasks
 ```
 
-This map is the base layer for later agent API, GitHub examples, and benchmark
-work. Higher-level reporting should consume the map instead of re-inventing
-route logic.
+This map is the base layer for agent API, GitHub examples, and benchmark work.
+Higher-level reporting should consume the map and field interpretation instead
+of re-inventing route logic.
 
 CLI exit codes:
 
@@ -210,9 +217,10 @@ V0 builds a source memory from `triads` and scores each `candidate_triads`
 composite against that memory. A swapped candidate should have high token
 overlap but low composite similarity.
 
-## Core Size v1.0
+## Core Size v1.1
 
-Use fixed dimensions for the current recursive comb/search verifier:
+Use fixed dimensions for the current recursive comb/search/agent-field
+verifier:
 
 ```text
 wave_dim:       1024 lanes

@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v1.0-rust
-core_version: sparse-triad-v1.0-release
+engine: nanda-check sparse-triad-v1.1-rust
+core_version: sparse-triad-v1.1-agent-field
 ```
 
 ## Build Order
@@ -42,6 +42,10 @@ core_version: sparse-triad-v1.0-release
 20. Add feedback memory packets. Done with `nanda feedback`.
 21. Add regression eval for peak/state behavior. Done with `nanda eval`.
 22. Add self-contained release doctor. Done with `nanda doctor`.
+23. Add file-backed eval suites. Done with `nanda eval --suite`.
+24. Add JSONL agent API. Done with `nanda serve`.
+25. Add field interpretation for interference peaks. Done in
+    `field_interpretation`.
 
 ## Engineering Constraints
 
@@ -97,10 +101,17 @@ For retrieval workflows, use `nanda search`: memory triads plus partial query
 triads produce top-k structural peaks. The first target experiment is a route
 search where the correct connected route beats similar single facts from a
 foreign route.
+Read `field_interpretation` in search output before trusting the peak. It
+labels stable, thin, contested, and lexical-trap cases and explains centroid
+drift from the nearest competing peak.
 For indexed retrieval workflows, use `nanda index` to build a reusable memory
 packet, then query it with `nanda search --query-file`.
 For extraction workflows, use `nanda extract` on arrow-text notes before
 indexing or searching.
+For regression workflows, keep suites in JSON and run
+`nanda eval --suite examples/eval-corpus.json`.
+For agent/runtime integration, prefer newline-delimited JSON through
+`nanda serve` instead of shelling one command per small check.
 
 ## Trigger Model
 

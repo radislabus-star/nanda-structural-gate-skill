@@ -32,6 +32,12 @@ jobs:
       - name: Release doctor
         run: cargo run --quiet --manifest-path Cargo.toml -- doctor
 
+      - name: Eval corpus
+        run: cargo run --quiet --manifest-path Cargo.toml -- eval --suite examples/eval-corpus.json
+
+      - name: Serve smoke
+        run: printf '{"command":"doctor"}\n' | cargo run --quiet --manifest-path Cargo.toml -- serve
+
   windows:
     runs-on: windows-latest
 
@@ -53,6 +59,14 @@ jobs:
 
       - name: Eval route-trap examples
         run: cargo run --quiet --manifest-path Cargo.toml -- eval --case examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED --case examples/triad-packet.interference-search-noisy.json:certification:WATCH
+
+      - name: Eval corpus
+        run: cargo run --quiet --manifest-path Cargo.toml -- eval --suite examples/eval-corpus.json
+
+      - name: Serve smoke
+        shell: pwsh
+        run: |
+          '{"command":"doctor"}' | cargo run --quiet --manifest-path Cargo.toml -- serve
 
       - name: Install Windows wrappers
         shell: pwsh

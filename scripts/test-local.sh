@@ -16,6 +16,7 @@ evaler="$root/nanda-structural-gate/scripts/nanda-eval"
 feedback="$root/nanda-structural-gate/scripts/nanda-feedback"
 indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
+serve="$root/nanda-structural-gate/scripts/nanda-serve"
 dogfood="$root/nanda-structural-gate/scripts/nanda-dogfood"
 reporter="$root/nanda-structural-gate/scripts/nanda-report"
 split_md="$root/nanda-structural-gate/scripts/nanda-split-md"
@@ -34,6 +35,7 @@ jq empty "$root/examples/triad-packet.watch-low-complexity.json"
 jq empty "$root/examples/triad-packet.interference-search.json"
 jq empty "$root/examples/triad-packet.interference-search-noisy.json"
 jq empty "$root/examples/triad-packet.interference-search-route-trap.json"
+jq empty "$root/examples/eval-corpus.json"
 
 pass_json="$("$checker" --triads "$root/examples/triad-packet.example.json" --format json)"
 if ! grep -q '"verdict": "PASS"' <<<"$pass_json"; then
@@ -133,7 +135,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v1.0-release"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v1.1-agent-field"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -216,6 +218,7 @@ grep -q '"peak_margin"' <<<"$noisy_search_json"
 grep -q '"lexical_baseline"' <<<"$noisy_search_json"
 grep -q '"symbolic_baseline"' <<<"$noisy_search_json"
 grep -q '"anti_triads"' <<<"$noisy_search_json"
+jq -e '.field_interpretation.state == "contested"' <<<"$noisy_search_json" >/dev/null
 jq -e '.peak_decision.state == "WATCH"' <<<"$noisy_search_json" >/dev/null
 jq -e '.peak_decision.safe_to_answer == false' <<<"$noisy_search_json" >/dev/null
 eval_json="$("$evaler" \
@@ -223,6 +226,9 @@ eval_json="$("$evaler" \
   --case "$root/examples/triad-packet.interference-search-noisy.json:certification:WATCH")"
 jq -e '.mode == "eval-suite"' <<<"$eval_json" >/dev/null
 jq -e '.passed == 2 and .total == 2 and .accuracy == 1' <<<"$eval_json" >/dev/null
+eval_suite_json="$("$evaler" --suite "$root/examples/eval-corpus.json")"
+jq -e '.mode == "eval-suite"' <<<"$eval_suite_json" >/dev/null
+jq -e '.passed == 2 and .total == 2 and .accuracy == 1' <<<"$eval_suite_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null
@@ -240,6 +246,10 @@ jq -e '.peak_margin > 0.05' <<<"$trap_search_json" >/dev/null
 jq -e '.peaks[0].propagation.component_score > .peaks[1].propagation.component_score' <<<"$trap_search_json" >/dev/null
 jq -e '.peak_decision.state == "FOCUSED"' <<<"$trap_search_json" >/dev/null
 jq -e '.peak_decision.safe_to_answer == true' <<<"$trap_search_json" >/dev/null
+jq -e '.field_interpretation.lexical_trap_detected == true' <<<"$trap_search_json" >/dev/null
+jq -e '.field_interpretation.centroid_drift.route.changed == true' <<<"$trap_search_json" >/dev/null
+serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"
+jq -e '.ok == true and .result.mode == "doctor" and .result.healthy == true' <<<"$serve_json" >/dev/null
 tmp_search="$(mktemp)"
 tmp_feedback="$(mktemp)"
 printf '%s\n' "$trap_search_json" >"$tmp_search"
@@ -335,6 +345,7 @@ fi
 "$extractor" --help | grep -q "Usage: nanda extract"
 "$indexer" --help | grep -q "Usage: nanda index"
 "$search" --help | grep -q "Usage: nanda search"
+"$serve" --help | grep -q "Usage: nanda serve"
 "$dogfood" --help | grep -q "Usage: nanda dogfood"
 "$split_packet" --help | grep -q "Usage: nanda split"
 "$reporter" --format md --title "Smoke Markdown Report" --domain code --overall "$root/examples/triads.watch-large.md" --route code:"$root/examples/triads.code-flow.md" >/dev/null || test "$?" -eq 3

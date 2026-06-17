@@ -1,0 +1,17 @@
+{
+  "name": "nanda-v1.1-core-eval",
+  "cases": [
+    {
+      "id": "route-trap-certification-beats-customs",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "expected_peak": "certification",
+      "expected_state": "FOCUSED"
+    },
+    {
+      "id": "noisy-certification-stays-watch",
+      "path": "triad-packet.interference-search-noisy.json",
+      "expected_peak": "certification",
+      "expected_state": "WATCH"
+    }
+  ]
+}

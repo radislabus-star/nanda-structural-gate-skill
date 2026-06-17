@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.1.0 - 2026-06-17
+
+Agent-field strengthening release.
+
+### Added
+
+- Eval corpus loading via `nanda eval --suite examples/eval-corpus.json`.
+- JSONL agent API via `nanda serve`, supporting `doctor`, `check`, and `search`
+  requests without restarting the process for every call.
+- Richer `nanda search` output with `field_interpretation`, including field
+  stability, lexical-trap detection, centroid drift, and nearest foreign pull.
+- `nanda-serve` shell wrapper and Windows `.cmd` wrapper generation.
+
+### Changed
+
+- Core version is now `sparse-triad-v1.1-agent-field`.
+- Local tests include Rust unit tests, eval corpus regression, JSONL serve
+  smoke, and field-interpretation assertions.
+
 ## v1.0.1 - 2026-06-17
 
 Windows compatibility release.

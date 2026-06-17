@@ -5,12 +5,13 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
+use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v1.0-release";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v1.0-rust";
+const CORE_VERSION: &str = "sparse-triad-v1.1-agent-field";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v1.1-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -41,6 +42,7 @@ enum Command {
     Search(SearchArgs),
     Feedback(FeedbackArgs),
     Eval(EvalArgs),
+    Serve(ServeArgs),
     Doctor(DoctorArgs),
     Dogfood(DogfoodArgs),
     Report(ReportArgs),
@@ -274,6 +276,8 @@ struct FeedbackArgs {
 struct EvalArgs {
     #[arg(long = "case")]
     cases: Vec<String>,
+    #[arg(long)]
+    suite: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "auto")]
     input_format: InputFormat,
     #[arg(long, default_value_t = 3)]
@@ -284,6 +288,12 @@ struct EvalArgs {
     format: OutputFormat,
     #[arg(long)]
     normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct ServeArgs {
+    #[arg(long, value_enum, default_value = "jsonl")]
+    format: ServeFormat,
 }
 
 #[derive(Parser)]
@@ -370,6 +380,11 @@ enum PeakGroupBy {
 }
 
 #[derive(Clone, ValueEnum)]
+enum ServeFormat {
+    Jsonl,
+}
+
+#[derive(Clone, ValueEnum)]
 enum FeedbackDecision {
     Accept,
     Reject,
@@ -414,6 +429,19 @@ struct Packet {
     candidate_triads: Vec<Triad>,
     #[serde(default)]
     candidate_answer: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct EvalSuite {
+    #[serde(default)]
+    cases: Vec<EvalSuiteCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct EvalSuiteCase {
+    path: PathBuf,
+    expected_peak: String,
+    expected_state: String,
 }
 
 fn default_confidence() -> f64 {
@@ -484,6 +512,7 @@ fn run() -> Result<u8> {
         Command::Search(args) => search_cmd(args),
         Command::Feedback(args) => feedback_cmd(args),
         Command::Eval(args) => eval_cmd(args),
+        Command::Serve(args) => serve_cmd(args),
         Command::Doctor(args) => doctor_cmd(args),
         Command::Dogfood(args) => dogfood_cmd(args),
         Command::Report(args) => report_cmd(args),
@@ -2335,15 +2364,15 @@ fn feedback_decision_label(decision: &FeedbackDecision) -> &'static str {
 }
 
 fn eval_cmd(args: EvalArgs) -> Result<u8> {
-    if args.cases.is_empty() {
+    let cases = eval_cases_from_args(&args)?;
+    if cases.is_empty() {
         return Err(anyhow!(
-            "nanda eval requires at least one --case path:expected_peak:expected_state"
+            "nanda eval requires at least one --case path:expected_peak:expected_state or --suite file.json"
         ));
     }
     let mut rows = vec![];
     let mut passed = 0usize;
-    for raw_case in &args.cases {
-        let (path, expected_peak, expected_state) = parse_eval_case(raw_case)?;
+    for (path, expected_peak, expected_state) in cases {
         let packet = load_packet_auto(
             &path,
             &args.input_format,
@@ -2402,6 +2431,29 @@ fn eval_cmd(args: EvalArgs) -> Result<u8> {
     }
 }
 
+fn eval_cases_from_args(args: &EvalArgs) -> Result<Vec<(PathBuf, String, String)>> {
+    let mut cases = vec![];
+    for raw_case in &args.cases {
+        cases.push(parse_eval_case(raw_case)?);
+    }
+    if let Some(suite_path) = &args.suite {
+        let text = fs::read_to_string(suite_path)
+            .with_context(|| format!("read {}", suite_path.display()))?;
+        let suite: EvalSuite = serde_json::from_str(&text)
+            .with_context(|| format!("parse {}", suite_path.display()))?;
+        let base = suite_path.parent().unwrap_or_else(|| Path::new("."));
+        for case in suite.cases {
+            let path = if case.path.is_absolute() {
+                case.path
+            } else {
+                base.join(case.path)
+            };
+            cases.push((path, case.expected_peak, case.expected_state));
+        }
+    }
+    Ok(cases)
+}
+
 fn parse_eval_case(raw: &str) -> Result<(PathBuf, String, String)> {
     let mut parts = raw.rsplitn(3, ':').collect::<Vec<_>>();
     if parts.len() != 3 {
@@ -2453,7 +2505,86 @@ fn print_eval_md(out: &Value) {
     println!("- accuracy: `{}`", out["accuracy"]);
 }
 
+fn serve_cmd(args: ServeArgs) -> Result<u8> {
+    match args.format {
+        ServeFormat::Jsonl => serve_jsonl(),
+    }
+}
+
+fn serve_jsonl() -> Result<u8> {
+    let stdin = io::stdin();
+    for line in stdin.lock().lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let response = match handle_serve_request(&line) {
+            Ok(result) => json!({"ok": true, "result": result}),
+            Err(err) => json!({"ok": false, "error": format!("{err:#}")}),
+        };
+        println!("{}", serde_json::to_string(&response)?);
+    }
+    Ok(EXIT_PASS)
+}
+
+fn handle_serve_request(line: &str) -> Result<Value> {
+    let request: Value = serde_json::from_str(line).context("parse serve request JSON")?;
+    let command = request["command"]
+        .as_str()
+        .ok_or_else(|| anyhow!("serve request requires string field command"))?;
+    match command {
+        "doctor" => Ok(doctor_value()),
+        "search" => {
+            let packet_value = request
+                .get("packet")
+                .ok_or_else(|| anyhow!("search request requires packet"))?;
+            let packet: Packet = serde_json::from_value(packet_value.clone())?;
+            let top_k = request["top_k"].as_u64().unwrap_or(5) as usize;
+            let group_by = match request["group_by"].as_str().unwrap_or("route") {
+                "group" => PeakGroupBy::Group,
+                "route" => PeakGroupBy::Route,
+                other => return Err(anyhow!("unsupported group_by: {other}")),
+            };
+            Ok(interference_search(
+                &packet,
+                &normalize_ids(packet.triads.clone(), "m"),
+                &normalize_ids(packet.candidate_triads.clone(), "q"),
+                top_k,
+                &group_by,
+            ))
+        }
+        "check" => {
+            let packet_value = request
+                .get("packet")
+                .ok_or_else(|| anyhow!("check request requires packet"))?;
+            let packet: Packet = serde_json::from_value(packet_value.clone())?;
+            let source = normalize_ids(packet.triads.clone(), "t");
+            let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+            Ok(serde_json::to_value(make_report(
+                &packet,
+                &source,
+                &candidates,
+            )?)?)
+        }
+        other => Err(anyhow!("unsupported serve command: {other}")),
+    }
+}
+
 fn doctor_cmd(args: DoctorArgs) -> Result<u8> {
+    let out = doctor_value();
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_doctor_text(&out),
+        OutputFormat::Md => print_doctor_md(&out),
+    }
+    if out["healthy"].as_bool().unwrap_or(false) {
+        Ok(EXIT_PASS)
+    } else {
+        Ok(EXIT_VETO)
+    }
+}
+
+fn doctor_value() -> Value {
     let route_trap = builtin_route_trap_packet(false);
     let trap_result = interference_search(
         &route_trap,
@@ -2484,7 +2615,7 @@ fn doctor_cmd(args: DoctorArgs) -> Result<u8> {
             .as_bool()
             .unwrap_or(true);
     let healthy = trap_ok && noisy_ok;
-    let out = json!({
+    json!({
         "core_version": CORE_VERSION,
         "wave_dim": WAVE_DIM,
         "mode": "doctor",
@@ -2507,17 +2638,7 @@ fn doctor_cmd(args: DoctorArgs) -> Result<u8> {
             "safe_to_answer": noisy_result["peak_decision"]["safe_to_answer"],
             "peak_margin": noisy_result["peak_margin"]
         }
-    });
-    match args.format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
-        OutputFormat::Text => print_doctor_text(&out),
-        OutputFormat::Md => print_doctor_md(&out),
-    }
-    if healthy {
-        Ok(EXIT_PASS)
-    } else {
-        Ok(EXIT_VETO)
-    }
+    })
 }
 
 fn print_doctor_text(out: &Value) {
@@ -3081,6 +3202,7 @@ fn interference_search(
         .to_string();
     let lexical_peak = lexical_baseline["top_peak"].as_str().unwrap_or("");
     let peak_decision = peak_decision(&peaks, peak_margin, lexical_peak);
+    let field_interpretation = field_interpretation(&peaks, peak_margin, &lexical_baseline);
     let mut output_peaks = peaks;
     output_peaks.truncate(top_k);
 
@@ -3103,8 +3225,83 @@ fn interference_search(
         "lexical_baseline": lexical_baseline,
         "wins_over_lexical_baseline": !lexical_peak.is_empty() && top_peak.as_str() != lexical_peak,
         "peak_decision": peak_decision,
+        "field_interpretation": field_interpretation,
         "peaks": output_peaks,
         "interpretation": "A peak is a route/group whose triads resonate together with the partial query. Read support as the focused structure and anti_triads as similar-but-foreign pulls."
+    })
+}
+
+fn field_interpretation(peaks: &[Value], margin: f64, lexical_baseline: &Value) -> Value {
+    if peaks.is_empty() {
+        return json!({
+            "state": "NO_FIELD",
+            "read_as": "No resonance field was produced."
+        });
+    }
+    let top = &peaks[0];
+    let second = peaks.get(1);
+    let top_name = top["peak"].as_str().unwrap_or("");
+    let second_name = second.and_then(|peak| peak["peak"].as_str()).unwrap_or("");
+    let lexical_peak = lexical_baseline["top_peak"].as_str().unwrap_or("");
+    let top_component = top["propagation"]["component_score"]
+        .as_f64()
+        .unwrap_or(0.0);
+    let second_component = second
+        .and_then(|peak| peak["propagation"]["component_score"].as_f64())
+        .unwrap_or(0.0);
+    let component_gap = round4(top_component - second_component);
+    let stability = if margin >= 0.06 && component_gap >= 0.12 {
+        "stable"
+    } else if margin < 0.04 {
+        "contested"
+    } else {
+        "thin"
+    };
+    let top_center = &top["center"];
+    let second_center = second.map(|peak| &peak["center"]);
+    let centroid_drift = json!({
+        "from_second_peak": second_name,
+        "route": center_pair(second_center, top_center, "route"),
+        "relation": center_pair(second_center, top_center, "relation"),
+        "entity": center_pair(second_center, top_center, "entity"),
+        "subject_role": center_pair(second_center, top_center, "subject_role"),
+        "object_role": center_pair(second_center, top_center, "object_role")
+    });
+    let nearest_foreign_pull = top["anti_triads"]
+        .as_array()
+        .and_then(|items| items.first())
+        .cloned()
+        .unwrap_or_else(|| json!(null));
+    let lexical_trap = !lexical_peak.is_empty() && lexical_peak != top_name;
+    json!({
+        "state": stability,
+        "top_peak": top_name,
+        "second_peak": second_name,
+        "margin": round4(margin),
+        "component_gap": component_gap,
+        "lexical_baseline_top": lexical_peak,
+        "lexical_trap_detected": lexical_trap,
+        "centroid_drift": centroid_drift,
+        "nearest_foreign_pull": nearest_foreign_pull,
+        "read_as": if lexical_trap {
+            "The structural field beats the lexical baseline; inspect support and anti-triads before final prose."
+        } else if stability == "stable" {
+            "The top route has a stable connected peak."
+        } else {
+            "The field is useful as retrieval context but is not a final answer skeleton."
+        }
+    })
+}
+
+fn center_pair(second_center: Option<&Value>, top_center: &Value, key: &str) -> Value {
+    json!({
+        "from": second_center
+            .and_then(|center| center[key].as_str())
+            .unwrap_or(""),
+        "to": top_center[key].as_str().unwrap_or(""),
+        "changed": second_center
+            .and_then(|center| center[key].as_str())
+            .unwrap_or("") != top_center[key].as_str().unwrap_or("")
     })
 }
 

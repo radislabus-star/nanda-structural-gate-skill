@@ -97,6 +97,8 @@ scripts/nanda-index memory-a.json memory-b.md --out .nanda/index.json
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-feedback .nanda/search.json --decision watch --note "margin too low"
+scripts/nanda-eval --suite examples/eval-corpus.json
+printf '{"command":"doctor"}\n' | scripts/nanda-serve
 scripts/nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
 scripts/nanda-doctor
 scripts/nanda-dogfood .
@@ -106,7 +108,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v1.0-release`, prefer `foreign_pull` when deciding what to
+In `v1.1-agent-field`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-dogfood .` inside a repository that has
@@ -122,11 +124,14 @@ Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with
 support, anti-triads, missing edges, and an answer projection.
+Use `nanda-serve` when several checks/searches will run in one agent turn. It
+keeps one process alive and accepts JSONL requests, avoiding per-call process
+startup overhead.
 Use `nanda-feedback` after search when the agent has decided whether the peak
 was useful. It writes an accept/reject/WATCH memory trace that can be kept next
 to the task index.
 Use `nanda-eval` before trusting a changed interference rule. It checks expected
-peak/state pairs and exits non-zero on regression.
+peak/state pairs from `--case` or `--suite` and exits non-zero on regression.
 Use `nanda-doctor` after installing or copying the skill. It runs the built-in
 focused/noisy interference smoke checks without external files.
 Use `peak_margin` and `lexical_baseline` to interpret confidence. A low margin
@@ -136,6 +141,9 @@ peak beat the route that a plain lexical search would have selected.
 Check `propagation.component_score` when explaining why: it shows whether the
 winning peak is one connected route or just a pile of individually similar
 triads.
+Check `field_interpretation` when explaining WAW behavior: it names the lexical
+trap, center drift, nearest foreign pull, and whether the field is stable,
+thin, or contested.
 Use `peak_decision.safe_to_answer` as the final retrieval trust gate. A found
 peak with `WATCH` state is useful context, not a final answer skeleton.
 
@@ -189,6 +197,8 @@ scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index code-flow.json --input-format json --out .nanda/index.json
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-feedback .nanda/search.json --decision accept
+scripts/nanda-eval --suite examples/eval-corpus.json
+printf '{"command":"doctor"}\n' | scripts/nanda-serve
 scripts/nanda-eval --case route-trap.json:certification:FOCUSED
 scripts/nanda-doctor
 scripts/nanda-comb code-flow.json --input-format json --depth 2 --out-dir comb/
@@ -210,7 +220,7 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v1.0 indexed route finder: use its top peak as a structural
+- `nanda-search` is the v1.1 indexed route finder: use its top peak as a structural
   candidate route, then verify evidence before final prose.
 
 For Codex skill or repository readiness checks:

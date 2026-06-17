@@ -115,6 +115,7 @@ evidence-conflict tasks do.
         ├── nanda-index
         ├── nanda-map
         ├── nanda-search
+        ├── nanda-serve
         └── nanda-self-check
 ```
 
@@ -200,6 +201,8 @@ nanda-search examples/triad-packet.interference-search-route-trap.json --input-f
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 > .nanda/search.json
 nanda-feedback .nanda/search.json --decision accept --note "accepted focused peak"
 nanda-eval --case examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED --case examples/triad-packet.interference-search-noisy.json:certification:WATCH
+nanda-eval --suite examples/eval-corpus.json
+printf '{"command":"doctor"}\n' | nanda-serve
 nanda-doctor
 nanda-dogfood .
 nanda-self-check
@@ -245,16 +248,20 @@ line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v1.0 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the v1.1 memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, and an answer projection.
+`nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
+requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
+or `{"command":"search","packet":...}`.
 `nanda-feedback` is the feedback-memory surface. It records whether a search
 peak was accepted, rejected, or kept under WATCH, together with margin, support
 ids, anti ids, and a compact memory patch.
 `nanda-eval` is the regression surface. It checks expected peak/state pairs
-so interference changes are measured before they are trusted.
-`nanda-doctor` is the v1.0 release smoke test. It runs built-in focused/noisy
+from `--case` or `--suite`, so interference changes are measured before they
+are trusted.
+`nanda-doctor` is the v1.1 release smoke test. It runs built-in focused/noisy
 interference checks without needing repository example files.
 
 Self-check modes:
@@ -283,16 +290,17 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v1.0-release
+core_version: sparse-triad-v1.1-agent-field
 wave_dim: 1024
 ```
 
-`v1.0-release` keeps recursive topology combing, v0.5 structural peak search,
-v0.6 reusable memory indexes, v0.7 arrow-text extraction, v0.8 feedback
-packets, and v0.9 regression evaluation, then adds a self-contained doctor
-check. The search path is intentionally small and universal: encode triads as
-slot-bound waves, superpose a partial query, score memory routes/groups by
-interference, then interpret, record, test, and smoke-check the top peaks.
+`v1.1-agent-field` keeps recursive topology combing, structural peak search,
+reusable memory indexes, arrow-text extraction, feedback packets, regression
+evaluation, and release doctor checks, then adds eval corpus loading, JSONL
+serve mode, and richer field interpretation. The search path is intentionally
+small and universal: encode triads as slot-bound waves, superpose a partial
+query, score memory routes/groups by interference, then interpret, record,
+test, and smoke-check the top peaks.
 If `foreign_pull` is non-empty, strict gate output is not `PASS`; repair the
 named candidate triads or split the route first.
 
@@ -306,6 +314,9 @@ lexical_baseline
 wins_over_lexical_baseline
 peak_decision.state
 peak_decision.safe_to_answer
+field_interpretation.state
+field_interpretation.lexical_trap_detected
+field_interpretation.centroid_drift
 propagation.component_score
 center
 supporting_triads
@@ -349,6 +360,8 @@ nanda-index memory-a.json memory-b.md --out .nanda/index.json
 nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 nanda-feedback .nanda/search.json --decision watch --note "margin too low"
 nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
+nanda-eval --suite examples/eval-corpus.json
+printf '{"command":"doctor"}\n' | nanda-serve
 nanda-doctor
 nanda-comb big-flow.json --input-format json --depth 2 --out-dir comb/
 nanda-map big-flow.md --domain code --normalize-paths
@@ -391,7 +404,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v1.0.1`.
+Current release: `v1.1.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -401,6 +414,8 @@ scripts/test-local.sh
 scripts/test-edge-cases.sh
 scripts/benchmark-v0.sh
 nanda-doctor
+nanda-eval --suite examples/eval-corpus.json
+nanda-dogfood . --format json
 nanda-dogfood . --format json
 ```
 
