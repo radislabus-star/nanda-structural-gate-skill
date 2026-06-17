@@ -300,8 +300,8 @@ cache-resident layout and returns `FITS_L3`, `FOCUS_REQUIRED`,
 dictionaries and sample `PackedTriad32` records from a packet, proving that the
 string/JSON world can be reduced to the planned fixed records before packed
 interference search exists. It also reports a fixed 1024-dimensional packed
-projection wave summary and first route/group centroid summaries from those
-records, including a first packed query-vs-centroid peak score.
+candidate/query projection wave summary, memory/source route/group centroid
+summaries, and a first packed candidate-query-vs-memory-centroid peak score.
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.

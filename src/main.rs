@@ -3166,7 +3166,8 @@ fn nanda_6m_pack_report(
     let mut groups = IdDictionary::default();
     let mut evidences = IdDictionary::default();
     let mut roles = IdDictionary::default();
-    let mut packed = Vec::with_capacity(source.len() + candidates.len());
+    let mut memory_packed = Vec::with_capacity(source.len());
+    let mut query_packed = Vec::with_capacity(candidates.len());
     let mut blockers = vec![];
 
     for triad in source {
@@ -3180,7 +3181,7 @@ fn nanda_6m_pack_report(
             &mut evidences,
             &mut roles,
         ) {
-            Ok(record) => packed.push(record),
+            Ok(record) => memory_packed.push(record),
             Err(err) => blockers.push(err),
         }
     }
@@ -3195,17 +3196,34 @@ fn nanda_6m_pack_report(
             &mut evidences,
             &mut roles,
         ) {
-            Ok(record) => packed.push(record),
+            Ok(record) => query_packed.push(record),
             Err(err) => blockers.push(err),
         }
     }
 
-    let projection = nanda_6m::project_triads(&packed);
+    let query_records = if query_packed.is_empty() {
+        &memory_packed
+    } else {
+        &query_packed
+    };
+    let projection_source = if query_packed.is_empty() {
+        "memory_fallback"
+    } else {
+        "candidate_triads"
+    };
+    let packed_count = memory_packed.len() + query_packed.len();
+    let sample_records = memory_packed
+        .iter()
+        .chain(query_packed.iter())
+        .take(sample)
+        .map(packed_triad_json)
+        .collect::<Vec<_>>();
+    let projection = nanda_6m::project_triads(query_records);
     let projection_summary = projection.summary();
     let route_centroids =
-        packed_centroid_report(&packed, &projection, CentroidAxis6m::Route, sample);
+        packed_centroid_report(&memory_packed, &projection, CentroidAxis6m::Route, sample);
     let group_centroids =
-        packed_centroid_report(&packed, &projection, CentroidAxis6m::Group, sample);
+        packed_centroid_report(&memory_packed, &projection, CentroidAxis6m::Group, sample);
     let route_peak = packed_peak_summary(&route_centroids);
     let group_peak = packed_peak_summary(&group_centroids);
     let dictionary_ok = blockers.is_empty()
@@ -3223,17 +3241,17 @@ fn nanda_6m_pack_report(
         "packed_ok": packed_ok,
         "budget": budget,
         "packed_records": {
-            "count": packed.len(),
-            "bytes": packed.len() * nanda_6m::TRIAD_BYTES,
+            "count": packed_count,
+            "memory_count": memory_packed.len(),
+            "query_count": query_packed.len(),
+            "bytes": packed_count * nanda_6m::TRIAD_BYTES,
             "record_bytes": nanda_6m::TRIAD_BYTES,
-            "sample": packed
-                .iter()
-                .take(sample)
-                .map(packed_triad_json)
-                .collect::<Vec<_>>()
+            "sample": sample_records
         },
         "projection": {
             "mode": "packed-triad-signed-hash",
+            "source": projection_source,
+            "records": query_records.len(),
             "wave_dim": nanda_6m::WAVE_DIM,
             "bytes": nanda_6m::QUERY_WAVE_BYTES,
             "summary": {
@@ -3245,6 +3263,7 @@ fn nanda_6m_pack_report(
             "sample": projection.values.iter().take(8).copied().collect::<Vec<_>>()
         },
         "centroids": {
+            "source": "memory_triads",
             "record_bytes": nanda_6m::CENTROID_BYTES,
             "route_count": route_centroids.len(),
             "group_count": group_centroids.len(),
@@ -3253,7 +3272,7 @@ fn nanda_6m_pack_report(
             "group": group_centroids
         },
         "peaks": {
-            "mode": "packed-query-vs-centroid-cosine",
+            "mode": "packed-candidate-query-vs-memory-centroid-cosine",
             "route": route_peak,
             "group": group_peak
         },
@@ -3266,7 +3285,7 @@ fn nanda_6m_pack_report(
             "roles": dictionary_summary(&roles, u8::MAX as usize)
         },
         "blockers": blockers,
-        "hot_core_note": "This command still runs in the cold layer. It proves deterministic ID packing into PackedTriad32 records and a fixed packed projection wave; it does not execute packed interference search yet."
+        "hot_core_note": "This command still runs in the cold layer. It now separates memory/source centroids from the candidate/query projection wave, proving the first honest packed peak path before full packed interference search."
     })
 }
 
@@ -3522,12 +3541,16 @@ fn print_pack6m_text(out: &Value) {
     );
     println!("packed_ok: {}", out["packed_ok"].as_bool().unwrap_or(false));
     println!(
-        "records: {} / bytes {}",
+        "records: {} / memory {} / query {} / bytes {}",
         out["packed_records"]["count"].as_u64().unwrap_or(0),
+        out["packed_records"]["memory_count"].as_u64().unwrap_or(0),
+        out["packed_records"]["query_count"].as_u64().unwrap_or(0),
         out["packed_records"]["bytes"].as_u64().unwrap_or(0)
     );
     println!(
-        "projection: dim {} / energy {}",
+        "projection: {} / records {} / dim {} / energy {}",
+        out["projection"]["source"].as_str().unwrap_or("unknown"),
+        out["projection"]["records"].as_u64().unwrap_or(0),
         out["projection"]["wave_dim"].as_u64().unwrap_or(0),
         out["projection"]["summary"]["energy"].as_u64().unwrap_or(0)
     );
@@ -3562,8 +3585,20 @@ fn print_pack6m_md(out: &Value) {
         out["packed_records"]["count"].as_u64().unwrap_or(0)
     );
     println!(
+        "- memory_records: `{}`",
+        out["packed_records"]["memory_count"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- query_records: `{}`",
+        out["packed_records"]["query_count"].as_u64().unwrap_or(0)
+    );
+    println!(
         "- bytes: `{}`",
         out["packed_records"]["bytes"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- projection_source: `{}`",
+        out["projection"]["source"].as_str().unwrap_or("unknown")
     );
     println!(
         "- projection_energy: `{}`",

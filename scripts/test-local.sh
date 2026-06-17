@@ -323,16 +323,16 @@ jq -e '.capacity.triads == 65536' <<<"$budget_json" >/dev/null
 pack6m_json="$("$pack6m" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json)"
 jq -e '.mode == "nanda-6m-pack-skeleton"' <<<"$pack6m_json" >/dev/null
 jq -e '.state == "PACKED_FITS_L3" and .packed_ok == true' <<<"$pack6m_json" >/dev/null
-jq -e '.packed_records.count == 10 and .packed_records.record_bytes == 32' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_records.count == 10 and .packed_records.memory_count == 8 and .packed_records.query_count == 2 and .packed_records.record_bytes == 32' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_records.sample[0].wave_seed > 0 and .packed_records.sample[0].check > 0' <<<"$pack6m_json" >/dev/null
 jq -e '.dictionaries.entities.fits == true and .dictionaries.roles.fits == true' <<<"$pack6m_json" >/dev/null
-jq -e '.projection.wave_dim == 1024 and .projection.bytes == 2048' <<<"$pack6m_json" >/dev/null
+jq -e '.projection.source == "candidate_triads" and .projection.records == 2 and .projection.wave_dim == 1024 and .projection.bytes == 2048' <<<"$pack6m_json" >/dev/null
 jq -e '.projection.summary.nonzero > 0 and .projection.summary.energy > 0' <<<"$pack6m_json" >/dev/null
 jq -e '.projection.sample | length == 8' <<<"$pack6m_json" >/dev/null
-jq -e '.centroids.record_bytes == 1024 and .centroids.route_count == 4 and .centroids.group_count == 4' <<<"$pack6m_json" >/dev/null
-jq -e '.centroids.total_count == 8 and .centroids.route[0].summary.energy > 0' <<<"$pack6m_json" >/dev/null
+jq -e '.centroids.source == "memory_triads" and .centroids.record_bytes == 1024 and .centroids.route_count == 3 and .centroids.group_count == 3' <<<"$pack6m_json" >/dev/null
+jq -e '.centroids.total_count == 6 and .centroids.route[0].summary.energy > 0' <<<"$pack6m_json" >/dev/null
 jq -e '.centroids.route[0].score.cosine > 0' <<<"$pack6m_json" >/dev/null
-jq -e '.peaks.mode == "packed-query-vs-centroid-cosine"' <<<"$pack6m_json" >/dev/null
+jq -e '.peaks.mode == "packed-candidate-query-vs-memory-centroid-cosine"' <<<"$pack6m_json" >/dev/null
 jq -e '.peaks.route.state == "PEAK_FOUND" and .peaks.route.top_score > 0 and .peaks.route.margin >= 0' <<<"$pack6m_json" >/dev/null
 jq -e '.peaks.group.state == "PEAK_FOUND" and .peaks.group.top_score > 0 and .peaks.group.margin >= 0' <<<"$pack6m_json" >/dev/null
 doctor_json="$("$doctor")"
