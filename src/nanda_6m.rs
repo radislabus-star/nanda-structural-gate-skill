@@ -102,6 +102,40 @@ impl Default for PackedCentroid1024 {
     }
 }
 
+impl PackedCentroid1024 {
+    pub fn from_wave(wave: &PackedWave1024, count: usize) -> Self {
+        let divisor = count.max(1) as i32;
+        let mut centroid = Self::default();
+        for (out, value) in centroid.values.iter_mut().zip(wave.values.iter()) {
+            let averaged = (*value as i32 / divisor).clamp(i8::MIN as i32, i8::MAX as i32);
+            *out = averaged as i8;
+        }
+        centroid
+    }
+
+    pub fn summary(&self) -> CentroidSummary {
+        let mut l1: u64 = 0;
+        let mut energy: u64 = 0;
+        let mut nonzero: usize = 0;
+        let mut max_abs: i8 = 0;
+        for value in self.values {
+            let abs = value.saturating_abs();
+            if abs != 0 {
+                nonzero += 1;
+            }
+            max_abs = max_abs.max(abs);
+            l1 += abs as u64;
+            energy += (value as i64 * value as i64) as u64;
+        }
+        CentroidSummary {
+            l1,
+            energy,
+            nonzero,
+            max_abs,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PackedLane64 {
@@ -213,8 +247,21 @@ pub struct WaveSummary {
     pub max_abs: i16,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CentroidSummary {
+    pub l1: u64,
+    pub energy: u64,
+    pub nonzero: usize,
+    pub max_abs: i8,
+}
+
 pub fn project_triads(triads: &[PackedTriad32]) -> PackedWave1024 {
     PackedWave1024::from_triads(triads)
+}
+
+pub fn centroid_from_triads(triads: &[PackedTriad32]) -> PackedCentroid1024 {
+    let wave = project_triads(triads);
+    PackedCentroid1024::from_wave(&wave, triads.len())
 }
 
 fn projection_seed(triad: &PackedTriad32) -> u64 {
@@ -305,6 +352,47 @@ mod tests {
         assert_eq!(left, right);
         let summary = left.summary();
         assert_eq!(summary.nonzero, WAVE_DIM);
+        assert!(summary.energy > 0);
+        assert!(summary.max_abs > 0);
+    }
+
+    #[test]
+    fn packed_centroid_is_quantized_and_nonzero() {
+        let triads = [
+            PackedTriad32::new(PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 3,
+                wave_seed: 4,
+                relation_id: 5,
+                route_id: 6,
+                group_id: 7,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 9,
+            }),
+            PackedTriad32::new(PackedTriadInput {
+                subject_id: 2,
+                object_id: 3,
+                evidence_ref: 4,
+                wave_seed: 9,
+                relation_id: 5,
+                route_id: 6,
+                group_id: 7,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 10,
+                confidence: 230,
+                polarity: 9,
+            }),
+        ];
+        let centroid = centroid_from_triads(&triads);
+        let summary = centroid.summary();
+        assert!(summary.nonzero > 0);
         assert!(summary.energy > 0);
         assert!(summary.max_abs > 0);
     }

@@ -3202,6 +3202,8 @@ fn nanda_6m_pack_report(
 
     let projection = nanda_6m::project_triads(&packed);
     let projection_summary = projection.summary();
+    let route_centroids = packed_centroid_report(&packed, CentroidAxis6m::Route, sample);
+    let group_centroids = packed_centroid_report(&packed, CentroidAxis6m::Group, sample);
     let dictionary_ok = blockers.is_empty()
         && relations.len() <= u16::MAX as usize
         && routes.len() <= u16::MAX as usize
@@ -3238,6 +3240,14 @@ fn nanda_6m_pack_report(
             },
             "sample": projection.values.iter().take(8).copied().collect::<Vec<_>>()
         },
+        "centroids": {
+            "record_bytes": nanda_6m::CENTROID_BYTES,
+            "route_count": route_centroids.len(),
+            "group_count": group_centroids.len(),
+            "total_count": route_centroids.len() + group_centroids.len(),
+            "route": route_centroids,
+            "group": group_centroids
+        },
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
             "relations": dictionary_summary(&relations, u16::MAX as usize),
@@ -3249,6 +3259,46 @@ fn nanda_6m_pack_report(
         "blockers": blockers,
         "hot_core_note": "This command still runs in the cold layer. It proves deterministic ID packing into PackedTriad32 records and a fixed packed projection wave; it does not execute packed interference search yet."
     })
+}
+
+#[derive(Clone, Copy)]
+enum CentroidAxis6m {
+    Route,
+    Group,
+}
+
+fn packed_centroid_report(
+    packed: &[nanda_6m::PackedTriad32],
+    axis: CentroidAxis6m,
+    sample: usize,
+) -> Vec<Value> {
+    let mut by_id: BTreeMap<u16, Vec<nanda_6m::PackedTriad32>> = BTreeMap::new();
+    for triad in packed {
+        let id = match axis {
+            CentroidAxis6m::Route => triad.route_id,
+            CentroidAxis6m::Group => triad.group_id,
+        };
+        by_id.entry(id).or_default().push(*triad);
+    }
+    by_id
+        .iter()
+        .take(sample)
+        .map(|(id, triads)| {
+            let centroid = nanda_6m::centroid_from_triads(triads);
+            let summary = centroid.summary();
+            json!({
+                "id": id,
+                "triads": triads.len(),
+                "summary": {
+                    "l1": summary.l1,
+                    "energy": summary.energy,
+                    "nonzero": summary.nonzero,
+                    "max_abs": summary.max_abs
+                },
+                "sample": centroid.values.iter().take(8).copied().collect::<Vec<_>>()
+            })
+        })
+        .collect()
 }
 
 #[derive(Default)]
@@ -3438,6 +3488,11 @@ fn print_pack6m_text(out: &Value) {
         out["projection"]["summary"]["energy"].as_u64().unwrap_or(0)
     );
     println!(
+        "centroids: route {} / group {}",
+        out["centroids"]["route_count"].as_u64().unwrap_or(0),
+        out["centroids"]["group_count"].as_u64().unwrap_or(0)
+    );
+    println!(
         "budget: {} / {}",
         out["budget"]["estimated_hot_bytes"].as_u64().unwrap_or(0),
         out["budget"]["hard_budget_bytes"].as_u64().unwrap_or(0)
@@ -3462,6 +3517,11 @@ fn print_pack6m_md(out: &Value) {
     println!(
         "- projection_energy: `{}`",
         out["projection"]["summary"]["energy"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- centroids: route `{}` / group `{}`",
+        out["centroids"]["route_count"].as_u64().unwrap_or(0),
+        out["centroids"]["group_count"].as_u64().unwrap_or(0)
     );
     println!(
         "- budget: `{}/{}`",

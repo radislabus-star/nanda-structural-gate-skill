@@ -329,6 +329,8 @@ jq -e '.dictionaries.entities.fits == true and .dictionaries.roles.fits == true'
 jq -e '.projection.wave_dim == 1024 and .projection.bytes == 2048' <<<"$pack6m_json" >/dev/null
 jq -e '.projection.summary.nonzero > 0 and .projection.summary.energy > 0' <<<"$pack6m_json" >/dev/null
 jq -e '.projection.sample | length == 8' <<<"$pack6m_json" >/dev/null
+jq -e '.centroids.record_bytes == 1024 and .centroids.route_count == 4 and .centroids.group_count == 4' <<<"$pack6m_json" >/dev/null
+jq -e '.centroids.total_count == 8 and .centroids.route[0].summary.energy > 0' <<<"$pack6m_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null
