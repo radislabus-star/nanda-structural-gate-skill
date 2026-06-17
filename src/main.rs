@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.5-probe-report";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.5-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.6-feedback-memory";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.6-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -506,6 +506,8 @@ struct Packet {
     candidate_answer: String,
     #[serde(default)]
     negative_shortcuts: Vec<NegativeShortcut>,
+    #[serde(default)]
+    positive_shortcuts: Vec<PositiveShortcut>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -544,6 +546,38 @@ struct NegativeShortcut {
 
 fn default_negative_penalty() -> f64 {
     0.18
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct PositiveShortcut {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    reinforce_peak: String,
+    #[serde(default)]
+    reinforce_route: String,
+    #[serde(default)]
+    reinforce_group: String,
+    #[serde(default = "default_positive_boost")]
+    boost: f64,
+    #[serde(default)]
+    terms: Vec<String>,
+    #[serde(default)]
+    support_terms: Vec<String>,
+    #[serde(default)]
+    reason: String,
+    #[serde(default)]
+    source_feedback: String,
+    #[serde(default = "default_one_usize")]
+    observations: usize,
+    #[serde(default)]
+    accepted_count: usize,
+    #[serde(default)]
+    rejected_count: usize,
+}
+
+fn default_positive_boost() -> f64 {
+    0.08
 }
 
 fn default_one_usize() -> usize {
@@ -722,6 +756,7 @@ fn load_packet(path: Option<&Path>) -> Result<Packet> {
             candidate_triads: vec![],
             candidate_answer: String::new(),
             negative_shortcuts: vec![],
+            positive_shortcuts: vec![],
         }),
     }
 }
@@ -1937,6 +1972,7 @@ fn init_task(args: InitTaskArgs) -> Result<u8> {
         candidate_triads: vec![],
         candidate_answer: String::new(),
         negative_shortcuts: vec![],
+        positive_shortcuts: vec![],
     };
     let output = serde_json::to_string_pretty(&packet)? + "\n";
     write_or_print(
@@ -2085,6 +2121,7 @@ fn split_packet(args: SplitPacketArgs) -> Result<u8> {
                     candidate_triads: split.candidates.clone(),
                     candidate_answer: packet.candidate_answer.clone(),
                     negative_shortcuts: packet.negative_shortcuts.clone(),
+                    positive_shortcuts: packet.positive_shortcuts.clone(),
                 };
                 fs::write(&path, serde_json::to_string_pretty(&split_packet)? + "\n")?;
             }
@@ -2754,9 +2791,11 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
     }
     let mut triads = vec![];
     let mut negative_shortcuts = vec![];
+    let mut positive_shortcuts = vec![];
     for input in &args.inputs {
-        if let Some(shortcuts) = load_feedback_negative_shortcuts(input)? {
-            negative_shortcuts.extend(shortcuts);
+        if let Some((negative, positive)) = load_feedback_lanes(input)? {
+            negative_shortcuts.extend(negative);
+            positive_shortcuts.extend(positive);
             continue;
         }
         let packet = load_packet_auto(
@@ -2772,9 +2811,11 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
             triads.extend(packet.candidate_triads);
         }
         negative_shortcuts.extend(packet.negative_shortcuts);
+        positive_shortcuts.extend(packet.positive_shortcuts);
     }
     let triads = dedup_triads(triads);
     let negative_shortcuts = merge_negative_shortcuts(negative_shortcuts);
+    let positive_shortcuts = merge_positive_shortcuts(positive_shortcuts);
     let packet = json!({
         "task_id": args.task_id,
         "domain": args.domain,
@@ -2783,6 +2824,7 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
         "candidate_triads": [],
         "candidate_answer": "",
         "negative_shortcuts": negative_shortcuts,
+        "positive_shortcuts": positive_shortcuts,
         "index": {
             "core_version": CORE_VERSION,
             "wave_dim": WAVE_DIM,
@@ -2800,6 +2842,12 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
 }
 
 fn load_feedback_negative_shortcuts(path: &Path) -> Result<Option<Vec<NegativeShortcut>>> {
+    Ok(load_feedback_lanes(path)?.map(|(negative, _)| negative))
+}
+
+fn load_feedback_lanes(
+    path: &Path,
+) -> Result<Option<(Vec<NegativeShortcut>, Vec<PositiveShortcut>)>> {
     if !path
         .extension()
         .and_then(|ext| ext.to_str())
@@ -2813,14 +2861,21 @@ fn load_feedback_negative_shortcuts(path: &Path) -> Result<Option<Vec<NegativeSh
     if value["mode"].as_str() != Some("feedback-memory") {
         return Ok(None);
     }
-    let shortcuts = value["negative_shortcuts"]
+    let negative = value["negative_shortcuts"]
         .as_array()
         .cloned()
         .unwrap_or_default()
         .into_iter()
         .map(serde_json::from_value)
         .collect::<std::result::Result<Vec<NegativeShortcut>, _>>()?;
-    Ok(Some(shortcuts))
+    let positive = value["positive_shortcuts"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(serde_json::from_value)
+        .collect::<std::result::Result<Vec<PositiveShortcut>, _>>()?;
+    Ok(Some((negative, positive)))
 }
 
 fn merge_negative_shortcuts(shortcuts: Vec<NegativeShortcut>) -> Vec<NegativeShortcut> {
@@ -2913,6 +2968,63 @@ fn normalized_shortcut_terms(terms: &[String]) -> BTreeSet<String> {
         .collect()
 }
 
+fn merge_positive_shortcuts(shortcuts: Vec<PositiveShortcut>) -> Vec<PositiveShortcut> {
+    let mut merged: BTreeMap<(String, String, String, String, String), PositiveShortcut> =
+        BTreeMap::new();
+    for mut shortcut in shortcuts {
+        if shortcut.observations == 0 {
+            shortcut.observations = 1;
+        }
+        if shortcut.accepted_count == 0 && shortcut.rejected_count == 0 {
+            shortcut.accepted_count = shortcut.observations;
+        }
+        shortcut.terms = normalized_shortcut_terms(&shortcut.terms)
+            .into_iter()
+            .collect::<Vec<_>>();
+        shortcut.support_terms = normalized_shortcut_terms(&shortcut.support_terms)
+            .into_iter()
+            .collect::<Vec<_>>();
+        let key = (
+            norm(&shortcut.reinforce_peak),
+            norm(&shortcut.reinforce_route),
+            norm(&shortcut.reinforce_group),
+            shortcut.terms.join("|"),
+            shortcut.support_terms.join("|"),
+        );
+        merged
+            .entry(key)
+            .and_modify(|existing| {
+                existing.observations += shortcut.observations;
+                existing.accepted_count += shortcut.accepted_count;
+                existing.rejected_count += shortcut.rejected_count;
+                existing.boost = existing.boost.max(shortcut.boost);
+                if existing.reason.is_empty() {
+                    existing.reason = shortcut.reason.clone();
+                }
+                if existing.reinforce_route.is_empty() {
+                    existing.reinforce_route = shortcut.reinforce_route.clone();
+                }
+                if existing.reinforce_group.is_empty() {
+                    existing.reinforce_group = shortcut.reinforce_group.clone();
+                }
+                if !shortcut.source_feedback.is_empty() {
+                    if existing.source_feedback.is_empty() {
+                        existing.source_feedback = shortcut.source_feedback.clone();
+                    } else if !existing
+                        .source_feedback
+                        .split(';')
+                        .any(|item| item == shortcut.source_feedback)
+                    {
+                        existing.source_feedback.push(';');
+                        existing.source_feedback.push_str(&shortcut.source_feedback);
+                    }
+                }
+            })
+            .or_insert(shortcut);
+    }
+    merged.into_values().collect()
+}
+
 fn extract_cmd(args: ExtractArgs) -> Result<u8> {
     let text = fs::read_to_string(&args.input)
         .with_context(|| format!("read {}", args.input.display()))?;
@@ -2973,12 +3085,23 @@ fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
     } else {
         vec![]
     };
+    let positive_shortcuts = if matches!(args.decision, FeedbackDecision::Accept) {
+        vec![positive_shortcut_from_search(
+            &search,
+            &peak_name,
+            &args.note,
+            args.input.display().to_string(),
+        )]
+    } else {
+        vec![]
+    };
     let decision = feedback_decision_label(&args.decision);
     let reinforcement = match args.decision {
         FeedbackDecision::Accept => json!({
             "reinforce_peak": peak_name,
             "reinforce_support": support_ids,
-            "suppress_foreign": anti_ids
+            "suppress_foreign": anti_ids,
+            "positive_shortcuts": positive_shortcuts
         }),
         FeedbackDecision::Reject => json!({
             "reject_peak": peak_name,
@@ -3008,12 +3131,56 @@ fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
         "support_ids": support_ids,
         "anti_ids": anti_ids,
         "negative_shortcuts": negative_shortcuts,
+        "positive_shortcuts": positive_shortcuts,
         "memory_patch": reinforcement,
-        "interpretation": "Feedback is a compact trace for later memory tuning. Reject feedback creates a negative shortcut that can suppress the same false peak in later search."
+        "interpretation": "Feedback is a compact trace for later memory tuning. Reject feedback creates a negative shortcut; accept feedback creates a positive shortcut that can boost the same supported route in later search."
     });
     let output = serde_json::to_string_pretty(&feedback)? + "\n";
     write_or_print(args.out, args.stdout, output)?;
     Ok(EXIT_PASS)
+}
+
+fn positive_shortcut_from_search(
+    search: &Value,
+    peak_name: &str,
+    note: &str,
+    source_feedback: String,
+) -> PositiveShortcut {
+    let top_peak = search["peaks"].as_array().and_then(|peaks| peaks.first());
+    let reinforce_route = top_peak
+        .and_then(|peak| peak["center"]["route"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let reinforce_group = top_peak
+        .and_then(|peak| peak["center"]["group"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let support_terms = top_peak
+        .and_then(|peak| peak["supporting_triads"].as_array())
+        .map(|items| support_terms_from_items(items))
+        .unwrap_or_default();
+    let terms = query_tokens_from_search(search)
+        .into_iter()
+        .take(16)
+        .collect::<Vec<_>>();
+    PositiveShortcut {
+        id: format!("pos-{}", slug(&format!("{peak_name}-{note}"))),
+        reinforce_peak: peak_name.to_string(),
+        reinforce_route,
+        reinforce_group,
+        boost: default_positive_boost(),
+        terms,
+        support_terms,
+        reason: if note.trim().is_empty() {
+            "accepted interference peak".to_string()
+        } else {
+            note.to_string()
+        },
+        source_feedback,
+        observations: 1,
+        accepted_count: 1,
+        rejected_count: 0,
+    }
 }
 
 fn negative_shortcut_from_search(
@@ -3908,6 +4075,7 @@ fn builtin_route_trap_packet(noisy: bool) -> Packet {
         candidate_triads,
         candidate_answer: String::new(),
         negative_shortcuts: vec![],
+        positive_shortcuts: vec![],
     }
 }
 
@@ -3981,6 +4149,7 @@ fn extract_packet_from_text(text: &str, task_id: &str, domain: &str, query: &str
         candidate_triads: candidates,
         candidate_answer: String::new(),
         negative_shortcuts: vec![],
+        positive_shortcuts: vec![],
     }
 }
 
@@ -4385,6 +4554,8 @@ fn interference_search(
     }
     let destructive_interference =
         apply_negative_lanes(&mut peaks, query, &packet.negative_shortcuts);
+    let constructive_interference =
+        apply_positive_lanes(&mut peaks, query, &packet.positive_shortcuts);
     peaks.sort_by(|a, b| {
         b["score"]
             .as_f64()
@@ -4455,6 +4626,7 @@ fn interference_search(
         "wins_over_lexical_baseline": !lexical_peak.is_empty() && top_peak.as_str() != lexical_peak,
         "peak_decision": peak_decision,
         "destructive_interference": destructive_interference,
+        "constructive_interference": constructive_interference,
         "source_weighting": {
             "enabled": true,
             "policy": "confidence multiplied by evidence authority: current/canon > latest/frontier > historical/archive > archive_noise"
@@ -4464,6 +4636,71 @@ fn interference_search(
         "field_interpretation": field_interpretation,
         "peaks": output_peaks,
         "interpretation": "A peak is a route/group whose triads resonate together with the partial query. Read support as the focused structure and anti_triads as similar-but-foreign pulls."
+    })
+}
+
+fn apply_positive_lanes(
+    peaks: &mut [Value],
+    query: &[Triad],
+    shortcuts: &[PositiveShortcut],
+) -> Value {
+    let query_tokens = query_token_set(query);
+    let mut reinforcements = vec![];
+    if shortcuts.is_empty() || peaks.is_empty() {
+        return json!({
+            "applied": false,
+            "positive_lanes": shortcuts.len(),
+            "reinforcements": reinforcements
+        });
+    }
+    for shortcut in shortcuts {
+        let query_ratio = positive_lane_match_ratio(&query_tokens, shortcut);
+        if query_ratio <= 0.0 {
+            continue;
+        }
+        let accepted_count = shortcut_accepted_count(shortcut);
+        let learned_boost =
+            (shortcut.boost.max(0.0) + (accepted_count.saturating_sub(1) as f64 * 0.025)).min(0.25);
+        for peak in peaks.iter_mut() {
+            let Some(peak_name) = peak["peak"].as_str().map(str::to_string) else {
+                continue;
+            };
+            if !positive_lane_matches_reinforce(peak, shortcut) {
+                continue;
+            }
+            let support_ratio = positive_lane_support_ratio(peak, shortcut);
+            let lane_ratio = round4(query_ratio * support_ratio);
+            if lane_ratio <= 0.0 {
+                continue;
+            }
+            let boost = round4(learned_boost * lane_ratio);
+            let old_score = peak["score"].as_f64().unwrap_or(0.0);
+            let new_score = round4((old_score + boost).min(1.5));
+            if let Some(object) = peak.as_object_mut() {
+                object.insert("score".to_string(), json!(new_score));
+                object.insert("raw_score".to_string(), json!(round4(old_score)));
+                object.insert("positive_lane_boost".to_string(), json!(boost));
+            }
+            reinforcements.push(json!({
+                "shortcut": shortcut.id,
+                "reinforce_peak": peak_name,
+                "reinforce_route": shortcut.reinforce_route,
+                "reinforce_group": shortcut.reinforce_group,
+                "boost": boost,
+                "effective_boost": round4(learned_boost),
+                "match_ratio": lane_ratio,
+                "query_match_ratio": round4(query_ratio),
+                "support_match_ratio": round4(support_ratio),
+                "observations": shortcut.observations,
+                "accepted_count": accepted_count,
+                "reason": shortcut.reason
+            }));
+        }
+    }
+    json!({
+        "applied": !reinforcements.is_empty(),
+        "positive_lanes": shortcuts.len(),
+        "reinforcements": reinforcements
     })
 }
 
@@ -4571,6 +4808,17 @@ fn negative_lane_matches_prefer(peak: &Value, shortcut: &NegativeShortcut) -> bo
     )
 }
 
+fn positive_lane_matches_reinforce(peak: &Value, shortcut: &PositiveShortcut) -> bool {
+    negative_lane_matches_labels(
+        peak,
+        &[
+            shortcut.reinforce_peak.as_str(),
+            shortcut.reinforce_route.as_str(),
+            shortcut.reinforce_group.as_str(),
+        ],
+    )
+}
+
 fn negative_lane_matches_labels(peak: &Value, labels: &[&str]) -> bool {
     let peak_name = peak["peak"].as_str().unwrap_or("");
     let route = peak["center"]["route"].as_str().unwrap_or("");
@@ -4584,6 +4832,33 @@ fn negative_lane_matches_labels(peak: &Value, labels: &[&str]) -> bool {
                 || hint == norm(group)
                 || hint == norm(&composite))
     })
+}
+
+fn positive_lane_support_ratio(peak: &Value, shortcut: &PositiveShortcut) -> f64 {
+    let terms = normalized_shortcut_terms(&shortcut.support_terms);
+    if terms.is_empty() {
+        return 1.0;
+    }
+    let mut peak_terms = BTreeSet::new();
+    if let Some(items) = peak["supporting_triads"].as_array() {
+        for item in items.iter().take(8) {
+            for key in ["subject", "relation", "object", "route", "group"] {
+                if let Some(value) = item[key].as_str() {
+                    peak_terms.extend(normalized_shortcut_terms(&[value.to_string()]));
+                }
+            }
+        }
+    }
+    if peak_terms.is_empty() {
+        return 0.0;
+    }
+    let hits = terms.intersection(&peak_terms).count();
+    let ratio = hits as f64 / terms.len() as f64;
+    if ratio >= 0.35 {
+        ratio
+    } else {
+        0.0
+    }
 }
 
 fn negative_lane_support_ratio(peak: &Value, shortcut: &NegativeShortcut) -> f64 {
@@ -4613,11 +4888,42 @@ fn negative_lane_support_ratio(peak: &Value, shortcut: &NegativeShortcut) -> f64
     }
 }
 
+fn shortcut_accepted_count(shortcut: &PositiveShortcut) -> usize {
+    if shortcut.accepted_count > 0 {
+        shortcut.accepted_count
+    } else {
+        shortcut.observations.max(1)
+    }
+}
+
 fn shortcut_rejected_count(shortcut: &NegativeShortcut) -> usize {
     if shortcut.rejected_count > 0 {
         shortcut.rejected_count
     } else {
         shortcut.observations.max(1)
+    }
+}
+
+fn positive_lane_match_ratio(query_tokens: &BTreeSet<String>, shortcut: &PositiveShortcut) -> f64 {
+    if shortcut.reinforce_peak.trim().is_empty() {
+        return 0.0;
+    }
+    if shortcut.terms.is_empty() {
+        return 1.0;
+    }
+    if query_tokens.is_empty() {
+        return 0.0;
+    }
+    let terms = normalized_shortcut_terms(&shortcut.terms);
+    if terms.is_empty() {
+        return 1.0;
+    }
+    let hits = terms.intersection(query_tokens).count();
+    let ratio = hits as f64 / terms.len() as f64;
+    if ratio >= 0.5 {
+        ratio
+    } else {
+        0.0
     }
 }
 
@@ -6094,6 +6400,7 @@ fn comb_node(
         candidate_triads: candidates.to_vec(),
         candidate_answer: packet.candidate_answer.clone(),
         negative_shortcuts: packet.negative_shortcuts.clone(),
+        positive_shortcuts: packet.positive_shortcuts.clone(),
     };
     let report = make_report(&local_packet, source, candidates)?;
     let map = structural_map(source, candidates);
@@ -6804,6 +7111,7 @@ fn packet_from_markdown(
         candidate_triads,
         candidate_answer: String::new(),
         negative_shortcuts: vec![],
+        positive_shortcuts: vec![],
     })
 }
 
@@ -7184,6 +7492,7 @@ fn example_packet(swapped: bool) -> Packet {
         candidate_triads,
         candidate_answer: String::new(),
         negative_shortcuts: vec![],
+        positive_shortcuts: vec![],
     }
 }
 
@@ -7291,6 +7600,7 @@ fn synthetic_packet(idx: usize, kind: &str) -> Packet {
         candidate_triads,
         candidate_answer: String::new(),
         negative_shortcuts: vec![],
+        positive_shortcuts: vec![],
     }
 }
 

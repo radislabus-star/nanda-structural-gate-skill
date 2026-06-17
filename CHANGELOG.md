@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.6.0 - 2026-06-17
+
+Feedback-memory release.
+
+### Added
+
+- `positive_shortcuts` in triad packets for accepted route reinforcement.
+- `nanda feedback --decision accept` now emits a reusable positive shortcut
+  with `reinforce_peak`, `reinforce_route`, `reinforce_group`, query terms,
+  support terms, and `accepted_count`.
+- `nanda index` now ingests feedback-memory JSON files with both negative and
+  positive lanes, merges repeated accepts, and accumulates `accepted_count`.
+- `constructive_interference` in `nanda search` output. It reports applied
+  positive-lane boosts, effective boost, match ratios, support ratios, and
+  learned accepted counts.
+- Positive-lane fixture and Linux/Windows CI smoke coverage.
+
+### Changed
+
+- Cargo package version is now `2.6.0`.
+- Core version is now `sparse-triad-v2.6-feedback-memory`.
+- Engine id is now `nanda-check sparse-triad-v2.6-rust`.
+
 ## v2.5.1 - 2026-06-17
 
 Probe-suite completion release.

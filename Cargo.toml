@@ -1,6 +1,6 @@
 [package]
 name = "nanda-structural-gate"
-version = "2.5.1"
+version = "2.6.0"
 edition = "2021"
 license = "MIT"
 description = "Sparse-triad structural gate for agent relation checks"

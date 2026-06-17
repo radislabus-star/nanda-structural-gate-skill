@@ -265,14 +265,14 @@ line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v2.5 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the v2.6 memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, source weights, destructive
-interference, route-balanced focus, coarse-to-fine local paths, polarization,
-and an answer projection. If no `candidate_triads` exist, text from `--query`
-or packet `query` is converted into lightweight `auto_query_triads`; check
-`query.source` before trusting the peak.
+interference, constructive interference, route-balanced focus, coarse-to-fine
+local paths, polarization, and an answer projection. If no `candidate_triads`
+exist, text from `--query` or packet `query` is converted into lightweight
+`auto_query_triads`; check `query.source` before trusting the peak.
 `nanda-dataset-doctor` is the corpus-quality gate. Run it before search on
 large memory packets; it warns about route imbalance, hub dominance, duplicate
 CURRENT facts, oversized direct-search packets, and weak text-only queries.
@@ -282,7 +282,9 @@ or `{"command":"search","packet":...}`.
 `nanda-feedback` is the feedback-memory surface. It records whether a search
 peak was accepted, rejected, or kept under WATCH, together with margin, support
 ids, anti ids, and a compact memory patch. Reject feedback emits
-`negative_shortcuts`, which `nanda-index` can carry into future search.
+`negative_shortcuts`; accept feedback emits `positive_shortcuts`. `nanda-index`
+can carry both into future search, so rejected shortcuts are suppressed and
+accepted routes are constructively reinforced.
 `nanda-probe` compares the same search before and after negative lanes. Use it
 before claiming destructive interference helped. `nanda probe --suite` runs a
 probe regression corpus. `SHIFTED_TO_REVIEW` means the false shortcut moved,
@@ -322,11 +324,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v2.5-probe-report
+core_version: sparse-triad-v2.6-feedback-memory
 wave_dim: 1024
 ```
 
-`v2.5-probe-report` keeps recursive topology combing, structural peak search,
+`v2.6-feedback-memory` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -346,6 +348,8 @@ repair. Local negative lanes make destructive interference route/group-aware
 and suppress the rejected reading shape, not just a whole peak name. Probe
 reports compare before/after search so the agent can verify whether a negative
 lane really helped or merely moved uncertainty elsewhere. The
+feedback-memory layer adds positive lanes: accepted peaks become constructive
+reinforcement for the same route/group/support shape in later search. The
 `POLARITY_REVERSED` gate prevents a reversed top peak from being used as an
 answer route. The search path is intentionally small and universal: encode
 triads as slot-bound waves, superpose a partial query, score memory
@@ -377,6 +381,7 @@ field_interpretation.lexical_trap_detected
 field_interpretation.centroid_drift
 field_interpretation.corpus
 destructive_interference
+constructive_interference
 propagation.component_score
 center
 supporting_triads
@@ -423,6 +428,9 @@ nanda-index memory-a.json memory-b.md --out .nanda/index.json
 nanda-dataset-doctor .nanda/index.json --input-format json
 nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
+nanda-feedback .nanda/search.json --decision accept --note "accepted route" --out .nanda/accept.json
+nanda-index memory-a.json .nanda/accept.json --out .nanda/index-with-positive-lanes.json
+nanda-search .nanda/index-with-positive-lanes.json --input-format json --query-file query.json --query-format json --top-k 5
 nanda-feedback .nanda/search.json --decision reject --note "customs shortcut" --out .nanda/reject.json
 nanda-index memory-a.json .nanda/reject.json --out .nanda/index-with-negative-lanes.json
 nanda-probe .nanda/index-with-negative-lanes.json --input-format json --top-k 5
@@ -472,7 +480,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v2.5.1`.
+Current release: `v2.6.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -545,6 +553,15 @@ with negative lane:    certification
 suppressed_peak:       customs
 suppress_peak:         customs
 group-aware suppress:  customs-shortcut
+```
+
+Current positive-lane fixture:
+
+```text
+accepted route:        certification
+constructive boost:    applied
+reinforced peak:       certification
+reinforced group:      certification-route
 ```
 
 ## Roadmap

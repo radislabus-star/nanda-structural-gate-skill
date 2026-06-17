@@ -53,6 +53,9 @@ jobs:
       - name: Probe suite smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- probe --suite examples/probe-corpus.json --input-format json --top-k 3
 
+      - name: Positive lane smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.positive-lanes.json --input-format json --top-k 3
+
       - name: Source weighting smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 
@@ -119,6 +122,9 @@ jobs:
 
       - name: Probe suite smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- probe --suite examples/probe-corpus.json --input-format json --top-k 3
+
+      - name: Positive lane smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.positive-lanes.json --input-format json --top-k 3
 
       - name: Source weighting smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.source-weighting.json --input-format json --top-k 3

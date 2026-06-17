@@ -103,8 +103,11 @@ scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-f
 scripts/nanda-search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
 scripts/nanda-probe examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 scripts/nanda-probe --suite examples/probe-corpus.json --input-format json --top-k 3
+scripts/nanda-search examples/triad-packet.positive-lanes.json --input-format json --top-k 3
 scripts/nanda-feedback .nanda/search.json --decision reject --note "false shortcut" --out .nanda/reject.json
+scripts/nanda-feedback .nanda/search.json --decision accept --note "accepted route" --out .nanda/accept.json
 scripts/nanda-index memory.json .nanda/reject.json --out .nanda/index-with-negative-lanes.json
+scripts/nanda-index memory.json .nanda/accept.json --out .nanda/index-with-positive-lanes.json
 scripts/nanda-eval --suite examples/eval-corpus.json
 scripts/nanda-waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | scripts/nanda-serve
@@ -117,7 +120,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v2.5-probe-report`, prefer `foreign_pull` when deciding what to
+In `v2.6-feedback-memory`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-dogfood .` inside a repository that has
@@ -162,8 +165,10 @@ keeps one process alive and accepts JSONL requests, avoiding per-call process
 startup overhead.
 Use `nanda-feedback` after search when the agent has decided whether the peak
 was useful. It writes an accept/reject/WATCH memory trace that can be kept next
-to the task index. Reject feedback emits `negative_shortcuts`; include that
-feedback JSON in `nanda-index` to suppress the same false shortcut later.
+to the task index. Reject feedback emits `negative_shortcuts`; accept feedback
+emits `positive_shortcuts`. Include feedback JSON in `nanda-index` to suppress
+the same false shortcut later or constructively reinforce an accepted
+route/group/support shape.
 Use `nanda-probe` before claiming that destructive interference helped. It
 compares plain search with negative-lane search. Use `nanda probe --suite`
 before changing probe or negative-lane behavior. Treat `IMPROVED` as usable
@@ -196,6 +201,10 @@ lane can suppress a grouped peak, but support terms keep suppression local to
 the rejected reading shape. Repeated reject feedback is learned by
 `nanda-index`: duplicate negative shortcuts accumulate `rejected_count` and
 raise `effective_penalty`.
+Check `constructive_interference` after search when positive lanes exist: it
+lists which accepted route/group/support shape was reinforced, the boost,
+match ratio, support ratio, and learned `accepted_count`. Positive lanes should
+raise a specific accepted route, not a whole topic.
 Use `peak_decision.safe_to_answer` as the final retrieval trust gate. A found
 peak with `WATCH` state is useful context, not a final answer skeleton.
 
@@ -276,7 +285,7 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v2.5 indexed route finder: use its top-level
+- `nanda-search` is the v2.6 indexed route finder: use its top-level
   `verdict`, `field_state`, `safe_to_answer`, and `top_peak` as the agent
   decision contract; use its top peak as a structural
   candidate route, then verify evidence before final prose.

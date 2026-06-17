@@ -150,7 +150,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v2.5-probe-report"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v2.6-feedback-memory"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -328,7 +328,24 @@ jq -e '.mode == "feedback-memory"' "$tmp_feedback" >/dev/null
 jq -e '.decision == "accept"' "$tmp_feedback" >/dev/null
 jq -e '.peak == "certification"' "$tmp_feedback" >/dev/null
 jq -e '.memory_patch.reinforce_peak == "certification"' "$tmp_feedback" >/dev/null
-rm -f "$tmp_search" "$tmp_feedback"
+jq -e '.positive_shortcuts[0].reinforce_peak == "certification"' "$tmp_feedback" >/dev/null
+tmp_positive_index="$(mktemp)"
+"$indexer" "$root/examples/triad-packet.interference-search-route-trap.json" "$tmp_feedback" --input-format json --out "$tmp_positive_index" >/dev/null
+jq -e '.positive_shortcuts[0].accepted_count == 1' "$tmp_positive_index" >/dev/null
+positive_search_json="$("$search" "$tmp_positive_index" --input-format json --query-file "$root/examples/triad-packet.interference-search-route-trap.json" --query-format json --top-k 3)"
+jq -e '.constructive_interference.applied == true' <<<"$positive_search_json" >/dev/null
+jq -e '.constructive_interference.reinforcements[0].reinforce_peak == "certification"' <<<"$positive_search_json" >/dev/null
+jq -e '.peaks[0].positive_lane_boost > 0' <<<"$positive_search_json" >/dev/null
+tmp_feedback2="$(mktemp)"
+tmp_positive_learned_index="$(mktemp)"
+"$feedback" "$tmp_search" --decision accept --note "route trap accepted" --out "$tmp_feedback2" >/dev/null
+"$indexer" "$root/examples/triad-packet.interference-search-route-trap.json" "$tmp_feedback" "$tmp_feedback2" --input-format json --out "$tmp_positive_learned_index" >/dev/null
+jq -e '.positive_shortcuts[0].accepted_count == 2' "$tmp_positive_learned_index" >/dev/null
+learned_positive_json="$("$search" "$tmp_positive_learned_index" --input-format json --query-file "$root/examples/triad-packet.interference-search-route-trap.json" --query-format json --top-k 3)"
+jq -e '.constructive_interference.reinforcements[0].effective_boost > 0.08' <<<"$learned_positive_json" >/dev/null
+jq -e '.constructive_interference.reinforcements[0].accepted_count == 2' <<<"$learned_positive_json" >/dev/null
+rm -f "$tmp_search" "$tmp_feedback" "$tmp_positive_index"
+rm -f "$tmp_feedback2" "$tmp_positive_learned_index"
 tmp_index="$(mktemp)"
 "$indexer" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --out "$tmp_index" >/dev/null
 jq empty "$tmp_index"
@@ -358,6 +375,11 @@ probe_external_json="$("$probe" "$root/examples/triad-packet.negative-shortcut-b
 jq -e '.decision == "SHIFTED_TO_REVIEW" and .plain.top_peak == "customs" and .negative.top_peak == "certification"' <<<"$probe_external_json" >/dev/null
 probe_suite_json="$("$probe" --suite "$root/examples/probe-corpus.json" --input-format json --top-k 3)"
 jq -e '.mode == "probe-suite" and .passed == 4 and .total == 4 and .accuracy == 1' <<<"$probe_suite_json" >/dev/null
+positive_fixture_json="$("$search" "$root/examples/triad-packet.positive-lanes.json" --input-format json --top-k 3)"
+jq -e '.top_peak == "certification"' <<<"$positive_fixture_json" >/dev/null
+jq -e '.constructive_interference.applied == true' <<<"$positive_fixture_json" >/dev/null
+jq -e '.constructive_interference.reinforcements[0].reinforce_peak == "certification"' <<<"$positive_fixture_json" >/dev/null
+jq -e '.peaks[0].positive_lane_boost > 0' <<<"$positive_fixture_json" >/dev/null
 tmp_negative_search="$(mktemp)"
 tmp_negative_feedback="$(mktemp)"
 tmp_negative_index="$(mktemp)"

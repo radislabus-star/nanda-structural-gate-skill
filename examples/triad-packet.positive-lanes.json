@@ -1,0 +1,164 @@
+{
+  "task_id": "positive-lanes",
+  "domain": "business",
+  "query": "Monster payment declaration protocols route trap",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "Monster",
+      "relation": "has_route",
+      "object": "certification",
+      "evidence": "trap-memory:1",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "route",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m2",
+      "subject": "certification payment",
+      "relation": "pays_for",
+      "object": "declaration",
+      "evidence": "trap-memory:2",
+      "confidence": 0.9,
+      "subject_role": "payment",
+      "object_role": "document",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m3",
+      "subject": "declaration",
+      "relation": "requires",
+      "object": "protocols",
+      "evidence": "trap-memory:3",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m4",
+      "subject": "protocols",
+      "relation": "support",
+      "object": "certification",
+      "evidence": "trap-memory:4",
+      "confidence": 0.9,
+      "subject_role": "evidence",
+      "object_role": "route",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m5",
+      "subject": "Monster",
+      "relation": "pays_for",
+      "object": "declaration",
+      "evidence": "trap-memory:5",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "document",
+      "route": "customs",
+      "group": "customs-route"
+    },
+    {
+      "id": "m6",
+      "subject": "customs declaration",
+      "relation": "requires",
+      "object": "payment confirmation",
+      "evidence": "trap-memory:6",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "customs",
+      "group": "customs-route"
+    },
+    {
+      "id": "m7",
+      "subject": "importer",
+      "relation": "files",
+      "object": "customs declaration",
+      "evidence": "trap-memory:7",
+      "confidence": 0.9,
+      "subject_role": "company",
+      "object_role": "document",
+      "route": "customs",
+      "group": "customs-route"
+    },
+    {
+      "id": "m8",
+      "subject": "Monster",
+      "relation": "produced_by",
+      "object": "Guangzhou 998",
+      "evidence": "trap-memory:8",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "factory",
+      "route": "production",
+      "group": "production-route"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "Monster",
+      "relation": "pays_for",
+      "object": "declaration",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "product",
+      "object_role": "document",
+      "route": "",
+      "group": "query"
+    },
+    {
+      "id": "q2",
+      "subject": "declaration",
+      "relation": "requires",
+      "object": "protocols",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "",
+      "group": "query"
+    }
+  ],
+  "positive_shortcuts": [
+    {
+      "id": "pos-certification-route-trap",
+      "reinforce_peak": "certification",
+      "reinforce_route": "certification",
+      "reinforce_group": "certification-route",
+      "boost": 0.08,
+      "terms": [
+        "declaration",
+        "document",
+        "evidence",
+        "monster",
+        "pays",
+        "product",
+        "protocols",
+        "query",
+        "requires"
+      ],
+      "support_terms": [
+        "certification",
+        "declaration",
+        "has",
+        "monster",
+        "payment",
+        "pays",
+        "protocols",
+        "requires",
+        "route"
+      ],
+      "reason": "accepted certification route trap",
+      "source_feedback": "examples/feedback.accept-certification.json",
+      "observations": 1,
+      "accepted_count": 1
+    }
+  ]
+}
