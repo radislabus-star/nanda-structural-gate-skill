@@ -56,6 +56,9 @@ jobs:
       - name: Polarization smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
 
+      - name: Polarity gate smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
+
       - name: Serve smoke
         run: printf '{"command":"doctor"}\n' | cargo run --quiet --manifest-path Cargo.toml -- serve
 
@@ -110,6 +113,9 @@ jobs:
 
       - name: Polarization smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
+
+      - name: Polarity gate smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
 
       - name: Serve smoke
         shell: pwsh

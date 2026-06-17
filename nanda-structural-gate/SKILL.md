@@ -100,6 +100,7 @@ scripts/nanda-search .nanda/index.json --input-format json --query-file query.js
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
+scripts/nanda-search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
 scripts/nanda-feedback .nanda/search.json --decision reject --note "false shortcut" --out .nanda/reject.json
 scripts/nanda-index memory.json .nanda/reject.json --out .nanda/index-with-negative-lanes.json
 scripts/nanda-eval --suite examples/eval-corpus.json
@@ -114,7 +115,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v2.1-polarized-field`, prefer `foreign_pull` when deciding what to
+In `v2.2-polarity-gate`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-dogfood .` inside a repository that has
@@ -147,6 +148,9 @@ local support chain inside the coarse route peak.
 When role direction matters, inspect `peaks[].polarization` and
 `supporting_triads[].polarity`. Treat `REVERSED` as a stop signal and
 `ALIGNED` as stronger structural support.
+If `peak_decision.state` is `POLARITY_REVERSED`, do not use the peak as an
+answer route; repair the query/source direction or retrieve a correctly
+polarized route.
 Use `nanda-serve` when several checks/searches will run in one agent turn. It
 keeps one process alive and accepts JSONL requests, avoiding per-call process
 startup overhead.
@@ -257,13 +261,13 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v2.1 indexed route finder: use its top peak as a structural
+- `nanda-search` is the v2.2 indexed route finder: use its top peak as a structural
   candidate route, then verify evidence before final prose.
 - `nanda-dataset-doctor` is the v1.3 corpus immunity gate: run it before search
   on large memory packets and focus/deduplicate when it returns WATCH.
 - `nanda-waw` is the trap benchmark: use it to verify that the interference
   peak beats lexical baseline on known hard cases before changing scoring.
-- Negative lanes are the v2.1 destructive-interference layer: reject false
+- Negative lanes are the v2.2 destructive-interference layer: reject false
   peaks, index the feedback JSON, and future search will suppress that shortcut
   when the query terms match. Repeated rejects strengthen the same lane.
 

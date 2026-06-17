@@ -211,6 +211,7 @@ nanda-search examples/triad-packet.source-weighting.json --input-format json --t
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
+nanda-search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 > .nanda/search.json
 nanda-feedback .nanda/search.json --decision accept --note "accepted focused peak"
 nanda-eval --case examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED --case examples/triad-packet.interference-search-noisy.json:certification:WATCH
@@ -314,11 +315,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v2.1-polarized-field
+core_version: sparse-triad-v2.2-polarity-gate
 wave_dim: 1024
 ```
 
-`v2.1-polarized-field` keeps recursive topology combing, structural peak search,
+`v2.2-polarity-gate` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -332,10 +333,11 @@ shortcut peaks and strengthen repeated rejects. Route-balanced focus reduces
 large/noisy corpora before direct search. Coarse-to-fine output shows the local
 supporting path after the coarse peak. Polarization adds role-direction lanes
 so reversed structures can look lexically similar but resonate differently. The
-search path is intentionally small and universal: encode triads as slot-bound
-waves, superpose a partial query, score memory routes/groups by weighted and
-polarized interference, then interpret, record, test, and smoke-check the top
-peaks.
+`POLARITY_REVERSED` gate prevents a reversed top peak from being used as an
+answer route. The search path is intentionally small and universal: encode
+triads as slot-bound waves, superpose a partial query, score memory
+routes/groups by weighted and polarized interference, then interpret, record,
+test, and smoke-check the top peaks.
 If `foreign_pull` is non-empty, strict gate output is not `PASS`; repair the
 named candidate triads or split the route first.
 
@@ -445,7 +447,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v2.1.0`.
+Current release: `v2.2.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -463,6 +465,7 @@ nanda-search examples/triad-packet.source-weighting.json --input-format json --t
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
+nanda-search examples/triad-packet.polarization-reversed-stop.json --input-format json --top-k 3
 nanda-dogfood . --format json
 ```
 

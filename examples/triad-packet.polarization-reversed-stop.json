@@ -1,0 +1,46 @@
+{
+  "task_id": "polarization-reversed-stop",
+  "domain": "business",
+  "query": "Maria pays declaration but memory only has reversed payment direction",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "declaration",
+      "relation": "pays_for",
+      "object": "Maria",
+      "evidence": "archive_noise/reversed-payment.md",
+      "confidence": 0.95,
+      "subject_role": "document",
+      "object_role": "payer",
+      "route": "payment-reversed",
+      "group": "payment-reversed"
+    },
+    {
+      "id": "m2",
+      "subject": "declaration",
+      "relation": "requires",
+      "object": "protocols",
+      "evidence": "archive_noise/reversed-payment.md",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "payment-reversed",
+      "group": "payment-reversed"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "Maria",
+      "relation": "pays_for",
+      "object": "declaration",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "payer",
+      "object_role": "document",
+      "route": "",
+      "group": "query"
+    }
+  ],
+  "candidate_answer": ""
+}

@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v2.1-rust
-core_version: sparse-triad-v2.1-polarized-field
+engine: nanda-check sparse-triad-v2.2-rust
+core_version: sparse-triad-v2.2-polarity-gate
 ```
 
 ## Build Order
@@ -62,6 +62,8 @@ core_version: sparse-triad-v2.1-polarized-field
     coarse route peak plus the local supporting path inside it.
 34. Add polarization. Done in `v2.1`: role direction contributes a wave lane
     and search reports aligned/reversed/mixed polarity per peak.
+35. Add polarity gate. Done in `v2.2`: reversed top peaks receive a score
+    penalty and `peak_decision` returns `POLARITY_REVERSED`.
 
 ## Engineering Constraints
 
@@ -148,6 +150,8 @@ For route interpretation, read `coarse_to_fine.local_path` before drafting; it
 is the small path an agent should inspect after the coarse peak.
 For role-direction traps, read `peaks[].polarization`. `ALIGNED` means the
 route has the same direction as the query; `REVERSED` is a stop signal.
+Do not draft from a search result whose `peak_decision.state` is
+`POLARITY_REVERSED`, even if the lexical facts look close.
 For agent/runtime integration, prefer newline-delimited JSON through
 `nanda serve` instead of shelling one command per small check.
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.2.0 - 2026-06-17
+
+Polarity-gate release.
+
+### Added
+
+- Polarity-aware peak scoring: reversed role-direction polarity applies a
+  `polarization_penalty` to the peak score.
+- `peak_decision.state = POLARITY_REVERSED` with `safe_to_answer=false` when
+  the top peak is structurally reversed relative to the query.
+- `field_interpretation.state = polarity_reversed` for reversed top peaks.
+- Reversed-polarity stop fixture and CI smoke coverage.
+
+### Changed
+
+- Core version is now `sparse-triad-v2.2-polarity-gate`.
+- Cargo package version is now `2.2.0`.
+
 ## v2.1.0 - 2026-06-17
 
 Polarized-field release. This folds the v1.9 route-balanced and v2.0

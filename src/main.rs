@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.1-polarized-field";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.1-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.2-polarity-gate";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.2-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -3836,7 +3836,7 @@ fn interference_search(
             let take = items.len().min(3);
             items.iter().take(take).map(|item| item.0).sum::<f64>() / take as f64
         };
-        let peak_score = round4(
+        let base_peak_score = round4(
             (0.26 * coherence)
                 + (0.18 * coverage)
                 + (0.15 * avg_top3)
@@ -3893,9 +3893,13 @@ fn interference_search(
             .collect::<Vec<_>>();
         let center = peak_center(&items);
         let polarization = polarization_summary(query, &items);
+        let polarization_penalty = polarization_penalty(&polarization);
+        let peak_score = round4((base_peak_score - polarization_penalty).max(0.0));
         peaks.push(json!({
             "peak": key,
             "score": peak_score,
+            "raw_score": base_peak_score,
+            "polarization_penalty": polarization_penalty,
             "coherence": coherence,
             "coverage": coverage,
             "chain_coherence": chain,
@@ -4359,7 +4363,10 @@ fn field_interpretation(peaks: &[Value], margin: f64, lexical_baseline: &Value) 
         .and_then(|peak| peak["propagation"]["component_score"].as_f64())
         .unwrap_or(0.0);
     let component_gap = round4(top_component - second_component);
-    let stability = if margin >= 0.055 && component_gap >= 0.12 {
+    let top_polarization = top["polarization"]["state"].as_str().unwrap_or("");
+    let stability = if top_polarization == "REVERSED" {
+        "polarity_reversed"
+    } else if margin >= 0.055 && component_gap >= 0.12 {
         "stable"
     } else if margin < 0.04 {
         "contested"
@@ -4390,10 +4397,13 @@ fn field_interpretation(peaks: &[Value], margin: f64, lexical_baseline: &Value) 
         "component_gap": component_gap,
         "lexical_baseline_top": lexical_peak,
         "lexical_trap_detected": lexical_trap,
+        "top_polarization": top_polarization,
         "centroid_drift": centroid_drift,
         "nearest_foreign_pull": nearest_foreign_pull,
         "read_as": if lexical_trap {
             "The structural field beats the lexical baseline; inspect support and anti-triads before final prose."
+        } else if stability == "polarity_reversed" {
+            "The top route has reversed role-direction polarity; do not use it as an answer route."
         } else if stability == "stable" {
             "The top route has a stable connected peak."
         } else {
@@ -4472,6 +4482,7 @@ fn peak_decision(peaks: &[Value], margin: f64, lexical_peak: &str) -> Value {
     let top = &peaks[0];
     let second = peaks.get(1);
     let top_name = top["peak"].as_str().unwrap_or("");
+    let top_polarization = top["polarization"]["state"].as_str().unwrap_or("");
     let top_component = top["propagation"]["component_score"]
         .as_f64()
         .unwrap_or(0.0);
@@ -4480,7 +4491,13 @@ fn peak_decision(peaks: &[Value], margin: f64, lexical_peak: &str) -> Value {
         .unwrap_or(0.0);
     let component_gap = round4(top_component - second_component);
     let wins_lexical = !lexical_peak.is_empty() && top_name != lexical_peak;
-    let (state, safe_to_answer, reason) = if margin >= 0.055 && component_gap >= 0.12 {
+    let (state, safe_to_answer, reason) = if top_polarization == "REVERSED" {
+        (
+            "POLARITY_REVERSED",
+            false,
+            "Top peak has reversed role-direction polarity relative to the query.",
+        )
+    } else if margin >= 0.055 && component_gap >= 0.12 {
         (
             "FOCUSED",
             true,
@@ -4511,6 +4528,7 @@ fn peak_decision(peaks: &[Value], margin: f64, lexical_peak: &str) -> Value {
         "top_peak": top_name,
         "lexical_baseline_top": lexical_peak,
         "wins_over_lexical_baseline": wins_lexical,
+        "top_polarization": top_polarization,
         "margin": round4(margin),
         "top_component_score": round4(top_component),
         "second_component_score": round4(second_component),
@@ -4952,6 +4970,15 @@ fn polarization_summary(query: &[Triad], items: &[(f64, f64, f64, &Triad)]) -> V
         "dominant": dominant,
         "query": query_polarities.into_iter().collect::<Vec<_>>()
     })
+}
+
+fn polarization_penalty(polarization: &Value) -> f64 {
+    match polarization["state"].as_str().unwrap_or("") {
+        "REVERSED" => 0.18,
+        "MIXED" => 0.04,
+        "UNALIGNED" => 0.02,
+        _ => 0.0,
+    }
 }
 
 fn query_feature_wave(query: &[Triad]) -> Vec<i32> {
