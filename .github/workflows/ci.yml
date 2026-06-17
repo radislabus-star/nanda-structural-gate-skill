@@ -35,6 +35,9 @@ jobs:
       - name: Eval corpus
         run: cargo run --quiet --manifest-path Cargo.toml -- eval --suite examples/eval-corpus.json
 
+      - name: WAW corpus
+        run: cargo run --quiet --manifest-path Cargo.toml -- waw --suite examples/waw-corpus.json
+
       - name: Serve smoke
         run: printf '{"command":"doctor"}\n' | cargo run --quiet --manifest-path Cargo.toml -- serve
 
@@ -62,6 +65,9 @@ jobs:
 
       - name: Eval corpus
         run: cargo run --quiet --manifest-path Cargo.toml -- eval --suite examples/eval-corpus.json
+
+      - name: WAW corpus
+        run: cargo run --quiet --manifest-path Cargo.toml -- waw --suite examples/waw-corpus.json
 
       - name: Serve smoke
         shell: pwsh

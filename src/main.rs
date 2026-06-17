@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v1.1-agent-field";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v1.1-rust";
+const CORE_VERSION: &str = "sparse-triad-v1.2-waw-benchmark";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v1.2-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -42,6 +42,7 @@ enum Command {
     Search(SearchArgs),
     Feedback(FeedbackArgs),
     Eval(EvalArgs),
+    Waw(WawArgs),
     Serve(ServeArgs),
     Doctor(DoctorArgs),
     Dogfood(DogfoodArgs),
@@ -291,6 +292,22 @@ struct EvalArgs {
 }
 
 #[derive(Parser)]
+struct WawArgs {
+    #[arg(long)]
+    suite: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long, default_value_t = 3)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "route")]
+    group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
 struct ServeArgs {
     #[arg(long, value_enum, default_value = "jsonl")]
     format: ServeFormat,
@@ -444,6 +461,33 @@ struct EvalSuiteCase {
     expected_state: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+struct WawSuite {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    cases: Vec<WawSuiteCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct WawSuiteCase {
+    #[serde(default)]
+    id: String,
+    path: PathBuf,
+    expected_peak: String,
+    expected_state: String,
+    #[serde(default)]
+    expected_lexical_peak: String,
+    #[serde(default = "default_true")]
+    require_lexical_trap: bool,
+    #[serde(default = "default_true")]
+    require_safe_to_answer: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 fn default_confidence() -> f64 {
     1.0
 }
@@ -512,6 +556,7 @@ fn run() -> Result<u8> {
         Command::Search(args) => search_cmd(args),
         Command::Feedback(args) => feedback_cmd(args),
         Command::Eval(args) => eval_cmd(args),
+        Command::Waw(args) => waw_cmd(args),
         Command::Serve(args) => serve_cmd(args),
         Command::Doctor(args) => doctor_cmd(args),
         Command::Dogfood(args) => dogfood_cmd(args),
@@ -2467,6 +2512,169 @@ fn parse_eval_case(raw: &str) -> Result<(PathBuf, String, String)> {
         parts[1].to_string(),
         parts[2].to_string(),
     ))
+}
+
+fn waw_cmd(args: WawArgs) -> Result<u8> {
+    let text = fs::read_to_string(&args.suite)
+        .with_context(|| format!("read {}", args.suite.display()))?;
+    let suite: WawSuite =
+        serde_json::from_str(&text).with_context(|| format!("parse {}", args.suite.display()))?;
+    if suite.cases.is_empty() {
+        return Err(anyhow!("nanda waw requires a suite with at least one case"));
+    }
+    let base = args.suite.parent().unwrap_or_else(|| Path::new("."));
+    let mut rows = vec![];
+    let mut passed = 0usize;
+    let mut structural_wins = 0usize;
+    let mut lexical_traps = 0usize;
+    let mut safe_answers = 0usize;
+    let mut explainable_drifts = 0usize;
+    for case in suite.cases {
+        let path = if case.path.is_absolute() {
+            case.path.clone()
+        } else {
+            base.join(&case.path)
+        };
+        let packet = load_packet_auto(
+            &path,
+            &args.input_format,
+            "waw",
+            "general",
+            "",
+            args.normalize_paths,
+        )?;
+        let memory = normalize_ids(packet.triads.clone(), "m");
+        let query = normalize_ids(packet.candidate_triads.clone(), "q");
+        let result = interference_search(&packet, &memory, &query, args.top_k, &args.group_by);
+        let actual_peak = result["peaks"]
+            .as_array()
+            .and_then(|peaks| peaks.first())
+            .and_then(|peak| peak["peak"].as_str())
+            .unwrap_or("")
+            .to_string();
+        let actual_state = result["peak_decision"]["state"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        let lexical_peak = result["lexical_baseline"]["top_peak"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        let wins = result["wins_over_lexical_baseline"]
+            .as_bool()
+            .unwrap_or(false);
+        let trap = result["field_interpretation"]["lexical_trap_detected"]
+            .as_bool()
+            .unwrap_or(false);
+        let safe = result["peak_decision"]["safe_to_answer"]
+            .as_bool()
+            .unwrap_or(false);
+        let route_drift = result["field_interpretation"]["centroid_drift"]["route"]["changed"]
+            .as_bool()
+            .unwrap_or(false);
+        let relation_drift = result["field_interpretation"]["centroid_drift"]["relation"]
+            ["changed"]
+            .as_bool()
+            .unwrap_or(false);
+        let explainable = trap && (route_drift || relation_drift);
+        if wins {
+            structural_wins += 1;
+        }
+        if trap {
+            lexical_traps += 1;
+        }
+        if safe {
+            safe_answers += 1;
+        }
+        if explainable {
+            explainable_drifts += 1;
+        }
+        let lexical_ok =
+            case.expected_lexical_peak.is_empty() || lexical_peak == case.expected_lexical_peak;
+        let trap_ok = !case.require_lexical_trap || trap;
+        let safe_ok = !case.require_safe_to_answer || safe;
+        let ok = actual_peak == case.expected_peak
+            && actual_state == case.expected_state
+            && lexical_ok
+            && wins
+            && trap_ok
+            && safe_ok
+            && explainable;
+        if ok {
+            passed += 1;
+        }
+        rows.push(json!({
+            "id": if case.id.is_empty() { path.display().to_string() } else { case.id },
+            "case": path.display().to_string(),
+            "expected_peak": case.expected_peak,
+            "actual_peak": actual_peak,
+            "expected_state": case.expected_state,
+            "actual_state": actual_state,
+            "expected_lexical_peak": case.expected_lexical_peak,
+            "actual_lexical_peak": lexical_peak,
+            "wins_over_lexical_baseline": wins,
+            "lexical_trap_detected": trap,
+            "safe_to_answer": safe,
+            "explainable_drift": explainable,
+            "route_drift": route_drift,
+            "relation_drift": relation_drift,
+            "peak_margin": result["peak_margin"],
+            "field_state": result["field_interpretation"]["state"],
+            "nearest_foreign_pull": result["field_interpretation"]["nearest_foreign_pull"],
+            "ok": ok
+        }));
+    }
+    let total = rows.len();
+    let out = json!({
+        "core_version": CORE_VERSION,
+        "wave_dim": WAVE_DIM,
+        "mode": "waw-benchmark",
+        "suite": if suite.name.is_empty() { args.suite.display().to_string() } else { suite.name },
+        "passed": passed,
+        "total": total,
+        "waw_score": round4(passed as f64 / total.max(1) as f64),
+        "structural_wins": structural_wins,
+        "lexical_traps": lexical_traps,
+        "safe_answers": safe_answers,
+        "explainable_drifts": explainable_drifts,
+        "cases": rows,
+        "interpretation": "A WAW pass means the structural interference peak beat the lexical baseline on a trap case and the field explains the drift."
+    });
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_waw_text(&out),
+        OutputFormat::Md => print_waw_md(&out),
+    }
+    if passed == total {
+        Ok(EXIT_PASS)
+    } else {
+        Ok(EXIT_VETO)
+    }
+}
+
+fn print_waw_text(out: &Value) {
+    println!("mode: {}", out["mode"].as_str().unwrap_or(""));
+    println!(
+        "core_version: {}",
+        out["core_version"].as_str().unwrap_or("")
+    );
+    println!("suite: {}", out["suite"].as_str().unwrap_or(""));
+    println!("passed: {}/{}", out["passed"], out["total"]);
+    println!("waw_score: {}", out["waw_score"]);
+    println!("structural_wins: {}", out["structural_wins"]);
+    println!("lexical_traps: {}", out["lexical_traps"]);
+    println!("explainable_drifts: {}", out["explainable_drifts"]);
+}
+
+fn print_waw_md(out: &Value) {
+    println!("# NANDA WAW Benchmark\n");
+    println!("- core: `{}`", out["core_version"].as_str().unwrap_or(""));
+    println!("- suite: `{}`", out["suite"].as_str().unwrap_or(""));
+    println!("- passed: `{}/{}`", out["passed"], out["total"]);
+    println!("- waw_score: `{}`", out["waw_score"]);
+    println!("- structural_wins: `{}`", out["structural_wins"]);
+    println!("- lexical_traps: `{}`", out["lexical_traps"]);
+    println!("- explainable_drifts: `{}`", out["explainable_drifts"]);
 }
 
 fn print_eval_text(out: &Value) {

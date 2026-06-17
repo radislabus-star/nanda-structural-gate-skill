@@ -98,6 +98,7 @@ scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-feedback .nanda/search.json --decision watch --note "margin too low"
 scripts/nanda-eval --suite examples/eval-corpus.json
+scripts/nanda-waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | scripts/nanda-serve
 scripts/nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
 scripts/nanda-doctor
@@ -108,7 +109,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v1.1-agent-field`, prefer `foreign_pull` when deciding what to
+In `v1.2-waw-benchmark`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-dogfood .` inside a repository that has
@@ -132,6 +133,9 @@ was useful. It writes an accept/reject/WATCH memory trace that can be kept next
 to the task index.
 Use `nanda-eval` before trusting a changed interference rule. It checks expected
 peak/state pairs from `--case` or `--suite` and exits non-zero on regression.
+Use `nanda-waw` before claiming WAW behavior. It requires the structural peak
+to beat a lexical trap, match expected peak/state, and expose explainable
+centroid drift.
 Use `nanda-doctor` after installing or copying the skill. It runs the built-in
 focused/noisy interference smoke checks without external files.
 Use `peak_margin` and `lexical_baseline` to interpret confidence. A low margin
@@ -198,6 +202,7 @@ scripts/nanda-index code-flow.json --input-format json --out .nanda/index.json
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-feedback .nanda/search.json --decision accept
 scripts/nanda-eval --suite examples/eval-corpus.json
+scripts/nanda-waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | scripts/nanda-serve
 scripts/nanda-eval --case route-trap.json:certification:FOCUSED
 scripts/nanda-doctor
@@ -220,8 +225,10 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v1.1 indexed route finder: use its top peak as a structural
+- `nanda-search` is the v1.2 indexed route finder: use its top peak as a structural
   candidate route, then verify evidence before final prose.
+- `nanda-waw` is the v1.2 trap benchmark: use it to verify that the interference
+  peak beats lexical baseline on known hard cases before changing scoring.
 
 For Codex skill or repository readiness checks:
 

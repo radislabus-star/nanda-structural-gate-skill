@@ -104,6 +104,7 @@ nanda comb packet.json --input-format json --depth 2 --out-dir comb/
 nanda split packet.json --input-format json --by linked-group --out-dir split/
 nanda check --triads split/route.json
 nanda eval --suite examples/eval-corpus.json
+nanda waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | nanda serve
 ```
 
@@ -114,15 +115,16 @@ No secondary scripting runtime is part of the shipped checker surface.
 Current core:
 
 ```text
-core_version: sparse-triad-v1.1-agent-field
+core_version: sparse-triad-v1.2-waw-benchmark
 wave_dim:     1024
 ```
 
-The `v1.1-agent-field` core keeps recursive combing, structural peak search,
+The `v1.2-waw-benchmark` core keeps recursive combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, and release doctor checks, then adds file-backed eval suites, a
 newline-delimited JSON agent API, and field interpretation for interference
-peaks:
+peaks. It also adds a WAW benchmark surface for cases where structural
+interference must beat a lexical trap:
 
 ```text
 topology graph
@@ -133,6 +135,7 @@ separate query packet
 accepted/rejected/WATCH peak feedback
 peak/state eval suite
 file-backed eval suite
+WAW lexical-trap benchmark suite
 JSONL agent serve loop
 field_interpretation for search peaks
 self-contained doctor smoke
@@ -217,9 +220,9 @@ V0 builds a source memory from `triads` and scores each `candidate_triads`
 composite against that memory. A swapped candidate should have high token
 overlap but low composite similarity.
 
-## Core Size v1.1
+## Core Size v1.2
 
-Use fixed dimensions for the current recursive comb/search/agent-field
+Use fixed dimensions for the current recursive comb/search/agent-field/WAW
 verifier:
 
 ```text

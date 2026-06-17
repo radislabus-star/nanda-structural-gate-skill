@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v1.1-rust
-core_version: sparse-triad-v1.1-agent-field
+engine: nanda-check sparse-triad-v1.2-rust
+core_version: sparse-triad-v1.2-waw-benchmark
 ```
 
 ## Build Order
@@ -46,6 +46,7 @@ core_version: sparse-triad-v1.1-agent-field
 24. Add JSONL agent API. Done with `nanda serve`.
 25. Add field interpretation for interference peaks. Done in
     `field_interpretation`.
+26. Add WAW benchmark for lexical-trap wins. Done with `nanda waw`.
 
 ## Engineering Constraints
 
@@ -110,6 +111,9 @@ For extraction workflows, use `nanda extract` on arrow-text notes before
 indexing or searching.
 For regression workflows, keep suites in JSON and run
 `nanda eval --suite examples/eval-corpus.json`.
+For WAW workflows, keep trap suites in JSON and run
+`nanda waw --suite examples/waw-corpus.json`; each case must show a structural
+win over lexical baseline plus explainable centroid drift.
 For agent/runtime integration, prefer newline-delimited JSON through
 `nanda serve` instead of shelling one command per small check.
 

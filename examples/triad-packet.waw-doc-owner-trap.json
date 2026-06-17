@@ -1,0 +1,129 @@
+{
+  "task_id": "waw-doc-owner-trap",
+  "domain": "business",
+  "query": "payment proof belongs to certification branch, not customs declaration ownership",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "lab payment",
+      "relation": "has_route",
+      "object": "certification",
+      "evidence": "doc-memory:1",
+      "confidence": 0.9,
+      "subject_role": "payment",
+      "object_role": "route",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m2",
+      "subject": "lab payment",
+      "relation": "pays_for",
+      "object": "declaration of conformity",
+      "evidence": "doc-memory:2",
+      "confidence": 0.9,
+      "subject_role": "payment",
+      "object_role": "document",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m3",
+      "subject": "declaration of conformity",
+      "relation": "requires",
+      "object": "test protocol",
+      "evidence": "doc-memory:3",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m4",
+      "subject": "test protocol",
+      "relation": "issued_by",
+      "object": "laboratory",
+      "evidence": "doc-memory:4",
+      "confidence": 0.9,
+      "subject_role": "evidence",
+      "object_role": "organization",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m5",
+      "subject": "lab payment",
+      "relation": "attached_to",
+      "object": "customs declaration test protocol laboratory result",
+      "evidence": "doc-memory:5",
+      "confidence": 0.9,
+      "subject_role": "payment",
+      "object_role": "document",
+      "route": "customs",
+      "group": "customs-route"
+    },
+    {
+      "id": "m6",
+      "subject": "customs declaration",
+      "relation": "filed_by",
+      "object": "importer",
+      "evidence": "doc-memory:6",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "company",
+      "route": "customs",
+      "group": "customs-route"
+    },
+    {
+      "id": "m7",
+      "subject": "importer",
+      "relation": "pays",
+      "object": "customs duty",
+      "evidence": "doc-memory:7",
+      "confidence": 0.9,
+      "subject_role": "company",
+      "object_role": "payment",
+      "route": "customs",
+      "group": "customs-route"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "lab payment",
+      "relation": "attached_to",
+      "object": "customs declaration test protocol laboratory result",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "payment",
+      "object_role": "document",
+      "route": "",
+      "group": "query"
+    },
+    {
+      "id": "q2",
+      "subject": "declaration of conformity",
+      "relation": "needs",
+      "object": "lab evidence",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "",
+      "group": "query"
+    },
+    {
+      "id": "q3",
+      "subject": "test protocol",
+      "relation": "confirms",
+      "object": "laboratory result",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "evidence",
+      "object_role": "organization",
+      "route": "",
+      "group": "query"
+    }
+  ]
+}

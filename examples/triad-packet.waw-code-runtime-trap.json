@@ -1,0 +1,153 @@
+{
+  "task_id": "waw-code-runtime-trap",
+  "domain": "code",
+  "query": "agent doctor request should use runtime serve loop, not one-shot check wrapper",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "agent request",
+      "relation": "has_route",
+      "object": "runtime-serve",
+      "evidence": "code-memory:1",
+      "confidence": 0.9,
+      "subject_role": "caller",
+      "object_role": "route",
+      "route": "runtime-serve",
+      "group": "runtime-route"
+    },
+    {
+      "id": "m2",
+      "subject": "nanda-serve",
+      "relation": "accepts",
+      "object": "JSONL request",
+      "evidence": "code-memory:2",
+      "confidence": 0.9,
+      "subject_role": "binary",
+      "object_role": "message",
+      "route": "runtime-serve",
+      "group": "runtime-route"
+    },
+    {
+      "id": "m3",
+      "subject": "JSONL request",
+      "relation": "contains",
+      "object": "doctor command",
+      "evidence": "code-memory:3",
+      "confidence": 0.9,
+      "subject_role": "message",
+      "object_role": "command",
+      "route": "runtime-serve",
+      "group": "runtime-route"
+    },
+    {
+      "id": "m4",
+      "subject": "doctor command",
+      "relation": "returns",
+      "object": "health result",
+      "evidence": "code-memory:4",
+      "confidence": 0.9,
+      "subject_role": "command",
+      "object_role": "result",
+      "route": "runtime-serve",
+      "group": "runtime-route"
+    },
+    {
+      "id": "m8",
+      "subject": "nanda-serve",
+      "relation": "keeps",
+      "object": "process alive",
+      "evidence": "code-memory:8",
+      "confidence": 0.9,
+      "subject_role": "binary",
+      "object_role": "runtime",
+      "route": "runtime-serve",
+      "group": "runtime-route"
+    },
+    {
+      "id": "m5",
+      "subject": "agent request",
+      "relation": "calls",
+      "object": "nanda-check JSONL doctor command",
+      "evidence": "code-memory:5",
+      "confidence": 0.9,
+      "subject_role": "caller",
+      "object_role": "binary",
+      "route": "one-shot-check",
+      "group": "check-route"
+    },
+    {
+      "id": "m6",
+      "subject": "nanda-check",
+      "relation": "validates",
+      "object": "triad packet",
+      "evidence": "code-memory:6",
+      "confidence": 0.9,
+      "subject_role": "binary",
+      "object_role": "packet",
+      "route": "one-shot-check",
+      "group": "check-route"
+    },
+    {
+      "id": "m7",
+      "subject": "triad packet",
+      "relation": "returns",
+      "object": "gate verdict",
+      "evidence": "code-memory:7",
+      "confidence": 0.9,
+      "subject_role": "packet",
+      "object_role": "verdict",
+      "route": "one-shot-check",
+      "group": "check-route"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "agent request",
+      "relation": "calls",
+      "object": "nanda-check JSONL doctor command",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "caller",
+      "object_role": "binary",
+      "route": "",
+      "group": "query"
+    },
+    {
+      "id": "q2",
+      "subject": "JSONL request",
+      "relation": "contains",
+      "object": "doctor command",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "message",
+      "object_role": "command",
+      "route": "",
+      "group": "query"
+    },
+    {
+      "id": "q3",
+      "subject": "doctor command",
+      "relation": "returns",
+      "object": "health result",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "command",
+      "object_role": "result",
+      "route": "",
+      "group": "query"
+    },
+    {
+      "id": "q4",
+      "subject": "nanda-serve",
+      "relation": "sustains",
+      "object": "runtime loop",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "binary",
+      "object_role": "runtime",
+      "route": "",
+      "group": "query"
+    }
+  ]
+}

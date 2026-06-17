@@ -23,6 +23,7 @@ $Commands = @(
     "doctor",
     "extract",
     "eval",
+    "waw",
     "feedback",
     "index",
     "search",

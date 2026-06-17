@@ -13,6 +13,7 @@ comb="$root/nanda-structural-gate/scripts/nanda-comb"
 doctor="$root/nanda-structural-gate/scripts/nanda-doctor"
 extractor="$root/nanda-structural-gate/scripts/nanda-extract"
 evaler="$root/nanda-structural-gate/scripts/nanda-eval"
+waw="$root/nanda-structural-gate/scripts/nanda-waw"
 feedback="$root/nanda-structural-gate/scripts/nanda-feedback"
 indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
@@ -35,7 +36,10 @@ jq empty "$root/examples/triad-packet.watch-low-complexity.json"
 jq empty "$root/examples/triad-packet.interference-search.json"
 jq empty "$root/examples/triad-packet.interference-search-noisy.json"
 jq empty "$root/examples/triad-packet.interference-search-route-trap.json"
+jq empty "$root/examples/triad-packet.waw-code-runtime-trap.json"
+jq empty "$root/examples/triad-packet.waw-doc-owner-trap.json"
 jq empty "$root/examples/eval-corpus.json"
+jq empty "$root/examples/waw-corpus.json"
 
 pass_json="$("$checker" --triads "$root/examples/triad-packet.example.json" --format json)"
 if ! grep -q '"verdict": "PASS"' <<<"$pass_json"; then
@@ -135,7 +139,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v1.1-agent-field"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v1.2-waw-benchmark"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -229,6 +233,10 @@ jq -e '.passed == 2 and .total == 2 and .accuracy == 1' <<<"$eval_json" >/dev/nu
 eval_suite_json="$("$evaler" --suite "$root/examples/eval-corpus.json")"
 jq -e '.mode == "eval-suite"' <<<"$eval_suite_json" >/dev/null
 jq -e '.passed == 2 and .total == 2 and .accuracy == 1' <<<"$eval_suite_json" >/dev/null
+waw_json="$("$waw" --suite "$root/examples/waw-corpus.json")"
+jq -e '.mode == "waw-benchmark"' <<<"$waw_json" >/dev/null
+jq -e '.passed == 3 and .total == 3 and .waw_score == 1' <<<"$waw_json" >/dev/null
+jq -e '.structural_wins == 3 and .lexical_traps == 3 and .explainable_drifts == 3' <<<"$waw_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null
@@ -282,16 +290,17 @@ grep -q '"root_verdict": "WATCH"' <<<"$dogfood_json"
 grep -q '"root_size_only": true' <<<"$dogfood_json"
 grep -q '"foreign_pull": 0' <<<"$dogfood_json"
 grep -q '"invariant_violation": 0' <<<"$dogfood_json"
-grep -q '"local_branches": 7' <<<"$dogfood_json"
-grep -q '"local_pass": 7' <<<"$dogfood_json"
+grep -q '"local_branches": 8' <<<"$dogfood_json"
+grep -q '"local_pass": 8' <<<"$dogfood_json"
 dogfood_text="$("$dogfood" "$root")"
 grep -q 'ACTION: SAFE_TO_EDIT' <<<"$dogfood_text"
-grep -q 'BRANCHES: 7/7 PASS' <<<"$dogfood_text"
+grep -q 'BRANCHES: 8/8 PASS' <<<"$dogfood_text"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null
 "$doctor" --help | grep -q "Usage: nanda doctor"
 "$evaler" --help | grep -q "Usage: nanda eval"
+"$waw" --help | grep -q "Usage: nanda waw"
 "$feedback" --help | grep -q "Usage: nanda feedback"
 NANDA_SELF_CHECK_RUNTIME_ONLY=1 "$self_check" | grep -q "verdict: PASS"
 

@@ -1,0 +1,26 @@
+{
+  "name": "nanda-v1.2-waw-corpus",
+  "cases": [
+    {
+      "id": "business-certification-beats-customs-lexical-trap",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "expected_peak": "certification",
+      "expected_state": "FOCUSED",
+      "expected_lexical_peak": "customs"
+    },
+    {
+      "id": "code-runtime-serve-beats-one-shot-check",
+      "path": "triad-packet.waw-code-runtime-trap.json",
+      "expected_peak": "runtime-serve",
+      "expected_state": "FOCUSED",
+      "expected_lexical_peak": "one-shot-check"
+    },
+    {
+      "id": "doc-certification-beats-customs-attachment",
+      "path": "triad-packet.waw-doc-owner-trap.json",
+      "expected_peak": "certification",
+      "expected_state": "FOCUSED",
+      "expected_lexical_peak": "customs"
+    }
+  ]
+}

@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.2.0 - 2026-06-17
+
+WAW benchmark release.
+
+### Added
+
+- `nanda waw --suite examples/waw-corpus.json` for hard route-trap benchmark
+  cases where the structural interference peak must beat the lexical baseline.
+- WAW corpus with business, code/runtime, and document-ownership traps.
+- `nanda-waw` shell wrapper and Windows `.cmd` wrapper generation.
+- CI coverage for the WAW corpus on Linux and Windows.
+
+### Changed
+
+- Core version is now `sparse-triad-v1.2-waw-benchmark`.
+- Local tests now require `structural_wins`, `lexical_traps`, and
+  `explainable_drifts` across the WAW corpus.
+
 ## v1.1.0 - 2026-06-17
 
 Agent-field strengthening release.

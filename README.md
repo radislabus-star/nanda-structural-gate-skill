@@ -70,6 +70,10 @@ evidence-conflict tasks do.
 │   ├── triad-packet.interference-search.json
 │   ├── triad-packet.interference-search-noisy.json
 │   ├── triad-packet.interference-search-route-trap.json
+│   ├── triad-packet.waw-code-runtime-trap.json
+│   ├── triad-packet.waw-doc-owner-trap.json
+│   ├── eval-corpus.json
+│   ├── waw-corpus.json
 │   ├── triad-packet.role-swap.json
 │   ├── triad-packet.route-splice.json
 │   ├── triad-packet.watch-low-complexity.json
@@ -110,6 +114,7 @@ evidence-conflict tasks do.
         ├── nanda-doctor
         ├── nanda-dogfood
         ├── nanda-eval
+        ├── nanda-waw
         ├── nanda-extract
         ├── nanda-feedback
         ├── nanda-index
@@ -248,7 +253,7 @@ line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v1.1 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the v1.2 memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, and an answer projection.
@@ -261,7 +266,10 @@ ids, anti ids, and a compact memory patch.
 `nanda-eval` is the regression surface. It checks expected peak/state pairs
 from `--case` or `--suite`, so interference changes are measured before they
 are trusted.
-`nanda-doctor` is the v1.1 release smoke test. It runs built-in focused/noisy
+`nanda-waw` is the WAW benchmark surface. It checks hard trap cases where a
+plain lexical baseline selects the wrong route, while the interference peak
+selects the structurally connected route and explains the centroid drift.
+`nanda-doctor` is the release smoke test. It runs built-in focused/noisy
 interference checks without needing repository example files.
 
 Self-check modes:
@@ -290,17 +298,19 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v1.1-agent-field
+core_version: sparse-triad-v1.2-waw-benchmark
 wave_dim: 1024
 ```
 
-`v1.1-agent-field` keeps recursive topology combing, structural peak search,
+`v1.2-waw-benchmark` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
-evaluation, and release doctor checks, then adds eval corpus loading, JSONL
-serve mode, and richer field interpretation. The search path is intentionally
-small and universal: encode triads as slot-bound waves, superpose a partial
-query, score memory routes/groups by interference, then interpret, record,
-test, and smoke-check the top peaks.
+evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
+richer field interpretation. It adds a WAW corpus where the lexical baseline is
+expected to pick the wrong route and the interference field must recover the
+connected structure. The search path is intentionally small and universal:
+encode triads as slot-bound waves, superpose a partial query, score memory
+routes/groups by interference, then interpret, record, test, and smoke-check
+the top peaks.
 If `foreign_pull` is non-empty, strict gate output is not `PASS`; repair the
 named candidate triads or split the route first.
 
@@ -361,6 +371,7 @@ nanda-search .nanda/index.json --input-format json --query-file query.json --que
 nanda-feedback .nanda/search.json --decision watch --note "margin too low"
 nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
 nanda-eval --suite examples/eval-corpus.json
+nanda-waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | nanda-serve
 nanda-doctor
 nanda-comb big-flow.json --input-format json --depth 2 --out-dir comb/
@@ -404,7 +415,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v1.1.0`.
+Current release: `v1.2.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -415,7 +426,7 @@ scripts/test-edge-cases.sh
 scripts/benchmark-v0.sh
 nanda-doctor
 nanda-eval --suite examples/eval-corpus.json
-nanda-dogfood . --format json
+nanda-waw --suite examples/waw-corpus.json
 nanda-dogfood . --format json
 ```
 
@@ -444,6 +455,15 @@ splice_veto:                        50/50
 splice_exact_baseline_false_accept: 50/50
 ```
 
+Current WAW corpus:
+
+```text
+waw_score:          3/3
+structural_wins:    3/3
+lexical_traps:      3/3
+explainable_drifts: 3/3
+```
+
 ## Roadmap
 
 See [GOAL.md](GOAL.md), [ARCHITECTURE.md](ARCHITECTURE.md), and
@@ -453,6 +473,7 @@ The first useful proof is not a pitch. It is a benchmark:
 
 ```text
 similar tokens, plausible facts, wrong binding -> NANDA returns VETO
+lexical route trap -> NANDA interference peak selects the connected route
 ```
 
 If simple symbolic rules or ordinary graph checks win, this project should say
