@@ -19,6 +19,7 @@ indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
 dataset_doctor="$root/nanda-structural-gate/scripts/nanda-dataset-doctor"
+budget="$root/nanda-structural-gate/scripts/nanda-budget"
 serve="$root/nanda-structural-gate/scripts/nanda-serve"
 dogfood="$root/nanda-structural-gate/scripts/nanda-dogfood"
 reporter="$root/nanda-structural-gate/scripts/nanda-report"
@@ -312,6 +313,12 @@ if [[ "$dataset_status" -ne 3 ]]; then
 fi
 jq -e '.mode == "dataset-doctor" and .verdict == "WATCH"' <<<"$dataset_json" >/dev/null
 jq -e '([.warnings[].kind] | index("large_unbalanced_corpus") and index("route_imbalance") and index("hub_dominance") and index("duplicate_current") and index("weak_text_query"))' <<<"$dataset_json" >/dev/null
+budget_json="$("$budget" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json)"
+jq -e '.mode == "nanda-6m-budget-planner"' <<<"$budget_json" >/dev/null
+jq -e '.state == "FITS_L3"' <<<"$budget_json" >/dev/null
+jq -e '.safe_for_hot_core == true' <<<"$budget_json" >/dev/null
+jq -e '.hard_budget_bytes == 6291456' <<<"$budget_json" >/dev/null
+jq -e '.capacity.triads == 65536' <<<"$budget_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null
@@ -450,6 +457,7 @@ grep -q 'BRANCHES: 14/14 PASS' <<<"$dogfood_text"
 "$evaler" --help | grep -q "Usage: nanda eval"
 "$waw" --help | grep -q "Usage: nanda waw"
 "$dataset_doctor" --help | grep -q "Usage: nanda dataset-doctor"
+"$budget" --help | grep -q "Usage: nanda budget"
 "$feedback" --help | grep -q "Usage: nanda feedback"
 NANDA_SELF_CHECK_RUNTIME_ONLY=1 "$self_check" | grep -q "verdict: PASS"
 

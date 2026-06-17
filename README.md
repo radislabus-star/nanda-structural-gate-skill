@@ -131,6 +131,7 @@ evidence-conflict tasks do.
         ├── nanda-search
         ├── nanda-probe
         ├── nanda-dataset-doctor
+        ├── nanda-budget
         ├── nanda-serve
         └── nanda-self-check
 ```
@@ -211,6 +212,7 @@ nanda-comb examples/triads.code-flow-splice.md --domain code --depth 2
 mkdir -p .nanda
 nanda-extract examples/route-trap.raw.txt --out .nanda/route-trap.json
 nanda-index examples/triad-packet.interference-search-route-trap.json --input-format json --out .nanda/index.json
+nanda-budget .nanda/index.json --input-format json
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-noisy.json --input-format json --format text
@@ -288,6 +290,10 @@ exist, text from `--query` or packet `query` is converted into lightweight
 `nanda-dataset-doctor` is the corpus-quality gate. Run it before search on
 large memory packets; it warns about route imbalance, hub dominance, duplicate
 CURRENT facts, oversized direct-search packets, and weak text-only queries.
+`nanda-budget` is the NANDA-6M Phase 1 planner. It does not run the packed hot
+core yet; it checks whether a packet could fit the planned 6 MiB
+cache-resident layout and returns `FITS_L3`, `FOCUS_REQUIRED`,
+`SPLIT_REQUIRED`, or `SPILL_REQUIRED`.
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.

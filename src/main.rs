@@ -12,6 +12,20 @@ use std::process::ExitCode;
 const WAVE_DIM: usize = 1024;
 const CORE_VERSION: &str = "sparse-triad-v2.7-hierarchical-gate";
 const ENGINE_ID: &str = "nanda-check sparse-triad-v2.7-rust";
+const NANDA_6M_VERSION: &str = "nanda-6m-v0-budget-planner";
+const NANDA_6M_BUDGET_BYTES: usize = 6_291_456;
+const NANDA_6M_HEADER_BYTES: usize = 16_384;
+const NANDA_6M_TRIAD_ARENA_BYTES: usize = 2_097_152;
+const NANDA_6M_CENTROID_ARENA_BYTES: usize = 2_097_152;
+const NANDA_6M_LANE_ARENA_BYTES: usize = 1_048_576;
+const NANDA_6M_WORKSPACE_BYTES: usize = 786_432;
+const NANDA_6M_INDEX_STATS_BYTES: usize = 245_760;
+const NANDA_6M_TRIAD_BYTES: usize = 32;
+const NANDA_6M_CENTROID_BYTES: usize = 1024;
+const NANDA_6M_LANE_BYTES: usize = 64;
+const NANDA_6M_TRIAD_CAPACITY: usize = NANDA_6M_TRIAD_ARENA_BYTES / NANDA_6M_TRIAD_BYTES;
+const NANDA_6M_CENTROID_CAPACITY: usize = NANDA_6M_CENTROID_ARENA_BYTES / NANDA_6M_CENTROID_BYTES;
+const NANDA_6M_LANE_CAPACITY: usize = NANDA_6M_LANE_ARENA_BYTES / NANDA_6M_LANE_BYTES;
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -43,6 +57,7 @@ enum Command {
     Search(SearchArgs),
     Probe(ProbeArgs),
     DatasetDoctor(DatasetDoctorArgs),
+    Budget(BudgetArgs),
     Feedback(FeedbackArgs),
     Eval(EvalArgs),
     Waw(WawArgs),
@@ -302,6 +317,23 @@ struct DatasetDoctorArgs {
     format: OutputFormat,
     #[arg(long, default_value_t = 256)]
     route_cap: usize,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct BudgetArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "budget")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
     #[arg(long)]
     normalize_paths: bool,
 }
@@ -740,6 +772,7 @@ fn run() -> Result<u8> {
         Command::Search(args) => search_cmd(args),
         Command::Probe(args) => probe_cmd(args),
         Command::DatasetDoctor(args) => dataset_doctor_cmd(args),
+        Command::Budget(args) => budget_cmd(args),
         Command::Feedback(args) => feedback_cmd(args),
         Command::Eval(args) => eval_cmd(args),
         Command::Waw(args) => waw_cmd(args),
@@ -2876,6 +2909,293 @@ fn dataset_doctor_cmd(args: DatasetDoctorArgs) -> Result<u8> {
         "WATCH" => EXIT_WATCH,
         _ => EXIT_WATCH,
     })
+}
+
+fn budget_cmd(args: BudgetArgs) -> Result<u8> {
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.query,
+        args.normalize_paths,
+    )?;
+    let source = normalize_ids(packet.triads.clone(), "t");
+    let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+    let out = nanda_6m_budget_report(&packet, &source, &candidates);
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_budget_text(&out),
+        OutputFormat::Md => print_budget_md(&out),
+    }
+    Ok(if out["fits_l3"].as_bool().unwrap_or(false) {
+        EXIT_PASS
+    } else {
+        EXIT_WATCH
+    })
+}
+
+fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad]) -> Value {
+    let active_triads = source.len() + candidates.len();
+    let active_lanes = packet.negative_shortcuts.len() + packet.positive_shortcuts.len();
+    let mut entities = BTreeSet::<String>::new();
+    let mut relations = BTreeSet::<String>::new();
+    let mut routes = BTreeSet::<String>::new();
+    let mut groups = BTreeSet::<String>::new();
+    let mut evidence_refs = BTreeSet::<String>::new();
+    let mut cold_labels = BTreeSet::<String>::new();
+
+    for triad in source.iter().chain(candidates.iter()) {
+        insert_label(&mut entities, &triad.subject);
+        insert_label(&mut entities, &triad.object);
+        insert_label(&mut relations, &triad.relation);
+        insert_label(&mut evidence_refs, &triad.evidence);
+        insert_label(&mut cold_labels, &triad.id);
+        insert_label(&mut cold_labels, &triad.subject);
+        insert_label(&mut cold_labels, &triad.relation);
+        insert_label(&mut cold_labels, &triad.object);
+        insert_label(&mut cold_labels, &triad.evidence);
+        insert_label(&mut cold_labels, &triad.subject_role);
+        insert_label(&mut cold_labels, &triad.object_role);
+
+        let route = if triad.route.trim().is_empty() {
+            "__route_default"
+        } else {
+            triad.route.trim()
+        };
+        let group = if triad.group.trim().is_empty() {
+            "__group_default"
+        } else {
+            triad.group.trim()
+        };
+        insert_label(&mut routes, route);
+        insert_label(&mut groups, group);
+        insert_label(&mut cold_labels, route);
+        insert_label(&mut cold_labels, group);
+    }
+
+    for lane in &packet.negative_shortcuts {
+        insert_label(&mut cold_labels, &lane.id);
+        insert_label(&mut cold_labels, &lane.suppress_peak);
+        insert_label(&mut cold_labels, &lane.suppress_route);
+        insert_label(&mut cold_labels, &lane.suppress_group);
+        insert_label(&mut cold_labels, &lane.prefer_peak);
+        insert_label(&mut cold_labels, &lane.prefer_route);
+        insert_label(&mut cold_labels, &lane.prefer_group);
+        insert_label(&mut cold_labels, &lane.reason);
+        insert_label(&mut cold_labels, &lane.source_feedback);
+        insert_label(&mut routes, &lane.suppress_route);
+        insert_label(&mut routes, &lane.prefer_route);
+        insert_label(&mut groups, &lane.suppress_group);
+        insert_label(&mut groups, &lane.prefer_group);
+        for term in lane.terms.iter().chain(lane.support_terms.iter()) {
+            insert_label(&mut cold_labels, term);
+        }
+    }
+    for lane in &packet.positive_shortcuts {
+        insert_label(&mut cold_labels, &lane.id);
+        insert_label(&mut cold_labels, &lane.reinforce_peak);
+        insert_label(&mut cold_labels, &lane.reinforce_route);
+        insert_label(&mut cold_labels, &lane.reinforce_group);
+        insert_label(&mut cold_labels, &lane.reason);
+        insert_label(&mut cold_labels, &lane.source_feedback);
+        insert_label(&mut routes, &lane.reinforce_route);
+        insert_label(&mut groups, &lane.reinforce_group);
+        for term in lane.terms.iter().chain(lane.support_terms.iter()) {
+            insert_label(&mut cold_labels, term);
+        }
+    }
+
+    let centroid_count = routes.len() + groups.len();
+    let estimated_hot_bytes = NANDA_6M_HEADER_BYTES
+        + (active_triads * NANDA_6M_TRIAD_BYTES)
+        + (centroid_count * NANDA_6M_CENTROID_BYTES)
+        + (active_lanes * NANDA_6M_LANE_BYTES)
+        + NANDA_6M_WORKSPACE_BYTES
+        + NANDA_6M_INDEX_STATS_BYTES;
+    let reserved_core_bytes = NANDA_6M_HEADER_BYTES
+        + NANDA_6M_TRIAD_ARENA_BYTES
+        + NANDA_6M_CENTROID_ARENA_BYTES
+        + NANDA_6M_LANE_ARENA_BYTES
+        + NANDA_6M_WORKSPACE_BYTES
+        + NANDA_6M_INDEX_STATS_BYTES;
+    let cold_dictionary_bytes = cold_labels
+        .iter()
+        .map(|label| label.len() + 8)
+        .sum::<usize>();
+    let triads_ok = active_triads <= NANDA_6M_TRIAD_CAPACITY;
+    let centroids_ok = centroid_count <= NANDA_6M_CENTROID_CAPACITY;
+    let lanes_ok = active_lanes <= NANDA_6M_LANE_CAPACITY;
+    let hot_bytes_ok = estimated_hot_bytes <= NANDA_6M_BUDGET_BYTES;
+    let fits_l3 = triads_ok && centroids_ok && lanes_ok && hot_bytes_ok;
+    let mut blockers = vec![];
+    if !triads_ok {
+        blockers.push(json!({
+            "state": "TOO_MANY_TRIADS",
+            "count": active_triads,
+            "capacity": NANDA_6M_TRIAD_CAPACITY,
+            "repair": "build a route-balanced focus packet or split by linked group"
+        }));
+    }
+    if !centroids_ok {
+        blockers.push(json!({
+            "state": "TOO_MANY_CENTROIDS",
+            "count": centroid_count,
+            "capacity": NANDA_6M_CENTROID_CAPACITY,
+            "repair": "merge aliases, normalize routes/groups, or split topology"
+        }));
+    }
+    if !lanes_ok {
+        blockers.push(json!({
+            "state": "TOO_MANY_LANES",
+            "count": active_lanes,
+            "capacity": NANDA_6M_LANE_CAPACITY,
+            "repair": "keep only active positive/negative lanes for this focus packet"
+        }));
+    }
+    if !hot_bytes_ok {
+        blockers.push(json!({
+            "state": "SPILL_REQUIRED",
+            "estimated_hot_bytes": estimated_hot_bytes,
+            "budget_bytes": NANDA_6M_BUDGET_BYTES,
+            "repair": "reduce active triads, centroids, or lanes before hot execution"
+        }));
+    }
+    let state = if fits_l3 {
+        "FITS_L3"
+    } else if !hot_bytes_ok {
+        "SPILL_REQUIRED"
+    } else if !centroids_ok {
+        "SPLIT_REQUIRED"
+    } else {
+        "FOCUS_REQUIRED"
+    };
+    json!({
+        "core_version": CORE_VERSION,
+        "nanda_6m_version": NANDA_6M_VERSION,
+        "mode": "nanda-6m-budget-planner",
+        "state": state,
+        "verdict": if fits_l3 { "PASS" } else { "WATCH" },
+        "fits_l3": fits_l3,
+        "safe_for_hot_core": fits_l3,
+        "hard_budget_bytes": NANDA_6M_BUDGET_BYTES,
+        "reserved_core_bytes": reserved_core_bytes,
+        "estimated_hot_bytes": estimated_hot_bytes,
+        "remaining_hot_bytes": NANDA_6M_BUDGET_BYTES.saturating_sub(estimated_hot_bytes),
+        "cold_dictionary_bytes": cold_dictionary_bytes,
+        "cold_dictionary_note": "String labels, evidence text, JSON, and source snippets stay outside the NANDA-6M hot core.",
+        "wave_dim": WAVE_DIM,
+        "record_sizes": {
+            "packed_triad_bytes": NANDA_6M_TRIAD_BYTES,
+            "centroid_bytes": NANDA_6M_CENTROID_BYTES,
+            "lane_bytes": NANDA_6M_LANE_BYTES
+        },
+        "capacity": {
+            "triads": NANDA_6M_TRIAD_CAPACITY,
+            "centroids": NANDA_6M_CENTROID_CAPACITY,
+            "lanes": NANDA_6M_LANE_CAPACITY
+        },
+        "counts": {
+            "source_triads": source.len(),
+            "candidate_triads": candidates.len(),
+            "active_triads": active_triads,
+            "entities": entities.len(),
+            "relations": relations.len(),
+            "routes": routes.len(),
+            "groups": groups.len(),
+            "centroids": centroid_count,
+            "evidence_refs": evidence_refs.len(),
+            "negative_lanes": packet.negative_shortcuts.len(),
+            "positive_lanes": packet.positive_shortcuts.len(),
+            "active_lanes": active_lanes
+        },
+        "usage": {
+            "triad_arena": usage_row(active_triads, NANDA_6M_TRIAD_CAPACITY, active_triads * NANDA_6M_TRIAD_BYTES, NANDA_6M_TRIAD_ARENA_BYTES),
+            "centroid_arena": usage_row(centroid_count, NANDA_6M_CENTROID_CAPACITY, centroid_count * NANDA_6M_CENTROID_BYTES, NANDA_6M_CENTROID_ARENA_BYTES),
+            "lane_arena": usage_row(active_lanes, NANDA_6M_LANE_CAPACITY, active_lanes * NANDA_6M_LANE_BYTES, NANDA_6M_LANE_ARENA_BYTES),
+            "workspace": usage_row(1, 1, NANDA_6M_WORKSPACE_BYTES, NANDA_6M_WORKSPACE_BYTES),
+            "index_stats": usage_row(1, 1, NANDA_6M_INDEX_STATS_BYTES, NANDA_6M_INDEX_STATS_BYTES)
+        },
+        "blockers": blockers,
+        "next": if fits_l3 {
+            "Packet can enter the future NANDA-6M packed hot core."
+        } else {
+            "Do not run as one hot packet; focus, split, or reduce lanes before NANDA-6M execution."
+        }
+    })
+}
+
+fn insert_label(set: &mut BTreeSet<String>, value: &str) {
+    let trimmed = value.trim();
+    if !trimmed.is_empty() {
+        set.insert(trimmed.to_string());
+    }
+}
+
+fn usage_row(count: usize, capacity: usize, bytes: usize, arena_bytes: usize) -> Value {
+    json!({
+        "count": count,
+        "capacity": capacity,
+        "bytes": bytes,
+        "arena_bytes": arena_bytes,
+        "percent": round4((count as f64 / capacity.max(1) as f64) * 100.0)
+    })
+}
+
+fn print_budget_text(out: &Value) {
+    println!("NANDA-6M BUDGET");
+    println!(
+        "state: {}",
+        out["state"].as_str().unwrap_or("FOCUS_REQUIRED")
+    );
+    println!("fits_l3: {}", out["fits_l3"].as_bool().unwrap_or(false));
+    println!(
+        "estimated_hot_bytes: {}/{}",
+        out["estimated_hot_bytes"].as_u64().unwrap_or(0),
+        out["hard_budget_bytes"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "triads: {}/{}",
+        out["counts"]["active_triads"].as_u64().unwrap_or(0),
+        out["capacity"]["triads"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "centroids: {}/{}",
+        out["counts"]["centroids"].as_u64().unwrap_or(0),
+        out["capacity"]["centroids"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "lanes: {}/{}",
+        out["counts"]["active_lanes"].as_u64().unwrap_or(0),
+        out["capacity"]["lanes"].as_u64().unwrap_or(0)
+    );
+    println!("next: {}", out["next"].as_str().unwrap_or(""));
+}
+
+fn print_budget_md(out: &Value) {
+    println!("# NANDA-6M Budget\n");
+    println!(
+        "- state: `{}`",
+        out["state"].as_str().unwrap_or("FOCUS_REQUIRED")
+    );
+    println!("- fits_l3: `{}`", out["fits_l3"]);
+    println!(
+        "- estimated_hot_bytes: `{}/{}`",
+        out["estimated_hot_bytes"], out["hard_budget_bytes"]
+    );
+    println!(
+        "- triads: `{}/{}`",
+        out["counts"]["active_triads"], out["capacity"]["triads"]
+    );
+    println!(
+        "- centroids: `{}/{}`",
+        out["counts"]["centroids"], out["capacity"]["centroids"]
+    );
+    println!(
+        "- lanes: `{}/{}`",
+        out["counts"]["active_lanes"], out["capacity"]["lanes"]
+    );
+    println!("- next: {}", out["next"].as_str().unwrap_or(""));
 }
 
 fn probe_report(plain: &Value, negative: &Value, negative_lanes: usize) -> Value {
