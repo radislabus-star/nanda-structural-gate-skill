@@ -2403,12 +2403,13 @@ fn eval_cmd(args: EvalArgs) -> Result<u8> {
 }
 
 fn parse_eval_case(raw: &str) -> Result<(PathBuf, String, String)> {
-    let parts = raw.split(':').collect::<Vec<_>>();
+    let mut parts = raw.rsplitn(3, ':').collect::<Vec<_>>();
     if parts.len() != 3 {
         return Err(anyhow!(
             "--case must be path:expected_peak:expected_state, got {raw}"
         ));
     }
+    parts.reverse();
     Ok((
         PathBuf::from(parts[0]),
         parts[1].to_string(),
@@ -4968,5 +4969,28 @@ fn triad(
         object_role: object_role.to_string(),
         route: route.to_string(),
         group: group.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn eval_case_parser_accepts_relative_paths() {
+        let (path, peak, state) =
+            parse_eval_case("examples/route.json:certification:FOCUSED").unwrap();
+        assert_eq!(path, PathBuf::from("examples/route.json"));
+        assert_eq!(peak, "certification");
+        assert_eq!(state, "FOCUSED");
+    }
+
+    #[test]
+    fn eval_case_parser_accepts_windows_drive_paths() {
+        let (path, peak, state) =
+            parse_eval_case(r"C:\repo\nanda\route.json:certification:WATCH").unwrap();
+        assert_eq!(path, PathBuf::from(r"C:\repo\nanda\route.json"));
+        assert_eq!(peak, "certification");
+        assert_eq!(state, "WATCH");
     }
 }

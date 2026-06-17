@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.1 - 2026-06-17
+
+Windows compatibility release.
+
+### Added
+
+- PowerShell installer: `scripts/install-windows.ps1`.
+- Windows `.cmd` wrappers for `nanda`, `nanda-check`, `nanda-search`,
+  `nanda-doctor`, and the rest of the command surface.
+- Windows CI job that builds, tests, runs `doctor`, runs `eval`, and verifies
+  the PowerShell installer.
+
+### Fixed
+
+- `nanda eval --case` now parses Windows drive-letter paths such as
+  `C:\repo\case.json:certification:FOCUSED` by splitting the case spec from
+  the right.
+
 ## v1.0.0 - 2026-06-17
 
 Initial public release of NANDA Structural Gate.
@@ -25,4 +43,3 @@ Initial public release of NANDA Structural Gate.
 - `nanda-doctor`: healthy
 - `nanda-eval`: 2/2 route-trap/noisy cases
 - `nanda-dogfood .`: `SAFE_TO_EDIT`, 7/7 local branches pass
-

@@ -120,6 +120,8 @@ evidence-conflict tasks do.
 
 ## Local Install
 
+### Linux / macOS / WSL
+
 Install the skill into the local Codex runtime and expose `nanda-check`:
 
 ```bash
@@ -129,6 +131,44 @@ scripts/install-local.sh
 The installer builds the Rust binary and places it inside the runtime skill at
 `nanda-structural-gate/bin/nanda`. The script names below are stable wrappers
 around that binary.
+
+### Windows PowerShell
+
+From PowerShell:
+
+```powershell
+git clone https://github.com/radislabus-star/nanda-structural-gate-skill.git
+cd nanda-structural-gate-skill
+powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+```
+
+If `nanda-doctor.cmd` is not found after install, add this directory to your
+user `PATH`:
+
+```text
+%USERPROFILE%\.local\bin
+```
+
+PowerShell one-liner:
+
+```powershell
+$bin = "$env:USERPROFILE\.local\bin"; [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$bin", "User")
+```
+
+Then open a new PowerShell window and run:
+
+```powershell
+nanda-doctor.cmd
+nanda-search.cmd examples\triad-packet.interference-search-route-trap.json --input-format json --top-k 3
+```
+
+The Windows installer builds `target\release\nanda.exe`, copies the skill to
+`%USERPROFILE%\.codex\skills\nanda-structural-gate`, and creates `.cmd`
+wrappers in `%USERPROFILE%\.local\bin`.
+
+Windows agents should use the generated `.cmd` wrappers, for example
+`nanda-check.cmd`, `nanda-search.cmd`, and `nanda-doctor.cmd`, or call
+`nanda.exe <subcommand>` directly.
 
 Run the checker:
 
@@ -351,7 +391,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v1.0.0`.
+Current release: `v1.0.1`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:

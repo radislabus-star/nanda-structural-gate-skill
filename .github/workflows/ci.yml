@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 jobs:
-  test:
+  linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,3 +32,30 @@ jobs:
       - name: Release doctor
         run: cargo run --quiet --manifest-path Cargo.toml -- doctor
 
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check formatting
+        run: cargo fmt --check --manifest-path Cargo.toml
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path Cargo.toml
+
+      - name: Release doctor
+        run: cargo run --quiet --manifest-path Cargo.toml -- doctor
+
+      - name: Eval route-trap examples
+        run: cargo run --quiet --manifest-path Cargo.toml -- eval --case examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED --case examples/triad-packet.interference-search-noisy.json:certification:WATCH
+
+      - name: Install Windows wrappers
+        shell: pwsh
+        run: |
+          ./scripts/install-windows.ps1
+          & "$env:USERPROFILE\.local\bin\nanda-doctor.cmd"

@@ -24,6 +24,7 @@ mapper="$root/nanda-structural-gate/scripts/nanda-map"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
+cargo test --manifest-path "$root/Cargo.toml" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"
