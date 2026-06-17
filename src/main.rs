@@ -46,6 +46,7 @@ enum Command {
     Probe(ProbeArgs),
     DatasetDoctor(DatasetDoctorArgs),
     Budget(BudgetArgs),
+    Pack6m(Pack6mArgs),
     Feedback(FeedbackArgs),
     Eval(EvalArgs),
     Waw(WawArgs),
@@ -320,6 +321,25 @@ struct BudgetArgs {
     domain: String,
     #[arg(long, default_value = "")]
     query: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct Pack6mArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "pack6m")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long, default_value_t = 8)]
+    sample: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]
@@ -761,6 +781,7 @@ fn run() -> Result<u8> {
         Command::Probe(args) => probe_cmd(args),
         Command::DatasetDoctor(args) => dataset_doctor_cmd(args),
         Command::Budget(args) => budget_cmd(args),
+        Command::Pack6m(args) => pack6m_cmd(args),
         Command::Feedback(args) => feedback_cmd(args),
         Command::Eval(args) => eval_cmd(args),
         Command::Waw(args) => waw_cmd(args),
@@ -2923,6 +2944,30 @@ fn budget_cmd(args: BudgetArgs) -> Result<u8> {
     })
 }
 
+fn pack6m_cmd(args: Pack6mArgs) -> Result<u8> {
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.query,
+        args.normalize_paths,
+    )?;
+    let source = normalize_ids(packet.triads.clone(), "t");
+    let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+    let out = nanda_6m_pack_report(&packet, &source, &candidates, args.sample);
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_pack6m_text(&out),
+        OutputFormat::Md => print_pack6m_md(&out),
+    }
+    Ok(if out["packed_ok"].as_bool().unwrap_or(false) {
+        EXIT_PASS
+    } else {
+        EXIT_WATCH
+    })
+}
+
 fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad]) -> Value {
     let active_triads = source.len() + candidates.len();
     let active_lanes = packet.negative_shortcuts.len() + packet.positive_shortcuts.len();
@@ -3106,6 +3151,299 @@ fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad
             "Do not run as one hot packet; focus, split, or reduce lanes before NANDA-6M execution."
         }
     })
+}
+
+fn nanda_6m_pack_report(
+    packet: &Packet,
+    source: &[Triad],
+    candidates: &[Triad],
+    sample: usize,
+) -> Value {
+    let budget = nanda_6m_budget_report(packet, source, candidates);
+    let mut entities = IdDictionary::default();
+    let mut relations = IdDictionary::default();
+    let mut routes = IdDictionary::default();
+    let mut groups = IdDictionary::default();
+    let mut evidences = IdDictionary::default();
+    let mut roles = IdDictionary::default();
+    let mut packed = Vec::with_capacity(source.len() + candidates.len());
+    let mut blockers = vec![];
+
+    for triad in source {
+        match pack_triad6m(
+            triad,
+            0x0001,
+            &mut entities,
+            &mut relations,
+            &mut routes,
+            &mut groups,
+            &mut evidences,
+            &mut roles,
+        ) {
+            Ok(record) => packed.push(record),
+            Err(err) => blockers.push(err),
+        }
+    }
+    for triad in candidates {
+        match pack_triad6m(
+            triad,
+            0x0002,
+            &mut entities,
+            &mut relations,
+            &mut routes,
+            &mut groups,
+            &mut evidences,
+            &mut roles,
+        ) {
+            Ok(record) => packed.push(record),
+            Err(err) => blockers.push(err),
+        }
+    }
+
+    let dictionary_ok = blockers.is_empty()
+        && relations.len() <= u16::MAX as usize
+        && routes.len() <= u16::MAX as usize
+        && groups.len() <= u16::MAX as usize
+        && roles.len() <= u8::MAX as usize;
+    let packed_ok = budget["fits_l3"].as_bool().unwrap_or(false) && dictionary_ok;
+    json!({
+        "core_version": CORE_VERSION,
+        "nanda_6m_version": nanda_6m::VERSION,
+        "mode": "nanda-6m-pack-skeleton",
+        "state": if packed_ok { "PACKED_FITS_L3" } else { "PACK_REVIEW_REQUIRED" },
+        "verdict": if packed_ok { "PASS" } else { "WATCH" },
+        "packed_ok": packed_ok,
+        "budget": budget,
+        "packed_records": {
+            "count": packed.len(),
+            "bytes": packed.len() * nanda_6m::TRIAD_BYTES,
+            "record_bytes": nanda_6m::TRIAD_BYTES,
+            "sample": packed
+                .iter()
+                .take(sample)
+                .map(packed_triad_json)
+                .collect::<Vec<_>>()
+        },
+        "dictionaries": {
+            "entities": dictionary_summary(&entities, u32::MAX as usize),
+            "relations": dictionary_summary(&relations, u16::MAX as usize),
+            "routes": dictionary_summary(&routes, u16::MAX as usize),
+            "groups": dictionary_summary(&groups, u16::MAX as usize),
+            "evidences": dictionary_summary(&evidences, u32::MAX as usize),
+            "roles": dictionary_summary(&roles, u8::MAX as usize)
+        },
+        "blockers": blockers,
+        "hot_core_note": "This command still runs in the cold layer. It proves deterministic ID packing into PackedTriad32 records; it does not execute packed interference search yet."
+    })
+}
+
+#[derive(Default)]
+struct IdDictionary {
+    items: BTreeMap<String, u32>,
+}
+
+impl IdDictionary {
+    fn id(&mut self, value: &str) -> u32 {
+        let key = if value.trim().is_empty() {
+            "__default"
+        } else {
+            value.trim()
+        };
+        if let Some(id) = self.items.get(key) {
+            return *id;
+        }
+        let id = self.items.len() as u32 + 1;
+        self.items.insert(key.to_string(), id);
+        id
+    }
+
+    fn len(&self) -> usize {
+        self.items.len()
+    }
+}
+
+fn pack_triad6m(
+    triad: &Triad,
+    flags: u16,
+    entities: &mut IdDictionary,
+    relations: &mut IdDictionary,
+    routes: &mut IdDictionary,
+    groups: &mut IdDictionary,
+    evidences: &mut IdDictionary,
+    roles: &mut IdDictionary,
+) -> std::result::Result<nanda_6m::PackedTriad32, Value> {
+    let relation_id = checked_u16(relations.id(&triad.relation), "relation", &triad.relation)?;
+    let route_id = checked_u16(
+        routes.id(defaulted(&triad.route, "__route_default")),
+        "route",
+        &triad.route,
+    )?;
+    let group_id = checked_u16(
+        groups.id(defaulted(&triad.group, "__group_default")),
+        "group",
+        &triad.group,
+    )?;
+    let subject_role = checked_u8(
+        roles.id(defaulted(&triad.subject_role, "subject")),
+        "subject_role",
+        &triad.subject_role,
+    )?;
+    let object_role = checked_u8(
+        roles.id(defaulted(&triad.object_role, "object")),
+        "object_role",
+        &triad.object_role,
+    )?;
+    let role_pack = u16::from(subject_role) | (u16::from(object_role) << 8);
+    let subject_id = entities.id(&triad.subject);
+    let object_id = entities.id(&triad.object);
+    let evidence_ref = evidences.id(&triad.evidence);
+    let wave_seed = stable_hash32(&format!(
+        "{}|{}|{}|{}|{}|{}",
+        triad.subject,
+        triad.relation,
+        triad.object,
+        triad.route,
+        triad.group,
+        triad_polarity(triad)
+    ));
+    let confidence = (triad.confidence.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let polarity = stable_hash8(&triad_polarity(triad));
+    let check = stable_hash16(&format!(
+        "{subject_id}|{object_id}|{evidence_ref}|{wave_seed}|{relation_id}|{route_id}|{group_id}|{role_pack}|{flags}|{confidence}|{polarity}"
+    ));
+    Ok(nanda_6m::PackedTriad32::new(nanda_6m::PackedTriadInput {
+        subject_id,
+        object_id,
+        evidence_ref,
+        wave_seed,
+        relation_id,
+        route_id,
+        group_id,
+        role_pack,
+        flags,
+        lane_hint: 0,
+        check,
+        confidence,
+        polarity,
+    }))
+}
+
+fn defaulted<'a>(value: &'a str, fallback: &'a str) -> &'a str {
+    if value.trim().is_empty() {
+        fallback
+    } else {
+        value
+    }
+}
+
+fn checked_u16(value: u32, field: &str, label: &str) -> std::result::Result<u16, Value> {
+    u16::try_from(value).map_err(|_| {
+        json!({
+            "state": "PACK_FIELD_OVERFLOW",
+            "field": field,
+            "label": label,
+            "id": value,
+            "capacity": u16::MAX
+        })
+    })
+}
+
+fn checked_u8(value: u32, field: &str, label: &str) -> std::result::Result<u8, Value> {
+    u8::try_from(value).map_err(|_| {
+        json!({
+            "state": "PACK_FIELD_OVERFLOW",
+            "field": field,
+            "label": label,
+            "id": value,
+            "capacity": u8::MAX
+        })
+    })
+}
+
+fn stable_hash32(value: &str) -> u32 {
+    let digest = Sha256::digest(value.as_bytes());
+    u32::from_le_bytes([digest[0], digest[1], digest[2], digest[3]])
+}
+
+fn stable_hash16(value: &str) -> u16 {
+    let digest = Sha256::digest(value.as_bytes());
+    u16::from_le_bytes([digest[0], digest[1]])
+}
+
+fn stable_hash8(value: &str) -> u8 {
+    Sha256::digest(value.as_bytes())[0]
+}
+
+fn dictionary_summary(dictionary: &IdDictionary, capacity: usize) -> Value {
+    json!({
+        "count": dictionary.len(),
+        "capacity": capacity,
+        "fits": dictionary.len() <= capacity,
+        "sample": dictionary
+            .items
+            .iter()
+            .take(8)
+            .map(|(label, id)| json!({ "id": id, "label": label }))
+            .collect::<Vec<_>>()
+    })
+}
+
+fn packed_triad_json(record: &nanda_6m::PackedTriad32) -> Value {
+    json!({
+        "subject_id": record.subject_id,
+        "object_id": record.object_id,
+        "evidence_ref": record.evidence_ref,
+        "wave_seed": record.wave_seed,
+        "relation_id": record.relation_id,
+        "route_id": record.route_id,
+        "group_id": record.group_id,
+        "role_pack": record.role_pack,
+        "flags": record.flags,
+        "lane_hint": record.lane_hint,
+        "check": record.check,
+        "confidence": record.confidence,
+        "polarity": record.polarity
+    })
+}
+
+fn print_pack6m_text(out: &Value) {
+    println!("NANDA-6M PACK");
+    println!(
+        "state: {}",
+        out["state"].as_str().unwrap_or("PACK_REVIEW_REQUIRED")
+    );
+    println!("packed_ok: {}", out["packed_ok"].as_bool().unwrap_or(false));
+    println!(
+        "records: {} / bytes {}",
+        out["packed_records"]["count"].as_u64().unwrap_or(0),
+        out["packed_records"]["bytes"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "budget: {} / {}",
+        out["budget"]["estimated_hot_bytes"].as_u64().unwrap_or(0),
+        out["budget"]["hard_budget_bytes"].as_u64().unwrap_or(0)
+    );
+}
+
+fn print_pack6m_md(out: &Value) {
+    println!("# NANDA-6M Pack\n");
+    println!(
+        "- state: `{}`",
+        out["state"].as_str().unwrap_or("PACK_REVIEW_REQUIRED")
+    );
+    println!("- packed_ok: `{}`", out["packed_ok"]);
+    println!(
+        "- records: `{}`",
+        out["packed_records"]["count"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- bytes: `{}`",
+        out["packed_records"]["bytes"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- budget: `{}/{}`",
+        out["budget"]["estimated_hot_bytes"], out["budget"]["hard_budget_bytes"]
+    );
 }
 
 fn insert_label(set: &mut BTreeSet<String>, value: &str) {

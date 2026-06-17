@@ -20,6 +20,7 @@ search="$root/nanda-structural-gate/scripts/nanda-search"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
 dataset_doctor="$root/nanda-structural-gate/scripts/nanda-dataset-doctor"
 budget="$root/nanda-structural-gate/scripts/nanda-budget"
+pack6m="$root/nanda-structural-gate/scripts/nanda-pack6m"
 serve="$root/nanda-structural-gate/scripts/nanda-serve"
 dogfood="$root/nanda-structural-gate/scripts/nanda-dogfood"
 reporter="$root/nanda-structural-gate/scripts/nanda-report"
@@ -319,6 +320,12 @@ jq -e '.state == "FITS_L3"' <<<"$budget_json" >/dev/null
 jq -e '.safe_for_hot_core == true' <<<"$budget_json" >/dev/null
 jq -e '.hard_budget_bytes == 6291456' <<<"$budget_json" >/dev/null
 jq -e '.capacity.triads == 65536' <<<"$budget_json" >/dev/null
+pack6m_json="$("$pack6m" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json)"
+jq -e '.mode == "nanda-6m-pack-skeleton"' <<<"$pack6m_json" >/dev/null
+jq -e '.state == "PACKED_FITS_L3" and .packed_ok == true' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_records.count == 10 and .packed_records.record_bytes == 32' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_records.sample[0].wave_seed > 0 and .packed_records.sample[0].check > 0' <<<"$pack6m_json" >/dev/null
+jq -e '.dictionaries.entities.fits == true and .dictionaries.roles.fits == true' <<<"$pack6m_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null
@@ -458,6 +465,7 @@ grep -q 'BRANCHES: 14/14 PASS' <<<"$dogfood_text"
 "$waw" --help | grep -q "Usage: nanda waw"
 "$dataset_doctor" --help | grep -q "Usage: nanda dataset-doctor"
 "$budget" --help | grep -q "Usage: nanda budget"
+"$pack6m" --help | grep -q "Usage: nanda pack6m"
 "$feedback" --help | grep -q "Usage: nanda feedback"
 NANDA_SELF_CHECK_RUNTIME_ONLY=1 "$self_check" | grep -q "verdict: PASS"
 

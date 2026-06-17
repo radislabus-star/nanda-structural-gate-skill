@@ -96,6 +96,7 @@ scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index memory-a.json memory-b.md --out .nanda/index.json
 scripts/nanda-dataset-doctor .nanda/index.json --input-format json
 scripts/nanda-budget .nanda/index.json --input-format json
+scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
@@ -148,6 +149,9 @@ Use `nanda-budget` before assuming a packet can enter the planned NANDA-6M
 cache-resident core. It is a Phase 1 planner, not packed execution: `FITS_L3`
 means the packet fits the 6 MiB packed layout; `FOCUS_REQUIRED`,
 `SPLIT_REQUIRED`, or `SPILL_REQUIRED` means do not run it as one hot packet.
+Use `nanda-pack6m` when you need to verify the cold-to-hot bridge. It produces
+deterministic dictionaries and sample `PackedTriad32` records, but it still
+does not execute packed interference search.
 Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with

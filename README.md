@@ -132,6 +132,7 @@ evidence-conflict tasks do.
         ├── nanda-probe
         ├── nanda-dataset-doctor
         ├── nanda-budget
+        ├── nanda-pack6m
         ├── nanda-serve
         └── nanda-self-check
 ```
@@ -213,6 +214,7 @@ mkdir -p .nanda
 nanda-extract examples/route-trap.raw.txt --out .nanda/route-trap.json
 nanda-index examples/triad-packet.interference-search-route-trap.json --input-format json --out .nanda/index.json
 nanda-budget .nanda/index.json --input-format json
+nanda-pack6m .nanda/index.json --input-format json
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-noisy.json --input-format json --format text
@@ -294,6 +296,10 @@ CURRENT facts, oversized direct-search packets, and weak text-only queries.
 core yet; it checks whether a packet could fit the planned 6 MiB
 cache-resident layout and returns `FITS_L3`, `FOCUS_REQUIRED`,
 `SPLIT_REQUIRED`, or `SPILL_REQUIRED`.
+`nanda-pack6m` is the first cold-to-hot bridge. It builds deterministic
+dictionaries and sample `PackedTriad32` records from a packet, proving that the
+string/JSON world can be reduced to the planned fixed records before packed
+interference search exists.
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.

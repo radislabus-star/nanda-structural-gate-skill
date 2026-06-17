@@ -50,6 +50,43 @@ pub struct PackedTriad32 {
     pub polarity: u8,
 }
 
+impl PackedTriad32 {
+    pub const fn new(input: PackedTriadInput) -> Self {
+        Self {
+            subject_id: input.subject_id,
+            object_id: input.object_id,
+            evidence_ref: input.evidence_ref,
+            wave_seed: input.wave_seed,
+            relation_id: input.relation_id,
+            route_id: input.route_id,
+            group_id: input.group_id,
+            role_pack: input.role_pack,
+            flags: input.flags,
+            lane_hint: input.lane_hint,
+            check: input.check,
+            confidence: input.confidence,
+            polarity: input.polarity,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedTriadInput {
+    pub subject_id: u32,
+    pub object_id: u32,
+    pub evidence_ref: u32,
+    pub wave_seed: u32,
+    pub relation_id: u16,
+    pub route_id: u16,
+    pub group_id: u16,
+    pub role_pack: u16,
+    pub flags: u16,
+    pub lane_hint: u16,
+    pub check: u16,
+    pub confidence: u8,
+    pub polarity: u8,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PackedCentroid1024 {
