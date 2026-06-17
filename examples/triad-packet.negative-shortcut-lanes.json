@@ -1,0 +1,105 @@
+{
+  "task_id": "negative-shortcut-lanes",
+  "domain": "business",
+  "query": "declaration protocols payment shortcut trap with negative lane",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "Monster",
+      "relation": "pays_for",
+      "object": "declaration protocols payment",
+      "evidence": "shortcut-memory:1",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "document",
+      "route": "customs",
+      "group": "customs-shortcut"
+    },
+    {
+      "id": "m2",
+      "subject": "declaration protocols payment",
+      "relation": "requires",
+      "object": "protocols",
+      "evidence": "shortcut-memory:2",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "customs",
+      "group": "customs-shortcut"
+    },
+    {
+      "id": "m3",
+      "subject": "Monster",
+      "relation": "has_route",
+      "object": "certification",
+      "evidence": "cert-memory:1",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "route",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m4",
+      "subject": "certification payment",
+      "relation": "pays_for",
+      "object": "declaration",
+      "evidence": "cert-memory:2",
+      "confidence": 0.9,
+      "subject_role": "payment",
+      "object_role": "document",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m5",
+      "subject": "declaration",
+      "relation": "requires",
+      "object": "protocols",
+      "evidence": "cert-memory:3",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "certification",
+      "group": "certification-route"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "Monster",
+      "relation": "pays_for",
+      "object": "declaration protocols payment",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "product",
+      "object_role": "document",
+      "route": "",
+      "group": "query"
+    },
+    {
+      "id": "q2",
+      "subject": "declaration",
+      "relation": "requires",
+      "object": "protocols",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "",
+      "group": "query"
+    }
+  ],
+  "candidate_answer": "",
+  "negative_shortcuts": [
+    {
+      "id": "neg-customs-declaration-protocols",
+      "suppress_peak": "customs",
+      "prefer_peak": "certification",
+      "penalty": 0.18,
+      "terms": ["declaration", "protocols", "payment"],
+      "reason": "customs route is a rejected lexical shortcut for certification protocols",
+      "source_feedback": "examples/feedback.reject-customs.json"
+    }
+  ]
+}

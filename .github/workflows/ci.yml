@@ -41,6 +41,9 @@ jobs:
       - name: Dataset doctor
         run: cargo run --quiet --manifest-path Cargo.toml -- dataset-doctor examples/triad-packet.dataset-noise.json --input-format json --route-cap 8 || test "$?" -eq 3
 
+      - name: Negative lane smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
+
       - name: Serve smoke
         run: printf '{"command":"doctor"}\n' | cargo run --quiet --manifest-path Cargo.toml -- serve
 
@@ -80,6 +83,9 @@ jobs:
           $code = $LASTEXITCODE
           if ($code -ne 3) { exit $code }
           exit 0
+
+      - name: Negative lane smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 
       - name: Serve smoke
         shell: pwsh

@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.4.0 - 2026-06-17
+
+Negative-lanes release.
+
+### Added
+
+- `negative_shortcuts` in triad packets for suppressing known false peaks.
+- Destructive-interference scoring in `nanda search`: matching negative lanes
+  suppress rejected peaks and lightly boost preferred alternatives.
+- `destructive_interference` output with applied suppressions, penalty, match
+  ratio, preferred peak, and reason.
+- `nanda feedback --decision reject` now emits a reusable negative shortcut.
+- `nanda index` can ingest feedback-memory JSON files and carry negative lanes
+  into indexed memory packets.
+- Negative shortcut fixtures proving `customs` wins without a lane and
+  `certification` wins after the lane is applied.
+
+### Changed
+
+- Core version is now `sparse-triad-v1.4-negative-lanes`.
+
 ## v1.3.0 - 2026-06-17
 
 Dataset-immunity release.

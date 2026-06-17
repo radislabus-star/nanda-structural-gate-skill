@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v1.3-rust
-core_version: sparse-triad-v1.3-dataset-immunity
+engine: nanda-check sparse-triad-v1.4-rust
+core_version: sparse-triad-v1.4-negative-lanes
 ```
 
 ## Build Order
@@ -48,6 +48,8 @@ core_version: sparse-triad-v1.3-dataset-immunity
     `field_interpretation`.
 26. Add WAW benchmark for lexical-trap wins. Done with `nanda waw`.
 27. Add dataset-quality gate before search. Done with `nanda dataset-doctor`.
+28. Add negative lanes for rejected shortcuts. Done with `negative_shortcuts`
+    and destructive-interference scoring in `nanda search`.
 
 ## Engineering Constraints
 
@@ -118,6 +120,9 @@ win over lexical baseline plus explainable centroid drift.
 For large-corpus workflows, run `nanda dataset-doctor` before search. A WATCH
 means the corpus should be route-balanced, deduplicated, or queried with
 explicit candidate triads before trusting peaks.
+For rejected-route workflows, run `nanda feedback --decision reject`, then
+include that feedback JSON in `nanda index`; future search will suppress the
+same shortcut through negative lanes.
 For agent/runtime integration, prefer newline-delimited JSON through
 `nanda serve` instead of shelling one command per small check.
 

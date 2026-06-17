@@ -343,7 +343,7 @@
       "id": "s17",
       "subject": "PLAN.md",
       "relation": "records",
-      "object": "v1.3 dataset immunity",
+      "object": "v1.4 negative lanes",
       "evidence": "PLAN.md:35",
       "confidence": 0.9,
       "subject_role": "doc",
@@ -602,6 +602,54 @@
       "object_role": "feature",
       "route": "examples",
       "group": "dataset-examples-flow"
+    },
+    {
+      "id": "s3g",
+      "subject": "nanda binary",
+      "relation": "scores",
+      "object": "negative lanes",
+      "evidence": "src/main.rs:3506",
+      "confidence": 0.9,
+      "subject_role": "binary",
+      "object_role": "feature",
+      "route": "core",
+      "group": "negative-lane-core"
+    },
+    {
+      "id": "s3h",
+      "subject": "feedback reject",
+      "relation": "emits",
+      "object": "negative shortcut",
+      "evidence": "src/main.rs:2420",
+      "confidence": 0.9,
+      "subject_role": "feedback",
+      "object_role": "memory",
+      "route": "core",
+      "group": "negative-lane-core"
+    },
+    {
+      "id": "s14h",
+      "subject": "test-local.sh",
+      "relation": "checks",
+      "object": "negative lane suppression",
+      "evidence": "scripts/test-local.sh:292",
+      "confidence": 0.9,
+      "subject_role": "test",
+      "object_role": "feature",
+      "route": "validation",
+      "group": "negative-lane-test-flow"
+    },
+    {
+      "id": "s29",
+      "subject": "negative shortcut examples",
+      "relation": "test",
+      "object": "destructive interference",
+      "evidence": "examples/triad-packet.negative-shortcut-lanes.json:1",
+      "confidence": 0.9,
+      "subject_role": "example",
+      "object_role": "feature",
+      "route": "examples",
+      "group": "negative-lane-examples-flow"
     }
   ],
   "candidate_triads": [
@@ -945,7 +993,7 @@
       "id": "c17",
       "subject": "PLAN.md",
       "relation": "records",
-      "object": "v1.3 dataset immunity",
+      "object": "v1.4 negative lanes",
       "evidence": "candidate_answer",
       "confidence": 0.9,
       "subject_role": "doc",
@@ -1204,6 +1252,54 @@
       "object_role": "feature",
       "route": "examples",
       "group": "candidate-dataset-examples-flow"
+    },
+    {
+      "id": "c3g",
+      "subject": "nanda binary",
+      "relation": "scores",
+      "object": "negative lanes",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "binary",
+      "object_role": "feature",
+      "route": "core",
+      "group": "candidate-negative-lane-core"
+    },
+    {
+      "id": "c3h",
+      "subject": "feedback reject",
+      "relation": "emits",
+      "object": "negative shortcut",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "feedback",
+      "object_role": "memory",
+      "route": "core",
+      "group": "candidate-negative-lane-core"
+    },
+    {
+      "id": "c14h",
+      "subject": "test-local.sh",
+      "relation": "checks",
+      "object": "negative lane suppression",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "test",
+      "object_role": "feature",
+      "route": "validation",
+      "group": "candidate-negative-lane-test-flow"
+    },
+    {
+      "id": "c29",
+      "subject": "negative shortcut examples",
+      "relation": "test",
+      "object": "destructive interference",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "example",
+      "object_role": "feature",
+      "route": "examples",
+      "group": "candidate-negative-lane-examples-flow"
     }
   ],
   "candidate_answer": "The project is structured into Rust core, runtime wrappers, install flow, test flow, documentation flow, and examples flow."

@@ -40,6 +40,8 @@ jq empty "$root/examples/triad-packet.interference-search-route-trap.json"
 jq empty "$root/examples/triad-packet.waw-code-runtime-trap.json"
 jq empty "$root/examples/triad-packet.waw-doc-owner-trap.json"
 jq empty "$root/examples/triad-packet.dataset-noise.json"
+jq empty "$root/examples/triad-packet.negative-shortcut-base.json"
+jq empty "$root/examples/triad-packet.negative-shortcut-lanes.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/waw-corpus.json"
 
@@ -141,7 +143,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v1.3-dataset-immunity"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v1.4-negative-lanes"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -288,6 +290,25 @@ indexed_search_json="$("$search" "$tmp_index" --input-format json --query-file "
 jq -e '.peak_decision.state == "FOCUSED"' <<<"$indexed_search_json" >/dev/null
 jq -e '.wins_over_lexical_baseline == true' <<<"$indexed_search_json" >/dev/null
 rm -f "$tmp_index"
+negative_base_json="$("$search" "$root/examples/triad-packet.negative-shortcut-base.json" --input-format json --top-k 3)"
+jq -e '.peaks[0].peak == "customs"' <<<"$negative_base_json" >/dev/null
+jq -e '.destructive_interference.applied == false' <<<"$negative_base_json" >/dev/null
+negative_lanes_json="$("$search" "$root/examples/triad-packet.negative-shortcut-lanes.json" --input-format json --top-k 3)"
+jq -e '.peaks[0].peak == "certification"' <<<"$negative_lanes_json" >/dev/null
+jq -e '.destructive_interference.applied == true' <<<"$negative_lanes_json" >/dev/null
+jq -e '.destructive_interference.suppressions[0].suppressed_peak == "customs"' <<<"$negative_lanes_json" >/dev/null
+tmp_negative_search="$(mktemp)"
+tmp_negative_feedback="$(mktemp)"
+tmp_negative_index="$(mktemp)"
+printf '%s\n' "$negative_base_json" >"$tmp_negative_search"
+"$feedback" "$tmp_negative_search" --decision reject --note "customs shortcut" --out "$tmp_negative_feedback" >/dev/null
+jq -e '.negative_shortcuts[0].suppress_peak == "customs"' "$tmp_negative_feedback" >/dev/null
+jq -e '.negative_shortcuts[0].prefer_peak == "certification"' "$tmp_negative_feedback" >/dev/null
+"$indexer" "$root/examples/triad-packet.negative-shortcut-base.json" "$tmp_negative_feedback" --input-format json --out "$tmp_negative_index" >/dev/null
+indexed_negative_json="$("$search" "$tmp_negative_index" --input-format json --query-file "$root/examples/triad-packet.negative-shortcut-base.json" --query-format json --top-k 3)"
+jq -e '.peaks[0].peak == "certification"' <<<"$indexed_negative_json" >/dev/null
+jq -e '.destructive_interference.applied == true' <<<"$indexed_negative_json" >/dev/null
+rm -f "$tmp_negative_search" "$tmp_negative_feedback" "$tmp_negative_index"
 tmp_extract="$(mktemp)"
 "$extractor" "$root/examples/route-trap.raw.txt" --out "$tmp_extract" >/dev/null
 jq empty "$tmp_extract"
@@ -303,11 +324,11 @@ grep -q '"root_verdict": "WATCH"' <<<"$dogfood_json"
 grep -q '"root_size_only": true' <<<"$dogfood_json"
 grep -q '"foreign_pull": 0' <<<"$dogfood_json"
 grep -q '"invariant_violation": 0' <<<"$dogfood_json"
-grep -q '"local_branches": 11' <<<"$dogfood_json"
-grep -q '"local_pass": 11' <<<"$dogfood_json"
+grep -q '"local_branches": 14' <<<"$dogfood_json"
+grep -q '"local_pass": 14' <<<"$dogfood_json"
 dogfood_text="$("$dogfood" "$root")"
 grep -q 'ACTION: SAFE_TO_EDIT' <<<"$dogfood_text"
-grep -q 'BRANCHES: 11/11 PASS' <<<"$dogfood_text"
+grep -q 'BRANCHES: 14/14 PASS' <<<"$dogfood_text"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null

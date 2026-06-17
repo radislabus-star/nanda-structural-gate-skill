@@ -104,6 +104,8 @@ nanda comb packet.json --input-format json --depth 2 --out-dir comb/
 nanda split packet.json --input-format json --by linked-group --out-dir split/
 nanda check --triads split/route.json
 nanda dataset-doctor index.json --input-format json
+nanda feedback search.json --decision reject --out .nanda/reject.json
+nanda index memory.json .nanda/reject.json --out .nanda/index.json
 nanda eval --suite examples/eval-corpus.json
 nanda waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | nanda serve
@@ -116,17 +118,17 @@ No secondary scripting runtime is part of the shipped checker surface.
 Current core:
 
 ```text
-core_version: sparse-triad-v1.3-dataset-immunity
+core_version: sparse-triad-v1.4-negative-lanes
 wave_dim:     1024
 ```
 
-The `v1.3-dataset-immunity` core keeps recursive combing, structural peak search,
+The `v1.4-negative-lanes` core keeps recursive combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, and release doctor checks, then adds file-backed eval suites, a
 newline-delimited JSON agent API, and field interpretation for interference
 peaks. It also adds a WAW benchmark surface for cases where structural
 interference must beat a lexical trap, plus a dataset-quality gate for noisy
-large corpora:
+large corpora and negative lanes for rejected shortcut peaks:
 
 ```text
 topology graph
@@ -139,6 +141,8 @@ peak/state eval suite
 file-backed eval suite
 WAW lexical-trap benchmark suite
 dataset-doctor corpus immunity
+negative_shortcuts
+destructive_interference
 JSONL agent serve loop
 field_interpretation for search peaks
 field_interpretation.corpus
@@ -224,10 +228,10 @@ V0 builds a source memory from `triads` and scores each `candidate_triads`
 composite against that memory. A swapped candidate should have high token
 overlap but low composite similarity.
 
-## Core Size v1.3
+## Core Size v1.4
 
 Use fixed dimensions for the current recursive comb/search/agent-field/WAW
-and dataset-immunity verifier:
+dataset-immunity, and negative-lane verifier:
 
 ```text
 wave_dim:       1024 lanes

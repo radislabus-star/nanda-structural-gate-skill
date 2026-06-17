@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v1.3-dataset-immunity";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v1.3-rust";
+const CORE_VERSION: &str = "sparse-triad-v1.4-negative-lanes";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v1.4-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -466,6 +466,30 @@ struct Packet {
     candidate_triads: Vec<Triad>,
     #[serde(default)]
     candidate_answer: String,
+    #[serde(default)]
+    negative_shortcuts: Vec<NegativeShortcut>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct NegativeShortcut {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    suppress_peak: String,
+    #[serde(default)]
+    prefer_peak: String,
+    #[serde(default = "default_negative_penalty")]
+    penalty: f64,
+    #[serde(default)]
+    terms: Vec<String>,
+    #[serde(default)]
+    reason: String,
+    #[serde(default)]
+    source_feedback: String,
+}
+
+fn default_negative_penalty() -> f64 {
+    0.18
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -613,6 +637,7 @@ fn load_packet(path: Option<&Path>) -> Result<Packet> {
             triads: vec![],
             candidate_triads: vec![],
             candidate_answer: String::new(),
+            negative_shortcuts: vec![],
         }),
     }
 }
@@ -1827,6 +1852,7 @@ fn init_task(args: InitTaskArgs) -> Result<u8> {
         }],
         candidate_triads: vec![],
         candidate_answer: String::new(),
+        negative_shortcuts: vec![],
     };
     let output = serde_json::to_string_pretty(&packet)? + "\n";
     write_or_print(
@@ -1974,6 +2000,7 @@ fn split_packet(args: SplitPacketArgs) -> Result<u8> {
                     triads: split.triads.clone(),
                     candidate_triads: split.candidates.clone(),
                     candidate_answer: packet.candidate_answer.clone(),
+                    negative_shortcuts: packet.negative_shortcuts.clone(),
                 };
                 fs::write(&path, serde_json::to_string_pretty(&split_packet)? + "\n")?;
             }
@@ -2318,7 +2345,12 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
         ));
     }
     let mut triads = vec![];
+    let mut negative_shortcuts = vec![];
     for input in &args.inputs {
+        if let Some(shortcuts) = load_feedback_negative_shortcuts(input)? {
+            negative_shortcuts.extend(shortcuts);
+            continue;
+        }
         let packet = load_packet_auto(
             input,
             &args.input_format,
@@ -2331,6 +2363,7 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
         if args.include_candidates {
             triads.extend(packet.candidate_triads);
         }
+        negative_shortcuts.extend(packet.negative_shortcuts);
     }
     let triads = dedup_triads(triads);
     let packet = json!({
@@ -2340,6 +2373,7 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
         "triads": triads,
         "candidate_triads": [],
         "candidate_answer": "",
+        "negative_shortcuts": negative_shortcuts,
         "index": {
             "core_version": CORE_VERSION,
             "wave_dim": WAVE_DIM,
@@ -2354,6 +2388,30 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
     fs::write(&args.out, serde_json::to_string_pretty(&packet)? + "\n")?;
     println!("{}", args.out.display());
     Ok(EXIT_PASS)
+}
+
+fn load_feedback_negative_shortcuts(path: &Path) -> Result<Option<Vec<NegativeShortcut>>> {
+    if !path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
+    {
+        return Ok(None);
+    }
+    let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let value: Value =
+        serde_json::from_str(&text).with_context(|| format!("parse {}", path.display()))?;
+    if value["mode"].as_str() != Some("feedback-memory") {
+        return Ok(None);
+    }
+    let shortcuts = value["negative_shortcuts"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(serde_json::from_value)
+        .collect::<std::result::Result<Vec<NegativeShortcut>, _>>()?;
+    Ok(Some(shortcuts))
 }
 
 fn extract_cmd(args: ExtractArgs) -> Result<u8> {
@@ -2406,6 +2464,16 @@ fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    let negative_shortcuts = if matches!(args.decision, FeedbackDecision::Reject) {
+        vec![negative_shortcut_from_search(
+            &search,
+            &peak_name,
+            &args.note,
+            args.input.display().to_string(),
+        )]
+    } else {
+        vec![]
+    };
     let decision = feedback_decision_label(&args.decision);
     let reinforcement = match args.decision {
         FeedbackDecision::Accept => json!({
@@ -2416,7 +2484,8 @@ fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
         FeedbackDecision::Reject => json!({
             "reject_peak": peak_name,
             "suppress_support": support_ids,
-            "inspect_alternatives": anti_ids
+            "inspect_alternatives": anti_ids,
+            "negative_shortcuts": negative_shortcuts
         }),
         FeedbackDecision::Watch => json!({
             "watch_peak": peak_name,
@@ -2439,12 +2508,75 @@ fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
         "wins_over_lexical_baseline": search["wins_over_lexical_baseline"].as_bool().unwrap_or(false),
         "support_ids": support_ids,
         "anti_ids": anti_ids,
+        "negative_shortcuts": negative_shortcuts,
         "memory_patch": reinforcement,
-        "interpretation": "Feedback is a compact trace for later memory tuning. It records whether a focused interference peak was accepted, rejected, or kept under WATCH."
+        "interpretation": "Feedback is a compact trace for later memory tuning. Reject feedback creates a negative shortcut that can suppress the same false peak in later search."
     });
     let output = serde_json::to_string_pretty(&feedback)? + "\n";
     write_or_print(args.out, args.stdout, output)?;
     Ok(EXIT_PASS)
+}
+
+fn negative_shortcut_from_search(
+    search: &Value,
+    peak_name: &str,
+    note: &str,
+    source_feedback: String,
+) -> NegativeShortcut {
+    let group_by = search["group_by"].as_str().unwrap_or("route");
+    let prefer_peak = search["peaks"]
+        .as_array()
+        .and_then(|peaks| peaks.first())
+        .and_then(|peak| peak["anti_triads"].as_array())
+        .and_then(|items| items.first())
+        .and_then(|item| match group_by {
+            "group" => item["group"].as_str(),
+            _ => item["route"].as_str(),
+        })
+        .unwrap_or("")
+        .to_string();
+    let terms = query_tokens_from_search(search)
+        .into_iter()
+        .take(16)
+        .collect::<Vec<_>>();
+    NegativeShortcut {
+        id: format!("neg-{}", slug(&format!("{peak_name}-{prefer_peak}-{note}"))),
+        suppress_peak: peak_name.to_string(),
+        prefer_peak,
+        penalty: default_negative_penalty(),
+        terms,
+        reason: if note.trim().is_empty() {
+            "rejected interference peak".to_string()
+        } else {
+            note.to_string()
+        },
+        source_feedback,
+    }
+}
+
+fn query_tokens_from_search(search: &Value) -> BTreeSet<String> {
+    let mut tokens = BTreeSet::new();
+    if let Some(items) = search["query"]["triads"].as_array() {
+        for item in items {
+            for key in [
+                "subject",
+                "relation",
+                "object",
+                "subject_role",
+                "object_role",
+                "route",
+                "group",
+            ] {
+                for token in norm(item[key].as_str().unwrap_or(""))
+                    .split(|c: char| !c.is_ascii_alphanumeric())
+                    .filter(|token| token.len() >= 2)
+                {
+                    tokens.insert(token.to_string());
+                }
+            }
+        }
+    }
+    tokens
 }
 
 fn feedback_decision_label(decision: &FeedbackDecision) -> &'static str {
@@ -3190,6 +3322,7 @@ fn builtin_route_trap_packet(noisy: bool) -> Packet {
         triads,
         candidate_triads,
         candidate_answer: String::new(),
+        negative_shortcuts: vec![],
     }
 }
 
@@ -3262,6 +3395,7 @@ fn extract_packet_from_text(text: &str, task_id: &str, domain: &str, query: &str
         triads,
         candidate_triads: candidates,
         candidate_answer: String::new(),
+        negative_shortcuts: vec![],
     }
 }
 
@@ -3448,6 +3582,8 @@ fn interference_search(
             "answer_projection": answer_projection(&center, &items)
         }));
     }
+    let destructive_interference =
+        apply_negative_lanes(&mut peaks, query, &packet.negative_shortcuts);
     peaks.sort_by(|a, b| {
         b["score"]
             .as_f64()
@@ -3497,10 +3633,105 @@ fn interference_search(
         "lexical_baseline": lexical_baseline,
         "wins_over_lexical_baseline": !lexical_peak.is_empty() && top_peak.as_str() != lexical_peak,
         "peak_decision": peak_decision,
+        "destructive_interference": destructive_interference,
         "field_interpretation": field_interpretation,
         "peaks": output_peaks,
         "interpretation": "A peak is a route/group whose triads resonate together with the partial query. Read support as the focused structure and anti_triads as similar-but-foreign pulls."
     })
+}
+
+fn apply_negative_lanes(
+    peaks: &mut [Value],
+    query: &[Triad],
+    shortcuts: &[NegativeShortcut],
+) -> Value {
+    let query_tokens = query_token_set(query);
+    let mut suppressions = vec![];
+    if shortcuts.is_empty() || peaks.is_empty() {
+        return json!({
+            "applied": false,
+            "negative_lanes": shortcuts.len(),
+            "suppressions": suppressions
+        });
+    }
+    for shortcut in shortcuts {
+        let ratio = negative_lane_match_ratio(&query_tokens, shortcut);
+        if ratio <= 0.0 {
+            continue;
+        }
+        let penalty = round4(shortcut.penalty.max(0.0) * ratio);
+        let boost = round4(penalty * 0.35);
+        for peak in peaks.iter_mut() {
+            let Some(peak_name) = peak["peak"].as_str().map(str::to_string) else {
+                continue;
+            };
+            if norm(&peak_name) == norm(&shortcut.suppress_peak) {
+                let old_score = peak["score"].as_f64().unwrap_or(0.0);
+                let new_score = round4((old_score - penalty).max(0.0));
+                if let Some(object) = peak.as_object_mut() {
+                    object.insert("score".to_string(), json!(new_score));
+                    object.insert("raw_score".to_string(), json!(round4(old_score)));
+                    object.insert("negative_lane_penalty".to_string(), json!(penalty));
+                }
+                suppressions.push(json!({
+                    "shortcut": shortcut.id,
+                    "suppressed_peak": peak_name,
+                    "penalty": penalty,
+                    "match_ratio": round4(ratio),
+                    "prefer_peak": shortcut.prefer_peak,
+                    "reason": shortcut.reason
+                }));
+            } else if !shortcut.prefer_peak.is_empty()
+                && norm(&peak_name) == norm(&shortcut.prefer_peak)
+            {
+                let old_score = peak["score"].as_f64().unwrap_or(0.0);
+                let new_score = round4(old_score + boost);
+                if let Some(object) = peak.as_object_mut() {
+                    object.insert("score".to_string(), json!(new_score));
+                    object.insert("raw_score".to_string(), json!(round4(old_score)));
+                    object.insert("negative_lane_boost".to_string(), json!(boost));
+                }
+            }
+        }
+    }
+    json!({
+        "applied": !suppressions.is_empty(),
+        "negative_lanes": shortcuts.len(),
+        "suppressions": suppressions
+    })
+}
+
+fn negative_lane_match_ratio(query_tokens: &BTreeSet<String>, shortcut: &NegativeShortcut) -> f64 {
+    if shortcut.suppress_peak.trim().is_empty() {
+        return 0.0;
+    }
+    if shortcut.terms.is_empty() {
+        return 1.0;
+    }
+    if query_tokens.is_empty() {
+        return 0.0;
+    }
+    let terms = shortcut
+        .terms
+        .iter()
+        .flat_map(|term| {
+            norm(term)
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .filter(|token| token.len() >= 2)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect::<BTreeSet<_>>();
+    if terms.is_empty() {
+        return 1.0;
+    }
+    let hits = terms.intersection(query_tokens).count();
+    let ratio = hits as f64 / terms.len() as f64;
+    if ratio >= 0.5 {
+        ratio
+    } else {
+        0.0
+    }
 }
 
 fn corpus_diagnostics(
@@ -4599,6 +4830,7 @@ fn comb_node(
         triads: source.to_vec(),
         candidate_triads: candidates.to_vec(),
         candidate_answer: packet.candidate_answer.clone(),
+        negative_shortcuts: packet.negative_shortcuts.clone(),
     };
     let report = make_report(&local_packet, source, candidates)?;
     let map = structural_map(source, candidates);
@@ -5193,6 +5425,7 @@ fn packet_from_markdown(
         triads,
         candidate_triads,
         candidate_answer: String::new(),
+        negative_shortcuts: vec![],
     })
 }
 
@@ -5572,6 +5805,7 @@ fn example_packet(swapped: bool) -> Packet {
         triads,
         candidate_triads,
         candidate_answer: String::new(),
+        negative_shortcuts: vec![],
     }
 }
 
@@ -5678,6 +5912,7 @@ fn synthetic_packet(idx: usize, kind: &str) -> Packet {
         triads,
         candidate_triads,
         candidate_answer: String::new(),
+        negative_shortcuts: vec![],
     }
 }
 
