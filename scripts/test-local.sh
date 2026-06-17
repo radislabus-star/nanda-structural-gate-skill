@@ -333,8 +333,10 @@ jq -e '.centroids.source == "memory_triads" and .centroids.record_bytes == 1024 
 jq -e '.centroids.total_count == 6 and .centroids.route[0].summary.energy > 0' <<<"$pack6m_json" >/dev/null
 jq -e '.centroids.route[0].score.cosine > 0' <<<"$pack6m_json" >/dev/null
 jq -e '.peaks.mode == "packed-candidate-query-vs-memory-centroid-cosine"' <<<"$pack6m_json" >/dev/null
-jq -e '.peaks.route.state == "PEAK_FOUND" and .peaks.route.top_score > 0 and .peaks.route.margin >= 0' <<<"$pack6m_json" >/dev/null
-jq -e '.peaks.group.state == "PEAK_FOUND" and .peaks.group.top_score > 0 and .peaks.group.margin >= 0' <<<"$pack6m_json" >/dev/null
+jq -e '.peaks.route.state == "PEAK_THIN" and .peaks.route.top_score > 0 and .peaks.route.margin >= 0' <<<"$pack6m_json" >/dev/null
+jq -e '.peaks.group.state == "PEAK_THIN" and .peaks.group.top_score > 0 and .peaks.group.margin >= 0' <<<"$pack6m_json" >/dev/null
+jq -e '.peak_decision.state == "PACKED_THIN" and .peak_decision.verdict == "WATCH" and .peak_decision.safe_to_answer == false' <<<"$pack6m_json" >/dev/null
+jq -e '.peak_decision.route.top_id > 0 and .peak_decision.group.top_id > 0 and .peak_decision.thresholds.min_focus_score == 0.01' <<<"$pack6m_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null

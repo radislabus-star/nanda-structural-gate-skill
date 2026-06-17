@@ -3226,6 +3226,13 @@ fn nanda_6m_pack_report(
         packed_centroid_report(&memory_packed, &projection, CentroidAxis6m::Group, sample);
     let route_peak = packed_peak_summary(&route_centroids);
     let group_peak = packed_peak_summary(&group_centroids);
+    let peak_decision = packed_field_decision(
+        &route_peak,
+        &group_peak,
+        projection_summary.energy,
+        memory_packed.len(),
+        query_packed.len(),
+    );
     let dictionary_ok = blockers.is_empty()
         && relations.len() <= u16::MAX as usize
         && routes.len() <= u16::MAX as usize
@@ -3276,6 +3283,7 @@ fn nanda_6m_pack_report(
             "route": route_peak,
             "group": group_peak
         },
+        "peak_decision": peak_decision,
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
             "relations": dictionary_summary(&relations, u16::MAX as usize),
@@ -3354,13 +3362,117 @@ fn packed_peak_summary(rows: &[Value]) -> Value {
     let second_score = second
         .and_then(|item| item["score"]["cosine"].as_f64())
         .unwrap_or(0.0);
+    let margin = top_score - second_score;
+    let state = if top.is_none() || top_score <= 0.0 {
+        "NO_PEAK"
+    } else if top_score < 0.01 {
+        "PEAK_THIN"
+    } else if margin < 0.003 {
+        "PEAK_CONTESTED"
+    } else {
+        "PEAK_FOUND"
+    };
     json!({
         "top_id": top.and_then(|item| item["id"].as_u64()).unwrap_or(0),
         "top_score": round4(top_score),
         "second_id": second.and_then(|item| item["id"].as_u64()).unwrap_or(0),
         "second_score": round4(second_score),
-        "margin": round4(top_score - second_score),
-        "state": if top_score > 0.0 { "PEAK_FOUND" } else { "NO_PEAK" }
+        "margin": round4(margin),
+        "state": state
+    })
+}
+
+fn packed_field_decision(
+    route_peak: &Value,
+    group_peak: &Value,
+    query_energy: u64,
+    memory_count: usize,
+    query_count: usize,
+) -> Value {
+    let route_state = route_peak["state"].as_str().unwrap_or("NO_PEAK");
+    let group_state = group_peak["state"].as_str().unwrap_or("NO_PEAK");
+    let route_id = route_peak["top_id"].as_u64().unwrap_or(0);
+    let group_id = group_peak["top_id"].as_u64().unwrap_or(0);
+    let route_score = route_peak["top_score"].as_f64().unwrap_or(0.0);
+    let group_score = group_peak["top_score"].as_f64().unwrap_or(0.0);
+    let route_margin = route_peak["margin"].as_f64().unwrap_or(0.0);
+    let group_margin = group_peak["margin"].as_f64().unwrap_or(0.0);
+
+    let (state, verdict, safe_to_answer, reason) = if memory_count == 0 {
+        (
+            "PACKED_EMPTY_MEMORY",
+            "WATCH",
+            false,
+            "No memory/source triads were packed, so centroids cannot be trusted.",
+        )
+    } else if query_count == 0 {
+        (
+            "PACKED_MEMORY_FALLBACK",
+            "WATCH",
+            false,
+            "No candidate/query triads were packed; projection uses memory fallback for diagnostics only.",
+        )
+    } else if query_energy == 0 {
+        (
+            "PACKED_EMPTY_QUERY",
+            "WATCH",
+            false,
+            "Candidate/query projection has zero energy.",
+        )
+    } else if route_state == "NO_PEAK" || group_state == "NO_PEAK" {
+        (
+            "PACKED_NO_PEAK",
+            "WATCH",
+            false,
+            "At least one centroid axis has no positive peak.",
+        )
+    } else if route_state == "PEAK_THIN" || group_state == "PEAK_THIN" {
+        (
+            "PACKED_THIN",
+            "WATCH",
+            false,
+            "A peak exists, but cosine strength is below the packed focus threshold.",
+        )
+    } else if route_state == "PEAK_CONTESTED" || group_state == "PEAK_CONTESTED" {
+        (
+            "PACKED_CONTESTED",
+            "WATCH",
+            false,
+            "Top centroid is too close to the runner-up.",
+        )
+    } else {
+        (
+            "PACKED_FOCUSED",
+            "PASS",
+            true,
+            "Route and group axes both expose strong packed peaks.",
+        )
+    };
+
+    json!({
+        "state": state,
+        "verdict": verdict,
+        "safe_to_answer": safe_to_answer,
+        "reason": reason,
+        "thresholds": {
+            "min_focus_score": 0.01,
+            "min_focus_margin": 0.003
+        },
+        "query_energy": query_energy,
+        "memory_records": memory_count,
+        "query_records": query_count,
+        "route": {
+            "top_id": route_id,
+            "state": route_state,
+            "top_score": round4(route_score),
+            "margin": round4(route_margin)
+        },
+        "group": {
+            "top_id": group_id,
+            "state": group_state,
+            "top_score": round4(group_score),
+            "margin": round4(group_margin)
+        }
     })
 }
 
@@ -3567,6 +3679,15 @@ fn print_pack6m_text(out: &Value) {
         out["peaks"]["group"]["top_score"].as_f64().unwrap_or(0.0)
     );
     println!(
+        "decision: {} / safe_to_answer {}",
+        out["peak_decision"]["state"]
+            .as_str()
+            .unwrap_or("PACKED_REVIEW_REQUIRED"),
+        out["peak_decision"]["safe_to_answer"]
+            .as_bool()
+            .unwrap_or(false)
+    );
+    println!(
         "budget: {} / {}",
         out["budget"]["estimated_hot_bytes"].as_u64().unwrap_or(0),
         out["budget"]["hard_budget_bytes"].as_u64().unwrap_or(0)
@@ -3613,6 +3734,16 @@ fn print_pack6m_md(out: &Value) {
         "- route_peak: `{}` / score `{}`",
         out["peaks"]["route"]["top_id"].as_u64().unwrap_or(0),
         out["peaks"]["route"]["top_score"].as_f64().unwrap_or(0.0)
+    );
+    println!(
+        "- peak_decision: `{}`",
+        out["peak_decision"]["state"]
+            .as_str()
+            .unwrap_or("PACKED_REVIEW_REQUIRED")
+    );
+    println!(
+        "- safe_to_answer: `{}`",
+        out["peak_decision"]["safe_to_answer"]
     );
     println!(
         "- budget: `{}/{}`",
