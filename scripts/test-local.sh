@@ -148,7 +148,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v2.3-field-state-machine"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v2.4-local-negative-lanes"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -290,7 +290,7 @@ if [[ "$dataset_status" -ne 3 ]]; then
   exit 1
 fi
 jq -e '.mode == "dataset-doctor" and .verdict == "WATCH"' <<<"$dataset_json" >/dev/null
-jq -e '([.warnings[].kind] | index("route_imbalance") and index("hub_dominance") and index("duplicate_current") and index("weak_text_query"))' <<<"$dataset_json" >/dev/null
+jq -e '([.warnings[].kind] | index("large_unbalanced_corpus") and index("route_imbalance") and index("hub_dominance") and index("duplicate_current") and index("weak_text_query"))' <<<"$dataset_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null
@@ -298,6 +298,7 @@ jq -e '.route_trap.field_state == "FIELD_FOCUSED" and .route_trap.field_safe_to_
 jq -e '.noisy.state == "WATCH" and .noisy.safe_to_answer == false' <<<"$doctor_json" >/dev/null
 jq -e '.noisy.field_state == "FIELD_CONTESTED" and .noisy.field_safe_to_answer == false' <<<"$doctor_json" >/dev/null
 trap_search_json="$("$search" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3)"
+jq -e '.verdict == "PASS" and .field_state == "FIELD_FOCUSED" and .safe_to_answer == true and .top_peak == "certification"' <<<"$trap_search_json" >/dev/null
 trap_first_peak="$(jq -r '.peaks[0].peak' <<<"$trap_search_json")"
 trap_lexical_peak="$(jq -r '.lexical_baseline.top_peak' <<<"$trap_search_json")"
 trap_wins="$(jq -r '.wins_over_lexical_baseline' <<<"$trap_search_json")"
@@ -337,16 +338,26 @@ negative_base_json="$("$search" "$root/examples/triad-packet.negative-shortcut-b
 jq -e '.peaks[0].peak == "customs"' <<<"$negative_base_json" >/dev/null
 jq -e '.destructive_interference.applied == false' <<<"$negative_base_json" >/dev/null
 negative_lanes_json="$("$search" "$root/examples/triad-packet.negative-shortcut-lanes.json" --input-format json --top-k 3)"
+jq -e '.verdict == "WATCH" and .field_state == "FIELD_THIN" and .safe_to_answer == false and .top_peak == "certification"' <<<"$negative_lanes_json" >/dev/null
 jq -e '.peaks[0].peak == "certification"' <<<"$negative_lanes_json" >/dev/null
 jq -e '.destructive_interference.applied == true' <<<"$negative_lanes_json" >/dev/null
 jq -e '.destructive_interference.suppressions[0].suppressed_peak == "customs"' <<<"$negative_lanes_json" >/dev/null
+jq -e '.destructive_interference.suppressions[0].suppress_peak == "customs"' <<<"$negative_lanes_json" >/dev/null
+negative_lanes_group_json="$("$search" "$root/examples/triad-packet.negative-shortcut-lanes.json" --input-format json --group-by group --top-k 5)"
+jq -e '.top_peak == "certification-route"' <<<"$negative_lanes_group_json" >/dev/null
+jq -e '.destructive_interference.applied == true' <<<"$negative_lanes_group_json" >/dev/null
+jq -e '.destructive_interference.suppressions[0].suppressed_peak == "customs-shortcut"' <<<"$negative_lanes_group_json" >/dev/null
+jq -e '.destructive_interference.suppressions[0].suppress_peak == "customs-shortcut"' <<<"$negative_lanes_group_json" >/dev/null
 tmp_negative_search="$(mktemp)"
 tmp_negative_feedback="$(mktemp)"
 tmp_negative_index="$(mktemp)"
 printf '%s\n' "$negative_base_json" >"$tmp_negative_search"
 "$feedback" "$tmp_negative_search" --decision reject --note "customs shortcut" --out "$tmp_negative_feedback" >/dev/null
 jq -e '.negative_shortcuts[0].suppress_peak == "customs"' "$tmp_negative_feedback" >/dev/null
+jq -e '.negative_shortcuts[0].suppress_route == "customs"' "$tmp_negative_feedback" >/dev/null
+jq -e '.negative_shortcuts[0].suppress_group == "customs-shortcut"' "$tmp_negative_feedback" >/dev/null
 jq -e '.negative_shortcuts[0].prefer_peak == "certification"' "$tmp_negative_feedback" >/dev/null
+jq -e '.negative_shortcuts[0].support_terms | length > 0' "$tmp_negative_feedback" >/dev/null
 "$indexer" "$root/examples/triad-packet.negative-shortcut-base.json" "$tmp_negative_feedback" --input-format json --out "$tmp_negative_index" >/dev/null
 indexed_negative_json="$("$search" "$tmp_negative_index" --input-format json --query-file "$root/examples/triad-packet.negative-shortcut-base.json" --query-format json --top-k 3)"
 jq -e '.peaks[0].peak == "certification"' <<<"$indexed_negative_json" >/dev/null

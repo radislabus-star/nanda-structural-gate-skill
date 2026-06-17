@@ -118,11 +118,11 @@ No secondary scripting runtime is part of the shipped checker surface.
 Current core:
 
 ```text
-core_version: sparse-triad-v2.3-field-state-machine
+core_version: sparse-triad-v2.4-local-negative-lanes
 wave_dim:     1024
 ```
 
-The `v2.3-field-state-machine` core keeps recursive combing, structural peak search,
+The `v2.4-local-negative-lanes` core keeps recursive combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, and release doctor checks, then adds file-backed eval suites, a
 newline-delimited JSON agent API, and field interpretation for interference
@@ -130,10 +130,10 @@ peaks. It also adds a WAW benchmark surface for cases where structural
 interference must beat a lexical trap, plus a dataset-quality gate for noisy
 large corpora, source/confidence weighting, auto query triads, and learning
 negative lanes for rejected shortcut peaks. The current field also adds
-route-balanced focus, coarse-to-fine localization, polarization lanes, and a
-polarity gate. The v2.3 layer adds `field_state_machine`, which turns the
-measured field into explicit agent actions instead of treating raw score weights
-as a final verdict:
+route-balanced focus, coarse-to-fine localization, polarization lanes, a
+polarity gate, and a field-state machine. The v2.4 layer makes negative lanes
+local to route/group/support shape so destructive interference suppresses a
+rejected reading rather than every semantically nearby peak:
 
 ```text
 topology graph
@@ -241,12 +241,12 @@ V0 builds a source memory from `triads` and scores each `candidate_triads`
 composite against that memory. A swapped candidate should have high token
 overlap but low composite similarity.
 
-## Core Size v2.3
+## Core Size v2.4
 
 Use fixed dimensions for the current recursive comb/search/agent-field/WAW
 dataset-immunity, source-weighted search, auto-query, and learning negative-lane
-verifier, plus route-balanced focus, coarse-to-fine trace, polarization, and
-field-state-machine interpretation:
+verifier, plus route-balanced focus, coarse-to-fine trace, polarization,
+field-state-machine interpretation, and local negative lanes:
 
 ```text
 wave_dim:       1024 lanes

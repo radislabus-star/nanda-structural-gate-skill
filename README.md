@@ -262,7 +262,7 @@ line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v2.3 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the v2.4 memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, source weights, destructive
@@ -315,11 +315,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v2.3-field-state-machine
+core_version: sparse-triad-v2.4-local-negative-lanes
 wave_dim: 1024
 ```
 
-`v2.3-field-state-machine` keeps recursive topology combing, structural peak search,
+`v2.4-local-negative-lanes` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -335,7 +335,8 @@ supporting path after the coarse peak. Polarization adds role-direction lanes
 so reversed structures can look lexically similar but resonate differently. The
 field-state machine then converts measured signals into an agent-safe action:
 answer from support, split/query more, focus the corpus, or stop for polarity
-repair. The
+repair. Local negative lanes make destructive interference route/group-aware
+and suppress the rejected reading shape, not just a whole peak name. The
 `POLARITY_REVERSED` gate prevents a reversed top peak from being used as an
 answer route. The search path is intentionally small and universal: encode
 triads as slot-bound waves, superpose a partial query, score memory
@@ -349,6 +350,10 @@ Interference search output:
 ```text
 peak
 score
+verdict
+field_state
+safe_to_answer
+top_peak
 peak_margin
 lexical_baseline
 wins_over_lexical_baseline
@@ -457,7 +462,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v2.3.0`.
+Current release: `v2.4.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -517,7 +522,7 @@ Current dataset doctor fixture:
 
 ```text
 verdict: WATCH
-warnings: large_corpus, route_imbalance, hub_dominance, duplicate_current, weak_text_query
+warnings: large_unbalanced_corpus, route_imbalance, hub_dominance, duplicate_current, weak_text_query
 ```
 
 Current negative-lane fixture:
@@ -526,6 +531,8 @@ Current negative-lane fixture:
 without negative lane: customs
 with negative lane:    certification
 suppressed_peak:       customs
+suppress_peak:         customs
+group-aware suppress:  customs-shortcut
 ```
 
 ## Roadmap

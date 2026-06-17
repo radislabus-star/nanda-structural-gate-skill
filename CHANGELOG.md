@@ -1,5 +1,31 @@
 # Changelog
 
+## v2.4.0 - 2026-06-17
+
+Local destructive-interference release.
+
+### Added
+
+- Group-aware destructive interference. Negative lanes now match peaks through
+  peak name, route, group, and `route:group` composites, so a route-level lane
+  can suppress a grouped peak such as `w-field-debt:canon_current`.
+- Shortcut-local negative lanes. Reject feedback now records
+  `suppress_route`, `suppress_group`, `prefer_route`, `prefer_group`, and
+  `support_terms` so suppression targets the rejected reading shape instead of
+  blindly killing every future peak with a similar name.
+- Top-level search contract: `verdict`, `field_state`, `safe_to_answer`, and
+  `top_peak` are now exposed directly on `nanda search` output.
+
+### Changed
+
+- Destructive-interference output now includes both `suppress_peak` and the
+  backwards-compatible `suppressed_peak`.
+- Dataset doctor now reports `large_unbalanced_corpus` for oversized
+  route-heavy corpora and can emit `large_but_route_balanced_focus` as a
+  notice instead of treating every large packet as the same failure.
+- Core version is now `sparse-triad-v2.4-local-negative-lanes`.
+- Cargo package version is now `2.4.0`.
+
 ## v2.3.0 - 2026-06-17
 
 Field-state-machine release.

@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.3-field-state-machine";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.3-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.4-local-negative-lanes";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.4-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -481,11 +481,21 @@ struct NegativeShortcut {
     #[serde(default)]
     suppress_peak: String,
     #[serde(default)]
+    suppress_route: String,
+    #[serde(default)]
+    suppress_group: String,
+    #[serde(default)]
     prefer_peak: String,
+    #[serde(default)]
+    prefer_route: String,
+    #[serde(default)]
+    prefer_group: String,
     #[serde(default = "default_negative_penalty")]
     penalty: f64,
     #[serde(default)]
     terms: Vec<String>,
+    #[serde(default)]
+    support_terms: Vec<String>,
     #[serde(default)]
     reason: String,
     #[serde(default)]
@@ -2447,7 +2457,19 @@ fn load_feedback_negative_shortcuts(path: &Path) -> Result<Option<Vec<NegativeSh
 }
 
 fn merge_negative_shortcuts(shortcuts: Vec<NegativeShortcut>) -> Vec<NegativeShortcut> {
-    let mut merged: BTreeMap<(String, String, String), NegativeShortcut> = BTreeMap::new();
+    let mut merged: BTreeMap<
+        (
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+        ),
+        NegativeShortcut,
+    > = BTreeMap::new();
     for mut shortcut in shortcuts {
         if shortcut.observations == 0 {
             shortcut.observations = 1;
@@ -2458,10 +2480,18 @@ fn merge_negative_shortcuts(shortcuts: Vec<NegativeShortcut>) -> Vec<NegativeSho
         shortcut.terms = normalized_shortcut_terms(&shortcut.terms)
             .into_iter()
             .collect::<Vec<_>>();
+        shortcut.support_terms = normalized_shortcut_terms(&shortcut.support_terms)
+            .into_iter()
+            .collect::<Vec<_>>();
         let key = (
             norm(&shortcut.suppress_peak),
+            norm(&shortcut.suppress_route),
+            norm(&shortcut.suppress_group),
             norm(&shortcut.prefer_peak),
+            norm(&shortcut.prefer_route),
+            norm(&shortcut.prefer_group),
             shortcut.terms.join("|"),
+            shortcut.support_terms.join("|"),
         );
         merged
             .entry(key)
@@ -2472,6 +2502,18 @@ fn merge_negative_shortcuts(shortcuts: Vec<NegativeShortcut>) -> Vec<NegativeSho
                 existing.penalty = existing.penalty.max(shortcut.penalty);
                 if existing.reason.is_empty() {
                     existing.reason = shortcut.reason.clone();
+                }
+                if existing.suppress_route.is_empty() {
+                    existing.suppress_route = shortcut.suppress_route.clone();
+                }
+                if existing.suppress_group.is_empty() {
+                    existing.suppress_group = shortcut.suppress_group.clone();
+                }
+                if existing.prefer_route.is_empty() {
+                    existing.prefer_route = shortcut.prefer_route.clone();
+                }
+                if existing.prefer_group.is_empty() {
+                    existing.prefer_group = shortcut.prefer_group.clone();
                 }
                 if !shortcut.source_feedback.is_empty() {
                     if existing.source_feedback.is_empty() {
@@ -2614,6 +2656,24 @@ fn negative_shortcut_from_search(
     source_feedback: String,
 ) -> NegativeShortcut {
     let group_by = search["group_by"].as_str().unwrap_or("route");
+    let top_peak = search["peaks"].as_array().and_then(|peaks| peaks.first());
+    let suppress_route = top_peak
+        .and_then(|peak| peak["center"]["route"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let suppress_group = top_peak
+        .and_then(|peak| peak["center"]["group"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let support_terms = top_peak
+        .and_then(|peak| peak["supporting_triads"].as_array())
+        .map(|items| support_terms_from_items(items))
+        .unwrap_or_default();
+    let prefer_item = search["peaks"]
+        .as_array()
+        .and_then(|peaks| peaks.first())
+        .and_then(|peak| peak["anti_triads"].as_array())
+        .and_then(|items| items.first());
     let prefer_peak = search["peaks"]
         .as_array()
         .and_then(|peaks| peaks.first())
@@ -2625,6 +2685,14 @@ fn negative_shortcut_from_search(
         })
         .unwrap_or("")
         .to_string();
+    let prefer_route = prefer_item
+        .and_then(|item| item["route"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let prefer_group = prefer_item
+        .and_then(|item| item["group"].as_str())
+        .unwrap_or("")
+        .to_string();
     let terms = query_tokens_from_search(search)
         .into_iter()
         .take(16)
@@ -2632,9 +2700,14 @@ fn negative_shortcut_from_search(
     NegativeShortcut {
         id: format!("neg-{}", slug(&format!("{peak_name}-{prefer_peak}-{note}"))),
         suppress_peak: peak_name.to_string(),
+        suppress_route,
+        suppress_group,
         prefer_peak,
+        prefer_route,
+        prefer_group,
         penalty: default_negative_penalty(),
         terms,
+        support_terms,
         reason: if note.trim().is_empty() {
             "rejected interference peak".to_string()
         } else {
@@ -2645,6 +2718,18 @@ fn negative_shortcut_from_search(
         rejected_count: 1,
         accepted_count: 0,
     }
+}
+
+fn support_terms_from_items(items: &[Value]) -> Vec<String> {
+    let mut terms = BTreeSet::new();
+    for item in items.iter().take(3) {
+        for key in ["subject", "relation", "object", "route", "group"] {
+            if let Some(value) = item[key].as_str() {
+                terms.extend(normalized_shortcut_terms(&[value.to_string()]));
+            }
+        }
+    }
+    terms.into_iter().take(24).collect()
 }
 
 fn query_tokens_from_search(search: &Value) -> BTreeSet<String> {
@@ -3969,6 +4054,11 @@ fn interference_search(
         &route_balanced_focus,
         &coarse_to_fine,
     );
+    let field_state = field_state_machine["state"].as_str().unwrap_or("NO_FIELD");
+    let safe_to_answer = field_state_machine["safe_to_answer"]
+        .as_bool()
+        .unwrap_or(false);
+    let verdict = search_verdict(field_state, safe_to_answer);
     let mut output_peaks = peaks;
     output_peaks.truncate(top_k);
 
@@ -3976,6 +4066,10 @@ fn interference_search(
         "core_version": CORE_VERSION,
         "wave_dim": WAVE_DIM,
         "mode": "interference-retrieval",
+        "verdict": verdict,
+        "field_state": field_state,
+        "safe_to_answer": safe_to_answer,
+        "top_peak": top_peak,
         "task_id": packet.task_id,
         "domain": packet.domain,
         "query": {
@@ -4021,21 +4115,26 @@ fn apply_negative_lanes(
         });
     }
     for shortcut in shortcuts {
-        let ratio = negative_lane_match_ratio(&query_tokens, shortcut);
-        if ratio <= 0.0 {
+        let query_ratio = negative_lane_match_ratio(&query_tokens, shortcut);
+        if query_ratio <= 0.0 {
             continue;
         }
         let rejected_count = shortcut_rejected_count(shortcut);
         let learned_penalty = (shortcut.penalty.max(0.0)
             + (rejected_count.saturating_sub(1) as f64 * 0.04))
             .min(0.45);
-        let penalty = round4(learned_penalty * ratio);
-        let boost = round4(penalty * 0.35);
         for peak in peaks.iter_mut() {
             let Some(peak_name) = peak["peak"].as_str().map(str::to_string) else {
                 continue;
             };
-            if norm(&peak_name) == norm(&shortcut.suppress_peak) {
+            let support_ratio = negative_lane_support_ratio(peak, shortcut);
+            let lane_ratio = round4(query_ratio * support_ratio);
+            if lane_ratio <= 0.0 {
+                continue;
+            }
+            let penalty = round4(learned_penalty * lane_ratio);
+            let boost = round4(penalty * 0.35);
+            if negative_lane_matches_suppress(peak, shortcut) {
                 let old_score = peak["score"].as_f64().unwrap_or(0.0);
                 let new_score = round4((old_score - penalty).max(0.0));
                 if let Some(object) = peak.as_object_mut() {
@@ -4045,17 +4144,26 @@ fn apply_negative_lanes(
                 }
                 suppressions.push(json!({
                     "shortcut": shortcut.id,
+                    "suppress_peak": peak_name,
                     "suppressed_peak": peak_name,
+                    "suppress_route": shortcut.suppress_route,
+                    "suppress_group": shortcut.suppress_group,
                     "penalty": penalty,
                     "effective_penalty": round4(learned_penalty),
-                    "match_ratio": round4(ratio),
+                    "match_ratio": lane_ratio,
+                    "query_match_ratio": round4(query_ratio),
+                    "support_match_ratio": round4(support_ratio),
                     "observations": shortcut.observations,
                     "rejected_count": rejected_count,
                     "prefer_peak": shortcut.prefer_peak,
+                    "prefer_route": shortcut.prefer_route,
+                    "prefer_group": shortcut.prefer_group,
                     "reason": shortcut.reason
                 }));
-            } else if !shortcut.prefer_peak.is_empty()
-                && norm(&peak_name) == norm(&shortcut.prefer_peak)
+            } else if (!shortcut.prefer_peak.is_empty()
+                || !shortcut.prefer_route.is_empty()
+                || !shortcut.prefer_group.is_empty())
+                && negative_lane_matches_prefer(peak, shortcut)
             {
                 let old_score = peak["score"].as_f64().unwrap_or(0.0);
                 let new_score = round4(old_score + boost);
@@ -4072,6 +4180,70 @@ fn apply_negative_lanes(
         "negative_lanes": shortcuts.len(),
         "suppressions": suppressions
     })
+}
+
+fn negative_lane_matches_suppress(peak: &Value, shortcut: &NegativeShortcut) -> bool {
+    negative_lane_matches_labels(
+        peak,
+        &[
+            shortcut.suppress_peak.as_str(),
+            shortcut.suppress_route.as_str(),
+            shortcut.suppress_group.as_str(),
+        ],
+    )
+}
+
+fn negative_lane_matches_prefer(peak: &Value, shortcut: &NegativeShortcut) -> bool {
+    negative_lane_matches_labels(
+        peak,
+        &[
+            shortcut.prefer_peak.as_str(),
+            shortcut.prefer_route.as_str(),
+            shortcut.prefer_group.as_str(),
+        ],
+    )
+}
+
+fn negative_lane_matches_labels(peak: &Value, labels: &[&str]) -> bool {
+    let peak_name = peak["peak"].as_str().unwrap_or("");
+    let route = peak["center"]["route"].as_str().unwrap_or("");
+    let group = peak["center"]["group"].as_str().unwrap_or("");
+    let composite = format!("{route}:{group}");
+    labels.iter().any(|hint| {
+        let hint = norm(hint);
+        !hint.is_empty()
+            && (hint == norm(peak_name)
+                || hint == norm(route)
+                || hint == norm(group)
+                || hint == norm(&composite))
+    })
+}
+
+fn negative_lane_support_ratio(peak: &Value, shortcut: &NegativeShortcut) -> f64 {
+    let terms = normalized_shortcut_terms(&shortcut.support_terms);
+    if terms.is_empty() {
+        return 1.0;
+    }
+    let mut peak_terms = BTreeSet::new();
+    if let Some(items) = peak["supporting_triads"].as_array() {
+        for item in items.iter().take(8) {
+            for key in ["subject", "relation", "object", "route", "group"] {
+                if let Some(value) = item[key].as_str() {
+                    peak_terms.extend(normalized_shortcut_terms(&[value.to_string()]));
+                }
+            }
+        }
+    }
+    if peak_terms.is_empty() {
+        return 0.0;
+    }
+    let hits = terms.intersection(&peak_terms).count();
+    let ratio = hits as f64 / terms.len() as f64;
+    if ratio >= 0.35 {
+        ratio
+    } else {
+        0.0
+    }
 }
 
 fn shortcut_rejected_count(shortcut: &NegativeShortcut) -> usize {
@@ -4155,10 +4327,16 @@ fn corpus_diagnostics(
     let hub_dominance = large_corpus && top_hub_share >= 0.08;
     let duplicate_current = large_corpus && current_duplicates > 0;
     let mut warnings = vec![];
-    if large_corpus {
+    let mut notices = vec![];
+    if large_corpus && route_imbalance {
         warnings.push(json!({
-            "kind": "large_corpus",
-            "message": "Corpus exceeds direct-search route cap; run dataset-doctor and build a route-balanced focus packet before search."
+            "kind": "large_unbalanced_corpus",
+            "message": "Corpus exceeds direct-search route cap and is route-heavy; build a route-balanced focus packet before search."
+        }));
+    } else if large_corpus {
+        notices.push(json!({
+            "kind": "large_but_route_balanced_focus",
+            "message": "Corpus exceeds direct-search route cap, but no single route dominates; continue with coarse-to-fine search or route caps."
         }));
     }
     if route_imbalance {
@@ -4210,6 +4388,7 @@ fn corpus_diagnostics(
         "query_triads": query.len(),
         "query_text_present": !query_text.trim().is_empty(),
         "warnings": warnings,
+        "notices": notices,
         "route_distribution": route_distribution,
         "group_distribution": group_distribution,
         "hub_nodes": hub_nodes,
@@ -4548,7 +4727,10 @@ fn field_state_machine(
         .filter(|kind| {
             matches!(
                 kind.as_str(),
-                "large_corpus" | "route_imbalance" | "hub_dominance" | "duplicate_current"
+                "large_unbalanced_corpus"
+                    | "route_imbalance"
+                    | "hub_dominance"
+                    | "duplicate_current"
             )
         })
         .count();
@@ -4640,6 +4822,14 @@ fn field_state_machine(
         },
         "read_as": read_as
     })
+}
+
+fn search_verdict(field_state: &str, safe_to_answer: bool) -> &'static str {
+    match field_state {
+        "FIELD_REVERSED" => "VETO",
+        "FIELD_FOCUSED" | "FIELD_SAFE" | "FIELD_ROUTE_BALANCED" if safe_to_answer => "PASS",
+        _ => "WATCH",
+    }
 }
 
 fn peak_decision(peaks: &[Value], margin: f64, lexical_peak: &str) -> Value {

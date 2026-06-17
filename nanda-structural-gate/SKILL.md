@@ -115,7 +115,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v2.3-field-state-machine`, prefer `foreign_pull` when deciding what to
+In `v2.4-local-negative-lanes`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-dogfood .` inside a repository that has
@@ -184,8 +184,11 @@ it names corpus-level noise such as route imbalance, hub dominance,
 duplicate-current facts, and weak query activation.
 Check `destructive_interference` after search when negative lanes exist: it
 lists which peak was suppressed, penalty, match ratio, preferred peak, and
-reason. Repeated reject feedback is learned by `nanda-index`: duplicate
-negative shortcuts accumulate `rejected_count` and raise `effective_penalty`.
+reason. In v2.4, negative lanes are route/group/support aware: a route-level
+lane can suppress a grouped peak, but support terms keep suppression local to
+the rejected reading shape. Repeated reject feedback is learned by
+`nanda-index`: duplicate negative shortcuts accumulate `rejected_count` and
+raise `effective_penalty`.
 Use `peak_decision.safe_to_answer` as the final retrieval trust gate. A found
 peak with `WATCH` state is useful context, not a final answer skeleton.
 
@@ -265,7 +268,9 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v2.3 indexed route finder: use its top peak as a structural
+- `nanda-search` is the v2.4 indexed route finder: use its top-level
+  `verdict`, `field_state`, `safe_to_answer`, and `top_peak` as the agent
+  decision contract; use its top peak as a structural
   candidate route, then verify evidence before final prose.
 - `nanda-dataset-doctor` is the corpus immunity gate: run it before search
   on large memory packets and focus/deduplicate when it returns WATCH.

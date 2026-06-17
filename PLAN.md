@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v2.3-rust
-core_version: sparse-triad-v2.3-field-state-machine
+engine: nanda-check sparse-triad-v2.4-rust
+core_version: sparse-triad-v2.4-local-negative-lanes
 ```
 
 ## Build Order
@@ -66,6 +66,8 @@ core_version: sparse-triad-v2.3-field-state-machine
     penalty and `peak_decision` returns `POLARITY_REVERSED`.
 36. Add field state machine. Done in `v2.3`: search converts measured field
     signals into explicit agent actions before drafting.
+37. Add local negative lanes. Done in `v2.4`: destructive interference matches
+    route/group/support shape and search exposes top-level verdict fields.
 
 ## Engineering Constraints
 

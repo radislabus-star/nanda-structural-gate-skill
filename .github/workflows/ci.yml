@@ -44,6 +44,9 @@ jobs:
       - name: Negative lane smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 
+      - name: Group-aware negative lane smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.negative-shortcut-lanes.json --input-format json --group-by group --top-k 5
+
       - name: Source weighting smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 
@@ -101,6 +104,9 @@ jobs:
 
       - name: Negative lane smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
+
+      - name: Group-aware negative lane smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.negative-shortcut-lanes.json --input-format json --group-by group --top-k 5
 
       - name: Source weighting smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.source-weighting.json --input-format json --top-k 3
