@@ -125,17 +125,17 @@ coarse-to-fine focus before they enter NANDA-6M.
 ```text
 subject_id:    u32   4 B
 object_id:     u32   4 B
+evidence_ref:  u32   4 B
+wave_seed:     u32   4 B
 relation_id:   u16   2 B
 route_id:      u16   2 B
 group_id:      u16   2 B
 role_pack:     u16   2 B
-evidence_ref:  u32   4 B
-wave_seed:     u32   4 B
 flags:         u16   2 B
-confidence:    u8    1 B
-polarity:      u8    1 B
 lane_hint:     u16   2 B
 check:         u16   2 B
+confidence:    u8    1 B
+polarity:      u8    1 B
 -----------------------
 total                32 B
 ```
@@ -147,21 +147,25 @@ evidence.
 `PackedLane64` is the first lane target. It is exactly 64 bytes:
 
 ```text
-lane_id:          u32
-target_route:     u16
-target_group:     u16
-target_relation:  u16
-action:           u8     # suppress, boost, veto, watch
-strength:         u8
 support_mask_a:   u64
 support_mask_b:   u64
 anti_mask_a:      u64
 anti_mask_b:      u64
+lane_id:          u32
+target_route:     u16
+target_group:     u16
+target_relation:  u16
 accepted_count:   u16
 rejected_count:   u16
 margin_hint:      i16
-reserved:         [u8; 18]
+action:           u8     # suppress, boost, veto, watch
+strength:         u8
+reserved:         [u8; 14]
 ```
+
+The field order is part of the contract. `src/nanda_6m.rs` uses `repr(C)` and
+unit tests to prove that `PackedTriad32`, `PackedCentroid1024`, and
+`PackedLane64` have the expected byte sizes.
 
 Lanes should be local to a reading shape, not global topic killers. A negative
 lane should suppress "this support shape means the wrong route," not "never

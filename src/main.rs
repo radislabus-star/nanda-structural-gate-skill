@@ -9,23 +9,11 @@ use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+mod nanda_6m;
+
 const WAVE_DIM: usize = 1024;
 const CORE_VERSION: &str = "sparse-triad-v2.7-hierarchical-gate";
 const ENGINE_ID: &str = "nanda-check sparse-triad-v2.7-rust";
-const NANDA_6M_VERSION: &str = "nanda-6m-v0-budget-planner";
-const NANDA_6M_BUDGET_BYTES: usize = 6_291_456;
-const NANDA_6M_HEADER_BYTES: usize = 16_384;
-const NANDA_6M_TRIAD_ARENA_BYTES: usize = 2_097_152;
-const NANDA_6M_CENTROID_ARENA_BYTES: usize = 2_097_152;
-const NANDA_6M_LANE_ARENA_BYTES: usize = 1_048_576;
-const NANDA_6M_WORKSPACE_BYTES: usize = 786_432;
-const NANDA_6M_INDEX_STATS_BYTES: usize = 245_760;
-const NANDA_6M_TRIAD_BYTES: usize = 32;
-const NANDA_6M_CENTROID_BYTES: usize = 1024;
-const NANDA_6M_LANE_BYTES: usize = 64;
-const NANDA_6M_TRIAD_CAPACITY: usize = NANDA_6M_TRIAD_ARENA_BYTES / NANDA_6M_TRIAD_BYTES;
-const NANDA_6M_CENTROID_CAPACITY: usize = NANDA_6M_CENTROID_ARENA_BYTES / NANDA_6M_CENTROID_BYTES;
-const NANDA_6M_LANE_CAPACITY: usize = NANDA_6M_LANE_ARENA_BYTES / NANDA_6M_LANE_BYTES;
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -1536,7 +1524,7 @@ fn structural_map(source: &[Triad], candidates: &[Triad]) -> Value {
 
     json!({
         "core_version": CORE_VERSION,
-        "wave_dim": WAVE_DIM,
+        "wave_dim": nanda_6m::WAVE_DIM,
         "source_group_sizes": source_group_sizes,
         "candidate_group_sizes": candidate_group_sizes,
         "group_centroids": {
@@ -3007,33 +2995,28 @@ fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad
     }
 
     let centroid_count = routes.len() + groups.len();
-    let estimated_hot_bytes = NANDA_6M_HEADER_BYTES
-        + (active_triads * NANDA_6M_TRIAD_BYTES)
-        + (centroid_count * NANDA_6M_CENTROID_BYTES)
-        + (active_lanes * NANDA_6M_LANE_BYTES)
-        + NANDA_6M_WORKSPACE_BYTES
-        + NANDA_6M_INDEX_STATS_BYTES;
-    let reserved_core_bytes = NANDA_6M_HEADER_BYTES
-        + NANDA_6M_TRIAD_ARENA_BYTES
-        + NANDA_6M_CENTROID_ARENA_BYTES
-        + NANDA_6M_LANE_ARENA_BYTES
-        + NANDA_6M_WORKSPACE_BYTES
-        + NANDA_6M_INDEX_STATS_BYTES;
+    let budget_usage = nanda_6m::BudgetUsage {
+        active_triads,
+        centroids: centroid_count,
+        lanes: active_lanes,
+    };
+    let estimated_hot_bytes = budget_usage.estimated_hot_bytes();
+    let reserved_core_bytes = nanda_6m::RESERVED_CORE_BYTES;
     let cold_dictionary_bytes = cold_labels
         .iter()
         .map(|label| label.len() + 8)
         .sum::<usize>();
-    let triads_ok = active_triads <= NANDA_6M_TRIAD_CAPACITY;
-    let centroids_ok = centroid_count <= NANDA_6M_CENTROID_CAPACITY;
-    let lanes_ok = active_lanes <= NANDA_6M_LANE_CAPACITY;
-    let hot_bytes_ok = estimated_hot_bytes <= NANDA_6M_BUDGET_BYTES;
-    let fits_l3 = triads_ok && centroids_ok && lanes_ok && hot_bytes_ok;
+    let triads_ok = active_triads <= nanda_6m::TRIAD_CAPACITY;
+    let centroids_ok = centroid_count <= nanda_6m::CENTROID_CAPACITY;
+    let lanes_ok = active_lanes <= nanda_6m::LANE_CAPACITY;
+    let hot_bytes_ok = estimated_hot_bytes <= nanda_6m::BUDGET_BYTES;
+    let fits_l3 = budget_usage.fits();
     let mut blockers = vec![];
     if !triads_ok {
         blockers.push(json!({
             "state": "TOO_MANY_TRIADS",
             "count": active_triads,
-            "capacity": NANDA_6M_TRIAD_CAPACITY,
+            "capacity": nanda_6m::TRIAD_CAPACITY,
             "repair": "build a route-balanced focus packet or split by linked group"
         }));
     }
@@ -3041,7 +3024,7 @@ fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad
         blockers.push(json!({
             "state": "TOO_MANY_CENTROIDS",
             "count": centroid_count,
-            "capacity": NANDA_6M_CENTROID_CAPACITY,
+            "capacity": nanda_6m::CENTROID_CAPACITY,
             "repair": "merge aliases, normalize routes/groups, or split topology"
         }));
     }
@@ -3049,7 +3032,7 @@ fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad
         blockers.push(json!({
             "state": "TOO_MANY_LANES",
             "count": active_lanes,
-            "capacity": NANDA_6M_LANE_CAPACITY,
+            "capacity": nanda_6m::LANE_CAPACITY,
             "repair": "keep only active positive/negative lanes for this focus packet"
         }));
     }
@@ -3057,7 +3040,7 @@ fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad
         blockers.push(json!({
             "state": "SPILL_REQUIRED",
             "estimated_hot_bytes": estimated_hot_bytes,
-            "budget_bytes": NANDA_6M_BUDGET_BYTES,
+            "budget_bytes": nanda_6m::BUDGET_BYTES,
             "repair": "reduce active triads, centroids, or lanes before hot execution"
         }));
     }
@@ -3072,28 +3055,28 @@ fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad
     };
     json!({
         "core_version": CORE_VERSION,
-        "nanda_6m_version": NANDA_6M_VERSION,
+        "nanda_6m_version": nanda_6m::VERSION,
         "mode": "nanda-6m-budget-planner",
         "state": state,
         "verdict": if fits_l3 { "PASS" } else { "WATCH" },
         "fits_l3": fits_l3,
         "safe_for_hot_core": fits_l3,
-        "hard_budget_bytes": NANDA_6M_BUDGET_BYTES,
+        "hard_budget_bytes": nanda_6m::BUDGET_BYTES,
         "reserved_core_bytes": reserved_core_bytes,
         "estimated_hot_bytes": estimated_hot_bytes,
-        "remaining_hot_bytes": NANDA_6M_BUDGET_BYTES.saturating_sub(estimated_hot_bytes),
+        "remaining_hot_bytes": nanda_6m::BUDGET_BYTES.saturating_sub(estimated_hot_bytes),
         "cold_dictionary_bytes": cold_dictionary_bytes,
         "cold_dictionary_note": "String labels, evidence text, JSON, and source snippets stay outside the NANDA-6M hot core.",
         "wave_dim": WAVE_DIM,
         "record_sizes": {
-            "packed_triad_bytes": NANDA_6M_TRIAD_BYTES,
-            "centroid_bytes": NANDA_6M_CENTROID_BYTES,
-            "lane_bytes": NANDA_6M_LANE_BYTES
+            "packed_triad_bytes": nanda_6m::TRIAD_BYTES,
+            "centroid_bytes": nanda_6m::CENTROID_BYTES,
+            "lane_bytes": nanda_6m::LANE_BYTES
         },
         "capacity": {
-            "triads": NANDA_6M_TRIAD_CAPACITY,
-            "centroids": NANDA_6M_CENTROID_CAPACITY,
-            "lanes": NANDA_6M_LANE_CAPACITY
+            "triads": nanda_6m::TRIAD_CAPACITY,
+            "centroids": nanda_6m::CENTROID_CAPACITY,
+            "lanes": nanda_6m::LANE_CAPACITY
         },
         "counts": {
             "source_triads": source.len(),
@@ -3110,11 +3093,11 @@ fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad
             "active_lanes": active_lanes
         },
         "usage": {
-            "triad_arena": usage_row(active_triads, NANDA_6M_TRIAD_CAPACITY, active_triads * NANDA_6M_TRIAD_BYTES, NANDA_6M_TRIAD_ARENA_BYTES),
-            "centroid_arena": usage_row(centroid_count, NANDA_6M_CENTROID_CAPACITY, centroid_count * NANDA_6M_CENTROID_BYTES, NANDA_6M_CENTROID_ARENA_BYTES),
-            "lane_arena": usage_row(active_lanes, NANDA_6M_LANE_CAPACITY, active_lanes * NANDA_6M_LANE_BYTES, NANDA_6M_LANE_ARENA_BYTES),
-            "workspace": usage_row(1, 1, NANDA_6M_WORKSPACE_BYTES, NANDA_6M_WORKSPACE_BYTES),
-            "index_stats": usage_row(1, 1, NANDA_6M_INDEX_STATS_BYTES, NANDA_6M_INDEX_STATS_BYTES)
+            "triad_arena": usage_row(active_triads, nanda_6m::TRIAD_CAPACITY, active_triads * nanda_6m::TRIAD_BYTES, nanda_6m::TRIAD_ARENA_BYTES),
+            "centroid_arena": usage_row(centroid_count, nanda_6m::CENTROID_CAPACITY, centroid_count * nanda_6m::CENTROID_BYTES, nanda_6m::CENTROID_ARENA_BYTES),
+            "lane_arena": usage_row(active_lanes, nanda_6m::LANE_CAPACITY, active_lanes * nanda_6m::LANE_BYTES, nanda_6m::LANE_ARENA_BYTES),
+            "workspace": usage_row(1, 1, nanda_6m::WORKSPACE_BYTES, nanda_6m::WORKSPACE_BYTES),
+            "index_stats": usage_row(1, 1, nanda_6m::INDEX_STATS_BYTES, nanda_6m::INDEX_STATS_BYTES)
         },
         "blockers": blockers,
         "next": if fits_l3 {
