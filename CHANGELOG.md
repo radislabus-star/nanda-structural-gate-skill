@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.3.0 - 2026-06-17
+
+Dataset-immunity release.
+
+### Added
+
+- `nanda dataset-doctor` and `nanda-dataset-doctor` wrapper for corpus-quality
+  checks before search.
+- Corpus diagnostics for route imbalance, hub dominance, duplicate CURRENT
+  facts, weak text-only queries, and oversized direct-search packets.
+- `field_interpretation.corpus` in search output so agents can see corpus noise
+  warnings next to the peak.
+- Mini dataset-noise fixture that models the large Wave Atlas failure mode.
+- Linux and Windows CI coverage for dataset-doctor WATCH behavior.
+
+### Changed
+
+- Core version is now `sparse-triad-v1.3-dataset-immunity`.
+
 ## v1.2.0 - 2026-06-17
 
 WAW benchmark release.

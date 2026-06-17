@@ -94,6 +94,7 @@ scripts/nanda-map task.md --domain code --normalize-paths
 scripts/nanda-comb task.json --input-format json --depth 2
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index memory-a.json memory-b.md --out .nanda/index.json
+scripts/nanda-dataset-doctor .nanda/index.json --input-format json
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-feedback .nanda/search.json --decision watch --note "margin too low"
@@ -109,7 +110,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v1.2-waw-benchmark`, prefer `foreign_pull` when deciding what to
+In `v1.3-dataset-immunity`, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-dogfood .` inside a repository that has
@@ -121,6 +122,10 @@ worksheets.
 Use `nanda-extract` when the input is simple notes rather than JSON/Markdown
 tables. Supported lines are `subject -> relation -> object [route=x group=y]`
 under `## triads` and `## candidate_triads`.
+Use `nanda-dataset-doctor` before searching large memory packets. Treat WATCH
+as "build a route-balanced focus packet first", especially when it reports
+route imbalance, hub dominance, duplicate CURRENT facts, or weak text-only
+query activation.
 Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with
@@ -148,6 +153,9 @@ triads.
 Check `field_interpretation` when explaining WAW behavior: it names the lexical
 trap, center drift, nearest foreign pull, and whether the field is stable,
 thin, or contested.
+Check `field_interpretation.corpus` before trusting search on large datasets:
+it names corpus-level noise such as route imbalance, hub dominance,
+duplicate-current facts, and weak query activation.
 Use `peak_decision.safe_to_answer` as the final retrieval trust gate. A found
 peak with `WATCH` state is useful context, not a final answer skeleton.
 
@@ -199,6 +207,7 @@ Recommended repository workflow:
 scripts/nanda-dogfood . --out-dir .nanda/
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index code-flow.json --input-format json --out .nanda/index.json
+scripts/nanda-dataset-doctor .nanda/index.json --input-format json
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-feedback .nanda/search.json --decision accept
 scripts/nanda-eval --suite examples/eval-corpus.json
@@ -225,9 +234,11 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v1.2 indexed route finder: use its top peak as a structural
+- `nanda-search` is the v1.3 indexed route finder: use its top peak as a structural
   candidate route, then verify evidence before final prose.
-- `nanda-waw` is the v1.2 trap benchmark: use it to verify that the interference
+- `nanda-dataset-doctor` is the v1.3 corpus immunity gate: run it before search
+  on large memory packets and focus/deduplicate when it returns WATCH.
+- `nanda-waw` is the trap benchmark: use it to verify that the interference
   peak beats lexical baseline on known hard cases before changing scoring.
 
 For Codex skill or repository readiness checks:

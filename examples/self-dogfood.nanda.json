@@ -343,7 +343,7 @@
       "id": "s17",
       "subject": "PLAN.md",
       "relation": "records",
-      "object": "v1.2 waw benchmark",
+      "object": "v1.3 dataset immunity",
       "evidence": "PLAN.md:35",
       "confidence": 0.9,
       "subject_role": "doc",
@@ -541,7 +541,7 @@
       "subject_role": "example",
       "object_role": "feature",
       "route": "examples",
-      "group": "examples-flow"
+      "group": "waw-examples-flow"
     },
     {
       "id": "s27",
@@ -553,7 +553,55 @@
       "subject_role": "example",
       "object_role": "feature",
       "route": "examples",
-      "group": "examples-flow"
+      "group": "waw-examples-flow"
+    },
+    {
+      "id": "s3f",
+      "subject": "nanda binary",
+      "relation": "exposes",
+      "object": "dataset-doctor command",
+      "evidence": "src/main.rs:43",
+      "confidence": 0.9,
+      "subject_role": "binary",
+      "object_role": "command",
+      "route": "core",
+      "group": "rust-agent-core"
+    },
+    {
+      "id": "s8i",
+      "subject": "nanda-dataset-doctor wrapper",
+      "relation": "executes",
+      "object": "nanda dataset-doctor",
+      "evidence": "nanda-structural-gate/scripts/nanda-dataset-doctor:5",
+      "confidence": 0.9,
+      "subject_role": "wrapper",
+      "object_role": "command",
+      "route": "runtime",
+      "group": "runtime-wave-wrappers"
+    },
+    {
+      "id": "s14g",
+      "subject": "test-local.sh",
+      "relation": "checks",
+      "object": "dataset doctor warnings",
+      "evidence": "scripts/test-local.sh:243",
+      "confidence": 0.9,
+      "subject_role": "test",
+      "object_role": "feature",
+      "route": "validation",
+      "group": "dataset-test-flow"
+    },
+    {
+      "id": "s28",
+      "subject": "triad-packet.dataset-noise.json",
+      "relation": "tests",
+      "object": "dataset immunity warnings",
+      "evidence": "examples/triad-packet.dataset-noise.json:1",
+      "confidence": 0.9,
+      "subject_role": "example",
+      "object_role": "feature",
+      "route": "examples",
+      "group": "dataset-examples-flow"
     }
   ],
   "candidate_triads": [
@@ -897,7 +945,7 @@
       "id": "c17",
       "subject": "PLAN.md",
       "relation": "records",
-      "object": "v1.2 waw benchmark",
+      "object": "v1.3 dataset immunity",
       "evidence": "candidate_answer",
       "confidence": 0.9,
       "subject_role": "doc",
@@ -1095,7 +1143,7 @@
       "subject_role": "example",
       "object_role": "feature",
       "route": "examples",
-      "group": "candidate-examples-flow"
+      "group": "candidate-waw-examples-flow"
     },
     {
       "id": "c27",
@@ -1107,7 +1155,55 @@
       "subject_role": "example",
       "object_role": "feature",
       "route": "examples",
-      "group": "candidate-examples-flow"
+      "group": "candidate-waw-examples-flow"
+    },
+    {
+      "id": "c3f",
+      "subject": "nanda binary",
+      "relation": "exposes",
+      "object": "dataset-doctor command",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "binary",
+      "object_role": "command",
+      "route": "core",
+      "group": "candidate-rust-agent-core"
+    },
+    {
+      "id": "c8i",
+      "subject": "nanda-dataset-doctor wrapper",
+      "relation": "executes",
+      "object": "nanda dataset-doctor",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "wrapper",
+      "object_role": "command",
+      "route": "runtime",
+      "group": "candidate-runtime-wave-wrappers"
+    },
+    {
+      "id": "c14g",
+      "subject": "test-local.sh",
+      "relation": "checks",
+      "object": "dataset doctor warnings",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "test",
+      "object_role": "feature",
+      "route": "validation",
+      "group": "candidate-dataset-test-flow"
+    },
+    {
+      "id": "c28",
+      "subject": "triad-packet.dataset-noise.json",
+      "relation": "tests",
+      "object": "dataset immunity warnings",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "example",
+      "object_role": "feature",
+      "route": "examples",
+      "group": "candidate-dataset-examples-flow"
     }
   ],
   "candidate_answer": "The project is structured into Rust core, runtime wrappers, install flow, test flow, documentation flow, and examples flow."

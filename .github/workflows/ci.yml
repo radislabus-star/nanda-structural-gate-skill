@@ -38,6 +38,9 @@ jobs:
       - name: WAW corpus
         run: cargo run --quiet --manifest-path Cargo.toml -- waw --suite examples/waw-corpus.json
 
+      - name: Dataset doctor
+        run: cargo run --quiet --manifest-path Cargo.toml -- dataset-doctor examples/triad-packet.dataset-noise.json --input-format json --route-cap 8 || test "$?" -eq 3
+
       - name: Serve smoke
         run: printf '{"command":"doctor"}\n' | cargo run --quiet --manifest-path Cargo.toml -- serve
 
@@ -68,6 +71,15 @@ jobs:
 
       - name: WAW corpus
         run: cargo run --quiet --manifest-path Cargo.toml -- waw --suite examples/waw-corpus.json
+
+      - name: Dataset doctor
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          cargo run --quiet --manifest-path Cargo.toml -- dataset-doctor examples/triad-packet.dataset-noise.json --input-format json --route-cap 8
+          $code = $LASTEXITCODE
+          if ($code -ne 3) { exit $code }
+          exit 0
 
       - name: Serve smoke
         shell: pwsh

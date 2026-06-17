@@ -27,6 +27,7 @@ $Commands = @(
     "feedback",
     "index",
     "search",
+    "dataset-doctor",
     "serve",
     "dogfood",
     "report",

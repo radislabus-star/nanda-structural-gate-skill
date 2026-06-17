@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v1.2-rust
-core_version: sparse-triad-v1.2-waw-benchmark
+engine: nanda-check sparse-triad-v1.3-rust
+core_version: sparse-triad-v1.3-dataset-immunity
 ```
 
 ## Build Order
@@ -47,6 +47,7 @@ core_version: sparse-triad-v1.2-waw-benchmark
 25. Add field interpretation for interference peaks. Done in
     `field_interpretation`.
 26. Add WAW benchmark for lexical-trap wins. Done with `nanda waw`.
+27. Add dataset-quality gate before search. Done with `nanda dataset-doctor`.
 
 ## Engineering Constraints
 
@@ -114,6 +115,9 @@ For regression workflows, keep suites in JSON and run
 For WAW workflows, keep trap suites in JSON and run
 `nanda waw --suite examples/waw-corpus.json`; each case must show a structural
 win over lexical baseline plus explainable centroid drift.
+For large-corpus workflows, run `nanda dataset-doctor` before search. A WATCH
+means the corpus should be route-balanced, deduplicated, or queried with
+explicit candidate triads before trusting peaks.
 For agent/runtime integration, prefer newline-delimited JSON through
 `nanda serve` instead of shelling one command per small check.
 

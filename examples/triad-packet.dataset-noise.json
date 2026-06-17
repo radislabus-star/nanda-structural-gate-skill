@@ -1,0 +1,153 @@
+{
+  "task_id": "dataset-noise-mini",
+  "domain": "atlas",
+  "query": "Which active route should answer the next lower operator debt action?",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "CURRENT",
+      "relation": "states",
+      "object": "status green",
+      "evidence": "CURRENT.md:1",
+      "confidence": 1.0,
+      "subject_role": "marker",
+      "object_role": "status",
+      "route": "status",
+      "group": "status-noise"
+    },
+    {
+      "id": "m2",
+      "subject": "CURRENT",
+      "relation": "states",
+      "object": "status green",
+      "evidence": "2026-06-16-status.md:1",
+      "confidence": 0.7,
+      "subject_role": "marker",
+      "object_role": "status",
+      "route": "status",
+      "group": "status-noise"
+    },
+    {
+      "id": "m3",
+      "subject": "CURRENT",
+      "relation": "mentions",
+      "object": "roadmap",
+      "evidence": "CURRENT.md:2",
+      "confidence": 1.0,
+      "subject_role": "marker",
+      "object_role": "topic",
+      "route": "status",
+      "group": "status-noise"
+    },
+    {
+      "id": "m4",
+      "subject": "CURRENT",
+      "relation": "mentions",
+      "object": "roadmap",
+      "evidence": "2026-06-15-roadmap.md:2",
+      "confidence": 0.7,
+      "subject_role": "marker",
+      "object_role": "topic",
+      "route": "status",
+      "group": "status-noise"
+    },
+    {
+      "id": "m5",
+      "subject": "CURRENT",
+      "relation": "links",
+      "object": "W5857",
+      "evidence": "CURRENT.md:3",
+      "confidence": 1.0,
+      "subject_role": "marker",
+      "object_role": "event",
+      "route": "status",
+      "group": "status-noise"
+    },
+    {
+      "id": "m6",
+      "subject": "CURRENT",
+      "relation": "links",
+      "object": "W5857",
+      "evidence": "archive-W5857.md:3",
+      "confidence": 0.6,
+      "subject_role": "marker",
+      "object_role": "event",
+      "route": "status",
+      "group": "status-noise"
+    },
+    {
+      "id": "m7",
+      "subject": "CURRENT",
+      "relation": "summarizes",
+      "object": "general next step",
+      "evidence": "CURRENT.md:4",
+      "confidence": 1.0,
+      "subject_role": "marker",
+      "object_role": "topic",
+      "route": "status",
+      "group": "status-noise"
+    },
+    {
+      "id": "m8",
+      "subject": "CURRENT",
+      "relation": "summarizes",
+      "object": "general next step",
+      "evidence": "archive-next.md:4",
+      "confidence": 0.6,
+      "subject_role": "marker",
+      "object_role": "topic",
+      "route": "status",
+      "group": "status-noise"
+    },
+    {
+      "id": "m9",
+      "subject": "W_field",
+      "relation": "points_to",
+      "object": "lower operator debt",
+      "evidence": "frontier.md:10",
+      "confidence": 1.0,
+      "subject_role": "field",
+      "object_role": "route",
+      "route": "lower-operator-debt",
+      "group": "focused-route"
+    },
+    {
+      "id": "m10",
+      "subject": "lower operator debt",
+      "relation": "requires",
+      "object": "operator cleanup",
+      "evidence": "frontier.md:11",
+      "confidence": 1.0,
+      "subject_role": "route",
+      "object_role": "action",
+      "route": "lower-operator-debt",
+      "group": "focused-route"
+    },
+    {
+      "id": "m11",
+      "subject": "physical claim",
+      "relation": "blocked_by",
+      "object": "physical firewall",
+      "evidence": "firewall.md:5",
+      "confidence": 0.95,
+      "subject_role": "claim",
+      "object_role": "route",
+      "route": "physical-firewall",
+      "group": "physical-route"
+    },
+    {
+      "id": "m12",
+      "subject": "bucket risk",
+      "relation": "belongs_to",
+      "object": "bucket-risk route",
+      "evidence": "risk.md:9",
+      "confidence": 0.95,
+      "subject_role": "risk",
+      "object_role": "route",
+      "route": "bucket-risk",
+      "group": "risk-route"
+    }
+  ],
+  "candidate_triads": [],
+  "candidate_answer": ""
+}

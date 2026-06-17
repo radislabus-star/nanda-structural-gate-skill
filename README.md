@@ -72,6 +72,7 @@ evidence-conflict tasks do.
 │   ├── triad-packet.interference-search-route-trap.json
 │   ├── triad-packet.waw-code-runtime-trap.json
 │   ├── triad-packet.waw-doc-owner-trap.json
+│   ├── triad-packet.dataset-noise.json
 │   ├── eval-corpus.json
 │   ├── waw-corpus.json
 │   ├── triad-packet.role-swap.json
@@ -120,6 +121,7 @@ evidence-conflict tasks do.
         ├── nanda-index
         ├── nanda-map
         ├── nanda-search
+        ├── nanda-dataset-doctor
         ├── nanda-serve
         └── nanda-self-check
 ```
@@ -253,10 +255,13 @@ line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v1.2 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the v1.3 memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, and an answer projection.
+`nanda-dataset-doctor` is the corpus-quality gate. Run it before search on
+large memory packets; it warns about route imbalance, hub dominance, duplicate
+CURRENT facts, oversized direct-search packets, and weak text-only queries.
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.
@@ -298,16 +303,18 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v1.2-waw-benchmark
+core_version: sparse-triad-v1.3-dataset-immunity
 wave_dim: 1024
 ```
 
-`v1.2-waw-benchmark` keeps recursive topology combing, structural peak search,
+`v1.3-dataset-immunity` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
 expected to pick the wrong route and the interference field must recover the
-connected structure. The search path is intentionally small and universal:
+connected structure. It also adds dataset immunity: before searching a large
+corpus, check whether the field is route-imbalanced, hub-heavy, duplicated, or
+too weakly queried. The search path is intentionally small and universal:
 encode triads as slot-bound waves, superpose a partial query, score memory
 routes/groups by interference, then interpret, record, test, and smoke-check
 the top peaks.
@@ -327,6 +334,7 @@ peak_decision.safe_to_answer
 field_interpretation.state
 field_interpretation.lexical_trap_detected
 field_interpretation.centroid_drift
+field_interpretation.corpus
 propagation.component_score
 center
 supporting_triads
@@ -367,6 +375,7 @@ mkdir -p .nanda
 nanda-dogfood . --out-dir .nanda/
 nanda-extract notes.raw.txt --out .nanda/notes.json
 nanda-index memory-a.json memory-b.md --out .nanda/index.json
+nanda-dataset-doctor .nanda/index.json --input-format json
 nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 nanda-feedback .nanda/search.json --decision watch --note "margin too low"
 nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
@@ -415,7 +424,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v1.2.0`.
+Current release: `v1.3.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -427,6 +436,7 @@ scripts/benchmark-v0.sh
 nanda-doctor
 nanda-eval --suite examples/eval-corpus.json
 nanda-waw --suite examples/waw-corpus.json
+nanda-dataset-doctor examples/triad-packet.dataset-noise.json --input-format json --route-cap 8 || test "$?" -eq 3
 nanda-dogfood . --format json
 ```
 
@@ -462,6 +472,13 @@ waw_score:          3/3
 structural_wins:    3/3
 lexical_traps:      3/3
 explainable_drifts: 3/3
+```
+
+Current dataset doctor fixture:
+
+```text
+verdict: WATCH
+warnings: large_corpus, route_imbalance, hub_dominance, duplicate_current, weak_text_query
 ```
 
 ## Roadmap
