@@ -150,8 +150,9 @@ cache-resident core. It is a Phase 1 planner, not packed execution: `FITS_L3`
 means the packet fits the 6 MiB packed layout; `FOCUS_REQUIRED`,
 `SPLIT_REQUIRED`, or `SPILL_REQUIRED` means do not run it as one hot packet.
 Use `nanda-pack6m` when you need to verify the cold-to-hot bridge. It produces
-deterministic dictionaries and sample `PackedTriad32` records, but it still
-does not execute packed interference search.
+deterministic dictionaries, sample `PackedTriad32` records, and a fixed
+1024-dimensional packed projection summary, but it still does not execute
+packed interference search.
 Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with

@@ -326,6 +326,9 @@ jq -e '.state == "PACKED_FITS_L3" and .packed_ok == true' <<<"$pack6m_json" >/de
 jq -e '.packed_records.count == 10 and .packed_records.record_bytes == 32' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_records.sample[0].wave_seed > 0 and .packed_records.sample[0].check > 0' <<<"$pack6m_json" >/dev/null
 jq -e '.dictionaries.entities.fits == true and .dictionaries.roles.fits == true' <<<"$pack6m_json" >/dev/null
+jq -e '.projection.wave_dim == 1024 and .projection.bytes == 2048' <<<"$pack6m_json" >/dev/null
+jq -e '.projection.summary.nonzero > 0 and .projection.summary.energy > 0' <<<"$pack6m_json" >/dev/null
+jq -e '.projection.sample | length == 8' <<<"$pack6m_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null

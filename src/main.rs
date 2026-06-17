@@ -3200,6 +3200,8 @@ fn nanda_6m_pack_report(
         }
     }
 
+    let projection = nanda_6m::project_triads(&packed);
+    let projection_summary = projection.summary();
     let dictionary_ok = blockers.is_empty()
         && relations.len() <= u16::MAX as usize
         && routes.len() <= u16::MAX as usize
@@ -3224,6 +3226,18 @@ fn nanda_6m_pack_report(
                 .map(packed_triad_json)
                 .collect::<Vec<_>>()
         },
+        "projection": {
+            "mode": "packed-triad-signed-hash",
+            "wave_dim": nanda_6m::WAVE_DIM,
+            "bytes": nanda_6m::QUERY_WAVE_BYTES,
+            "summary": {
+                "l1": projection_summary.l1,
+                "energy": projection_summary.energy,
+                "nonzero": projection_summary.nonzero,
+                "max_abs": projection_summary.max_abs
+            },
+            "sample": projection.values.iter().take(8).copied().collect::<Vec<_>>()
+        },
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
             "relations": dictionary_summary(&relations, u16::MAX as usize),
@@ -3233,7 +3247,7 @@ fn nanda_6m_pack_report(
             "roles": dictionary_summary(&roles, u8::MAX as usize)
         },
         "blockers": blockers,
-        "hot_core_note": "This command still runs in the cold layer. It proves deterministic ID packing into PackedTriad32 records; it does not execute packed interference search yet."
+        "hot_core_note": "This command still runs in the cold layer. It proves deterministic ID packing into PackedTriad32 records and a fixed packed projection wave; it does not execute packed interference search yet."
     })
 }
 
@@ -3419,6 +3433,11 @@ fn print_pack6m_text(out: &Value) {
         out["packed_records"]["bytes"].as_u64().unwrap_or(0)
     );
     println!(
+        "projection: dim {} / energy {}",
+        out["projection"]["wave_dim"].as_u64().unwrap_or(0),
+        out["projection"]["summary"]["energy"].as_u64().unwrap_or(0)
+    );
+    println!(
         "budget: {} / {}",
         out["budget"]["estimated_hot_bytes"].as_u64().unwrap_or(0),
         out["budget"]["hard_budget_bytes"].as_u64().unwrap_or(0)
@@ -3439,6 +3458,10 @@ fn print_pack6m_md(out: &Value) {
     println!(
         "- bytes: `{}`",
         out["packed_records"]["bytes"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- projection_energy: `{}`",
+        out["projection"]["summary"]["energy"].as_u64().unwrap_or(0)
     );
     println!(
         "- budget: `{}/{}`",

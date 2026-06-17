@@ -20,6 +20,7 @@ pub const INDEX_STATS_BYTES: usize = 245_760;
 pub const TRIAD_BYTES: usize = 32;
 pub const CENTROID_BYTES: usize = 1024;
 pub const LANE_BYTES: usize = 64;
+pub const QUERY_WAVE_BYTES: usize = WAVE_DIM * core::mem::size_of::<i16>();
 
 pub const TRIAD_CAPACITY: usize = TRIAD_ARENA_BYTES / TRIAD_BYTES;
 pub const CENTROID_CAPACITY: usize = CENTROID_ARENA_BYTES / CENTROID_BYTES;
@@ -145,6 +146,106 @@ impl BudgetUsage {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PackedWave1024 {
+    pub values: [i16; WAVE_DIM],
+}
+
+impl Default for PackedWave1024 {
+    fn default() -> Self {
+        Self {
+            values: [0; WAVE_DIM],
+        }
+    }
+}
+
+impl PackedWave1024 {
+    pub fn accumulate_triad(&mut self, triad: &PackedTriad32) {
+        let mut state = projection_seed(triad);
+        let strength = projection_strength(triad);
+        for value in &mut self.values {
+            state = mix64(state);
+            let sign = if (state & 1) == 0 {
+                -strength
+            } else {
+                strength
+            };
+            *value = value.saturating_add(sign);
+        }
+    }
+
+    pub fn from_triads(triads: &[PackedTriad32]) -> Self {
+        let mut wave = Self::default();
+        for triad in triads {
+            wave.accumulate_triad(triad);
+        }
+        wave
+    }
+
+    pub fn summary(&self) -> WaveSummary {
+        let mut l1: u64 = 0;
+        let mut energy: u64 = 0;
+        let mut nonzero: usize = 0;
+        let mut max_abs: i16 = 0;
+        for value in self.values {
+            let abs = value.saturating_abs();
+            if abs != 0 {
+                nonzero += 1;
+            }
+            max_abs = max_abs.max(abs);
+            l1 += abs as u64;
+            energy += (value as i64 * value as i64) as u64;
+        }
+        WaveSummary {
+            l1,
+            energy,
+            nonzero,
+            max_abs,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WaveSummary {
+    pub l1: u64,
+    pub energy: u64,
+    pub nonzero: usize,
+    pub max_abs: i16,
+}
+
+pub fn project_triads(triads: &[PackedTriad32]) -> PackedWave1024 {
+    PackedWave1024::from_triads(triads)
+}
+
+fn projection_seed(triad: &PackedTriad32) -> u64 {
+    let mut state = u64::from(triad.wave_seed) << 32 | u64::from(triad.check);
+    state ^= u64::from(triad.subject_id).rotate_left(7);
+    state ^= u64::from(triad.object_id).rotate_left(17);
+    state ^= u64::from(triad.evidence_ref).rotate_left(31);
+    state ^= u64::from(triad.relation_id) << 3;
+    state ^= u64::from(triad.route_id) << 19;
+    state ^= u64::from(triad.group_id) << 37;
+    state ^= u64::from(triad.role_pack) << 43;
+    state ^= u64::from(triad.flags) << 53;
+    mix64(state)
+}
+
+fn projection_strength(triad: &PackedTriad32) -> i16 {
+    let base = 1 + i16::from(triad.confidence / 64);
+    if triad.polarity & 1 == 0 {
+        base
+    } else {
+        -base
+    }
+}
+
+fn mix64(mut value: u64) -> u64 {
+    value = value.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +255,7 @@ mod tests {
         assert_eq!(core::mem::size_of::<PackedTriad32>(), TRIAD_BYTES);
         assert_eq!(core::mem::size_of::<PackedCentroid1024>(), CENTROID_BYTES);
         assert_eq!(core::mem::size_of::<PackedLane64>(), LANE_BYTES);
+        assert_eq!(core::mem::size_of::<PackedWave1024>(), QUERY_WAVE_BYTES);
     }
 
     #[test]
@@ -179,5 +281,31 @@ mod tests {
             lanes: 0,
         }
         .fits());
+    }
+
+    #[test]
+    fn packed_projection_is_deterministic_and_nonzero() {
+        let triad = PackedTriad32::new(PackedTriadInput {
+            subject_id: 1,
+            object_id: 2,
+            evidence_ref: 3,
+            wave_seed: 4,
+            relation_id: 5,
+            route_id: 6,
+            group_id: 7,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 9,
+        });
+        let left = project_triads(&[triad]);
+        let right = project_triads(&[triad]);
+        assert_eq!(left, right);
+        let summary = left.summary();
+        assert_eq!(summary.nonzero, WAVE_DIM);
+        assert!(summary.energy > 0);
+        assert!(summary.max_abs > 0);
     }
 }

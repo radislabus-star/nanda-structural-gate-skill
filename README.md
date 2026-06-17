@@ -299,7 +299,8 @@ cache-resident layout and returns `FITS_L3`, `FOCUS_REQUIRED`,
 `nanda-pack6m` is the first cold-to-hot bridge. It builds deterministic
 dictionaries and sample `PackedTriad32` records from a packet, proving that the
 string/JSON world can be reduced to the planned fixed records before packed
-interference search exists.
+interference search exists. It also reports a fixed 1024-dimensional packed
+projection wave summary from those records.
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.
