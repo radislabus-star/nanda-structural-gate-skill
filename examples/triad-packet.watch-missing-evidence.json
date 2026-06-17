@@ -1,0 +1,31 @@
+{
+  "task_id": "example-watch-missing-evidence",
+  "domain": "contract",
+  "query": "Check that missing evidence keeps the gate unresolved.",
+  "triads": [
+    {
+      "id": "t1",
+      "subject": "Importer A",
+      "relation": "imports",
+      "object": "Goods X",
+      "evidence": "",
+      "confidence": 0.9,
+      "subject_role": "importer",
+      "object_role": "goods",
+      "route": "customs"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "c1",
+      "subject": "Importer A",
+      "relation": "imports",
+      "object": "Goods X",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "importer",
+      "object_role": "goods",
+      "route": "customs"
+    }
+  ]
+}

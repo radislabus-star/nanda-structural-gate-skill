@@ -1,0 +1,153 @@
+{
+  "task_id": "interference-search-monster",
+  "domain": "business",
+  "query": "Monster certification responsibility route",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "Monster",
+      "relation": "has_route",
+      "object": "certification",
+      "evidence": "case-memory:1",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "route",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m2",
+      "subject": "certification payment",
+      "relation": "pays_for",
+      "object": "TR CU declaration",
+      "evidence": "case-memory:2",
+      "confidence": 0.9,
+      "subject_role": "payment",
+      "object_role": "document",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m3",
+      "subject": "TR CU declaration",
+      "relation": "requires",
+      "object": "test protocols",
+      "evidence": "case-memory:3",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m4",
+      "subject": "Maria Elena payment",
+      "relation": "belongs_to",
+      "object": "certification route",
+      "evidence": "case-memory:4",
+      "confidence": 0.9,
+      "subject_role": "payment",
+      "object_role": "route",
+      "route": "certification",
+      "group": "certification-route"
+    },
+    {
+      "id": "m5",
+      "subject": "Monster",
+      "relation": "produced_by",
+      "object": "Guangzhou 998",
+      "evidence": "case-memory:5",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "factory",
+      "route": "production",
+      "group": "production-route"
+    },
+    {
+      "id": "m6",
+      "subject": "Coca-Cola",
+      "relation": "produced_by",
+      "object": "Guangzhou 998",
+      "evidence": "case-memory:6",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "factory",
+      "route": "production",
+      "group": "production-route"
+    },
+    {
+      "id": "m7",
+      "subject": "Sprite",
+      "relation": "produced_by",
+      "object": "Guangzhou 998",
+      "evidence": "case-memory:7",
+      "confidence": 0.9,
+      "subject_role": "product",
+      "object_role": "factory",
+      "route": "production",
+      "group": "production-route"
+    },
+    {
+      "id": "m8",
+      "subject": "importer",
+      "relation": "files",
+      "object": "customs declaration",
+      "evidence": "case-memory:8",
+      "confidence": 0.9,
+      "subject_role": "company",
+      "object_role": "document",
+      "route": "customs",
+      "group": "customs-route"
+    },
+    {
+      "id": "m9",
+      "subject": "customs declaration",
+      "relation": "not_same_as",
+      "object": "TR CU declaration",
+      "evidence": "case-memory:9",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "document",
+      "route": "customs",
+      "group": "customs-route"
+    },
+    {
+      "id": "m10",
+      "subject": "Maria Elena payment",
+      "relation": "not_pays_for",
+      "object": "customs declaration",
+      "evidence": "case-memory:10",
+      "confidence": 0.9,
+      "subject_role": "payment",
+      "object_role": "document",
+      "route": "customs",
+      "group": "customs-route"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "Monster",
+      "relation": "has_route",
+      "object": "certification",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "product",
+      "object_role": "route",
+      "route": "certification",
+      "group": "query"
+    },
+    {
+      "id": "q2",
+      "subject": "certification payment",
+      "relation": "pays_for",
+      "object": "",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "payment",
+      "object_role": "document",
+      "route": "certification",
+      "group": "query"
+    }
+  ]
+}

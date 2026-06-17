@@ -1,0 +1,291 @@
+---
+name: nanda-structural-gate
+description: "Use when a task involves enough structural relations that an LLM may confuse them: many roles, routes, contracts, obligations, ownership chains, buyer/seller/supplier chains, certification responsibility, payment/logistics/customs paths, evidence conflicts, graph-like dependencies, or candidate answers where each fact looks plausible but the combined relation shape may be wrong. Trigger especially when relation complexity exceeds the skill threshold: 5+ entities, 7+ triads, 2+ competing routes, 2+ evidence sources that can conflict, or any high-risk role swap. This skill routes the agent through the bundled `scripts/nanda-check` sparse-triad V0 checker and treats WATCH as unresolved."
+---
+
+# NANDA Structural Gate
+
+NANDA is a structural verifier, not a text generator. Use it to force explicit
+relation checking before finalizing answers where role swaps or route mistakes
+matter.
+
+The bundled commands are stable wrappers around one Rust CLI binary. Treat
+their JSON output as the primary agent interface.
+
+## Trigger Threshold
+
+Do not call the gate for every tiny relation. Call it when the task crosses a
+complexity threshold where LLMs realistically start mixing bindings.
+
+Use the gate when any condition is true:
+
+- 5 or more distinct entities/variables;
+- 7 or more triads;
+- 2 or more routes that must not be merged;
+- 2 or more evidence sources that may conflict;
+- 3 or more role types, such as supplier, buyer, importer, applicant;
+- any high-risk role swap, even if the task is small.
+
+Quick score:
+
+```text
+complexity =
+  entities
++ triads
++ 2 * routes
++ 2 * conflicting_sources
++ 3 * high_risk_role_swaps
+```
+
+If `complexity >= 12`, the NANDA gate is mandatory before finalizing.
+
+## Workflow
+
+1. Extract a compact triad packet:
+
+```text
+subject | relation | object | evidence
+```
+
+For a new task file, start with:
+
+```bash
+scripts/nanda-init-task --task-id local-check --domain general --query "short task"
+```
+
+If triads are easier to author in Markdown, write pipe tables under `## triads`
+and `## candidate_triads`, then run:
+
+```bash
+scripts/nanda-pack-from-md task.md --task-id local-check --domain general
+```
+
+For live agent work, prefer:
+
+```bash
+scripts/nanda-init-md --task-id local-check --domain general --query "short task"
+scripts/nanda-gate-md nanda-task-local-check.md --task-id local-check --domain general
+```
+
+For large worksheets, split first:
+
+```bash
+scripts/nanda-split-md task.md --by group --out-dir split/
+scripts/nanda-split-md task.md --by route --out-dir split/
+scripts/nanda-split-md task.md --by linked-group --out-dir split/
+scripts/nanda-split task.json --input-format json --by linked-group --out-dir split-json/
+```
+
+Prefer `--by linked-group` when source groups and candidate groups have
+different names. It uses `nanda-map` group links to write paired worksheets
+containing the source group and its matching candidate group.
+For machine flows, prefer `scripts/nanda-split` because it writes JSON packets
+that can be passed directly to `scripts/nanda-check --triads`.
+
+To inspect the structural wave map directly:
+
+```bash
+scripts/nanda-map task.md --domain general
+scripts/nanda-map task.md --domain code --normalize-paths
+scripts/nanda-comb task.json --input-format json --depth 2
+scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
+scripts/nanda-index memory-a.json memory-b.md --out .nanda/index.json
+scripts/nanda-search task.json --input-format json --top-k 5
+scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
+scripts/nanda-feedback .nanda/search.json --decision watch --note "margin too low"
+scripts/nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
+scripts/nanda-doctor
+scripts/nanda-dogfood .
+```
+
+Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
+topology, recursive branch checks, and invariant drift checks in one packet.
+Use `nanda-map` when the next agent step depends on seeing which candidate
+groups resonate with which source groups, not only on the final verdict.
+In `v1.0-release`, prefer `foreign_pull` when deciding what to
+repair: it names the candidate triad that pulls a group toward a different
+source route.
+Use `nanda-dogfood .` inside a repository that has
+`examples/self-dogfood.nanda.json` when you need a compact agent readiness
+check. It accepts root `WATCH` only when it is size-only and all linked branches
+pass.
+Use `nanda-index` to build a reusable memory packet from triad packets or
+worksheets.
+Use `nanda-extract` when the input is simple notes rather than JSON/Markdown
+tables. Supported lines are `subject -> relation -> object [route=x group=y]`
+under `## triads` and `## candidate_triads`.
+Use `nanda-search` when the task is retrieval, not verification: indexed
+`triads` are memory, same-packet `candidate_triads` or `--query-file` are the
+partial query, and the output is a ranked set of interference peaks with
+support, anti-triads, missing edges, and an answer projection.
+Use `nanda-feedback` after search when the agent has decided whether the peak
+was useful. It writes an accept/reject/WATCH memory trace that can be kept next
+to the task index.
+Use `nanda-eval` before trusting a changed interference rule. It checks expected
+peak/state pairs and exits non-zero on regression.
+Use `nanda-doctor` after installing or copying the skill. It runs the built-in
+focused/noisy interference smoke checks without external files.
+Use `peak_margin` and `lexical_baseline` to interpret confidence. A low margin
+is a retrieval hint, not proof.
+Treat `wins_over_lexical_baseline=true` as the key WAW signal: the structural
+peak beat the route that a plain lexical search would have selected.
+Check `propagation.component_score` when explaining why: it shows whether the
+winning peak is one connected route or just a pile of individually similar
+triads.
+Use `peak_decision.safe_to_answer` as the final retrieval trust gate. A found
+peak with `WATCH` state is useful context, not a final answer skeleton.
+
+For source/runtime/CLI architecture checks, start with:
+
+```bash
+scripts/nanda-init-md --task-id code-check --template code --query "check source/runtime flow"
+```
+
+For code worksheets, use `--normalize-paths` when source/object cells contain
+file paths. This collapses Rust-style paths into module-like entities, for
+example `src/bin/check.rs` -> `bin::check`.
+
+## Code Flow Gate for Repositories
+
+For repository architecture reviews, build a worksheet with these groups:
+
+- source module;
+- public export;
+- binary/CLI;
+- install target;
+- runtime caller;
+- UI/status reader;
+- tests/eval gate.
+
+If the graph is large, do not force one global PASS. Run:
+
+```bash
+scripts/nanda-map code-flow.md --domain code --normalize-paths
+scripts/nanda-split-md code-flow.md --by linked-group --normalize-paths --out-dir split/
+```
+
+Inspect JSON fields:
+
+- `mixed_candidate_groups`;
+- `foreign_pull`;
+- `group_centroids`;
+- `route_memory`;
+- `candidate_superposition`;
+- `repair_tasks`.
+
+If `foreign_pull` is non-empty, do not finalize as PASS. Explain which
+`candidate_triad` pulls the candidate group toward a different source route and
+repair or split that group first.
+
+Recommended repository workflow:
+
+```bash
+scripts/nanda-dogfood . --out-dir .nanda/
+scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
+scripts/nanda-index code-flow.json --input-format json --out .nanda/index.json
+scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
+scripts/nanda-feedback .nanda/search.json --decision accept
+scripts/nanda-eval --case route-trap.json:certification:FOCUSED
+scripts/nanda-doctor
+scripts/nanda-comb code-flow.json --input-format json --depth 2 --out-dir comb/
+scripts/nanda-map code-flow.md --domain code --normalize-paths
+scripts/nanda-gate-md code-flow.md --domain code --normalize-paths --format json
+scripts/nanda-split code-flow.json --input-format json --by linked-group --out-dir split-json/
+scripts/nanda-split-md code-flow.md --by linked-group --normalize-paths --out-dir split/
+for f in split/*.md; do
+  scripts/nanda-gate-md "$f" --domain code --normalize-paths --format json
+done
+```
+
+Interpret the result as:
+
+- global map clean + global gate size stop = split, not failure;
+- global `foreign_pull` non-empty = repair before PASS;
+- linked split files should contain both source and candidate triads;
+- route-level PASS across split files is the practical acceptance condition.
+- `comb_tree` is the canonical record of what was checked at each depth.
+- `nanda-dogfood` is the quick go/no-go output for agents:
+  `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
+- `nanda-search` is the v1.0 indexed route finder: use its top peak as a structural
+  candidate route, then verify evidence before final prose.
+
+For Codex skill or repository readiness checks:
+
+```bash
+scripts/nanda-init-md --task-id skill-check --template skill --query "check skill flow"
+scripts/nanda-init-md --task-id project-check --template project --query "check project flow"
+```
+
+Before relying on this skill in a long task, run:
+
+```bash
+scripts/nanda-self-check
+```
+
+For multiple route worksheets, use `scripts/nanda-report`. Its default output
+is a machine-readable agent decision packet. Do not prefer Markdown unless a
+human report is explicitly requested.
+
+```bash
+scripts/nanda-report --overall overall.md --route invoice:invoice.md --route factories:factories.md
+```
+
+2. Run the gate:
+
+```bash
+scripts/nanda-check --triads path/to/triads.json
+```
+
+If there is no file yet, run:
+
+```bash
+scripts/nanda-check
+```
+
+Use `scripts/nanda-gate` when the surrounding workflow must continue only on
+`PASS`.
+
+3. Treat `WATCH` as unresolved, not verified.
+
+4. Finalize with explicit caution when the checker returns `WATCH` or when the
+   triad packet was extracted manually from uncertain evidence.
+
+5. When `weak_details` exists in JSON, use `score`, `nearest_source`,
+   `why_weak`, and `suggested_fix` to repair candidate triads before retrying.
+
+6. When `structural_map` or `nanda-map` shows `mixed_candidate_groups`, split
+   those groups before drafting a final answer.
+
+7. When `foreign_pull` exists, repair or move those candidate triads before
+   changing unrelated parts of the answer.
+
+## Verdicts
+
+- `PASS`: relations produce stable composite peaks and no required conflict is
+  detected.
+- `WATCH`: structure is incomplete, weak, or unverified.
+- `VETO`: a role swap, route contradiction, evidence conflict, or broken binding
+  is detected.
+
+CLI exit codes:
+
+```text
+0 - PASS
+1 - VETO
+2 - ERROR
+3 - WATCH
+```
+
+## When To Load References
+
+- Read `references/triad-packet.md` when building inputs for the checker.
+- Read `references/roadmap.md` when extending the implementation or deciding
+  the next milestone.
+
+## Non-Goals
+
+- Do not use NANDA to generate prose.
+- Do not replace source checking, RAG, graph search, or LLM reasoning with the
+  checker.
+- Do not treat phase/coherence alone as truth. The checker must compare against
+  baselines and evidence.

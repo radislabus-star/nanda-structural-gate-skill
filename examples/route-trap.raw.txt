@@ -1,0 +1,13 @@
+## triads
+Monster -> has_route -> certification [subject_role=product object_role=route route=certification group=certification-route evidence=raw:1]
+certification payment -> pays_for -> declaration [subject_role=payment object_role=document route=certification group=certification-route evidence=raw:2]
+declaration -> requires -> protocols [subject_role=document object_role=evidence route=certification group=certification-route evidence=raw:3]
+protocols -> support -> certification [subject_role=evidence object_role=route route=certification group=certification-route evidence=raw:4]
+Monster -> pays_for -> declaration [subject_role=product object_role=document route=customs group=customs-route evidence=raw:5]
+customs declaration -> requires -> payment confirmation [subject_role=document object_role=evidence route=customs group=customs-route evidence=raw:6]
+importer -> files -> customs declaration [subject_role=company object_role=document route=customs group=customs-route evidence=raw:7]
+Monster -> produced_by -> Guangzhou 998 [subject_role=product object_role=factory route=production group=production-route evidence=raw:8]
+
+## candidate_triads
+Monster -> pays_for -> declaration [subject_role=product object_role=document group=query evidence=query]
+declaration -> requires -> protocols [subject_role=document object_role=evidence group=query evidence=query]

@@ -1,0 +1,46 @@
+{
+  "task_id": "example-role-swap",
+  "domain": "contract",
+  "query": "Check whether the candidate answer swapped the payment direction.",
+  "triads": [
+    {
+      "id": "t1",
+      "subject": "Alpha Ltd",
+      "relation": "supplies",
+      "object": "industrial equipment",
+      "evidence": "contract.md:12",
+      "confidence": 0.9,
+      "subject_role": "supplier",
+      "object_role": "goods",
+      "route": "delivery",
+      "group": "deal-alpha-beta"
+    },
+    {
+      "id": "t2",
+      "subject": "Beta LLC",
+      "relation": "pays",
+      "object": "Alpha Ltd",
+      "evidence": "invoice.md:4",
+      "confidence": 0.9,
+      "subject_role": "buyer",
+      "object_role": "supplier",
+      "route": "payment",
+      "group": "deal-alpha-beta"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "c1",
+      "subject": "Alpha Ltd",
+      "relation": "pays",
+      "object": "Beta LLC",
+      "evidence": "candidate_answer",
+      "confidence": 0.9,
+      "subject_role": "supplier",
+      "object_role": "buyer",
+      "route": "payment",
+      "group": "candidate-answer"
+    }
+  ],
+  "candidate_answer": "Alpha Ltd pays Beta LLC."
+}

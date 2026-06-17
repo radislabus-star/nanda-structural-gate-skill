@@ -1,0 +1,19 @@
+{
+  "task_id": "example-watch-low-complexity",
+  "domain": "general",
+  "query": "A tiny one-hop relation should not force a mandatory gate.",
+  "triads": [
+    {
+      "id": "t1",
+      "subject": "Alice",
+      "relation": "owns",
+      "object": "File A",
+      "evidence": "note.md:1",
+      "confidence": 0.9,
+      "subject_role": "owner",
+      "object_role": "document",
+      "route": ""
+    }
+  ],
+  "candidate_triads": []
+}

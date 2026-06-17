@@ -1,0 +1,32 @@
+{
+  "task_id": "example-evidence-conflict",
+  "domain": "contract",
+  "query": "Check whether one evidence reference is bound to incompatible triads.",
+  "triads": [
+    {
+      "id": "t1",
+      "subject": "Alpha Ltd",
+      "relation": "supplies",
+      "object": "Equipment A",
+      "evidence": "contract.md:12",
+      "confidence": 0.9,
+      "subject_role": "supplier",
+      "object_role": "goods",
+      "route": "delivery",
+      "group": "deal-a"
+    },
+    {
+      "id": "t2",
+      "subject": "Beta LLC",
+      "relation": "supplies",
+      "object": "Equipment A",
+      "evidence": "contract.md:12",
+      "confidence": 0.9,
+      "subject_role": "supplier",
+      "object_role": "goods",
+      "route": "delivery",
+      "group": "deal-b"
+    }
+  ],
+  "candidate_triads": []
+}
