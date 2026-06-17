@@ -4,6 +4,9 @@ version = "1.0.0"
 edition = "2021"
 license = "MIT"
 description = "Sparse-triad structural gate for agent relation checks"
+readme = "README.md"
+keywords = ["agent", "structural", "retrieval", "vsa", "codex"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "nanda"

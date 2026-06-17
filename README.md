@@ -67,14 +67,21 @@ evidence-conflict tasks do.
 ├── examples/
 │   ├── triad-packet.example.json
 │   ├── triad-packet.evidence-conflict.json
+│   ├── triad-packet.interference-search.json
+│   ├── triad-packet.interference-search-noisy.json
+│   ├── triad-packet.interference-search-route-trap.json
 │   ├── triad-packet.role-swap.json
 │   ├── triad-packet.route-splice.json
 │   ├── triad-packet.watch-low-complexity.json
 │   ├── triad-packet.watch-missing-evidence.json
+│   ├── route-trap.raw.txt
+│   ├── self-dogfood.nanda.json
 │   ├── triads.route-splice.md
 │   ├── triads.code-flow.md
 │   ├── triads.code-flow-splice.md
 │   ├── triads.code-path-normalization.md
+│   ├── triads.invariant-drift.md
+│   ├── triads.linked-group-split.md
 │   ├── triads.skill-flow.md
 │   └── triads.skill-flow-splice.md
 ├── scripts/
@@ -100,7 +107,14 @@ evidence-conflict tasks do.
         ├── nanda-split-md
         ├── nanda-report
         ├── nanda-comb
+        ├── nanda-doctor
+        ├── nanda-dogfood
+        ├── nanda-eval
+        ├── nanda-extract
+        ├── nanda-feedback
+        ├── nanda-index
         ├── nanda-map
+        ├── nanda-search
         └── nanda-self-check
 ```
 
@@ -136,6 +150,7 @@ nanda-split-md examples/triads.watch-large.md --by group --out-dir split/
 nanda-split-md examples/triads.code-flow-splice.md --by linked-group --out-dir split/
 nanda-map examples/triads.code-flow-splice.md --domain code
 nanda-comb examples/triads.code-flow-splice.md --domain code --depth 2
+mkdir -p .nanda
 nanda-extract examples/route-trap.raw.txt --out .nanda/route-trap.json
 nanda-index examples/triad-packet.interference-search-route-trap.json --input-format json --out .nanda/index.json
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
@@ -287,6 +302,7 @@ Use this workflow for large code-flow, repository, contract, logistics, or
 multi-route graphs:
 
 ```bash
+mkdir -p .nanda
 nanda-dogfood . --out-dir .nanda/
 nanda-extract notes.raw.txt --out .nanda/notes.json
 nanda-index memory-a.json memory-b.md --out .nanda/index.json
@@ -299,7 +315,6 @@ nanda-map big-flow.md --domain code --normalize-paths
 nanda-gate-md big-flow.md --domain code --normalize-paths --format json
 nanda-split big-flow.json --input-format json --by linked-group --out-dir split-json/
 nanda-split-md big-flow.md --by linked-group --normalize-paths --out-dir split/
-```
 for f in split/*.md; do
   nanda-gate-md "$f" --domain code --normalize-paths --format json
 done
@@ -332,6 +347,21 @@ Run local tests:
 scripts/test-local.sh
 scripts/benchmark-v0.sh
 scripts/test-edge-cases.sh
+```
+
+## Release
+
+Current release: `v1.0.0`.
+
+Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
+release, run:
+
+```bash
+scripts/test-local.sh
+scripts/test-edge-cases.sh
+scripts/benchmark-v0.sh
+nanda-doctor
+nanda-dogfood . --format json
 ```
 
 ## Current Status
