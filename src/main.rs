@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v1.8-learning-lanes";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v1.8-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.1-polarized-field";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.1-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -219,6 +219,10 @@ struct SearchArgs {
     query_format: InputFormat,
     #[arg(long, default_value_t = 5)]
     top_k: usize,
+    #[arg(long, default_value_t = 256)]
+    route_cap: usize,
+    #[arg(long, default_value_t = 32)]
+    route_triad_cap: usize,
     #[arg(long, value_enum, default_value = "route")]
     group_by: PeakGroupBy,
     #[arg(long, value_enum, default_value = "json")]
@@ -2321,13 +2325,15 @@ fn search_cmd(args: SearchArgs) -> Result<u8> {
     };
     packet.query = query_text.clone();
     let (query, query_source) = search_query_triads(&query_packet, &query_text);
+    let focus = route_balanced_focus(&memory, &query, args.route_cap, args.route_triad_cap);
     let result = interference_search(
         &packet,
-        &memory,
+        &focus.memory,
         &query,
         args.top_k,
         &args.group_by,
         query_source,
+        focus.metadata,
     );
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&result)?),
@@ -2701,6 +2707,7 @@ fn eval_cmd(args: EvalArgs) -> Result<u8> {
             args.top_k,
             &args.group_by,
             "candidate_triads",
+            no_focus_metadata(memory.len()),
         );
         let actual_peak = result["peaks"]
             .as_array()
@@ -2825,6 +2832,7 @@ fn waw_cmd(args: WawArgs) -> Result<u8> {
             args.top_k,
             &args.group_by,
             "candidate_triads",
+            no_focus_metadata(memory.len()),
         );
         let actual_peak = result["peaks"]
             .as_array()
@@ -3041,6 +3049,7 @@ fn handle_serve_request(line: &str) -> Result<Value> {
                 top_k,
                 &group_by,
                 query_source,
+                no_focus_metadata(packet.triads.len()),
             ))
         }
         "check" => {
@@ -3096,6 +3105,7 @@ fn doctor_value() -> Value {
         3,
         &PeakGroupBy::Route,
         "candidate_triads",
+        no_focus_metadata(route_trap.triads.len()),
     );
     let noisy = builtin_route_trap_packet(true);
     let noisy_result = interference_search(
@@ -3105,6 +3115,7 @@ fn doctor_value() -> Value {
         3,
         &PeakGroupBy::Route,
         "candidate_triads",
+        no_focus_metadata(noisy.triads.len()),
     );
     let trap_ok = trap_result["peaks"]
         .as_array()
@@ -3690,6 +3701,91 @@ fn source_weight(triad: &Triad) -> f64 {
     round4((triad.confidence.clamp(0.05, 1.0) * authority).clamp(0.05, 1.2))
 }
 
+struct FocusedMemory {
+    memory: Vec<Triad>,
+    metadata: Value,
+}
+
+fn route_balanced_focus(
+    memory: &[Triad],
+    query: &[Triad],
+    route_cap: usize,
+    route_triad_cap: usize,
+) -> FocusedMemory {
+    let route_cap = route_cap.max(1);
+    let route_triad_cap = route_triad_cap.max(1);
+    if memory.len() <= route_cap {
+        return FocusedMemory {
+            memory: memory.to_vec(),
+            metadata: json!({
+                "enabled": false,
+                "reason": "memory_size_within_route_cap",
+                "route_cap": route_cap,
+                "route_triad_cap": route_triad_cap,
+                "original_memory_size": memory.len(),
+                "focused_memory_size": memory.len()
+            }),
+        };
+    }
+    let query_terms = query_term_set(query);
+    let mut by_route: BTreeMap<String, Vec<(f64, &Triad)>> = BTreeMap::new();
+    for triad in memory {
+        let relevance = (0.52 * symbolic_query_overlap(query, triad))
+            + (0.28 * token_overlap(&query_terms, triad))
+            + (0.20 * source_weight(triad));
+        by_route
+            .entry(route_name(triad, "memory-route"))
+            .or_default()
+            .push((round4(relevance), triad));
+    }
+    let mut focused = vec![];
+    let mut route_rows = vec![];
+    for (route, mut items) in by_route {
+        items.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        let before = items.len();
+        let selected = items
+            .iter()
+            .take(route_triad_cap)
+            .map(|(_, triad)| (*triad).clone())
+            .collect::<Vec<_>>();
+        route_rows.push(json!({
+            "route": route,
+            "original_triads": before,
+            "selected_triads": selected.len(),
+            "top_relevance": items.first().map(|(score, _)| *score).unwrap_or(0.0)
+        }));
+        focused.extend(selected);
+    }
+    route_rows.sort_by(|a, b| {
+        b["top_relevance"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["top_relevance"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    FocusedMemory {
+        memory: focused,
+        metadata: json!({
+            "enabled": true,
+            "reason": "memory_size_exceeded_route_cap",
+            "route_cap": route_cap,
+            "route_triad_cap": route_triad_cap,
+            "original_memory_size": memory.len(),
+            "focused_memory_size": route_rows.iter().map(|row| row["selected_triads"].as_u64().unwrap_or(0)).sum::<u64>() as usize,
+            "routes": route_rows
+        }),
+    }
+}
+
+fn no_focus_metadata(memory_size: usize) -> Value {
+    json!({
+        "enabled": false,
+        "reason": "not_requested_by_internal_caller",
+        "original_memory_size": memory_size,
+        "focused_memory_size": memory_size
+    })
+}
+
 fn interference_search(
     packet: &Packet,
     memory: &[Triad],
@@ -3697,6 +3793,7 @@ fn interference_search(
     top_k: usize,
     group_by: &PeakGroupBy,
     query_source: &str,
+    route_balanced_focus: Value,
 ) -> Value {
     let query_wave = query_feature_wave(query);
     let mut scored = vec![];
@@ -3757,6 +3854,7 @@ fn interference_search(
                     "wave_score": round4(*wave_score),
                     "symbolic_overlap": round4(*symbolic),
                     "source_weight": source_weight(triad),
+                    "polarity": triad_polarity(triad),
                     "subject": triad.subject,
                     "relation": triad.relation,
                     "object": triad.object,
@@ -3783,6 +3881,7 @@ fn interference_search(
                     "wave_score": round4(*wave_score),
                     "symbolic_overlap": round4(*symbolic),
                     "source_weight": source_weight(triad),
+                    "polarity": triad_polarity(triad),
                     "subject": triad.subject,
                     "relation": triad.relation,
                     "object": triad.object,
@@ -3793,6 +3892,7 @@ fn interference_search(
             })
             .collect::<Vec<_>>();
         let center = peak_center(&items);
+        let polarization = polarization_summary(query, &items);
         peaks.push(json!({
             "peak": key,
             "score": peak_score,
@@ -3803,6 +3903,7 @@ fn interference_search(
             "top_triad_score": round4(top_score),
             "symbolic_baseline": symbolic_peak_baseline(&items),
             "center": center,
+            "polarization": polarization,
             "supporting_triads": support,
             "anti_triads": anti,
             "missing_edges": missing_edges(&query_terms, &items),
@@ -3838,6 +3939,7 @@ fn interference_search(
     if let Some(object) = field_interpretation.as_object_mut() {
         object.insert("corpus".to_string(), corpus_interpretation);
     }
+    let coarse_to_fine = coarse_to_fine_trace(&peaks, &query_terms);
     let mut output_peaks = peaks;
     output_peaks.truncate(top_k);
 
@@ -3853,6 +3955,7 @@ fn interference_search(
             "triads": query.iter().map(triad_json).collect::<Vec<_>>()
         },
         "memory_size": memory.len(),
+        "route_balanced_focus": route_balanced_focus,
         "group_by": match group_by {
             PeakGroupBy::Group => "group",
             PeakGroupBy::Route => "route",
@@ -3866,6 +3969,7 @@ fn interference_search(
             "enabled": true,
             "policy": "confidence multiplied by evidence authority: current/canon > latest/frontier > historical/archive > archive_noise"
         },
+        "coarse_to_fine": coarse_to_fine,
         "field_interpretation": field_interpretation,
         "peaks": output_peaks,
         "interpretation": "A peak is a route/group whose triads resonate together with the partial query. Read support as the focused structure and anti_triads as similar-but-foreign pulls."
@@ -4255,7 +4359,7 @@ fn field_interpretation(peaks: &[Value], margin: f64, lexical_baseline: &Value) 
         .and_then(|peak| peak["propagation"]["component_score"].as_f64())
         .unwrap_or(0.0);
     let component_gap = round4(top_component - second_component);
-    let stability = if margin >= 0.06 && component_gap >= 0.12 {
+    let stability = if margin >= 0.055 && component_gap >= 0.12 {
         "stable"
     } else if margin < 0.04 {
         "contested"
@@ -4298,6 +4402,53 @@ fn field_interpretation(peaks: &[Value], margin: f64, lexical_baseline: &Value) 
     })
 }
 
+fn coarse_to_fine_trace(peaks: &[Value], query_terms: &BTreeSet<String>) -> Value {
+    let Some(top) = peaks.first() else {
+        return json!({
+            "enabled": true,
+            "state": "NO_PEAK",
+            "coarse_peak": "",
+            "local_path": []
+        });
+    };
+    let coarse_peak = top["peak"].as_str().unwrap_or("");
+    let support = top["supporting_triads"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let local_path = support
+        .iter()
+        .take(5)
+        .map(|item| {
+            let subject = item["subject"].as_str().unwrap_or("");
+            let relation = item["relation"].as_str().unwrap_or("");
+            let object = item["object"].as_str().unwrap_or("");
+            let mut hits = vec![];
+            for term in query_terms {
+                let haystack = norm(&format!("{subject} {relation} {object}"));
+                if haystack.contains(term) {
+                    hits.push(term.clone());
+                }
+            }
+            json!({
+                "triad": item["id"].as_str().unwrap_or(""),
+                "edge": format!("{subject} -> {relation} -> {object}"),
+                "score": item["score"].as_f64().unwrap_or(0.0),
+                "polarity": item["polarity"].as_str().unwrap_or(""),
+                "query_hits": hits
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "enabled": true,
+        "state": if local_path.is_empty() { "THIN" } else { "LOCALIZED" },
+        "coarse_peak": coarse_peak,
+        "local_memory_size": support.len(),
+        "local_path": local_path,
+        "read_as": "Coarse route first, then inspect the local supporting path inside that route."
+    })
+}
+
 fn center_pair(second_center: Option<&Value>, top_center: &Value, key: &str) -> Value {
     json!({
         "from": second_center
@@ -4329,7 +4480,7 @@ fn peak_decision(peaks: &[Value], margin: f64, lexical_peak: &str) -> Value {
         .unwrap_or(0.0);
     let component_gap = round4(top_component - second_component);
     let wins_lexical = !lexical_peak.is_empty() && top_name != lexical_peak;
-    let (state, safe_to_answer, reason) = if margin >= 0.06 && component_gap >= 0.12 {
+    let (state, safe_to_answer, reason) = if margin >= 0.055 && component_gap >= 0.12 {
         (
             "FOCUSED",
             true,
@@ -4686,6 +4837,123 @@ fn shared_endpoint(left: &Triad, right: &Triad) -> String {
     String::new()
 }
 
+fn triad_polarity(triad: &Triad) -> String {
+    format!(
+        "{}->{}->{}",
+        role_family(&triad.subject_role),
+        relation_family(&triad.relation),
+        role_family(&triad.object_role)
+    )
+}
+
+fn reversed_polarity(triad: &Triad) -> String {
+    format!(
+        "{}->{}->{}",
+        role_family(&triad.object_role),
+        relation_family(&triad.relation),
+        role_family(&triad.subject_role)
+    )
+}
+
+fn role_family(role: &str) -> String {
+    let role = norm(role);
+    if role.contains("payer") || role.contains("buyer") || role.contains("customer") {
+        "payer".to_string()
+    } else if role.contains("supplier") || role.contains("seller") || role.contains("factory") {
+        "supplier".to_string()
+    } else if role.contains("document") || role.contains("certificate") || role.contains("doc") {
+        "document".to_string()
+    } else if role.contains("route") || role.contains("path") {
+        "route".to_string()
+    } else if role.contains("owner") || role.contains("holder") {
+        "owner".to_string()
+    } else if role.contains("asset") || role.contains("goods") || role.contains("product") {
+        "asset".to_string()
+    } else if role.is_empty() {
+        "role".to_string()
+    } else {
+        role
+    }
+}
+
+fn relation_family(relation: &str) -> String {
+    let relation = norm(relation);
+    if relation.contains("pay") || relation.contains("fund") || relation.contains("owe") {
+        "payment".to_string()
+    } else if relation.contains("own") || relation.contains("hold") {
+        "ownership".to_string()
+    } else if relation.contains("supply")
+        || relation.contains("deliver")
+        || relation.contains("ship")
+    {
+        "flow".to_string()
+    } else if relation.contains("require")
+        || relation.contains("confirm")
+        || relation.contains("cert")
+    {
+        "evidence".to_string()
+    } else if relation.is_empty() {
+        "relation".to_string()
+    } else {
+        relation
+    }
+}
+
+fn polarization_summary(query: &[Triad], items: &[(f64, f64, f64, &Triad)]) -> Value {
+    let query_polarities = query
+        .iter()
+        .map(triad_polarity)
+        .filter(|value| !value.is_empty())
+        .collect::<BTreeSet<_>>();
+    let query_reversed = query
+        .iter()
+        .map(reversed_polarity)
+        .filter(|value| !value.is_empty())
+        .collect::<BTreeSet<_>>();
+    if query_polarities.is_empty() || items.is_empty() {
+        return json!({
+            "state": "NO_QUERY_POLARITY",
+            "aligned": 0,
+            "reversed": 0,
+            "dominant": ""
+        });
+    }
+    let mut counts = BTreeMap::<String, usize>::new();
+    let mut aligned = 0usize;
+    let mut reversed = 0usize;
+    for (_, _, _, triad) in items {
+        let polarity = triad_polarity(triad);
+        if query_polarities.contains(&polarity) {
+            aligned += 1;
+        }
+        if query_reversed.contains(&polarity) && !query_polarities.contains(&polarity) {
+            reversed += 1;
+        }
+        *counts.entry(polarity).or_default() += 1;
+    }
+    let dominant = counts
+        .iter()
+        .max_by_key(|(_, count)| **count)
+        .map(|(polarity, _)| polarity.clone())
+        .unwrap_or_default();
+    let state = if aligned > 0 && reversed == 0 {
+        "ALIGNED"
+    } else if reversed > aligned {
+        "REVERSED"
+    } else if aligned > 0 {
+        "MIXED"
+    } else {
+        "UNALIGNED"
+    };
+    json!({
+        "state": state,
+        "aligned": aligned,
+        "reversed": reversed,
+        "dominant": dominant,
+        "query": query_polarities.into_iter().collect::<Vec<_>>()
+    })
+}
+
 fn query_feature_wave(query: &[Triad]) -> Vec<i32> {
     let mut wave = vec![0; WAVE_DIM];
     for triad in query {
@@ -4700,6 +4968,7 @@ fn triad_feature_wave(triad: &Triad) -> Vec<i32> {
     add_feature(&mut wave, "route", &triad.route);
     add_feature(&mut wave, "subject_role", &triad.subject_role);
     add_feature(&mut wave, "object_role", &triad.object_role);
+    add_feature(&mut wave, "polarity", &triad_polarity(triad));
     wave
 }
 
@@ -4712,6 +4981,7 @@ fn partial_triad_feature_wave(triad: &Triad) -> Vec<i32> {
     add_feature(&mut wave, "object_role", &triad.object_role);
     add_feature(&mut wave, "route", &triad.route);
     add_feature(&mut wave, "group", &triad.group);
+    add_feature(&mut wave, "polarity", &triad_polarity(triad));
     wave
 }
 

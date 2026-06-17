@@ -118,18 +118,19 @@ No secondary scripting runtime is part of the shipped checker surface.
 Current core:
 
 ```text
-core_version: sparse-triad-v1.8-learning-lanes
+core_version: sparse-triad-v2.1-polarized-field
 wave_dim:     1024
 ```
 
-The `v1.8-learning-lanes` core keeps recursive combing, structural peak search,
+The `v2.1-polarized-field` core keeps recursive combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, and release doctor checks, then adds file-backed eval suites, a
 newline-delimited JSON agent API, and field interpretation for interference
 peaks. It also adds a WAW benchmark surface for cases where structural
 interference must beat a lexical trap, plus a dataset-quality gate for noisy
 large corpora, source/confidence weighting, auto query triads, and learning
-negative lanes for rejected shortcut peaks:
+negative lanes for rejected shortcut peaks. The current field also adds
+route-balanced focus, coarse-to-fine localization, and polarization lanes:
 
 ```text
 topology graph
@@ -147,6 +148,9 @@ destructive_interference
 source_weighting
 auto_query_triads
 learned negative lane penalty
+route_balanced_focus
+coarse_to_fine local path
+polarization lane
 JSONL agent serve loop
 field_interpretation for search peaks
 field_interpretation.corpus
@@ -232,11 +236,11 @@ V0 builds a source memory from `triads` and scores each `candidate_triads`
 composite against that memory. A swapped candidate should have high token
 overlap but low composite similarity.
 
-## Core Size v1.8
+## Core Size v2.1
 
 Use fixed dimensions for the current recursive comb/search/agent-field/WAW
 dataset-immunity, source-weighted search, auto-query, and learning negative-lane
-verifier:
+verifier, plus route-balanced focus, coarse-to-fine trace, and polarization:
 
 ```text
 wave_dim:       1024 lanes

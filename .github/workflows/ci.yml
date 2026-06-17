@@ -50,6 +50,12 @@ jobs:
       - name: Auto query smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 
+      - name: Route-balanced focus smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
+
+      - name: Polarization smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
+
       - name: Serve smoke
         run: printf '{"command":"doctor"}\n' | cargo run --quiet --manifest-path Cargo.toml -- serve
 
@@ -98,6 +104,12 @@ jobs:
 
       - name: Auto query smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
+
+      - name: Route-balanced focus smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
+
+      - name: Polarization smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
 
       - name: Serve smoke
         shell: pwsh

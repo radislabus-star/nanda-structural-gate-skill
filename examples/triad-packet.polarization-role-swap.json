@@ -1,0 +1,70 @@
+{
+  "task_id": "polarization-role-swap",
+  "domain": "business",
+  "query": "Maria pays declaration, not declaration pays Maria",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "Maria",
+      "relation": "pays_for",
+      "object": "declaration",
+      "evidence": "CURRENT.md",
+      "confidence": 1.0,
+      "subject_role": "payer",
+      "object_role": "document",
+      "route": "payment-forward",
+      "group": "payment-forward"
+    },
+    {
+      "id": "m2",
+      "subject": "declaration",
+      "relation": "requires",
+      "object": "protocols",
+      "evidence": "CURRENT.md",
+      "confidence": 1.0,
+      "subject_role": "document",
+      "object_role": "evidence",
+      "route": "payment-forward",
+      "group": "payment-forward"
+    },
+    {
+      "id": "m3",
+      "subject": "declaration",
+      "relation": "pays_for",
+      "object": "Maria",
+      "evidence": "archive_noise/reversed.md",
+      "confidence": 0.95,
+      "subject_role": "document",
+      "object_role": "payer",
+      "route": "payment-reversed",
+      "group": "payment-reversed"
+    },
+    {
+      "id": "m4",
+      "subject": "protocols",
+      "relation": "requires",
+      "object": "declaration",
+      "evidence": "archive_noise/reversed.md",
+      "confidence": 0.95,
+      "subject_role": "evidence",
+      "object_role": "document",
+      "route": "payment-reversed",
+      "group": "payment-reversed"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "Maria",
+      "relation": "pays_for",
+      "object": "declaration",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "payer",
+      "object_role": "document",
+      "route": "",
+      "group": "query"
+    }
+  ],
+  "candidate_answer": ""
+}

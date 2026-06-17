@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v1.8-rust
-core_version: sparse-triad-v1.8-learning-lanes
+engine: nanda-check sparse-triad-v2.1-rust
+core_version: sparse-triad-v2.1-polarized-field
 ```
 
 ## Build Order
@@ -56,6 +56,12 @@ core_version: sparse-triad-v1.8-learning-lanes
     creates lightweight query triads when no candidate triads exist.
 31. Add learning negative lanes. Done in `v1.8`: repeated reject feedback is
     merged by `nanda index` and raises the effective destructive penalty.
+32. Add route-balanced focus. Done in `v1.9`: large/noisy route-heavy memory
+    packets are reduced to a per-route focus before search.
+33. Add coarse-to-fine retrieval trace. Done in `v2.0`: search reports the
+    coarse route peak plus the local supporting path inside it.
+34. Add polarization. Done in `v2.1`: role direction contributes a wave lane
+    and search reports aligned/reversed/mixed polarity per peak.
 
 ## Engineering Constraints
 
@@ -135,6 +141,13 @@ negative lane accumulates `rejected_count` and increases
 For text-only retrieval, `nanda search --query "..."` is now usable as a first
 pass because it builds `auto_query_triads`; explicit candidate triads remain
 better for high-risk checks.
+For large retrieval, prefer `nanda search --route-cap N --route-triad-cap M`.
+Read `route_balanced_focus` to see whether the corpus was reduced before
+search.
+For route interpretation, read `coarse_to_fine.local_path` before drafting; it
+is the small path an agent should inspect after the coarse peak.
+For role-direction traps, read `peaks[].polarization`. `ALIGNED` means the
+route has the same direction as the query; `REVERSED` is a stop signal.
 For agent/runtime integration, prefer newline-delimited JSON through
 `nanda serve` instead of shelling one command per small check.
 

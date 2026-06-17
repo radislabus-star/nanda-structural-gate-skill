@@ -209,6 +209,8 @@ nanda-search examples/triad-packet.interference-search-noisy.json --input-format
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
+nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
+nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 > .nanda/search.json
 nanda-feedback .nanda/search.json --decision accept --note "accepted focused peak"
 nanda-eval --case examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED --case examples/triad-packet.interference-search-noisy.json:certification:WATCH
@@ -259,13 +261,14 @@ line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v1.8 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the v2.1 memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, source weights, destructive
-interference, and an answer projection. If no `candidate_triads` exist,
-text from `--query` or packet `query` is converted into lightweight
-`auto_query_triads`; check `query.source` before trusting the peak.
+interference, route-balanced focus, coarse-to-fine local paths, polarization,
+and an answer projection. If no `candidate_triads` exist, text from `--query`
+or packet `query` is converted into lightweight `auto_query_triads`; check
+`query.source` before trusting the peak.
 `nanda-dataset-doctor` is the corpus-quality gate. Run it before search on
 large memory packets; it warns about route imbalance, hub dominance, duplicate
 CURRENT facts, oversized direct-search packets, and weak text-only queries.
@@ -311,11 +314,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v1.8-learning-lanes
+core_version: sparse-triad-v2.1-polarized-field
 wave_dim: 1024
 ```
 
-`v1.8-learning-lanes` keeps recursive topology combing, structural peak search,
+`v2.1-polarized-field` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -325,10 +328,14 @@ corpus, check whether the field is route-imbalanced, hub-heavy, duplicated, or
 too weakly queried. Source weighting makes current/canonical evidence pull
 harder than archive/noise evidence. Auto-query triads make text-only search
 less blind. Learning negative lanes add destructive interference for rejected
-shortcut peaks and strengthen repeated rejects. The search path is intentionally
-small and universal: encode triads as slot-bound waves, superpose a partial
-query, score memory routes/groups by weighted interference, then interpret,
-record, test, and smoke-check the top peaks.
+shortcut peaks and strengthen repeated rejects. Route-balanced focus reduces
+large/noisy corpora before direct search. Coarse-to-fine output shows the local
+supporting path after the coarse peak. Polarization adds role-direction lanes
+so reversed structures can look lexically similar but resonate differently. The
+search path is intentionally small and universal: encode triads as slot-bound
+waves, superpose a partial query, score memory routes/groups by weighted and
+polarized interference, then interpret, record, test, and smoke-check the top
+peaks.
 If `foreign_pull` is non-empty, strict gate output is not `PASS`; repair the
 named candidate triads or split the route first.
 
@@ -389,7 +396,7 @@ nanda-extract notes.raw.txt --out .nanda/notes.json
 nanda-index memory-a.json memory-b.md --out .nanda/index.json
 nanda-dataset-doctor .nanda/index.json --input-format json
 nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
-nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --top-k 5
+nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
 nanda-feedback .nanda/search.json --decision reject --note "customs shortcut" --out .nanda/reject.json
 nanda-index memory-a.json .nanda/reject.json --out .nanda/index-with-negative-lanes.json
 nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
@@ -438,7 +445,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v1.8.0`.
+Current release: `v2.1.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
@@ -454,6 +461,8 @@ nanda-dataset-doctor examples/triad-packet.dataset-noise.json --input-format jso
 nanda-search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
+nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
+nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
 nanda-dogfood . --format json
 ```
 

@@ -1,0 +1,81 @@
+{
+  "task_id": "route-balanced-focus",
+  "domain": "memory",
+  "query": "find lower operator debt route without status hub dominance",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "lower operator debt",
+      "relation": "activates",
+      "object": "debt cleanup route",
+      "evidence": "CURRENT.md",
+      "confidence": 1.0,
+      "subject_role": "topic",
+      "object_role": "route",
+      "route": "lower-operator-debt-route",
+      "group": "operator-debt"
+    },
+    {
+      "id": "m2",
+      "subject": "debt cleanup route",
+      "relation": "requires",
+      "object": "source contract review",
+      "evidence": "latest_W_chain.md",
+      "confidence": 0.95,
+      "subject_role": "route",
+      "object_role": "evidence",
+      "route": "lower-operator-debt-route",
+      "group": "operator-debt"
+    },
+    {
+      "id": "m3",
+      "subject": "status hub",
+      "relation": "mentions",
+      "object": "current status",
+      "evidence": "archive_noise/status-1.md",
+      "confidence": 0.8,
+      "subject_role": "topic",
+      "object_role": "status",
+      "route": "status-route",
+      "group": "status"
+    },
+    {
+      "id": "m4",
+      "subject": "status hub",
+      "relation": "mentions",
+      "object": "general roadmap",
+      "evidence": "archive_noise/status-2.md",
+      "confidence": 0.8,
+      "subject_role": "topic",
+      "object_role": "status",
+      "route": "status-route",
+      "group": "status"
+    },
+    {
+      "id": "m5",
+      "subject": "status hub",
+      "relation": "mentions",
+      "object": "general current",
+      "evidence": "archive_noise/status-3.md",
+      "confidence": 0.8,
+      "subject_role": "topic",
+      "object_role": "status",
+      "route": "status-route",
+      "group": "status"
+    },
+    {
+      "id": "m6",
+      "subject": "calendar",
+      "relation": "mentions",
+      "object": "current reminder",
+      "evidence": "archive_noise/status-4.md",
+      "confidence": 0.8,
+      "subject_role": "topic",
+      "object_role": "status",
+      "route": "status-route",
+      "group": "status"
+    }
+  ],
+  "candidate_triads": [],
+  "candidate_answer": ""
+}

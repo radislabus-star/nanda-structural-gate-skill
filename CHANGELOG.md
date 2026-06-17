@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.1.0 - 2026-06-17
+
+Polarized-field release. This folds the v1.9 route-balanced and v2.0
+coarse-to-fine milestones into one published core.
+
+### Added
+
+- `nanda search --route-cap` and `--route-triad-cap` route-balanced focus for
+  large/noisy memory packets.
+- `route_balanced_focus` output showing original memory size, focused memory
+  size, per-route selected triads, and why focus was applied.
+- `coarse_to_fine` output: first pick the coarse route peak, then expose the
+  local supporting path inside that route.
+- Polarization lane in triad wave encoding so role direction contributes to
+  resonance, not only to post-hoc explanation.
+- `polarization` output per peak and `polarity` per support/anti triad.
+- Route-balanced and polarization fixtures with local and CI smoke coverage.
+
+### Changed
+
+- Core version is now `sparse-triad-v2.1-polarized-field`.
+- Cargo package version is now `2.1.0`.
+
 ## v1.8.0 - 2026-06-17
 
 Learning-lanes release. This is the first release after the v1.6/v1.7 scoring

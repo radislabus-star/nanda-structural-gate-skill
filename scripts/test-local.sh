@@ -44,6 +44,8 @@ jq empty "$root/examples/triad-packet.negative-shortcut-base.json"
 jq empty "$root/examples/triad-packet.negative-shortcut-lanes.json"
 jq empty "$root/examples/triad-packet.source-weighting.json"
 jq empty "$root/examples/triad-packet.auto-query-memory.json"
+jq empty "$root/examples/triad-packet.polarization-role-swap.json"
+jq empty "$root/examples/triad-packet.route-balanced-focus.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/waw-corpus.json"
 
@@ -145,7 +147,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v1.8-learning-lanes"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v2.1-polarized-field"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -229,6 +231,16 @@ auto_query_override_json="$("$search" "$root/examples/triad-packet.auto-query-me
 jq -e '.query.text == "lower operator debt route"' <<<"$auto_query_override_json" >/dev/null
 jq -e '.query.source == "auto_query_triads"' <<<"$auto_query_override_json" >/dev/null
 jq -e '.peaks[0].peak == "lower-operator-debt-route"' <<<"$auto_query_override_json" >/dev/null
+polarization_json="$("$search" "$root/examples/triad-packet.polarization-role-swap.json" --input-format json --top-k 3)"
+jq -e '.peaks[0].peak == "payment-forward"' <<<"$polarization_json" >/dev/null
+jq -e '.peaks[0].polarization.state == "ALIGNED"' <<<"$polarization_json" >/dev/null
+jq -e '.peaks[0].supporting_triads[0].polarity == "payer->payment->document"' <<<"$polarization_json" >/dev/null
+jq -e '.coarse_to_fine.state == "LOCALIZED"' <<<"$polarization_json" >/dev/null
+balanced_json="$("$search" "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3)"
+jq -e '.route_balanced_focus.enabled == true' <<<"$balanced_json" >/dev/null
+jq -e '.route_balanced_focus.original_memory_size == 6 and .route_balanced_focus.focused_memory_size == 2' <<<"$balanced_json" >/dev/null
+jq -e '.peaks[0].peak == "lower-operator-debt-route"' <<<"$balanced_json" >/dev/null
+jq -e '.coarse_to_fine.state == "LOCALIZED"' <<<"$balanced_json" >/dev/null
 noisy_search_json="$("$search" "$root/examples/triad-packet.interference-search-noisy.json" --input-format json --top-k 3)"
 noisy_first_peak="$(jq -r '.peaks[0].peak' <<<"$noisy_search_json")"
 if [[ "$noisy_first_peak" != "certification" ]]; then
