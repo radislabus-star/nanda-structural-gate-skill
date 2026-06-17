@@ -9,8 +9,8 @@ Runtime behavior is intentionally conservative:
 
 ```text
 PASS | WATCH | VETO
-engine: nanda-check sparse-triad-v1.4-rust
-core_version: sparse-triad-v1.4-negative-lanes
+engine: nanda-check sparse-triad-v1.8-rust
+core_version: sparse-triad-v1.8-learning-lanes
 ```
 
 ## Build Order
@@ -50,6 +50,12 @@ core_version: sparse-triad-v1.4-negative-lanes
 27. Add dataset-quality gate before search. Done with `nanda dataset-doctor`.
 28. Add negative lanes for rejected shortcuts. Done with `negative_shortcuts`
     and destructive-interference scoring in `nanda search`.
+29. Add source/confidence weighting. Done in `v1.6`: current/canonical evidence
+    pulls harder than historical/archive/noise evidence.
+30. Add auto query triads. Done in `v1.7`: text-only `nanda search --query`
+    creates lightweight query triads when no candidate triads exist.
+31. Add learning negative lanes. Done in `v1.8`: repeated reject feedback is
+    merged by `nanda index` and raises the effective destructive penalty.
 
 ## Engineering Constraints
 
@@ -123,6 +129,12 @@ explicit candidate triads before trusting peaks.
 For rejected-route workflows, run `nanda feedback --decision reject`, then
 include that feedback JSON in `nanda index`; future search will suppress the
 same shortcut through negative lanes.
+For repeated false shortcuts, index multiple reject feedback files. The same
+negative lane accumulates `rejected_count` and increases
+`destructive_interference.effective_penalty`.
+For text-only retrieval, `nanda search --query "..."` is now usable as a first
+pass because it builds `auto_query_triads`; explicit candidate triads remain
+better for high-risk checks.
 For agent/runtime integration, prefer newline-delimited JSON through
 `nanda serve` instead of shelling one command per small check.
 

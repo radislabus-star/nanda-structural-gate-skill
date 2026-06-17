@@ -1,0 +1,45 @@
+{
+  "task_id": "auto-query-memory",
+  "domain": "memory",
+  "query": "which route handles lower operator debt",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "lower operator debt",
+      "relation": "activates",
+      "object": "debt cleanup route",
+      "evidence": "CURRENT.md",
+      "confidence": 1.0,
+      "subject_role": "topic",
+      "object_role": "route",
+      "route": "lower-operator-debt-route",
+      "group": "operator-debt"
+    },
+    {
+      "id": "m2",
+      "subject": "debt cleanup route",
+      "relation": "requires",
+      "object": "source contract review",
+      "evidence": "latest_W_chain.md",
+      "confidence": 0.95,
+      "subject_role": "route",
+      "object_role": "evidence",
+      "route": "lower-operator-debt-route",
+      "group": "operator-debt"
+    },
+    {
+      "id": "m3",
+      "subject": "calendar reminder",
+      "relation": "activates",
+      "object": "status route",
+      "evidence": "archive_noise/status.md",
+      "confidence": 0.9,
+      "subject_role": "topic",
+      "object_role": "route",
+      "route": "status-route",
+      "group": "status"
+    }
+  ],
+  "candidate_triads": [],
+  "candidate_answer": ""
+}

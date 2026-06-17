@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v1.4-negative-lanes";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v1.4-rust";
+const CORE_VERSION: &str = "sparse-triad-v1.8-learning-lanes";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v1.8-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -486,10 +486,20 @@ struct NegativeShortcut {
     reason: String,
     #[serde(default)]
     source_feedback: String,
+    #[serde(default = "default_one_usize")]
+    observations: usize,
+    #[serde(default)]
+    rejected_count: usize,
+    #[serde(default)]
+    accepted_count: usize,
 }
 
 fn default_negative_penalty() -> f64 {
     0.18
+}
+
+fn default_one_usize() -> usize {
+    1
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -2281,7 +2291,7 @@ fn comb_cmd(args: CombArgs) -> Result<u8> {
 }
 
 fn search_cmd(args: SearchArgs) -> Result<u8> {
-    let packet = load_packet_auto(
+    let mut packet = load_packet_auto(
         &args.input,
         &args.input_format,
         &args.task_id,
@@ -2302,8 +2312,23 @@ fn search_cmd(args: SearchArgs) -> Result<u8> {
     } else {
         packet.clone()
     };
-    let query = normalize_ids(query_packet.candidate_triads.clone(), "q");
-    let result = interference_search(&packet, &memory, &query, args.top_k, &args.group_by);
+    let query_text = if !args.query.trim().is_empty() {
+        args.query.clone()
+    } else if !query_packet.query.trim().is_empty() {
+        query_packet.query.clone()
+    } else {
+        packet.query.clone()
+    };
+    packet.query = query_text.clone();
+    let (query, query_source) = search_query_triads(&query_packet, &query_text);
+    let result = interference_search(
+        &packet,
+        &memory,
+        &query,
+        args.top_k,
+        &args.group_by,
+        query_source,
+    );
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&result)?),
         OutputFormat::Text => print_search_text(&result),
@@ -2366,6 +2391,7 @@ fn index_cmd(args: IndexArgs) -> Result<u8> {
         negative_shortcuts.extend(packet.negative_shortcuts);
     }
     let triads = dedup_triads(triads);
+    let negative_shortcuts = merge_negative_shortcuts(negative_shortcuts);
     let packet = json!({
         "task_id": args.task_id,
         "domain": args.domain,
@@ -2412,6 +2438,64 @@ fn load_feedback_negative_shortcuts(path: &Path) -> Result<Option<Vec<NegativeSh
         .map(serde_json::from_value)
         .collect::<std::result::Result<Vec<NegativeShortcut>, _>>()?;
     Ok(Some(shortcuts))
+}
+
+fn merge_negative_shortcuts(shortcuts: Vec<NegativeShortcut>) -> Vec<NegativeShortcut> {
+    let mut merged: BTreeMap<(String, String, String), NegativeShortcut> = BTreeMap::new();
+    for mut shortcut in shortcuts {
+        if shortcut.observations == 0 {
+            shortcut.observations = 1;
+        }
+        if shortcut.rejected_count == 0 && shortcut.accepted_count == 0 {
+            shortcut.rejected_count = shortcut.observations;
+        }
+        shortcut.terms = normalized_shortcut_terms(&shortcut.terms)
+            .into_iter()
+            .collect::<Vec<_>>();
+        let key = (
+            norm(&shortcut.suppress_peak),
+            norm(&shortcut.prefer_peak),
+            shortcut.terms.join("|"),
+        );
+        merged
+            .entry(key)
+            .and_modify(|existing| {
+                existing.observations += shortcut.observations;
+                existing.rejected_count += shortcut.rejected_count;
+                existing.accepted_count += shortcut.accepted_count;
+                existing.penalty = existing.penalty.max(shortcut.penalty);
+                if existing.reason.is_empty() {
+                    existing.reason = shortcut.reason.clone();
+                }
+                if !shortcut.source_feedback.is_empty() {
+                    if existing.source_feedback.is_empty() {
+                        existing.source_feedback = shortcut.source_feedback.clone();
+                    } else if !existing
+                        .source_feedback
+                        .split(';')
+                        .any(|item| item == shortcut.source_feedback)
+                    {
+                        existing.source_feedback.push(';');
+                        existing.source_feedback.push_str(&shortcut.source_feedback);
+                    }
+                }
+            })
+            .or_insert(shortcut);
+    }
+    merged.into_values().collect()
+}
+
+fn normalized_shortcut_terms(terms: &[String]) -> BTreeSet<String> {
+    terms
+        .iter()
+        .flat_map(|term| {
+            norm(term)
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .filter(|token| token.len() >= 2)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 fn extract_cmd(args: ExtractArgs) -> Result<u8> {
@@ -2551,6 +2635,9 @@ fn negative_shortcut_from_search(
             note.to_string()
         },
         source_feedback,
+        observations: 1,
+        rejected_count: 1,
+        accepted_count: 0,
     }
 }
 
@@ -2607,7 +2694,14 @@ fn eval_cmd(args: EvalArgs) -> Result<u8> {
         )?;
         let memory = normalize_ids(packet.triads.clone(), "m");
         let query = normalize_ids(packet.candidate_triads.clone(), "q");
-        let result = interference_search(&packet, &memory, &query, args.top_k, &args.group_by);
+        let result = interference_search(
+            &packet,
+            &memory,
+            &query,
+            args.top_k,
+            &args.group_by,
+            "candidate_triads",
+        );
         let actual_peak = result["peaks"]
             .as_array()
             .and_then(|peaks| peaks.first())
@@ -2724,7 +2818,14 @@ fn waw_cmd(args: WawArgs) -> Result<u8> {
         )?;
         let memory = normalize_ids(packet.triads.clone(), "m");
         let query = normalize_ids(packet.candidate_triads.clone(), "q");
-        let result = interference_search(&packet, &memory, &query, args.top_k, &args.group_by);
+        let result = interference_search(
+            &packet,
+            &memory,
+            &query,
+            args.top_k,
+            &args.group_by,
+            "candidate_triads",
+        );
         let actual_peak = result["peaks"]
             .as_array()
             .and_then(|peaks| peaks.first())
@@ -2932,12 +3033,14 @@ fn handle_serve_request(line: &str) -> Result<Value> {
                 "route" => PeakGroupBy::Route,
                 other => return Err(anyhow!("unsupported group_by: {other}")),
             };
+            let (query, query_source) = search_query_triads(&packet, &packet.query);
             Ok(interference_search(
                 &packet,
                 &normalize_ids(packet.triads.clone(), "m"),
-                &normalize_ids(packet.candidate_triads.clone(), "q"),
+                &query,
                 top_k,
                 &group_by,
+                query_source,
             ))
         }
         "check" => {
@@ -2992,6 +3095,7 @@ fn doctor_value() -> Value {
         &normalize_ids(route_trap.candidate_triads.clone(), "q"),
         3,
         &PeakGroupBy::Route,
+        "candidate_triads",
     );
     let noisy = builtin_route_trap_packet(true);
     let noisy_result = interference_search(
@@ -3000,6 +3104,7 @@ fn doctor_value() -> Value {
         &normalize_ids(noisy.candidate_triads.clone(), "q"),
         3,
         &PeakGroupBy::Route,
+        "candidate_triads",
     );
     let trap_ok = trap_result["peaks"]
         .as_array()
@@ -3467,12 +3572,131 @@ fn dedup_triads(triads: Vec<Triad>) -> Vec<Triad> {
     out
 }
 
+fn search_query_triads(packet: &Packet, query_text: &str) -> (Vec<Triad>, &'static str) {
+    if !packet.candidate_triads.is_empty() {
+        return (
+            normalize_ids(packet.candidate_triads.clone(), "q"),
+            "candidate_triads",
+        );
+    }
+    let auto = auto_query_triads(query_text);
+    if auto.is_empty() {
+        (vec![], "empty")
+    } else {
+        (normalize_ids(auto, "q"), "auto_query_triads")
+    }
+}
+
+fn auto_query_triads(query_text: &str) -> Vec<Triad> {
+    let tokens = query_tokens_from_text(query_text);
+    if tokens.is_empty() {
+        return vec![];
+    }
+    let topic = tokens.iter().take(5).cloned().collect::<Vec<_>>().join(" ");
+    let mut triads = vec![Triad {
+        id: "q1".to_string(),
+        subject: "query".to_string(),
+        relation: "asks_about".to_string(),
+        object: topic.clone(),
+        evidence: "auto_query".to_string(),
+        confidence: 0.72,
+        subject_role: "query".to_string(),
+        object_role: "topic".to_string(),
+        route: String::new(),
+        group: "auto-query".to_string(),
+    }];
+    if tokens.len() >= 2 {
+        triads.push(Triad {
+            id: "q2".to_string(),
+            subject: tokens[0].clone(),
+            relation: "co_occurs_with".to_string(),
+            object: tokens[1].clone(),
+            evidence: "auto_query".to_string(),
+            confidence: 0.66,
+            subject_role: "query_term".to_string(),
+            object_role: "query_term".to_string(),
+            route: String::new(),
+            group: "auto-query".to_string(),
+        });
+    }
+    if tokens.len() >= 3 {
+        triads.push(Triad {
+            id: "q3".to_string(),
+            subject: tokens[1].clone(),
+            relation: "co_occurs_with".to_string(),
+            object: tokens[2].clone(),
+            evidence: "auto_query".to_string(),
+            confidence: 0.62,
+            subject_role: "query_term".to_string(),
+            object_role: "query_term".to_string(),
+            route: String::new(),
+            group: "auto-query".to_string(),
+        });
+    }
+    triads
+}
+
+fn query_tokens_from_text(query_text: &str) -> Vec<String> {
+    let stop = [
+        "about", "after", "again", "against", "and", "are", "before", "between", "can", "could",
+        "does", "for", "from", "how", "into", "need", "needs", "not", "our", "route", "should",
+        "that", "the", "then", "this", "what", "when", "where", "which", "with", "без", "где",
+        "для", "как", "или", "что", "это",
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
+    let mut seen = BTreeSet::new();
+    let mut out = vec![];
+    for token in norm(query_text)
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|token| token.chars().count() >= 2)
+    {
+        if stop.contains(token) || !seen.insert(token.to_string()) {
+            continue;
+        }
+        out.push(token.to_string());
+        if out.len() == 12 {
+            break;
+        }
+    }
+    out
+}
+
+fn source_weight(triad: &Triad) -> f64 {
+    let text = norm(&format!(
+        "{} {} {} {}",
+        triad.evidence, triad.route, triad.group, triad.object_role
+    ));
+    let authority = if text.contains("archive_noise") || text.contains("noise") {
+        0.35
+    } else if text.contains("historical") || text.contains("archive") || text.contains("old") {
+        0.65
+    } else if text.contains("current")
+        || text.contains("canon")
+        || text.contains("canonical")
+        || text.contains("source")
+    {
+        1.12
+    } else if text.contains("latest")
+        || text.contains("frontier")
+        || text.contains("w-chain")
+        || text.contains("w_")
+        || text.contains("w-")
+    {
+        0.95
+    } else {
+        0.86
+    };
+    round4((triad.confidence.clamp(0.05, 1.0) * authority).clamp(0.05, 1.2))
+}
+
 fn interference_search(
     packet: &Packet,
     memory: &[Triad],
     query: &[Triad],
     top_k: usize,
     group_by: &PeakGroupBy,
+    query_source: &str,
 ) -> Value {
     let query_wave = query_feature_wave(query);
     let mut scored = vec![];
@@ -3480,7 +3704,8 @@ fn interference_search(
         let wave = triad_feature_wave(triad);
         let score = cosine(&query_wave, &wave);
         let symbolic = symbolic_query_overlap(query, triad);
-        let combined = round4((0.72 * score) + (0.28 * symbolic));
+        let weight = source_weight(triad);
+        let combined = round4(((0.72 * score) + (0.28 * symbolic)) * weight);
         scored.push((combined, score, symbolic, triad));
     }
     scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -3531,6 +3756,7 @@ fn interference_search(
                     "score": combined,
                     "wave_score": round4(*wave_score),
                     "symbolic_overlap": round4(*symbolic),
+                    "source_weight": source_weight(triad),
                     "subject": triad.subject,
                     "relation": triad.relation,
                     "object": triad.object,
@@ -3556,6 +3782,7 @@ fn interference_search(
                     "score": combined,
                     "wave_score": round4(*wave_score),
                     "symbolic_overlap": round4(*symbolic),
+                    "source_weight": source_weight(triad),
                     "subject": triad.subject,
                     "relation": triad.relation,
                     "object": triad.object,
@@ -3622,6 +3849,7 @@ fn interference_search(
         "domain": packet.domain,
         "query": {
             "text": packet.query,
+            "source": query_source,
             "triads": query.iter().map(triad_json).collect::<Vec<_>>()
         },
         "memory_size": memory.len(),
@@ -3634,6 +3862,10 @@ fn interference_search(
         "wins_over_lexical_baseline": !lexical_peak.is_empty() && top_peak.as_str() != lexical_peak,
         "peak_decision": peak_decision,
         "destructive_interference": destructive_interference,
+        "source_weighting": {
+            "enabled": true,
+            "policy": "confidence multiplied by evidence authority: current/canon > latest/frontier > historical/archive > archive_noise"
+        },
         "field_interpretation": field_interpretation,
         "peaks": output_peaks,
         "interpretation": "A peak is a route/group whose triads resonate together with the partial query. Read support as the focused structure and anti_triads as similar-but-foreign pulls."
@@ -3659,7 +3891,11 @@ fn apply_negative_lanes(
         if ratio <= 0.0 {
             continue;
         }
-        let penalty = round4(shortcut.penalty.max(0.0) * ratio);
+        let rejected_count = shortcut_rejected_count(shortcut);
+        let learned_penalty = (shortcut.penalty.max(0.0)
+            + (rejected_count.saturating_sub(1) as f64 * 0.04))
+            .min(0.45);
+        let penalty = round4(learned_penalty * ratio);
         let boost = round4(penalty * 0.35);
         for peak in peaks.iter_mut() {
             let Some(peak_name) = peak["peak"].as_str().map(str::to_string) else {
@@ -3677,7 +3913,10 @@ fn apply_negative_lanes(
                     "shortcut": shortcut.id,
                     "suppressed_peak": peak_name,
                     "penalty": penalty,
+                    "effective_penalty": round4(learned_penalty),
                     "match_ratio": round4(ratio),
+                    "observations": shortcut.observations,
+                    "rejected_count": rejected_count,
                     "prefer_peak": shortcut.prefer_peak,
                     "reason": shortcut.reason
                 }));
@@ -3701,6 +3940,14 @@ fn apply_negative_lanes(
     })
 }
 
+fn shortcut_rejected_count(shortcut: &NegativeShortcut) -> usize {
+    if shortcut.rejected_count > 0 {
+        shortcut.rejected_count
+    } else {
+        shortcut.observations.max(1)
+    }
+}
+
 fn negative_lane_match_ratio(query_tokens: &BTreeSet<String>, shortcut: &NegativeShortcut) -> f64 {
     if shortcut.suppress_peak.trim().is_empty() {
         return 0.0;
@@ -3711,17 +3958,7 @@ fn negative_lane_match_ratio(query_tokens: &BTreeSet<String>, shortcut: &Negativ
     if query_tokens.is_empty() {
         return 0.0;
     }
-    let terms = shortcut
-        .terms
-        .iter()
-        .flat_map(|term| {
-            norm(term)
-                .split(|c: char| !c.is_ascii_alphanumeric())
-                .filter(|token| token.len() >= 2)
-                .map(str::to_string)
-                .collect::<Vec<_>>()
-        })
-        .collect::<BTreeSet<_>>();
+    let terms = normalized_shortcut_terms(&shortcut.terms);
     if terms.is_empty() {
         return 1.0;
     }
@@ -4601,6 +4838,7 @@ fn triad_json(triad: &Triad) -> Value {
         "subject": triad.subject,
         "relation": triad.relation,
         "object": triad.object,
+        "confidence": triad.confidence,
         "subject_role": triad.subject_role,
         "object_role": triad.object_role,
         "route": triad.route,

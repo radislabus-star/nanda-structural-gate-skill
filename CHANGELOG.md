@@ -1,5 +1,49 @@
 # Changelog
 
+## v1.8.0 - 2026-06-17
+
+Learning-lanes release. This is the first release after the v1.6/v1.7 scoring
+steps; no separate Windows release was cut for those internal milestones.
+
+### Added
+
+- Repeated reject feedback now learns stronger negative lanes. `nanda index`
+  merges duplicate `negative_shortcuts`, accumulates `observations` and
+  `rejected_count`, and future search reports the learned `effective_penalty`.
+- Local regression coverage proving that two rejects produce a stronger
+  destructive-interference penalty than one reject.
+
+### Changed
+
+- Core version is now `sparse-triad-v1.8-learning-lanes`.
+- Cargo package version is now `1.8.0`.
+
+## v1.7.0 - 2026-06-17
+
+Auto-query release.
+
+### Added
+
+- `nanda search` now builds lightweight auto query triads from `--query` or
+  packet `query` when no `candidate_triads` are provided.
+- Search output now exposes `query.source`, with values such as
+  `candidate_triads`, `auto_query_triads`, or `empty`.
+- Auto-query fixture proving a text-only query can activate a specific route
+  without hand-authored candidate triads.
+
+## v1.6.0 - 2026-06-17
+
+Source-weighting release.
+
+### Added
+
+- Source/confidence weighting in interference search. Triad confidence is
+  multiplied by evidence authority so current/canonical evidence pulls harder
+  than historical/archive/noise evidence.
+- `source_weighting` metadata in search output.
+- `source_weight` on supporting and anti triads for explanation.
+- Source-weighting fixture proving `current-frontier` beats archive noise.
+
 ## v1.4.0 - 2026-06-17
 
 Negative-lanes release.

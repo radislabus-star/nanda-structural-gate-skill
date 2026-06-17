@@ -1,0 +1,70 @@
+{
+  "task_id": "source-weighting",
+  "domain": "memory",
+  "query": "current canon operator debt route",
+  "triads": [
+    {
+      "id": "m1",
+      "subject": "operator debt",
+      "relation": "points_to",
+      "object": "archive status",
+      "evidence": "archive_noise/status-2025.md",
+      "confidence": 0.95,
+      "subject_role": "topic",
+      "object_role": "status",
+      "route": "archive-noise",
+      "group": "archive-status"
+    },
+    {
+      "id": "m2",
+      "subject": "operator debt",
+      "relation": "mentions",
+      "object": "old route",
+      "evidence": "historical/archive.md",
+      "confidence": 0.8,
+      "subject_role": "topic",
+      "object_role": "route",
+      "route": "archive-noise",
+      "group": "archive-status"
+    },
+    {
+      "id": "m3",
+      "subject": "operator debt",
+      "relation": "belongs_to",
+      "object": "lower operator debt route",
+      "evidence": "CURRENT.md",
+      "confidence": 1.0,
+      "subject_role": "topic",
+      "object_role": "current route",
+      "route": "current-frontier",
+      "group": "current-canon"
+    },
+    {
+      "id": "m4",
+      "subject": "lower operator debt route",
+      "relation": "is_confirmed_by",
+      "object": "canon",
+      "evidence": "project_canon.md",
+      "confidence": 1.0,
+      "subject_role": "route",
+      "object_role": "authority",
+      "route": "current-frontier",
+      "group": "current-canon"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "operator debt",
+      "relation": "belongs_to",
+      "object": "current route",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "topic",
+      "object_role": "route",
+      "route": "",
+      "group": "query"
+    }
+  ],
+  "candidate_answer": ""
+}

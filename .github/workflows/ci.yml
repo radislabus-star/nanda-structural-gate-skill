@@ -44,6 +44,12 @@ jobs:
       - name: Negative lane smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
 
+      - name: Source weighting smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.source-weighting.json --input-format json --top-k 3
+
+      - name: Auto query smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
+
       - name: Serve smoke
         run: printf '{"command":"doctor"}\n' | cargo run --quiet --manifest-path Cargo.toml -- serve
 
@@ -86,6 +92,12 @@ jobs:
 
       - name: Negative lane smoke
         run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.negative-shortcut-lanes.json --input-format json --top-k 3
+
+      - name: Source weighting smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.source-weighting.json --input-format json --top-k 3
+
+      - name: Auto query smoke
+        run: cargo run --quiet --manifest-path Cargo.toml -- search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 
       - name: Serve smoke
         shell: pwsh

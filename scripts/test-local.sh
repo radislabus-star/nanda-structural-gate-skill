@@ -42,6 +42,8 @@ jq empty "$root/examples/triad-packet.waw-doc-owner-trap.json"
 jq empty "$root/examples/triad-packet.dataset-noise.json"
 jq empty "$root/examples/triad-packet.negative-shortcut-base.json"
 jq empty "$root/examples/triad-packet.negative-shortcut-lanes.json"
+jq empty "$root/examples/triad-packet.source-weighting.json"
+jq empty "$root/examples/triad-packet.auto-query-memory.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/waw-corpus.json"
 
@@ -143,7 +145,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v1.4-negative-lanes"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v1.8-learning-lanes"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -215,6 +217,18 @@ grep -q '"anti_triads"' <<<"$search_json"
 grep -q 'customs declaration' <<<"$search_json"
 search_text="$("$search" "$root/examples/triad-packet.interference-search.json" --input-format json --format text --top-k 1)"
 grep -q 'peak=certification' <<<"$search_text"
+source_weight_json="$("$search" "$root/examples/triad-packet.source-weighting.json" --input-format json --top-k 3)"
+jq -e '.peaks[0].peak == "current-frontier"' <<<"$source_weight_json" >/dev/null
+jq -e '.source_weighting.enabled == true' <<<"$source_weight_json" >/dev/null
+jq -e '[.peaks[0].supporting_triads[].source_weight] | min >= 1.0' <<<"$source_weight_json" >/dev/null
+auto_query_json="$("$search" "$root/examples/triad-packet.auto-query-memory.json" --input-format json --top-k 3)"
+jq -e '.query.source == "auto_query_triads"' <<<"$auto_query_json" >/dev/null
+jq -e '.query.triads | length > 0' <<<"$auto_query_json" >/dev/null
+jq -e '.peaks[0].peak == "lower-operator-debt-route"' <<<"$auto_query_json" >/dev/null
+auto_query_override_json="$("$search" "$root/examples/triad-packet.auto-query-memory.json" --input-format json --query "lower operator debt route" --top-k 3)"
+jq -e '.query.text == "lower operator debt route"' <<<"$auto_query_override_json" >/dev/null
+jq -e '.query.source == "auto_query_triads"' <<<"$auto_query_override_json" >/dev/null
+jq -e '.peaks[0].peak == "lower-operator-debt-route"' <<<"$auto_query_override_json" >/dev/null
 noisy_search_json="$("$search" "$root/examples/triad-packet.interference-search-noisy.json" --input-format json --top-k 3)"
 noisy_first_peak="$(jq -r '.peaks[0].peak' <<<"$noisy_search_json")"
 if [[ "$noisy_first_peak" != "certification" ]]; then
@@ -308,7 +322,16 @@ jq -e '.negative_shortcuts[0].prefer_peak == "certification"' "$tmp_negative_fee
 indexed_negative_json="$("$search" "$tmp_negative_index" --input-format json --query-file "$root/examples/triad-packet.negative-shortcut-base.json" --query-format json --top-k 3)"
 jq -e '.peaks[0].peak == "certification"' <<<"$indexed_negative_json" >/dev/null
 jq -e '.destructive_interference.applied == true' <<<"$indexed_negative_json" >/dev/null
+tmp_negative_feedback2="$(mktemp)"
+tmp_negative_learned_index="$(mktemp)"
+"$feedback" "$tmp_negative_search" --decision reject --note "customs shortcut" --out "$tmp_negative_feedback2" >/dev/null
+"$indexer" "$root/examples/triad-packet.negative-shortcut-base.json" "$tmp_negative_feedback" "$tmp_negative_feedback2" --input-format json --out "$tmp_negative_learned_index" >/dev/null
+jq -e '.negative_shortcuts[0].rejected_count == 2' "$tmp_negative_learned_index" >/dev/null
+learned_negative_json="$("$search" "$tmp_negative_learned_index" --input-format json --query-file "$root/examples/triad-packet.negative-shortcut-base.json" --query-format json --top-k 3)"
+jq -e '.destructive_interference.suppressions[0].effective_penalty > 0.18' <<<"$learned_negative_json" >/dev/null
+jq -e '.destructive_interference.suppressions[0].rejected_count == 2' <<<"$learned_negative_json" >/dev/null
 rm -f "$tmp_negative_search" "$tmp_negative_feedback" "$tmp_negative_index"
+rm -f "$tmp_negative_feedback2" "$tmp_negative_learned_index"
 tmp_extract="$(mktemp)"
 "$extractor" "$root/examples/route-trap.raw.txt" --out "$tmp_extract" >/dev/null
 jq empty "$tmp_extract"
