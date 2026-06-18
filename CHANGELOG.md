@@ -26,7 +26,11 @@
   from cached route/group dot scores.
 - `nanda bench6m` now includes `--mode support-score-build` and
   `--mode support-score-build-compile-sweep`.
-- NANDA-6M version is now `nanda-6m-v11-hot-support-score-cache-core`.
+- NANDA-6M now has route/group support score bucket assembly for faster field
+  construction from cached scores.
+- `nanda bench6m` now includes `--mode support-bucket-build` and
+  `--mode support-bucket-build-compile-sweep`.
+- NANDA-6M version is now `nanda-6m-v12-hot-support-bucket-core`.
 
 ## v3.3.0 - 2026-06-18
 

@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-pub const VERSION: &str = "nanda-6m-v11-hot-support-score-cache-core";
+pub const VERSION: &str = "nanda-6m-v12-hot-support-bucket-core";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -29,6 +29,7 @@ pub const LANE_FOCUSED_DELTA_DOT: i64 = 64;
 pub const TRIAD_CAPACITY: usize = TRIAD_ARENA_BYTES / TRIAD_BYTES;
 pub const CENTROID_CAPACITY: usize = CENTROID_ARENA_BYTES / CENTROID_BYTES;
 pub const LANE_CAPACITY: usize = LANE_ARENA_BYTES / LANE_BYTES;
+pub const SCORE_BUCKET_CAPACITY: usize = CENTROID_CAPACITY;
 
 pub const RESERVED_CORE_BYTES: usize = HEADER_BYTES
     + TRIAD_ARENA_BYTES
@@ -614,6 +615,98 @@ pub fn build_packed_support_field_from_scores(
         support_count,
         anti_count,
     }
+}
+
+pub fn bucket_packed_triad_support_scores(
+    scores: &[PackedTriadSupportScore],
+    axis: PackedAxis,
+    sorted_out: &mut [PackedTriadSupportScore],
+    offsets_out: &mut [u16],
+    cursors_out: &mut [u16],
+) -> usize {
+    let hard_bucket_count = SCORE_BUCKET_CAPACITY
+        .min(offsets_out.len().saturating_sub(1))
+        .min(cursors_out.len());
+    if hard_bucket_count == 0 {
+        return 0;
+    }
+    let max_id = scores
+        .iter()
+        .map(|score| usize::from(score.axis_id(axis)))
+        .filter(|id| *id < hard_bucket_count)
+        .max()
+        .unwrap_or(0);
+    let bucket_count = (max_id + 1).min(hard_bucket_count);
+    offsets_out[..=bucket_count].fill(0);
+    cursors_out[..bucket_count].fill(0);
+
+    let mut accepted = 0usize;
+    for score in scores.iter().copied() {
+        let id = usize::from(score.axis_id(axis));
+        if id >= bucket_count || accepted >= sorted_out.len() {
+            continue;
+        }
+        cursors_out[id] = cursors_out[id].saturating_add(1);
+        accepted += 1;
+    }
+
+    let mut running = 0u16;
+    for idx in 0..bucket_count {
+        offsets_out[idx] = running;
+        running = running.saturating_add(cursors_out[idx]);
+        cursors_out[idx] = offsets_out[idx];
+    }
+    offsets_out[bucket_count] = running;
+    if bucket_count + 1 < offsets_out.len() {
+        offsets_out[bucket_count + 1..].fill(running);
+    }
+
+    for score in scores.iter().copied() {
+        let id = usize::from(score.axis_id(axis));
+        if id >= bucket_count {
+            continue;
+        }
+        let pos = usize::from(cursors_out[id]);
+        if pos >= sorted_out.len() || pos >= accepted {
+            continue;
+        }
+        sorted_out[pos] = score;
+        cursors_out[id] = cursors_out[id].saturating_add(1);
+    }
+    accepted
+}
+
+pub fn build_packed_support_field_from_score_bucket(
+    sorted_scores: &[PackedTriadSupportScore],
+    offsets: &[u16],
+    axis: PackedAxis,
+    top_id: u16,
+    key_hash: u32,
+) -> PackedSupportSummary {
+    let id = usize::from(top_id);
+    if top_id == 0 || id + 1 >= offsets.len() {
+        return PackedSupportSummary {
+            field: PackedSupportField {
+                top_id,
+                key_hash,
+                ..PackedSupportField::default()
+            },
+            ..PackedSupportSummary::default()
+        };
+    }
+    let start = usize::from(offsets[id]).min(sorted_scores.len());
+    let end = usize::from(offsets[id + 1]).min(sorted_scores.len());
+    if end <= start {
+        return PackedSupportSummary {
+            field: PackedSupportField {
+                top_id,
+                key_hash,
+                ..PackedSupportField::default()
+            },
+            ..PackedSupportSummary::default()
+        };
+    }
+    build_packed_support_field_from_scores(&sorted_scores[start..end], axis, top_id, key_hash)
 }
 
 pub fn compile_suppress_anti_lanes(
@@ -1419,6 +1512,109 @@ mod tests {
 
         assert_eq!(count, 2);
         assert_eq!(cached, direct);
+    }
+
+    #[test]
+    fn packed_support_score_buckets_match_score_scan() {
+        let support = PackedTriad32::new(PackedTriadInput {
+            subject_id: 1,
+            object_id: 2,
+            evidence_ref: 3,
+            wave_seed: 4,
+            relation_id: 5,
+            route_id: 7,
+            group_id: 9,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 0,
+        });
+        let anti = PackedTriad32::new(PackedTriadInput {
+            polarity: 1,
+            ..PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 3,
+                wave_seed: 4,
+                relation_id: 5,
+                route_id: 7,
+                group_id: 9,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 0,
+            }
+        });
+        let foreign = PackedTriad32::new(PackedTriadInput {
+            route_id: 11,
+            group_id: 12,
+            ..PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 5,
+                wave_seed: 9,
+                relation_id: 5,
+                route_id: 7,
+                group_id: 9,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 0,
+            }
+        });
+        let memory = [support, anti, foreign];
+        let query = project_triads(&[support]);
+        let mut scores = [PackedTriadSupportScore::default(); 3];
+        let count = build_packed_triad_support_scores(&memory, &query, &mut scores);
+        let mut sorted = [PackedTriadSupportScore::default(); 3];
+        let mut offsets = [0u16; SCORE_BUCKET_CAPACITY + 1];
+        let mut cursors = [0u16; SCORE_BUCKET_CAPACITY];
+
+        let accepted = bucket_packed_triad_support_scores(
+            &scores[..count],
+            PackedAxis::Route,
+            &mut sorted,
+            &mut offsets,
+            &mut cursors,
+        );
+        let scanned =
+            build_packed_support_field_from_scores(&scores[..count], PackedAxis::Route, 7, 0x55);
+        let bucketed = build_packed_support_field_from_score_bucket(
+            &sorted[..accepted],
+            &offsets,
+            PackedAxis::Route,
+            7,
+            0x55,
+        );
+
+        assert_eq!(accepted, 3);
+        assert_eq!(bucketed, scanned);
+
+        let accepted = bucket_packed_triad_support_scores(
+            &scores[..count],
+            PackedAxis::Group,
+            &mut sorted,
+            &mut offsets,
+            &mut cursors,
+        );
+        let scanned =
+            build_packed_support_field_from_scores(&scores[..count], PackedAxis::Group, 9, 0x66);
+        let bucketed = build_packed_support_field_from_score_bucket(
+            &sorted[..accepted],
+            &offsets,
+            PackedAxis::Group,
+            9,
+            0x66,
+        );
+
+        assert_eq!(accepted, 3);
+        assert_eq!(bucketed, scanned);
     }
 
     #[test]
