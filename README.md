@@ -304,6 +304,9 @@ candidate/query projection wave summary, memory/source route/group centroid
 summaries, and a first packed candidate-query-vs-memory-centroid peak score.
 Inspect `peak_decision.safe_to_answer`: `PACKED_THIN` means the packed field
 has a weak honest peak, not a trustworthy answer route yet.
+Inspect `packed_support`: it explains the packed peak as supporting and
+anti-supporting memory records. A thin peak with a small positive `net_dot`
+usually means constructive and destructive contributions nearly cancelled.
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.

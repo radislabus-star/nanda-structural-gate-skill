@@ -3226,6 +3226,13 @@ fn nanda_6m_pack_report(
         packed_centroid_report(&memory_packed, &projection, CentroidAxis6m::Group, sample);
     let route_peak = packed_peak_summary(&route_centroids);
     let group_peak = packed_peak_summary(&group_centroids);
+    let packed_support = packed_support_report(
+        &memory_packed,
+        &projection,
+        &route_peak,
+        &group_peak,
+        sample,
+    );
     let peak_decision = packed_field_decision(
         &route_peak,
         &group_peak,
@@ -3283,6 +3290,7 @@ fn nanda_6m_pack_report(
             "route": route_peak,
             "group": group_peak
         },
+        "packed_support": packed_support,
         "peak_decision": peak_decision,
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
@@ -3473,6 +3481,120 @@ fn packed_field_decision(
             "top_score": round4(group_score),
             "margin": round4(group_margin)
         }
+    })
+}
+
+fn packed_support_report(
+    memory: &[nanda_6m::PackedTriad32],
+    query: &nanda_6m::PackedWave1024,
+    route_peak: &Value,
+    group_peak: &Value,
+    sample: usize,
+) -> Value {
+    json!({
+        "mode": "query-vs-memory-triad-contributors",
+        "route": packed_axis_support(
+            memory,
+            query,
+            CentroidAxis6m::Route,
+            route_peak["top_id"].as_u64().unwrap_or(0) as u16,
+            sample
+        ),
+        "group": packed_axis_support(
+            memory,
+            query,
+            CentroidAxis6m::Group,
+            group_peak["top_id"].as_u64().unwrap_or(0) as u16,
+            sample
+        )
+    })
+}
+
+fn packed_axis_support(
+    memory: &[nanda_6m::PackedTriad32],
+    query: &nanda_6m::PackedWave1024,
+    axis: CentroidAxis6m,
+    top_id: u16,
+    sample: usize,
+) -> Value {
+    let mut rows = memory
+        .iter()
+        .enumerate()
+        .filter_map(|(index, triad)| {
+            let id = match axis {
+                CentroidAxis6m::Route => triad.route_id,
+                CentroidAxis6m::Group => triad.group_id,
+            };
+            if id != top_id || top_id == 0 {
+                return None;
+            }
+            let centroid = nanda_6m::centroid_from_triads(std::slice::from_ref(triad));
+            let score = nanda_6m::score_centroid(query, &centroid);
+            Some(json!({
+                "record_index": index,
+                "route_id": triad.route_id,
+                "group_id": triad.group_id,
+                "relation_id": triad.relation_id,
+                "subject_id": triad.subject_id,
+                "object_id": triad.object_id,
+                "evidence_ref": triad.evidence_ref,
+                "dot": score.dot,
+                "cosine": round4(score.cosine),
+                "polarity": triad.polarity,
+                "confidence": triad.confidence,
+                "wave_seed": triad.wave_seed,
+                "check": triad.check
+            }))
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["cosine"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["cosine"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let considered = rows.len();
+    let mut positive_dot: i64 = 0;
+    let mut negative_dot: i64 = 0;
+    let mut support_count = 0usize;
+    let mut anti_count = 0usize;
+    for row in &rows {
+        let dot = row["dot"].as_i64().unwrap_or(0);
+        if dot > 0 {
+            positive_dot += dot;
+            support_count += 1;
+        } else if dot < 0 {
+            negative_dot += dot;
+            anti_count += 1;
+        }
+    }
+
+    let support = rows
+        .iter()
+        .filter(|row| row["dot"].as_i64().unwrap_or(0) > 0)
+        .take(sample)
+        .cloned()
+        .collect::<Vec<_>>();
+    let anti = rows
+        .iter()
+        .rev()
+        .filter(|row| row["dot"].as_i64().unwrap_or(0) < 0)
+        .take(sample)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    json!({
+        "top_id": top_id,
+        "considered": considered,
+        "support_count": support_count,
+        "anti_count": anti_count,
+        "positive_dot": positive_dot,
+        "negative_dot": negative_dot,
+        "net_dot": positive_dot + negative_dot,
+        "support": support,
+        "anti": anti
     })
 }
 
@@ -3688,6 +3810,18 @@ fn print_pack6m_text(out: &Value) {
             .unwrap_or(false)
     );
     println!(
+        "support: route +{} / -{} / net {}",
+        out["packed_support"]["route"]["support_count"]
+            .as_u64()
+            .unwrap_or(0),
+        out["packed_support"]["route"]["anti_count"]
+            .as_u64()
+            .unwrap_or(0),
+        out["packed_support"]["route"]["net_dot"]
+            .as_i64()
+            .unwrap_or(0)
+    );
+    println!(
         "budget: {} / {}",
         out["budget"]["estimated_hot_bytes"].as_u64().unwrap_or(0),
         out["budget"]["hard_budget_bytes"].as_u64().unwrap_or(0)
@@ -3744,6 +3878,18 @@ fn print_pack6m_md(out: &Value) {
     println!(
         "- safe_to_answer: `{}`",
         out["peak_decision"]["safe_to_answer"]
+    );
+    println!(
+        "- route_support: `+{} / -{} / net {}`",
+        out["packed_support"]["route"]["support_count"]
+            .as_u64()
+            .unwrap_or(0),
+        out["packed_support"]["route"]["anti_count"]
+            .as_u64()
+            .unwrap_or(0),
+        out["packed_support"]["route"]["net_dot"]
+            .as_i64()
+            .unwrap_or(0)
     );
     println!(
         "- budget: `{}/{}`",

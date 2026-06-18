@@ -189,6 +189,12 @@ Triads do not store full waves. They store `wave_seed`, relation/route/group
 IDs, polarity, role flags, and confidence. The hot core projects a triad into a
 working wave on demand by deterministic signed hashing and role binding.
 
+The first packed diagnostic path keeps memory/source records separate from the
+candidate/query wave. It scores the query wave against memory route/group
+centroids, then reports per-triad support and anti-support for the top packed
+axis. This lets the core distinguish "there is no peak" from "there is a thin
+peak because constructive and destructive contributions nearly cancel."
+
 Workspace may use wider accumulators:
 
 ```text

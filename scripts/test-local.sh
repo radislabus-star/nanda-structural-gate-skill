@@ -337,6 +337,10 @@ jq -e '.peaks.route.state == "PEAK_THIN" and .peaks.route.top_score > 0 and .pea
 jq -e '.peaks.group.state == "PEAK_THIN" and .peaks.group.top_score > 0 and .peaks.group.margin >= 0' <<<"$pack6m_json" >/dev/null
 jq -e '.peak_decision.state == "PACKED_THIN" and .peak_decision.verdict == "WATCH" and .peak_decision.safe_to_answer == false' <<<"$pack6m_json" >/dev/null
 jq -e '.peak_decision.route.top_id > 0 and .peak_decision.group.top_id > 0 and .peak_decision.thresholds.min_focus_score == 0.01' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_support.mode == "query-vs-memory-triad-contributors"' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_support.route.top_id == .peaks.route.top_id and .packed_support.route.considered == 3' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_support.route.support_count == 1 and .packed_support.route.anti_count == 2 and .packed_support.route.net_dot == 32' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_support.route.support[0].dot > 0 and .packed_support.route.anti[0].dot < 0' <<<"$pack6m_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null
