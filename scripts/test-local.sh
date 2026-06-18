@@ -341,6 +341,10 @@ jq -e '.packed_support.mode == "query-vs-memory-triad-contributors"' <<<"$pack6m
 jq -e '.packed_support.route.top_id == .peaks.route.top_id and .packed_support.route.considered == 3' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_support.route.support_count == 1 and .packed_support.route.anti_count == 2 and .packed_support.route.net_dot == 32' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_support.route.support[0].dot > 0 and .packed_support.route.anti[0].dot < 0' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_lanes.mode == "packed-lane-preview" and .packed_lanes.lane_bytes == 64' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_lanes.route.state == "LANE_PREVIEW_READY" and .packed_lanes.route.action == "suppress_anti_support"' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_lanes.route.before_net_dot == 32 and .packed_lanes.route.after_net_dot == 288 and .packed_lanes.route.delta_dot == 256' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_lanes.route.record_mask_a == 96 and .packed_lanes.route.protected_support_mask_a == 16' <<<"$pack6m_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null

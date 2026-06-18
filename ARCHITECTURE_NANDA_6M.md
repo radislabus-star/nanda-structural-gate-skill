@@ -195,6 +195,12 @@ centroids, then reports per-triad support and anti-support for the top packed
 axis. This lets the core distinguish "there is no peak" from "there is a thin
 peak because constructive and destructive contributions nearly cancel."
 
+`packed_lanes` is the first `PackedLane64` bridge. It is preview-only: it
+builds a lane-shaped mask over the current anti-support records and reports the
+possible `net_dot` change if that destructive contribution were suppressed.
+This proves the byte-level lane can target a reading shape before the hot loop
+learns and applies persistent lanes.
+
 Workspace may use wider accumulators:
 
 ```text

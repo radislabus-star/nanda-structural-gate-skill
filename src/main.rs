@@ -3233,6 +3233,7 @@ fn nanda_6m_pack_report(
         &group_peak,
         sample,
     );
+    let packed_lanes = packed_lane_preview(&packed_support);
     let peak_decision = packed_field_decision(
         &route_peak,
         &group_peak,
@@ -3291,6 +3292,7 @@ fn nanda_6m_pack_report(
             "group": group_peak
         },
         "packed_support": packed_support,
+        "packed_lanes": packed_lanes,
         "peak_decision": peak_decision,
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
@@ -3598,6 +3600,79 @@ fn packed_axis_support(
     })
 }
 
+fn packed_lane_preview(packed_support: &Value) -> Value {
+    json!({
+        "mode": "packed-lane-preview",
+        "lane_bytes": nanda_6m::LANE_BYTES,
+        "route": packed_axis_lane_preview(&packed_support["route"]),
+        "group": packed_axis_lane_preview(&packed_support["group"])
+    })
+}
+
+fn packed_axis_lane_preview(axis_support: &Value) -> Value {
+    let top_id = axis_support["top_id"].as_u64().unwrap_or(0) as u16;
+    let positive_dot = axis_support["positive_dot"].as_i64().unwrap_or(0);
+    let negative_dot = axis_support["negative_dot"].as_i64().unwrap_or(0);
+    let before_net = axis_support["net_dot"].as_i64().unwrap_or(0);
+    let anti_mask = packed_support_mask(&axis_support["anti"]);
+    let support_mask = packed_support_mask(&axis_support["support"]);
+    let has_lane = negative_dot < 0 && (anti_mask.0 != 0 || anti_mask.1 != 0);
+    let lane = nanda_6m::PackedLane64 {
+        support_mask_a: anti_mask.0,
+        support_mask_b: anti_mask.1,
+        anti_mask_a: support_mask.0,
+        anti_mask_b: support_mask.1,
+        lane_id: u32::from(top_id),
+        target_route: top_id,
+        target_group: top_id,
+        target_relation: 0,
+        accepted_count: 0,
+        rejected_count: if has_lane { 1 } else { 0 },
+        margin_hint: before_net.clamp(i64::from(i16::MIN), i64::from(i16::MAX)) as i16,
+        action: if has_lane { 1 } else { 0 },
+        strength: if has_lane { 255 } else { 0 },
+        reserved: [0; 14],
+    };
+    let after_net = if has_lane { positive_dot } else { before_net };
+    json!({
+        "state": if has_lane { "LANE_PREVIEW_READY" } else { "NO_ANTI_LANE" },
+        "action": if has_lane { "suppress_anti_support" } else { "none" },
+        "target_id": top_id,
+        "record_mask_a": lane.support_mask_a,
+        "record_mask_b": lane.support_mask_b,
+        "protected_support_mask_a": lane.anti_mask_a,
+        "protected_support_mask_b": lane.anti_mask_b,
+        "strength": lane.strength,
+        "before_net_dot": before_net,
+        "suppressed_negative_dot": if has_lane { negative_dot } else { 0 },
+        "after_net_dot": after_net,
+        "delta_dot": after_net - before_net,
+        "interpretation": if has_lane {
+            "Preview only: suppressing the current anti-support records would remove the destructive contribution without changing positive support."
+        } else {
+            "No negative contribution was found for this packed axis."
+        }
+    })
+}
+
+fn packed_support_mask(items: &Value) -> (u64, u64) {
+    let mut mask_a = 0u64;
+    let mut mask_b = 0u64;
+    if let Some(items) = items.as_array() {
+        for item in items {
+            let Some(index) = item["record_index"].as_u64() else {
+                continue;
+            };
+            if index < 64 {
+                mask_a |= 1u64 << index;
+            } else if index < 128 {
+                mask_b |= 1u64 << (index - 64);
+            }
+        }
+    }
+    (mask_a, mask_b)
+}
+
 #[derive(Default)]
 struct IdDictionary {
     items: BTreeMap<String, u32>,
@@ -3822,6 +3897,15 @@ fn print_pack6m_text(out: &Value) {
             .unwrap_or(0)
     );
     println!(
+        "lane preview: route net {} -> {}",
+        out["packed_lanes"]["route"]["before_net_dot"]
+            .as_i64()
+            .unwrap_or(0),
+        out["packed_lanes"]["route"]["after_net_dot"]
+            .as_i64()
+            .unwrap_or(0)
+    );
+    println!(
         "budget: {} / {}",
         out["budget"]["estimated_hot_bytes"].as_u64().unwrap_or(0),
         out["budget"]["hard_budget_bytes"].as_u64().unwrap_or(0)
@@ -3888,6 +3972,15 @@ fn print_pack6m_md(out: &Value) {
             .as_u64()
             .unwrap_or(0),
         out["packed_support"]["route"]["net_dot"]
+            .as_i64()
+            .unwrap_or(0)
+    );
+    println!(
+        "- lane_preview: `route net {} -> {}`",
+        out["packed_lanes"]["route"]["before_net_dot"]
+            .as_i64()
+            .unwrap_or(0),
+        out["packed_lanes"]["route"]["after_net_dot"]
             .as_i64()
             .unwrap_or(0)
     );

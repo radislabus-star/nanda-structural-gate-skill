@@ -307,6 +307,9 @@ has a weak honest peak, not a trustworthy answer route yet.
 Inspect `packed_support`: it explains the packed peak as supporting and
 anti-supporting memory records. A thin peak with a small positive `net_dot`
 usually means constructive and destructive contributions nearly cancelled.
+Inspect `packed_lanes`: it is a preview-only `PackedLane64` bridge that masks
+the current anti-support records and reports the possible `net_dot` change
+before learned lanes are applied in the hot loop.
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.

@@ -159,6 +159,9 @@ not a trustworthy answer route yet.
 Inspect `packed_support`: it splits the packed peak into supporting and
 anti-supporting memory records. A thin peak with a small positive `net_dot`
 usually means constructive and destructive contributions nearly cancelled.
+Inspect `packed_lanes`: it is a preview-only `PackedLane64` bridge that masks
+the current anti-support records and reports the possible `net_dot` change
+before learned lanes are applied in the hot loop.
 Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with
