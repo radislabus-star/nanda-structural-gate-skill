@@ -86,3 +86,16 @@ Status: implemented.
   forms as suppression.
 - Search output reports which form was replayed and keeps the replay separate
   from the final trust gate.
+
+## Phase 30 - Pattern Store + Wave Decoder
+
+Status: started.
+
+- `nanda-decode` runs the interference field and decodes ranked
+  `next_structural_pattern` candidates.
+- The decoder emits structural continuations rather than prose:
+  `subject -> relation -> object`, route, role, polarity, continuity, and
+  support score.
+- This is the first LLMWave bridge: field peak -> next pattern distribution.
+- Next milestones are token/pattern encoder, recurrent wave steps, and a
+  training/eval loop for continuation quality.

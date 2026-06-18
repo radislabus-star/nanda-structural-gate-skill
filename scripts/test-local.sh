@@ -17,6 +17,7 @@ waw="$root/nanda-structural-gate/scripts/nanda-waw"
 feedback="$root/nanda-structural-gate/scripts/nanda-feedback"
 indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
+decode="$root/nanda-structural-gate/scripts/nanda-decode"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
 proof="$root/nanda-structural-gate/scripts/nanda-proof"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
@@ -162,7 +163,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v3.4-resonance-memory"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v3.5-wave-decoder"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -454,6 +455,14 @@ jq -e '.resonant_field.standing_wave.state == "STANDING_STABLE"' <<<"$trap_searc
 jq -e '.resonant_field.energy.state == "ENERGY_CONTAINED"' <<<"$trap_search_json" >/dev/null
 jq -e '.field_interpretation.lexical_trap_detected == true' <<<"$trap_search_json" >/dev/null
 jq -e '.field_interpretation.centroid_drift.route.changed == true' <<<"$trap_search_json" >/dev/null
+decode_json="$("$decode" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 5)"
+jq -e '.mode == "wave-pattern-decoder"' <<<"$decode_json" >/dev/null
+jq -e '.decoder_version == "v30-pattern-store-wave-decoder"' <<<"$decode_json" >/dev/null
+jq -e '.decoder_state == "PATTERN_READY" and .safe_to_generate == true' <<<"$decode_json" >/dev/null
+jq -e '.source_search.top_peak == "certification"' <<<"$decode_json" >/dev/null
+jq -e '.patterns | length >= 3' <<<"$decode_json" >/dev/null
+jq -e '.patterns[0].decode_as == "next_structural_pattern"' <<<"$decode_json" >/dev/null
+jq -e '.patterns[0].subject_role != "" and .patterns[0].object_role != ""' <<<"$decode_json" >/dev/null
 serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"
 jq -e '.ok == true and .result.mode == "doctor" and .result.healthy == true' <<<"$serve_json" >/dev/null
 tmp_search="$(mktemp)"

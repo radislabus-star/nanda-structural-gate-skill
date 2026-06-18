@@ -74,6 +74,10 @@
   for accepted/rejected/WATCH peaks. `nanda-index` merges these forms and
   `nanda-search` softly replays them to reinforce known honest resonance forms
   or suppress known bad field shapes without treating memory as proof.
+- v30 adds `nanda decode` / `nanda-decode`, the first LLMWave bridge. It runs
+  the interference field and decodes ranked `next_structural_pattern`
+  candidates instead of natural-language text.
+- Core version is now `sparse-triad-v3.5-wave-decoder`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

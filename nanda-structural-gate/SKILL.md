@@ -108,6 +108,7 @@ scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
+scripts/nanda-decode .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-hgate task.json --input-format json --by linked-group
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
@@ -238,6 +239,11 @@ Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with
 support, anti-triads, missing edges, and an answer projection.
+Use `nanda-decode` when the next step is pattern continuation rather than
+retrieval. It runs the same interference field and emits ranked
+`next_structural_pattern` candidates: `subject`, `relation`, `object`, route,
+roles, polarity, continuity, and support score. Treat it as the first LLMWave
+bridge, not as natural-language generation.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each

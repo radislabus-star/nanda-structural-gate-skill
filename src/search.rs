@@ -374,6 +374,8 @@ pub(crate) fn interference_search(
                     "subject": triad.subject,
                     "relation": triad.relation,
                     "object": triad.object,
+                    "subject_role": triad.subject_role,
+                    "object_role": triad.object_role,
                     "route": triad.route,
                     "group": triad.group,
                     "evidence": triad.evidence
@@ -401,6 +403,8 @@ pub(crate) fn interference_search(
                     "subject": triad.subject,
                     "relation": triad.relation,
                     "object": triad.object,
+                    "subject_role": triad.subject_role,
+                    "object_role": triad.object_role,
                     "route": triad.route,
                     "group": triad.group,
                     "reason": "similar query features but outside this peak route/group"

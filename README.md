@@ -129,6 +129,7 @@ evidence-conflict tasks do.
         ├── nanda-index
         ├── nanda-map
         ├── nanda-search
+        ├── nanda-decode
         ├── nanda-focus
         ├── nanda-proof
         ├── nanda-probe
@@ -228,6 +229,7 @@ nanda-search .nanda/focus.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-noisy.json --input-format json --format text
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3
+nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 5
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
@@ -326,6 +328,11 @@ destructive locality, multiscale agreement, energy conservation,
 frequency/mode scan, temporal phase, coherence memory, and the final
 `waw_status`. Treat `WAW_RESONANCE` as a strong field phenomenon, but still
 require proof/packed gates before final `ANSWER_READY`.
+`nanda-decode` is the first LLMWave bridge. It runs the same interference
+field as `nanda-search`, then decodes the top field into ranked
+`next_structural_pattern` candidates. It does not generate prose yet; it emits
+candidate `subject -> relation -> object` continuations with route, role,
+polarity, continuity, and support scores.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact
@@ -464,7 +471,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v3.4-resonance-memory
+core_version: sparse-triad-v3.5-wave-decoder
 wave_dim: 1024
 ```
 
