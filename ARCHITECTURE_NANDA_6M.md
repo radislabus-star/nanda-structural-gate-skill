@@ -209,6 +209,10 @@ indexes as durable memory.
 The key signature is based on stable projected shape fields such as
 `wave_seed`, polarity, and confidence, not on current dictionary IDs or record
 indexes.
+`packed_lane_store` reports the compiled hot arena cost: each runtime lane is
+64 bytes, so the 1 MiB lane arena holds 16,384 compiled lanes. This is the
+rational 6M representation; cold signatures can live outside the hot arena and
+compile into masks for the current focused packet.
 
 `packed_lane_application` is the first single-pass applied-lane diagnostic. It
 applies the preview mask to the support-map and reports whether the adjusted

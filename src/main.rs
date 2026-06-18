@@ -3235,6 +3235,7 @@ fn nanda_6m_pack_report(
     );
     let packed_lane_keys = packed_lane_keys_report(&packed_support);
     let packed_lanes = packed_lane_preview(&packed_support, &packed_lane_keys);
+    let packed_lane_store = packed_lane_store_report(&packed_lane_keys, &packed_lanes);
     let peak_decision = packed_field_decision(
         &route_peak,
         &group_peak,
@@ -3297,6 +3298,7 @@ fn nanda_6m_pack_report(
         "packed_support": packed_support,
         "packed_lane_keys": packed_lane_keys,
         "packed_lanes": packed_lanes,
+        "packed_lane_store": packed_lane_store,
         "packed_lane_application": packed_lane_application,
         "peak_decision": peak_decision,
         "dictionaries": {
@@ -3664,6 +3666,55 @@ fn packed_lane_preview(packed_support: &Value, packed_lane_keys: &Value) -> Valu
         "route": packed_axis_lane_preview(&packed_support["route"], &packed_lane_keys["route"]),
         "group": packed_axis_lane_preview(&packed_support["group"], &packed_lane_keys["group"])
     })
+}
+
+fn packed_lane_store_report(packed_lane_keys: &Value, packed_lanes: &Value) -> Value {
+    let mut lanes = vec![];
+    if let Some(lane) =
+        packed_lane_store_item(&packed_lane_keys["route"], &packed_lanes["route"], "route")
+    {
+        lanes.push(lane);
+    }
+    if let Some(lane) =
+        packed_lane_store_item(&packed_lane_keys["group"], &packed_lanes["group"], "group")
+    {
+        lanes.push(lane);
+    }
+    let count = lanes.len();
+    json!({
+        "mode": "packed-lane-store",
+        "storage": "hot-compiled-lane-arena",
+        "source": "cold-stable-lane-keys",
+        "capacity": nanda_6m::LANE_CAPACITY,
+        "count": count,
+        "bytes": count * nanda_6m::LANE_BYTES,
+        "arena_bytes": nanda_6m::LANE_ARENA_BYTES,
+        "record_bytes": nanda_6m::LANE_BYTES,
+        "replay_ready": count > 0,
+        "sample": lanes
+    })
+}
+
+fn packed_lane_store_item(axis_key: &Value, axis_lane: &Value, axis: &str) -> Option<Value> {
+    if axis_lane["state"].as_str() != Some("LANE_PREVIEW_READY") {
+        return None;
+    }
+    Some(json!({
+        "axis": axis,
+        "key_hash": axis_key["key_hash"].as_u64().unwrap_or(0),
+        "target_id": axis_key["target_id"].as_u64().unwrap_or(0),
+        "action": axis_lane["action"].as_str().unwrap_or("none"),
+        "record_mask_a": axis_lane["record_mask_a"].as_u64().unwrap_or(0),
+        "record_mask_b": axis_lane["record_mask_b"].as_u64().unwrap_or(0),
+        "protected_support_mask_a": axis_lane["protected_support_mask_a"].as_u64().unwrap_or(0),
+        "protected_support_mask_b": axis_lane["protected_support_mask_b"].as_u64().unwrap_or(0),
+        "strength": axis_lane["strength"].as_u64().unwrap_or(0),
+        "before_net_dot": axis_lane["before_net_dot"].as_i64().unwrap_or(0),
+        "after_net_dot": axis_lane["after_net_dot"].as_i64().unwrap_or(0),
+        "delta_dot": axis_lane["delta_dot"].as_i64().unwrap_or(0),
+        "key_storage": axis_lane["key_storage"].as_str().unwrap_or("cold-stable-signature"),
+        "compiled_storage": axis_lane["compiled_storage"].as_str().unwrap_or("hot-packed-lane64")
+    }))
 }
 
 fn packed_axis_lane_preview(axis_support: &Value, axis_key: &Value) -> Value {
@@ -4056,6 +4107,12 @@ fn print_pack6m_text(out: &Value) {
             .unwrap_or(0)
     );
     println!(
+        "lane store: {} / {} / bytes {}",
+        out["packed_lane_store"]["count"].as_u64().unwrap_or(0),
+        out["packed_lane_store"]["capacity"].as_u64().unwrap_or(0),
+        out["packed_lane_store"]["bytes"].as_u64().unwrap_or(0)
+    );
+    println!(
         "lane applied: {} -> {}",
         out["packed_lane_application"]["raw_state"]
             .as_str()
@@ -4151,6 +4208,12 @@ fn print_pack6m_md(out: &Value) {
         out["packed_lanes"]["route"]["record_mask_a"]
             .as_u64()
             .unwrap_or(0)
+    );
+    println!(
+        "- lane_store: `{}/{}` / bytes `{}`",
+        out["packed_lane_store"]["count"].as_u64().unwrap_or(0),
+        out["packed_lane_store"]["capacity"].as_u64().unwrap_or(0),
+        out["packed_lane_store"]["bytes"].as_u64().unwrap_or(0)
     );
     println!(
         "- lane_applied: `{} -> {}`",

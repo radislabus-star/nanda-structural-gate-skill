@@ -165,6 +165,8 @@ before learned lanes are applied in the hot loop.
 Inspect `packed_lane_keys`: it is the cold stable lane signature. The key is
 compiled into current-window `PackedLane64` masks; record masks are not treated
 as persistent memory.
+Inspect `packed_lane_store`: it reports the hot compiled lane arena cost. Each
+stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
 Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for a real hot-loop implementation, but it still keeps
