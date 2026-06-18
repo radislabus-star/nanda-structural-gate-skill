@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.8.0 - 2026-06-18
+
+Packed replay release.
+
+### Added
+
+- `packed_lane_replay.touch_policy` for observer-to-compute replay semantics.
+- `packed_lane_replay.stability_sweep` with observer, soft-touch,
+  medium-touch, and full-touch strengths.
+- `packed_lane_replay.stability_state` to distinguish no replay, soft-stable
+  replay, full-touch-only replay, weak constructive replay, and destabilizing
+  replay.
+- `packed_lane_replay.computational_effect` to report when matched feedback
+  lanes are ready to shape the packed field without granting answer
+  permission.
+- Text and Markdown `pack6m` output now show replay stability and compute
+  readiness.
+
+### Changed
+
+- Cargo package version is now `2.8.0`.
+- Core version is now `sparse-triad-v2.8-packed-replay`.
+- Engine id is now `nanda-check sparse-triad-v2.8-rust`.
+
 ## v2.7.0 - 2026-06-17
 
 Hierarchical-gate release.

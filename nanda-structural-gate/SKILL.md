@@ -124,7 +124,7 @@ Use `nanda-comb --depth 2` for the normal machine workflow when the agent needs
 topology, recursive branch checks, and invariant drift checks in one packet.
 Use `nanda-map` when the next agent step depends on seeing which candidate
 groups resonate with which source groups, not only on the final verdict.
-In `v2.7-hierarchical-gate`, prefer `foreign_pull` when deciding what to
+In the hierarchical gate, prefer `foreign_pull` when deciding what to
 repair: it names the candidate triad that pulls a group toward a different
 source route.
 Use `nanda-hgate` when a packet is too large for one honest global PASS. It
@@ -170,6 +170,10 @@ stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
 Inspect `packed_lane_replay`: it matches feedback shortcuts against current
 stable lane keys, compiles matched keys into current-window `PackedLane64`
 masks, and reports replayed `before_net_dot -> after_net_dot`.
+In v2.8, inspect `packed_lane_replay.stability_sweep` and
+`packed_lane_replay.computational_effect`: replay is measured as observer,
+soft, medium, and full touch. It may become a compute-ready field intervention,
+but it never grants `safe_to_answer=true` by itself.
 Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for a real hot-loop implementation, but it still keeps
@@ -330,7 +334,7 @@ Interpret the result as:
 - `comb_tree` is the canonical record of what was checked at each depth.
 - `nanda-dogfood` is the quick go/no-go output for agents:
   `SAFE_TO_EDIT`, `SPLIT_REQUIRED`, `REPAIR_REQUIRED`, or `REVIEW_REQUIRED`.
-- `nanda-search` is the v2.7 indexed route finder: use its top-level
+- `nanda-search` is the indexed route finder: use its top-level
   `verdict`, `field_state`, `safe_to_answer`, and `top_peak` as the agent
   decision contract; use its top peak as a structural
   candidate route, then verify evidence before final prose.

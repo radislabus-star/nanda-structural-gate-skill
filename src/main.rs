@@ -12,8 +12,8 @@ use std::process::ExitCode;
 mod nanda_6m;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.7-hierarchical-gate";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.7-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.8-packed-replay";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.8-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -3935,10 +3935,21 @@ fn packed_lane_replay_report(
         .sum();
     let delta_dot = after_net_dot - before_net_dot;
     let focused = compiled_lanes > 0 && after_net_dot >= 128 && delta_dot >= 64;
+    let stability_sweep = packed_lane_replay_stability_sweep(before_net_dot, delta_dot);
+    let stability_state = packed_lane_replay_stability_state(&stability_sweep, compiled_lanes);
     json!({
         "mode": "feedback-lane-replay",
         "source": "negative_shortcuts+positive_shortcuts",
+        "touch_policy": {
+            "mode": "observer-to-compute-sweep",
+            "default_strength": 0.0,
+            "soft_strength": 0.25,
+            "full_strength": 1.0,
+            "safe_to_answer_grant": false,
+            "interpretation": "Replay is measured at observer/soft/medium/full strengths. It may shape the packed field, but it never grants final answer permission by itself."
+        },
         "state": if focused { "PACKED_LANE_REPLAY_FOCUSED" } else if compiled_lanes > 0 { "PACKED_LANE_REPLAY_PARTIAL" } else { "PACKED_LANE_REPLAY_NONE" },
+        "stability_state": stability_state,
         "safe_to_answer": false,
         "matched_keys": compiled_lanes,
         "compiled_lanes": compiled_lanes,
@@ -3946,8 +3957,94 @@ fn packed_lane_replay_report(
         "after_net_dot": after_net_dot,
         "delta_dot": delta_dot,
         "replay_ready": focused,
+        "computational_effect": {
+            "state": if focused { "REPLAY_COMPUTE_READY" } else if compiled_lanes > 0 { "REPLAY_COMPUTE_WEAK" } else { "REPLAY_COMPUTE_NONE" },
+            "applied_strength": if focused { 1.0 } else { 0.0 },
+            "field_before": before_net_dot,
+            "field_after": if focused { after_net_dot } else { before_net_dot },
+            "delta_dot": if focused { delta_dot } else { 0 },
+            "safe_to_answer": false,
+            "reason": if focused {
+                "Matched feedback lanes can be applied as a packed compute pass, but the structural gate must still decide trust."
+            } else if compiled_lanes > 0 {
+                "Matched feedback lanes exist, but the replay field is not focused enough for compute application."
+            } else {
+                "No feedback lane matched the current packed lane keys."
+            }
+        },
+        "stability_sweep": stability_sweep,
         "sample": replayed
     })
+}
+
+fn packed_lane_replay_stability_sweep(before_net_dot: i64, delta_dot: i64) -> Vec<Value> {
+    [
+        ("observer", 0u32),
+        ("soft_touch", 250u32),
+        ("medium_touch", 500u32),
+        ("full_touch", 1000u32),
+    ]
+    .into_iter()
+    .map(|(label, permille)| {
+        let applied_delta = delta_dot * i64::from(permille) / 1000;
+        let after = before_net_dot + applied_delta;
+        json!({
+            "label": label,
+            "strength": round4(f64::from(permille) / 1000.0),
+            "before_net_dot": before_net_dot,
+            "after_net_dot": after,
+            "delta_dot": applied_delta,
+            "field_state": packed_lane_replay_field_state(after, applied_delta)
+        })
+    })
+    .collect()
+}
+
+fn packed_lane_replay_stability_state(sweep: &[Value], compiled_lanes: usize) -> &'static str {
+    if compiled_lanes == 0 {
+        return "NO_REPLAY_FIELD";
+    }
+    let soft = sweep
+        .iter()
+        .find(|item| item["label"].as_str() == Some("soft_touch"));
+    let full = sweep
+        .iter()
+        .find(|item| item["label"].as_str() == Some("full_touch"));
+    let soft_after = soft
+        .and_then(|item| item["after_net_dot"].as_i64())
+        .unwrap_or(0);
+    let soft_delta = soft
+        .and_then(|item| item["delta_dot"].as_i64())
+        .unwrap_or(0);
+    let full_after = full
+        .and_then(|item| item["after_net_dot"].as_i64())
+        .unwrap_or(0);
+    let full_delta = full
+        .and_then(|item| item["delta_dot"].as_i64())
+        .unwrap_or(0);
+    if soft_after >= 128 && soft_delta >= 64 {
+        "STABLE_UNDER_SOFT_TOUCH"
+    } else if full_after >= 128 && full_delta >= 64 {
+        "FULL_TOUCH_REQUIRED"
+    } else if full_delta > 0 {
+        "WEAK_CONSTRUCTIVE_REPLAY"
+    } else if full_delta < 0 {
+        "DESTABILIZING_REPLAY"
+    } else {
+        "NO_REPLAY_SHIFT"
+    }
+}
+
+fn packed_lane_replay_field_state(after_net_dot: i64, delta_dot: i64) -> &'static str {
+    if after_net_dot >= 128 && delta_dot >= 64 {
+        "FIELD_FOCUSED_BY_REPLAY"
+    } else if delta_dot > 0 {
+        "FIELD_IMPROVED_BY_REPLAY"
+    } else if delta_dot < 0 {
+        "FIELD_WEAKENED_BY_REPLAY"
+    } else {
+        "FIELD_OBSERVED"
+    }
 }
 
 fn packed_lane_replay_item(
@@ -4307,6 +4404,15 @@ fn print_pack6m_text(out: &Value) {
             .unwrap_or(0)
     );
     println!(
+        "replay stability: {} / compute {}",
+        out["packed_lane_replay"]["stability_state"]
+            .as_str()
+            .unwrap_or("NO_REPLAY_FIELD"),
+        out["packed_lane_replay"]["computational_effect"]["state"]
+            .as_str()
+            .unwrap_or("REPLAY_COMPUTE_NONE")
+    );
+    println!(
         "lane applied: {} -> {}",
         out["packed_lane_application"]["raw_state"]
             .as_str()
@@ -4417,6 +4523,15 @@ fn print_pack6m_md(out: &Value) {
         out["packed_lane_replay"]["matched_keys"]
             .as_u64()
             .unwrap_or(0)
+    );
+    println!(
+        "- replay_stability: `{}` / compute `{}`",
+        out["packed_lane_replay"]["stability_state"]
+            .as_str()
+            .unwrap_or("NO_REPLAY_FIELD"),
+        out["packed_lane_replay"]["computational_effect"]["state"]
+            .as_str()
+            .unwrap_or("REPLAY_COMPUTE_NONE")
     );
     println!(
         "- lane_applied: `{} -> {}`",

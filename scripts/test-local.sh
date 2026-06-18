@@ -153,7 +153,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v2.7-hierarchical-gate"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v2.8-packed-replay"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -353,6 +353,9 @@ jq -e '.packed_lane_store.mode == "packed-lane-store" and .packed_lane_store.sto
 jq -e '.packed_lane_store.capacity == 16384 and .packed_lane_store.count == 2 and .packed_lane_store.bytes == 128' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_store.sample[0].key_hash == .packed_lanes.route.key_hash and .packed_lane_store.sample[0].record_mask_a == 96' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_replay.mode == "feedback-lane-replay" and .packed_lane_replay.state == "PACKED_LANE_REPLAY_NONE" and .packed_lane_replay.matched_keys == 0' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_lane_replay.touch_policy.mode == "observer-to-compute-sweep" and .packed_lane_replay.stability_state == "NO_REPLAY_FIELD"' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_lane_replay.stability_sweep[0].label == "observer" and .packed_lane_replay.stability_sweep[3].label == "full_touch"' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_lane_replay.computational_effect.state == "REPLAY_COMPUTE_NONE" and .packed_lane_replay.computational_effect.safe_to_answer == false' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_application.mode == "single-pass-suppress-anti-support"' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_application.raw_state == "PACKED_THIN" and .packed_lane_application.state == "PACKED_LANE_FOCUSED_CANDIDATE"' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_application.ready_for_hot_loop == true and .packed_lane_application.safe_to_answer == false' <<<"$pack6m_json" >/dev/null
@@ -361,6 +364,9 @@ pack6m_replay_json="$("$pack6m" "$root/examples/triad-packet.negative-shortcut-l
 jq -e '.packed_lane_replay.state == "PACKED_LANE_REPLAY_FOCUSED" and .packed_lane_replay.matched_keys == 2 and .packed_lane_replay.compiled_lanes == 2' <<<"$pack6m_replay_json" >/dev/null
 jq -e '.packed_lane_replay.sample[0].source == "negative_shortcuts" and .packed_lane_replay.sample[0].query_match_ratio == 1' <<<"$pack6m_replay_json" >/dev/null
 jq -e '.packed_lane_replay.before_net_dot == 2816 and .packed_lane_replay.after_net_dot == 3456 and .packed_lane_replay.delta_dot == 640' <<<"$pack6m_replay_json" >/dev/null
+jq -e '.packed_lane_replay.stability_state == "STABLE_UNDER_SOFT_TOUCH"' <<<"$pack6m_replay_json" >/dev/null
+jq -e '.packed_lane_replay.stability_sweep[1].label == "soft_touch" and .packed_lane_replay.stability_sweep[1].after_net_dot == 2976 and .packed_lane_replay.stability_sweep[1].field_state == "FIELD_FOCUSED_BY_REPLAY"' <<<"$pack6m_replay_json" >/dev/null
+jq -e '.packed_lane_replay.computational_effect.state == "REPLAY_COMPUTE_READY" and .packed_lane_replay.computational_effect.field_after == 3456 and .packed_lane_replay.computational_effect.safe_to_answer == false' <<<"$pack6m_replay_json" >/dev/null
 doctor_json="$("$doctor")"
 jq -e '.mode == "doctor" and .healthy == true' <<<"$doctor_json" >/dev/null
 jq -e '.route_trap.top == "certification" and .route_trap.state == "FOCUSED"' <<<"$doctor_json" >/dev/null

@@ -271,7 +271,7 @@ Use `--format md` only when a human-facing report is explicitly needed.
 `nanda-map` exposes the core structural map: source/candidate group sizes,
 interference matrix, dominant source group, mixed candidate groups, and repair
 tasks.
-`nanda-hgate` is the v2.7 hierarchical gate for large packets. It runs one
+`nanda-hgate` is the hierarchical gate for large packets. It runs one
 global map/check, splits by linked group, runs local gates, and returns
 `STRUCTURALLY_ACCEPTED` only when the global `WATCH` is size-only and every
 local branch is `PASS`. If `foreign_pull`, conflicts, or any local `VETO`
@@ -281,7 +281,7 @@ line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
-`nanda-search` is the v2.7 memory-index retrieval surface. It treats `triads`
+`nanda-search` is the memory-index retrieval surface. It treats `triads`
 as memory and either the same packet's `candidate_triads` or a separate
 `--query-file` as the partial query, then returns top-k route/group peaks with
 support, foreign pulls, missing edges, source weights, destructive
@@ -318,6 +318,10 @@ stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
 Inspect `packed_lane_replay`: it matches feedback shortcuts against current
 stable lane keys, compiles matched keys into current-window `PackedLane64`
 masks, and reports replayed `before_net_dot -> after_net_dot`.
+In v2.8 it also reports an observer-to-compute sweep: observer, soft, medium,
+and full touch strengths. This makes replay a controlled computational
+intervention diagnostic: it can show whether feedback would stabilize the
+packed field, but it still cannot set `safe_to_answer=true` by itself.
 Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for a real hot-loop implementation, but it still keeps
@@ -370,11 +374,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v2.7-hierarchical-gate
+core_version: sparse-triad-v2.8-packed-replay
 wave_dim: 1024
 ```
 
-`v2.7-hierarchical-gate` keeps recursive topology combing, structural peak search,
+`v2.8-packed-replay` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -533,7 +537,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v2.7.0`.
+Current release: `v2.8.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:

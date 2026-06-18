@@ -1,9 +1,9 @@
 # NANDA-6M Cache-Resident Packed Core
 
-Status: design contract, not yet implemented.
+Status: packed replay contract with diagnostic compute sweep.
 
 NANDA-6M is the planned cache-resident core for NANDA. It is not another
-command added to the current reference engine. The current v2.7 Rust CLI is a
+command added to the current reference engine. The current v2.8 Rust CLI is a
 correctness and UX engine: it parses JSON/Markdown, owns strings, builds maps,
 explains decisions, and is allowed to be convenient. NANDA-6M is the opposite
 layer: a packed hot path with a hard memory budget.
@@ -38,7 +38,7 @@ NANDA-6M is not:
 - a text store;
 - a source/evidence archive;
 - a JSON parser;
-- a replacement for the v2.7 reference engine;
+- a replacement for the v2.8 reference engine;
 - a place for `String`, `Vec` per record, `HashMap`, `BTreeMap`, or serde in
   the query loop.
 
@@ -220,6 +220,13 @@ matched keys into current-window `PackedLane64` masks, and reports replayed
 `before_net_dot -> after_net_dot` without treating the result as final answer
 permission.
 
+v2.8 adds the observer-to-compute sweep. Replay is evaluated at observer,
+soft-touch, medium-touch, and full-touch strengths. A stable peak should improve
+under soft touch; a peak that only appears under full touch is marked as
+strongly intervention-dependent. `computational_effect` may say that replay is
+ready to shape the packed field, but `safe_to_answer` remains false until the
+normal structural gate accepts the result.
+
 `packed_lane_application` is the first single-pass applied-lane diagnostic. It
 applies the preview mask to the support-map and reports whether the adjusted
 field becomes a focused candidate. This is still not an answer gate:
@@ -276,9 +283,9 @@ WATCH
 unsafe to answer from. `STRUCTURALLY_ACCEPTED` requires a stable peak, no
 foreign pull, no active veto lane, and passing linked branches.
 
-## Why This Is Different From v2.7
+## Why This Is Different From v2.8
 
-Current v2.7 reference behavior is intentionally expressive:
+Current v2.8 reference behavior is intentionally expressive:
 
 ```text
 JSON packet -> Rust structs with String fields -> maps/vectors -> JSON report
@@ -290,7 +297,7 @@ NANDA-6M behavior must be:
 packed packet -> fixed arrays -> interference field -> compact decision
 ```
 
-v2.7 proves what to compute. NANDA-6M proves that the computation can be kept
+v2.8 proves what to compute. NANDA-6M proves that the computation can be kept
 small, local, predictable, and fast enough to act as an always-on agent gate.
 
 ## Acceptance Tests
@@ -308,7 +315,7 @@ The first implementation must pass these before it is trusted:
 7. Large unfocused corpus returns `FOCUS_REQUIRED`, not a fake PASS.
 8. Focused corpus returns stable peaks with better margin than lexical
    baseline.
-9. Linux CI must cover deterministic parity with v2.7 fixtures.
+9. Linux CI must cover deterministic parity with v2.8 fixtures.
 10. Microbench must report bytes used, peak count, query time, and whether the
     packet stayed in the 6 MiB budget.
 
@@ -321,7 +328,7 @@ an existing packet would fit the NANDA-6M limits and explains what must be
 focused or split.
 
 Phase 2: introduce a separate Rust module/crate for packed types. It must not
-reuse the v2.7 dynamic structs in the hot path.
+reuse the v2.8 dynamic structs in the hot path.
 
 Phase 3: implement packed projection and centroid scoring with parity fixtures.
 
