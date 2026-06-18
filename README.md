@@ -318,10 +318,15 @@ stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
 Inspect `packed_lane_replay`: it matches feedback shortcuts against current
 stable lane keys, compiles matched keys into current-window `PackedLane64`
 masks, and reports replayed `before_net_dot -> after_net_dot`.
-In v2.8 it also reports an observer-to-compute sweep: observer, soft, medium,
+In v2.9 it also reports an observer-to-compute sweep: observer, soft, medium,
 and full touch strengths. This makes replay a controlled computational
 intervention diagnostic: it can show whether feedback would stabilize the
 packed field, but it still cannot set `safe_to_answer=true` by itself.
+Inspect `packed_replay_decision`: it compares the raw `peak_decision` with the
+replay-adjusted field and returns a firewall verdict such as
+`STABLE_WITH_REPLAY`, `REPLAY_RESCUED_THIN_FIELD`, or
+`REPLAY_DESTABILIZED_FIELD`. The firewall may move a thin field to review-ready,
+but it still blocks direct answer permission.
 Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for a real hot-loop implementation, but it still keeps
@@ -374,11 +379,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v2.8-packed-replay
+core_version: sparse-triad-v2.9-replay-firewall
 wave_dim: 1024
 ```
 
-`v2.8-packed-replay` keeps recursive topology combing, structural peak search,
+`v2.9-replay-firewall` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -537,7 +542,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v2.8.0`.
+Current release: `v2.9.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:

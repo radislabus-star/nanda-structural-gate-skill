@@ -170,10 +170,15 @@ stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
 Inspect `packed_lane_replay`: it matches feedback shortcuts against current
 stable lane keys, compiles matched keys into current-window `PackedLane64`
 masks, and reports replayed `before_net_dot -> after_net_dot`.
-In v2.8, inspect `packed_lane_replay.stability_sweep` and
+In v2.9, inspect `packed_lane_replay.stability_sweep` and
 `packed_lane_replay.computational_effect`: replay is measured as observer,
 soft, medium, and full touch. It may become a compute-ready field intervention,
 but it never grants `safe_to_answer=true` by itself.
+Inspect `packed_replay_decision`: it is the replay firewall. It compares raw
+`peak_decision` with the replay-adjusted field and reports
+`STABLE_WITH_REPLAY`, `REPLAY_RESCUED_THIN_FIELD`,
+`REPLAY_DESTABILIZED_FIELD`, `REPLAY_TOO_STRONG_REQUIRED`, or
+`NO_REPLAY_EVIDENCE`. Treat rescued thin fields as review-ready, not PASS.
 Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for a real hot-loop implementation, but it still keeps

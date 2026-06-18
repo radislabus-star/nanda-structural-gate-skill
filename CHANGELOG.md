@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.9.0 - 2026-06-18
+
+Replay-firewall release.
+
+### Added
+
+- `packed_replay_decision` in `nanda pack6m` output.
+- Replay stability verdicts:
+  `STABLE_WITH_REPLAY`, `REPLAY_RESCUED_THIN_FIELD`,
+  `REPLAY_DESTABILIZED_FIELD`, `REPLAY_TOO_STRONG_REQUIRED`, and
+  `NO_REPLAY_EVIDENCE`.
+- Replay firewall rules that allow replay to shape or rescue the packed field
+  while still blocking direct `safe_to_answer=true`.
+- `examples/triad-packet.pack6m-replay-waw.json`, a WAW fixture where the raw
+  packed field is thin and soft replay rescues it into review-ready state.
+- Text and Markdown `pack6m` output now show replay decision/action.
+
+### Changed
+
+- Cargo package version is now `2.9.0`.
+- Core version is now `sparse-triad-v2.9-replay-firewall`.
+- Engine id is now `nanda-check sparse-triad-v2.9-rust`.
+
 ## v2.8.0 - 2026-06-18
 
 Packed replay release.

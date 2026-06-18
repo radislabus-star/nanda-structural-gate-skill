@@ -12,8 +12,8 @@ use std::process::ExitCode;
 mod nanda_6m;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.8-packed-replay";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.8-rust";
+const CORE_VERSION: &str = "sparse-triad-v2.9-replay-firewall";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v2.9-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -3253,6 +3253,7 @@ fn nanda_6m_pack_report(
         &routes,
         &groups,
     );
+    let packed_replay_decision = packed_replay_decision_report(&peak_decision, &packed_lane_replay);
     let dictionary_ok = blockers.is_empty()
         && relations.len() <= u16::MAX as usize
         && routes.len() <= u16::MAX as usize
@@ -3309,6 +3310,7 @@ fn nanda_6m_pack_report(
         "packed_lane_store": packed_lane_store,
         "packed_lane_application": packed_lane_application,
         "packed_lane_replay": packed_lane_replay,
+        "packed_replay_decision": packed_replay_decision,
         "peak_decision": peak_decision,
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
@@ -4047,6 +4049,139 @@ fn packed_lane_replay_field_state(after_net_dot: i64, delta_dot: i64) -> &'stati
     }
 }
 
+fn packed_replay_decision_report(raw_decision: &Value, replay: &Value) -> Value {
+    let raw_state = raw_decision["state"]
+        .as_str()
+        .unwrap_or("PACKED_REVIEW_REQUIRED");
+    let raw_safe = raw_decision["safe_to_answer"].as_bool().unwrap_or(false);
+    let replay_state = replay["state"]
+        .as_str()
+        .unwrap_or("PACKED_LANE_REPLAY_NONE");
+    let stability_state = replay["stability_state"]
+        .as_str()
+        .unwrap_or("NO_REPLAY_FIELD");
+    let compute_state = replay["computational_effect"]["state"]
+        .as_str()
+        .unwrap_or("REPLAY_COMPUTE_NONE");
+    let matched_keys = replay["matched_keys"].as_u64().unwrap_or(0);
+    let soft = replay_touch(replay, "soft_touch");
+    let full = replay_touch(replay, "full_touch");
+    let soft_field_state = soft["field_state"].as_str().unwrap_or("FIELD_OBSERVED");
+    let full_field_state = full["field_state"].as_str().unwrap_or("FIELD_OBSERVED");
+    let full_after = full["after_net_dot"].as_i64().unwrap_or(0);
+
+    let stability_verdict = if matched_keys == 0 {
+        "NO_REPLAY_EVIDENCE"
+    } else if stability_state == "DESTABILIZING_REPLAY"
+        || full_field_state == "FIELD_WEAKENED_BY_REPLAY"
+    {
+        "REPLAY_DESTABILIZED_FIELD"
+    } else if raw_state == "PACKED_THIN" && soft_field_state == "FIELD_FOCUSED_BY_REPLAY" {
+        "REPLAY_RESCUED_THIN_FIELD"
+    } else if raw_safe && stability_state == "STABLE_UNDER_SOFT_TOUCH" {
+        "STABLE_WITH_REPLAY"
+    } else if stability_state == "FULL_TOUCH_REQUIRED" {
+        "REPLAY_TOO_STRONG_REQUIRED"
+    } else if compute_state == "REPLAY_COMPUTE_READY" {
+        "REPLAY_COMPUTE_READY_REVIEW"
+    } else {
+        "REPLAY_WEAK_OR_AMBIGUOUS"
+    };
+
+    let action = match stability_verdict {
+        "STABLE_WITH_REPLAY" => "KEEP_GATE_DECISION",
+        "REPLAY_RESCUED_THIN_FIELD" => "REVIEW_REPLAY_RESCUED_FIELD",
+        "REPLAY_DESTABILIZED_FIELD" => "STOP_REPAIR_OR_SPLIT",
+        "REPLAY_TOO_STRONG_REQUIRED" => "REVIEW_INTERVENTION_DEPENDENCE",
+        "NO_REPLAY_EVIDENCE" => "USE_RAW_DECISION",
+        _ => "REVIEW_REPLAY_EFFECT",
+    };
+    let verdict = match stability_verdict {
+        "REPLAY_DESTABILIZED_FIELD" => "VETO",
+        "NO_REPLAY_EVIDENCE" => raw_decision["verdict"].as_str().unwrap_or("WATCH"),
+        "STABLE_WITH_REPLAY" if raw_safe => "PASS",
+        _ => "WATCH",
+    };
+
+    json!({
+        "mode": "replay-adjusted-peak-firewall",
+        "raw_state": raw_state,
+        "raw_safe_to_answer": raw_safe,
+        "replay_state": replay_state,
+        "compute_state": compute_state,
+        "stability_state": stability_state,
+        "stability_verdict": stability_verdict,
+        "verdict": verdict,
+        "action": action,
+        "safe_to_answer": false,
+        "firewall": {
+            "rule": "replay may shape or rescue the packed field, but cannot grant final answer permission",
+            "blocks_direct_pass": true,
+            "requires_structural_gate": true
+        },
+        "adjusted_field": {
+            "observer_net_dot": replay["before_net_dot"].as_i64().unwrap_or(0),
+            "soft_touch_net_dot": soft["after_net_dot"].as_i64().unwrap_or(0),
+            "full_touch_net_dot": full_after,
+            "full_delta_dot": replay["delta_dot"].as_i64().unwrap_or(0),
+            "matched_keys": matched_keys
+        },
+        "reason": packed_replay_decision_reason(stability_verdict, raw_state, raw_safe)
+    })
+}
+
+fn replay_touch(replay: &Value, label: &str) -> Value {
+    replay["stability_sweep"]
+        .as_array()
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|item| item["label"].as_str() == Some(label))
+        })
+        .cloned()
+        .unwrap_or_else(|| {
+            json!({
+                "label": label,
+                "strength": 0.0,
+                "before_net_dot": 0,
+                "after_net_dot": 0,
+                "delta_dot": 0,
+                "field_state": "FIELD_OBSERVED"
+            })
+        })
+}
+
+fn packed_replay_decision_reason(
+    stability_verdict: &str,
+    raw_state: &str,
+    raw_safe: bool,
+) -> &'static str {
+    match stability_verdict {
+        "STABLE_WITH_REPLAY" => {
+            "Raw packed field was already acceptable and replay remains stable under soft touch."
+        }
+        "REPLAY_RESCUED_THIN_FIELD" => {
+            "Raw packed field was thin, but matched feedback lanes focus it under soft touch; keep under WATCH for structural review."
+        }
+        "REPLAY_DESTABILIZED_FIELD" => {
+            "Replay weakens or destabilizes the packed field; do not trust the raw peak."
+        }
+        "REPLAY_TOO_STRONG_REQUIRED" => {
+            "Replay only focuses the field under full-strength intervention; treat the peak as intervention-dependent."
+        }
+        "NO_REPLAY_EVIDENCE" if raw_safe => {
+            "No feedback lane matched; rely on the raw packed decision."
+        }
+        "NO_REPLAY_EVIDENCE" => {
+            "No feedback lane matched; replay provides no extra evidence for the raw packed decision."
+        }
+        _ if raw_state == "PACKED_THIN" => {
+            "Replay changed the field, but not enough to rescue the thin packed decision."
+        }
+        _ => "Replay effect requires review before it can influence downstream trust.",
+    }
+}
+
 fn packed_lane_replay_item(
     item: &Value,
     axis: &str,
@@ -4413,6 +4548,15 @@ fn print_pack6m_text(out: &Value) {
             .unwrap_or("REPLAY_COMPUTE_NONE")
     );
     println!(
+        "replay decision: {} / action {}",
+        out["packed_replay_decision"]["stability_verdict"]
+            .as_str()
+            .unwrap_or("NO_REPLAY_EVIDENCE"),
+        out["packed_replay_decision"]["action"]
+            .as_str()
+            .unwrap_or("USE_RAW_DECISION")
+    );
+    println!(
         "lane applied: {} -> {}",
         out["packed_lane_application"]["raw_state"]
             .as_str()
@@ -4532,6 +4676,15 @@ fn print_pack6m_md(out: &Value) {
         out["packed_lane_replay"]["computational_effect"]["state"]
             .as_str()
             .unwrap_or("REPLAY_COMPUTE_NONE")
+    );
+    println!(
+        "- replay_decision: `{}` / action `{}`",
+        out["packed_replay_decision"]["stability_verdict"]
+            .as_str()
+            .unwrap_or("NO_REPLAY_EVIDENCE"),
+        out["packed_replay_decision"]["action"]
+            .as_str()
+            .unwrap_or("USE_RAW_DECISION")
     );
     println!(
         "- lane_applied: `{} -> {}`",
