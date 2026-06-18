@@ -201,6 +201,12 @@ possible `net_dot` change if that destructive contribution were suppressed.
 This proves the byte-level lane can target a reading shape before the hot loop
 learns and applies persistent lanes.
 
+`packed_lane_application` is the first single-pass applied-lane diagnostic. It
+applies the preview mask to the support-map and reports whether the adjusted
+field becomes a focused candidate. This is still not an answer gate:
+`safe_to_answer` remains false until persistent lanes are learned and replayed
+inside the cache-resident hot loop.
+
 Workspace may use wider accumulators:
 
 ```text

@@ -3241,6 +3241,8 @@ fn nanda_6m_pack_report(
         memory_packed.len(),
         query_packed.len(),
     );
+    let packed_lane_application =
+        packed_lane_application_report(&packed_support, &packed_lanes, &peak_decision);
     let dictionary_ok = blockers.is_empty()
         && relations.len() <= u16::MAX as usize
         && routes.len() <= u16::MAX as usize
@@ -3293,6 +3295,7 @@ fn nanda_6m_pack_report(
         },
         "packed_support": packed_support,
         "packed_lanes": packed_lanes,
+        "packed_lane_application": packed_lane_application,
         "peak_decision": peak_decision,
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
@@ -3673,6 +3676,87 @@ fn packed_support_mask(items: &Value) -> (u64, u64) {
     (mask_a, mask_b)
 }
 
+fn packed_lane_application_report(
+    packed_support: &Value,
+    packed_lanes: &Value,
+    raw_decision: &Value,
+) -> Value {
+    let route =
+        packed_axis_lane_application(&packed_support["route"], &packed_lanes["route"], "route");
+    let group =
+        packed_axis_lane_application(&packed_support["group"], &packed_lanes["group"], "group");
+    let route_state = route["state"].as_str().unwrap_or("LANE_NO_EFFECT");
+    let group_state = group["state"].as_str().unwrap_or("LANE_NO_EFFECT");
+    let improved = route["improved"].as_bool().unwrap_or(false)
+        || group["improved"].as_bool().unwrap_or(false);
+    let focused_candidate = route_state == "LANE_AXIS_FOCUSED_CANDIDATE"
+        && group_state == "LANE_AXIS_FOCUSED_CANDIDATE";
+    let state = if focused_candidate {
+        "PACKED_LANE_FOCUSED_CANDIDATE"
+    } else if improved {
+        "PACKED_LANE_IMPROVED"
+    } else {
+        "PACKED_LANE_NO_EFFECT"
+    };
+
+    json!({
+        "mode": "single-pass-suppress-anti-support",
+        "state": state,
+        "verdict": if focused_candidate { "WATCH" } else { raw_decision["verdict"].as_str().unwrap_or("WATCH") },
+        "safe_to_answer": false,
+        "ready_for_hot_loop": focused_candidate,
+        "raw_state": raw_decision["state"].as_str().unwrap_or("PACKED_REVIEW_REQUIRED"),
+        "reason": if focused_candidate {
+            "Single-pass lane application turns the support-map net into a focused candidate, but persistent learned lanes are still required before answering from the hot core."
+        } else if improved {
+            "Single-pass lane application improves the support-map net, but the adjusted field is not focused enough."
+        } else {
+            "No useful packed lane application was available."
+        },
+        "thresholds": {
+            "min_focused_net_dot": 128,
+            "min_delta_dot": 64
+        },
+        "route": route,
+        "group": group
+    })
+}
+
+fn packed_axis_lane_application(axis_support: &Value, axis_lane: &Value, axis: &str) -> Value {
+    let before_net = axis_lane["before_net_dot"]
+        .as_i64()
+        .unwrap_or_else(|| axis_support["net_dot"].as_i64().unwrap_or(0));
+    let after_net = axis_lane["after_net_dot"].as_i64().unwrap_or(before_net);
+    let delta = axis_lane["delta_dot"]
+        .as_i64()
+        .unwrap_or(after_net - before_net);
+    let lane_ready = axis_lane["state"].as_str() == Some("LANE_PREVIEW_READY");
+    let focused = lane_ready && after_net >= 128 && delta >= 64;
+    let improved = lane_ready && delta > 0 && after_net > before_net;
+    let state = if focused {
+        "LANE_AXIS_FOCUSED_CANDIDATE"
+    } else if improved {
+        "LANE_AXIS_IMPROVED"
+    } else {
+        "LANE_NO_EFFECT"
+    };
+    json!({
+        "axis": axis,
+        "state": state,
+        "improved": improved,
+        "before_net_dot": before_net,
+        "after_net_dot": after_net,
+        "delta_dot": delta,
+        "suppressed_negative_dot": axis_lane["suppressed_negative_dot"].as_i64().unwrap_or(0),
+        "support_count": axis_support["support_count"].as_u64().unwrap_or(0),
+        "anti_count": axis_support["anti_count"].as_u64().unwrap_or(0),
+        "record_mask_a": axis_lane["record_mask_a"].as_u64().unwrap_or(0),
+        "record_mask_b": axis_lane["record_mask_b"].as_u64().unwrap_or(0),
+        "protected_support_mask_a": axis_lane["protected_support_mask_a"].as_u64().unwrap_or(0),
+        "protected_support_mask_b": axis_lane["protected_support_mask_b"].as_u64().unwrap_or(0)
+    })
+}
+
 #[derive(Default)]
 struct IdDictionary {
     items: BTreeMap<String, u32>,
@@ -3906,6 +3990,15 @@ fn print_pack6m_text(out: &Value) {
             .unwrap_or(0)
     );
     println!(
+        "lane applied: {} -> {}",
+        out["packed_lane_application"]["raw_state"]
+            .as_str()
+            .unwrap_or("PACKED_REVIEW_REQUIRED"),
+        out["packed_lane_application"]["state"]
+            .as_str()
+            .unwrap_or("PACKED_LANE_NO_EFFECT")
+    );
+    println!(
         "budget: {} / {}",
         out["budget"]["estimated_hot_bytes"].as_u64().unwrap_or(0),
         out["budget"]["hard_budget_bytes"].as_u64().unwrap_or(0)
@@ -3983,6 +4076,15 @@ fn print_pack6m_md(out: &Value) {
         out["packed_lanes"]["route"]["after_net_dot"]
             .as_i64()
             .unwrap_or(0)
+    );
+    println!(
+        "- lane_applied: `{} -> {}`",
+        out["packed_lane_application"]["raw_state"]
+            .as_str()
+            .unwrap_or("PACKED_REVIEW_REQUIRED"),
+        out["packed_lane_application"]["state"]
+            .as_str()
+            .unwrap_or("PACKED_LANE_NO_EFFECT")
     );
     println!(
         "- budget: `{}/{}`",
