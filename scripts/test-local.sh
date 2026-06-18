@@ -19,6 +19,7 @@ indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
 dataset_doctor="$root/nanda-structural-gate/scripts/nanda-dataset-doctor"
+aliases="$root/nanda-structural-gate/scripts/nanda-aliases"
 budget="$root/nanda-structural-gate/scripts/nanda-budget"
 pack6m="$root/nanda-structural-gate/scripts/nanda-pack6m"
 bench6m="$root/nanda-structural-gate/scripts/nanda-bench6m"
@@ -53,6 +54,9 @@ jq empty "$root/examples/triad-packet.polarization-role-swap.json"
 jq empty "$root/examples/triad-packet.polarization-reversed-stop.json"
 jq empty "$root/examples/triad-packet.route-balanced-focus.json"
 jq empty "$root/examples/triad-packet.hgate-size-only.json"
+jq empty "$root/examples/triad-packet.canonical-alias-pass.json"
+jq empty "$root/examples/triad-packet.canonical-alias-veto.json"
+jq empty "$root/examples/triad-packet.canonical-alias-conflict.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"
@@ -155,7 +159,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v3.0-hot-replay-core"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v3.2-canonical-aliases"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -516,6 +520,31 @@ grep -q 'BRANCHES: 14/14 PASS' <<<"$dogfood_text"
 "$evaler" --help | grep -q "Usage: nanda eval"
 "$waw" --help | grep -q "Usage: nanda waw"
 "$dataset_doctor" --help | grep -q "Usage: nanda dataset-doctor"
+"$aliases" --help | grep -q "Usage: nanda aliases"
+alias_json="$("$aliases" "$root/examples/triad-packet.canonical-alias-pass.json" --input-format json)"
+jq -e '.canonicalization.enabled == true and .canonicalization.applied_count == 1' <<<"$alias_json" >/dev/null
+alias_pass="$("$checker" --triads "$root/examples/triad-packet.canonical-alias-pass.json" --format json)"
+jq -e '.verdict == "PASS" and .canonicalization.applied_count == 1' <<<"$alias_pass" >/dev/null
+set +e
+alias_veto="$("$checker" --triads "$root/examples/triad-packet.canonical-alias-veto.json" --format json)"
+alias_veto_status=$?
+set -e
+if [[ "$alias_veto_status" -ne 1 ]]; then
+  echo "expected canonical alias issuer conflict to VETO" >&2
+  echo "$alias_veto" >&2
+  exit 1
+fi
+jq -e '.verdict == "VETO" and (.conflicts | length) > 0 and .canonicalization.applied_count == 1' <<<"$alias_veto" >/dev/null
+set +e
+alias_conflict="$("$aliases" "$root/examples/triad-packet.canonical-alias-conflict.json" --input-format json)"
+alias_conflict_status=$?
+set -e
+if [[ "$alias_conflict_status" -ne 3 ]]; then
+  echo "expected ambiguous aliases to WATCH" >&2
+  echo "$alias_conflict" >&2
+  exit 1
+fi
+jq -e '.canonicalization.conflict_count == 1' <<<"$alias_conflict" >/dev/null
 "$budget" --help | grep -q "Usage: nanda budget"
 "$pack6m" --help | grep -q "Usage: nanda pack6m"
 "$bench6m" --help | grep -q "Usage: nanda bench6m"

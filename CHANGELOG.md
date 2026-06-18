@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.2.0 - 2026-06-18
+
+Canonical aliases release.
+
+### Added
+
+- `aliases` packet field for explicit high-confidence canonicalization.
+- `nanda aliases` / `nanda-aliases` diagnostic command.
+- Canonicalization trace in gate reports, map/search/budget/pack6m output, and
+  trace files.
+- Alias fixtures for naming drift PASS, real post-alias conflict VETO, and
+  ambiguous alias WATCH.
+
+### Changed
+
+- `subject`, `object`, `route`, and `group` are canonicalized before structural
+  checks when explicit aliases are present.
+- `search --query-file` inherits aliases from the memory packet when the query
+  packet has none.
+- `issued_by` is treated as a functional relation.
+- Core version is now `sparse-triad-v3.2-canonical-aliases`.
+- Engine id is now `nanda-check sparse-triad-v3.2-rust`.
+- Cargo package version is now `3.2.0`.
+
 ## v3.1.0 - 2026-06-18
 
 NANDA-6M hot benchmark and full-model contract release.

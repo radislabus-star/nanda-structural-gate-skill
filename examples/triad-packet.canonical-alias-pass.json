@@ -1,0 +1,46 @@
+{
+  "task_id": "canonical-alias-pass",
+  "domain": "document",
+  "query": "Check invoice naming drift after explicit canonical aliases.",
+  "aliases": [
+    {
+      "canonical": "invoice",
+      "variants": [
+        "updated invoice",
+        "invoice document",
+        "PI"
+      ],
+      "confidence": 1.0,
+      "scope": "document"
+    }
+  ],
+  "triads": [
+    {
+      "id": "t1",
+      "subject": "invoice",
+      "relation": "issued_by",
+      "object": "Honglu",
+      "evidence": "source:1",
+      "confidence": 0.95,
+      "subject_role": "document",
+      "object_role": "supplier",
+      "route": "invoice",
+      "group": "invoice-route"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "c1",
+      "subject": "updated invoice",
+      "relation": "issued_by",
+      "object": "Honglu",
+      "evidence": "candidate",
+      "confidence": 0.95,
+      "subject_role": "document",
+      "object_role": "supplier",
+      "route": "invoice",
+      "group": "invoice-route"
+    }
+  ],
+  "candidate_answer": "The updated invoice was issued by Honglu."
+}

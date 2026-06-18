@@ -95,6 +95,7 @@ scripts/nanda-comb task.json --input-format json --depth 2
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index memory-a.json memory-b.md --out .nanda/index.json
 scripts/nanda-dataset-doctor .nanda/index.json --input-format json
+scripts/nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
 scripts/nanda-budget .nanda/index.json --input-format json
 scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
@@ -146,6 +147,12 @@ Use `nanda-dataset-doctor` before searching large memory packets. Treat WATCH
 as "build a route-balanced focus packet first", especially when it reports
 route imbalance, hub dominance, duplicate CURRENT facts, or weak text-only
 query activation.
+Use `nanda-aliases` when the packet contains explicit `aliases` and you need
+to inspect canonicalization before the gate. NANDA applies only explicit,
+high-confidence aliases; it does not guess equivalence. The alias layer
+canonicalizes `subject`, `object`, `route`, and `group` before structural
+checks. Treat `canonicalization.conflict_count > 0` or
+`canonicalization.watch_count > 0` as unresolved.
 Use `nanda-budget` before assuming a packet can enter the planned NANDA-6M
 cache-resident core. It is a Phase 1 planner, not packed execution: `FITS_L3`
 means the packet fits the 6 MiB packed layout; `FOCUS_REQUIRED`,

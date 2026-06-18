@@ -131,6 +131,7 @@ evidence-conflict tasks do.
         ├── nanda-search
         ├── nanda-probe
         ├── nanda-dataset-doctor
+        ├── nanda-aliases
         ├── nanda-budget
         ├── nanda-pack6m
         ├── nanda-bench6m
@@ -217,6 +218,7 @@ nanda-index examples/triad-packet.interference-search-route-trap.json --input-fo
 nanda-budget .nanda/index.json --input-format json
 nanda-pack6m .nanda/index.json --input-format json
 nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
+nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-noisy.json --input-format json --format text
@@ -294,6 +296,12 @@ exist, text from `--query` or packet `query` is converted into lightweight
 `nanda-dataset-doctor` is the corpus-quality gate. Run it before search on
 large memory packets; it warns about route imbalance, hub dominance, duplicate
 CURRENT facts, oversized direct-search packets, and weak text-only queries.
+`nanda-aliases` is the explicit canonicalization diagnostic. If a JSON packet
+contains `aliases`, NANDA applies exact high-confidence variants to `subject`,
+`object`, `route`, and `group` before check/map/search/pack6m. It does not
+guess aliases automatically. Ambiguous or low-confidence aliases return WATCH
+and are shown in `canonicalization.conflicts` or
+`canonicalization.warnings`.
 `nanda-budget` is the NANDA-6M Phase 1 planner. It does not run the packed hot
 core yet; it checks whether a packet could fit the planned 6 MiB
 cache-resident layout and returns `FITS_L3`, `FOCUS_REQUIRED`,
@@ -394,11 +402,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v3.0-hot-replay-core
+core_version: sparse-triad-v3.2-canonical-aliases
 wave_dim: 1024
 ```
 
-`v3.0-hot-replay-core` keeps recursive topology combing, structural peak search,
+`v3.2-canonical-aliases` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -557,7 +565,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v3.1.0`.
+Current release: `v3.2.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:

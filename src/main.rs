@@ -14,8 +14,8 @@ use std::time::Instant;
 mod nanda_6m;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v3.0-hot-replay-core";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v3.0-rust";
+const CORE_VERSION: &str = "sparse-triad-v3.2-canonical-aliases";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v3.2-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -47,6 +47,7 @@ enum Command {
     Search(SearchArgs),
     Probe(ProbeArgs),
     DatasetDoctor(DatasetDoctorArgs),
+    Aliases(AliasesArgs),
     Budget(BudgetArgs),
     Pack6m(Pack6mArgs),
     Feedback(FeedbackArgs),
@@ -309,6 +310,23 @@ struct DatasetDoctorArgs {
     format: OutputFormat,
     #[arg(long, default_value_t = 256)]
     route_cap: usize,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct AliasesArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "aliases")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
     #[arg(long)]
     normalize_paths: bool,
 }
@@ -591,9 +609,64 @@ struct Packet {
     #[serde(default)]
     candidate_answer: String,
     #[serde(default)]
+    aliases: Vec<AliasRule>,
+    #[serde(default, skip_serializing_if = "CanonicalizationReport::is_empty")]
+    canonicalization: CanonicalizationReport,
+    #[serde(default)]
     negative_shortcuts: Vec<NegativeShortcut>,
     #[serde(default)]
     positive_shortcuts: Vec<PositiveShortcut>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct AliasRule {
+    #[serde(default)]
+    canonical: String,
+    #[serde(default)]
+    variants: Vec<String>,
+    #[serde(default = "default_alias_confidence")]
+    confidence: f64,
+    #[serde(default)]
+    scope: String,
+}
+
+fn default_alias_confidence() -> f64 {
+    1.0
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct CanonicalizationReport {
+    enabled: bool,
+    applied_count: usize,
+    conflict_count: usize,
+    watch_count: usize,
+    #[serde(default)]
+    applied: Vec<CanonicalizationApplied>,
+    #[serde(default)]
+    conflicts: Vec<String>,
+    #[serde(default)]
+    warnings: Vec<String>,
+}
+
+impl CanonicalizationReport {
+    fn is_empty(&self) -> bool {
+        !self.enabled
+            && self.applied_count == 0
+            && self.conflict_count == 0
+            && self.watch_count == 0
+            && self.applied.is_empty()
+            && self.conflicts.is_empty()
+            && self.warnings.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct CanonicalizationApplied {
+    triad_id: String,
+    field: String,
+    from: String,
+    to: String,
+    scope: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -766,6 +839,7 @@ struct Report {
     weak_triads: Vec<String>,
     conflicts: Vec<String>,
     evidence_gaps: Vec<String>,
+    canonicalization: CanonicalizationReport,
     baseline_summary: Value,
     wave_summary: Value,
     route_coherence: Value,
@@ -804,6 +878,7 @@ fn run() -> Result<u8> {
         Command::Search(args) => search_cmd(args),
         Command::Probe(args) => probe_cmd(args),
         Command::DatasetDoctor(args) => dataset_doctor_cmd(args),
+        Command::Aliases(args) => aliases_cmd(args),
         Command::Budget(args) => budget_cmd(args),
         Command::Pack6m(args) => pack6m_cmd(args),
         Command::Feedback(args) => feedback_cmd(args),
@@ -836,7 +911,9 @@ fn load_packet(path: Option<&Path>) -> Result<Packet> {
         Some(path) => {
             let text =
                 fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-            Ok(serde_json::from_str(&text).with_context(|| format!("parse {}", path.display()))?)
+            let packet: Packet =
+                serde_json::from_str(&text).with_context(|| format!("parse {}", path.display()))?;
+            Ok(canonicalize_packet(packet))
         }
         None => Ok(Packet {
             task_id: "stdin-empty".to_string(),
@@ -845,6 +922,8 @@ fn load_packet(path: Option<&Path>) -> Result<Packet> {
             triads: vec![],
             candidate_triads: vec![],
             candidate_answer: String::new(),
+            aliases: vec![],
+            canonicalization: CanonicalizationReport::default(),
             negative_shortcuts: vec![],
             positive_shortcuts: vec![],
         }),
@@ -870,7 +949,217 @@ fn load_packet_auto(
     if is_json {
         load_packet(Some(path))
     } else {
-        packet_from_markdown(path, task_id, domain, query, normalize_paths)
+        packet_from_markdown(path, task_id, domain, query, normalize_paths).map(canonicalize_packet)
+    }
+}
+
+fn canonicalize_packet(mut packet: Packet) -> Packet {
+    let mut report = CanonicalizationReport {
+        enabled: !packet.aliases.is_empty(),
+        ..CanonicalizationReport::default()
+    };
+    if packet.aliases.is_empty() {
+        packet.canonicalization = report;
+        return packet;
+    }
+
+    let alias_map = build_alias_map(&packet.aliases, &mut report);
+    canonicalize_triads(&mut packet.triads, &alias_map, &mut report);
+    canonicalize_triads(&mut packet.candidate_triads, &alias_map, &mut report);
+    canonicalize_shortcuts(&mut packet.negative_shortcuts, &alias_map, &mut report);
+    canonicalize_positive_shortcuts(&mut packet.positive_shortcuts, &alias_map, &mut report);
+    report.applied_count = report.applied.len();
+    report.conflict_count = report.conflicts.len();
+    report.watch_count = report.warnings.len() + report.conflicts.len();
+    packet.canonicalization = report;
+    packet
+}
+
+fn build_alias_map(
+    rules: &[AliasRule],
+    report: &mut CanonicalizationReport,
+) -> BTreeMap<String, (String, String)> {
+    let mut map = BTreeMap::<String, (String, String)>::new();
+    for (idx, rule) in rules.iter().enumerate() {
+        let canonical = rule.canonical.trim();
+        if canonical.is_empty() {
+            report
+                .warnings
+                .push(format!("alias rule {} has empty canonical", idx + 1));
+            continue;
+        }
+        if rule.confidence < 0.85 {
+            report.warnings.push(format!(
+                "alias rule {} for {canonical} has low confidence {:.2}; variants were not applied",
+                idx + 1,
+                rule.confidence
+            ));
+            continue;
+        }
+        let scope = if rule.scope.trim().is_empty() {
+            "global".to_string()
+        } else {
+            rule.scope.trim().to_string()
+        };
+        for raw in rule
+            .variants
+            .iter()
+            .map(String::as_str)
+            .chain(std::iter::once(canonical))
+        {
+            let key = norm(raw);
+            if key.is_empty() {
+                continue;
+            }
+            if let Some((existing, existing_scope)) = map.get(&key) {
+                if norm(existing) != norm(canonical) {
+                    report.conflicts.push(format!(
+                        "alias variant {raw} maps to both {existing} ({existing_scope}) and {canonical} ({scope})"
+                    ));
+                    continue;
+                }
+            }
+            map.insert(key, (canonical.to_string(), scope.clone()));
+        }
+    }
+    map
+}
+
+fn canonicalize_triads(
+    triads: &mut [Triad],
+    alias_map: &BTreeMap<String, (String, String)>,
+    report: &mut CanonicalizationReport,
+) {
+    for triad in triads {
+        canonicalize_field(&mut triad.subject, &triad.id, "subject", alias_map, report);
+        canonicalize_field(&mut triad.object, &triad.id, "object", alias_map, report);
+        canonicalize_field(&mut triad.route, &triad.id, "route", alias_map, report);
+        canonicalize_field(&mut triad.group, &triad.id, "group", alias_map, report);
+    }
+}
+
+fn canonicalize_shortcuts(
+    shortcuts: &mut [NegativeShortcut],
+    alias_map: &BTreeMap<String, (String, String)>,
+    report: &mut CanonicalizationReport,
+) {
+    for item in shortcuts {
+        canonicalize_plain_field(
+            &mut item.suppress_peak,
+            &item.id,
+            "negative_shortcuts.suppress_peak",
+            alias_map,
+            report,
+        );
+        canonicalize_plain_field(
+            &mut item.suppress_route,
+            &item.id,
+            "negative_shortcuts.suppress_route",
+            alias_map,
+            report,
+        );
+        canonicalize_plain_field(
+            &mut item.suppress_group,
+            &item.id,
+            "negative_shortcuts.suppress_group",
+            alias_map,
+            report,
+        );
+        canonicalize_plain_field(
+            &mut item.prefer_peak,
+            &item.id,
+            "negative_shortcuts.prefer_peak",
+            alias_map,
+            report,
+        );
+        canonicalize_plain_field(
+            &mut item.prefer_route,
+            &item.id,
+            "negative_shortcuts.prefer_route",
+            alias_map,
+            report,
+        );
+        canonicalize_plain_field(
+            &mut item.prefer_group,
+            &item.id,
+            "negative_shortcuts.prefer_group",
+            alias_map,
+            report,
+        );
+    }
+}
+
+fn canonicalize_positive_shortcuts(
+    shortcuts: &mut [PositiveShortcut],
+    alias_map: &BTreeMap<String, (String, String)>,
+    report: &mut CanonicalizationReport,
+) {
+    for item in shortcuts {
+        canonicalize_plain_field(
+            &mut item.reinforce_peak,
+            &item.id,
+            "positive_shortcuts.reinforce_peak",
+            alias_map,
+            report,
+        );
+        canonicalize_plain_field(
+            &mut item.reinforce_route,
+            &item.id,
+            "positive_shortcuts.reinforce_route",
+            alias_map,
+            report,
+        );
+        canonicalize_plain_field(
+            &mut item.reinforce_group,
+            &item.id,
+            "positive_shortcuts.reinforce_group",
+            alias_map,
+            report,
+        );
+    }
+}
+
+fn canonicalize_field(
+    value: &mut String,
+    triad_id: &str,
+    field: &str,
+    alias_map: &BTreeMap<String, (String, String)>,
+    report: &mut CanonicalizationReport,
+) {
+    canonicalize_plain_field(value, triad_id, field, alias_map, report);
+}
+
+fn canonicalize_plain_field(
+    value: &mut String,
+    triad_id: &str,
+    field: &str,
+    alias_map: &BTreeMap<String, (String, String)>,
+    report: &mut CanonicalizationReport,
+) {
+    let key = norm(value);
+    if key.is_empty() {
+        return;
+    }
+    if let Some((canonical, scope)) = alias_map.get(&key) {
+        if norm(canonical) != key {
+            let from = value.clone();
+            *value = canonical.clone();
+            report.applied.push(CanonicalizationApplied {
+                triad_id: triad_id.to_string(),
+                field: field.to_string(),
+                from,
+                to: canonical.clone(),
+                scope: scope.clone(),
+            });
+        }
+    }
+}
+
+fn inherit_aliases_if_needed(query_packet: &mut Packet, memory_packet: &Packet) {
+    if query_packet.aliases.is_empty() && !memory_packet.aliases.is_empty() {
+        query_packet.aliases = memory_packet.aliases.clone();
+        let recanonicalized = canonicalize_packet(query_packet.clone());
+        *query_packet = recanonicalized;
     }
 }
 
@@ -1032,12 +1321,21 @@ fn make_report(packet: &Packet, source: &[Triad], candidates: &[Triad]) -> Resul
         .as_array()
         .is_some_and(|items| !items.is_empty());
 
+    let alias_watch = packet.canonicalization.conflict_count > 0
+        || packet
+            .canonicalization
+            .warnings
+            .iter()
+            .any(|item| item.contains("low confidence") || item.contains("empty canonical"));
+
     let verdict = if limits.iter().any(|x| x.contains("hard limit")) {
         "WATCH"
     } else if !conflicts.is_empty() {
         "VETO"
     } else if has_foreign_pull {
         "VETO"
+    } else if alias_watch {
+        "WATCH"
     } else if !gaps.is_empty() || !weak_conf.is_empty() {
         "WATCH"
     } else if routes["weak"].as_array().is_some_and(|x| !x.is_empty()) {
@@ -1091,6 +1389,7 @@ fn make_report(packet: &Packet, source: &[Triad], candidates: &[Triad]) -> Resul
         weak_triads: weak_ids.into_iter().collect(),
         conflicts,
         evidence_gaps: gaps,
+        canonicalization: packet.canonicalization.clone(),
         baseline_summary: baselines,
         wave_summary: wave,
         route_coherence: routes,
@@ -1357,6 +1656,7 @@ fn functional_relation(relation: &str) -> bool {
             | "applies_for"
             | "manufactures"
             | "delivers_to"
+            | "issued_by"
     )
 }
 
@@ -1844,6 +2144,9 @@ fn build_explanation(report: &Report) -> Vec<String> {
     if !report.limits.is_empty() {
         notes.push("Task exceeds target or hard limits and should be split.".to_string());
     }
+    if report.canonicalization.conflict_count > 0 || report.canonicalization.watch_count > 0 {
+        notes.push("Alias canonicalization needs review before structural acceptance.".to_string());
+    }
     if notes.is_empty() {
         notes.push("No decisive structural signal was found.".to_string());
     }
@@ -1861,6 +2164,18 @@ fn build_repair_prompt(report: &Report) -> String {
     if !report.conflicts.is_empty() {
         lines.push("Fix these conflicts:".to_string());
         for item in &report.conflicts {
+            lines.push(format!("- {item}"));
+        }
+    }
+    if !report.canonicalization.conflicts.is_empty() {
+        lines.push("Fix alias conflicts before trusting the gate:".to_string());
+        for item in &report.canonicalization.conflicts {
+            lines.push(format!("- {item}"));
+        }
+    }
+    if !report.canonicalization.warnings.is_empty() {
+        lines.push("Review alias warnings before retrying:".to_string());
+        for item in &report.canonicalization.warnings {
             lines.push(format!("- {item}"));
         }
     }
@@ -1948,6 +2263,20 @@ fn print_report(report: &Report, format: &OutputFormat) -> Result<()> {
             println!("task_id: {}", report.task_id);
             println!("complexity_score: {}", report.complexity_score);
             println!("mandatory_gate: {}", report.mandatory_gate);
+            if report.canonicalization.enabled {
+                println!(
+                    "canonicalization: applied={} conflicts={} warnings={}",
+                    report.canonicalization.applied_count,
+                    report.canonicalization.conflict_count,
+                    report.canonicalization.watch_count
+                );
+                for item in &report.canonicalization.applied {
+                    println!(
+                        "  - {} {}: {} -> {}",
+                        item.triad_id, item.field, item.from, item.to
+                    );
+                }
+            }
             for (label, items) in [
                 ("conflicts", &report.conflicts),
                 ("evidence_gaps", &report.evidence_gaps),
@@ -1974,10 +2303,60 @@ fn print_report(report: &Report, format: &OutputFormat) -> Result<()> {
             println!("- verdict: `{}`", report.verdict);
             println!("- action: `{}`", action_for_report(report));
             println!("- complexity: `{}`", report.complexity_score);
+            if report.canonicalization.enabled {
+                println!(
+                    "- canonicalization: `applied={} conflicts={} warnings={}`",
+                    report.canonicalization.applied_count,
+                    report.canonicalization.conflict_count,
+                    report.canonicalization.watch_count
+                );
+            }
             println!("- trace: `{}`", report.trace_path);
         }
     }
     Ok(())
+}
+
+fn print_aliases_text(out: &Value) {
+    let report = &out["canonicalization"];
+    println!("mode: canonical-aliases");
+    println!("enabled: {}", report["enabled"].as_bool().unwrap_or(false));
+    println!("applied: {}", report["applied_count"].as_u64().unwrap_or(0));
+    println!(
+        "conflicts: {}",
+        report["conflict_count"].as_u64().unwrap_or(0)
+    );
+    println!("warnings: {}", report["watch_count"].as_u64().unwrap_or(0));
+    if let Some(items) = report["applied"].as_array() {
+        for item in items {
+            println!(
+                "  - {} {}: {} -> {}",
+                item["triad_id"].as_str().unwrap_or(""),
+                item["field"].as_str().unwrap_or(""),
+                item["from"].as_str().unwrap_or(""),
+                item["to"].as_str().unwrap_or("")
+            );
+        }
+    }
+    if let Some(items) = report["conflicts"].as_array() {
+        for item in items {
+            println!("conflict: {}", item.as_str().unwrap_or(""));
+        }
+    }
+    if let Some(items) = report["warnings"].as_array() {
+        for item in items {
+            println!("warning: {}", item.as_str().unwrap_or(""));
+        }
+    }
+}
+
+fn print_aliases_md(out: &Value) {
+    let report = &out["canonicalization"];
+    println!("# NANDA Canonical Aliases\n");
+    println!("- enabled: `{}`", report["enabled"]);
+    println!("- applied: `{}`", report["applied_count"]);
+    println!("- conflicts: `{}`", report["conflict_count"]);
+    println!("- warnings: `{}`", report["watch_count"]);
 }
 
 fn print_map_text(map: &Value) {
@@ -2061,6 +2440,8 @@ fn init_task(args: InitTaskArgs) -> Result<u8> {
         }],
         candidate_triads: vec![],
         candidate_answer: String::new(),
+        aliases: vec![],
+        canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
     };
@@ -2210,6 +2591,8 @@ fn split_packet(args: SplitPacketArgs) -> Result<u8> {
                     triads: split.triads.clone(),
                     candidate_triads: split.candidates.clone(),
                     candidate_answer: packet.candidate_answer.clone(),
+                    aliases: packet.aliases.clone(),
+                    canonicalization: packet.canonicalization.clone(),
                     negative_shortcuts: packet.negative_shortcuts.clone(),
                     positive_shortcuts: packet.positive_shortcuts.clone(),
                 };
@@ -2431,7 +2814,8 @@ fn map_cmd(args: MapArgs) -> Result<u8> {
     )?;
     let source = normalize_ids(packet.triads.clone(), "t");
     let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
-    let map = structural_map(&source, &candidates);
+    let mut map = structural_map(&source, &candidates);
+    map["canonicalization"] = json!(packet.canonicalization);
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&map)?),
         OutputFormat::Text => print_map_text(&map),
@@ -2466,6 +2850,8 @@ fn hgate_cmd(args: HgateArgs) -> Result<u8> {
             triads: split.triads.clone(),
             candidate_triads: split.candidates.clone(),
             candidate_answer: packet.candidate_answer.clone(),
+            aliases: packet.aliases.clone(),
+            canonicalization: packet.canonicalization.clone(),
             negative_shortcuts: packet.negative_shortcuts.clone(),
             positive_shortcuts: packet.positive_shortcuts.clone(),
         };
@@ -2479,6 +2865,7 @@ fn hgate_cmd(args: HgateArgs) -> Result<u8> {
             "conflicts": report.conflicts,
             "evidence_gaps": report.evidence_gaps,
             "weak_triads": report.weak_triads,
+            "canonicalization": report.canonicalization,
             "foreign_pull": report.structural_map["foreign_pull"],
             "repair_prompt": report.repair_prompt,
             "trace_path": report.trace_path
@@ -2504,6 +2891,7 @@ fn hgate_cmd(args: HgateArgs) -> Result<u8> {
             "repair_tasks": global_map["repair_tasks"],
             "trace_path": global_report.trace_path
         },
+        "canonicalization": packet.canonicalization,
         "branches": branches,
         "split_warnings": splits.warnings,
         "truncated_branches": truncated,
@@ -2660,7 +3048,7 @@ fn search_cmd(args: SearchArgs) -> Result<u8> {
         args.normalize_paths,
     )?;
     let memory = normalize_ids(packet.triads.clone(), "m");
-    let query_packet = if let Some(query_file) = &args.query_file {
+    let mut query_packet = if let Some(query_file) = &args.query_file {
         load_packet_auto(
             query_file,
             &args.query_format,
@@ -2672,6 +3060,7 @@ fn search_cmd(args: SearchArgs) -> Result<u8> {
     } else {
         packet.clone()
     };
+    inherit_aliases_if_needed(&mut query_packet, &packet);
     let query_text = if !args.query.trim().is_empty() {
         args.query.clone()
     } else if !query_packet.query.trim().is_empty() {
@@ -2691,6 +3080,8 @@ fn search_cmd(args: SearchArgs) -> Result<u8> {
         query_source,
         focus.metadata,
     );
+    let mut result = result;
+    result["canonicalization"] = json!(packet.canonicalization);
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&result)?),
         OutputFormat::Text => print_search_text(&result),
@@ -2775,7 +3166,7 @@ fn run_probe_once(
     }
     negative_shortcuts = merge_negative_shortcuts(negative_shortcuts);
 
-    let query_packet = if let Some(query_file) = query_file {
+    let mut query_packet = if let Some(query_file) = query_file {
         load_packet_auto(
             query_file,
             query_format,
@@ -2787,6 +3178,7 @@ fn run_probe_once(
     } else {
         packet.clone()
     };
+    inherit_aliases_if_needed(&mut query_packet, &packet);
     let query_text = if !query_arg.trim().is_empty() {
         query_arg.to_string()
     } else if !query_packet.query.trim().is_empty() {
@@ -2943,6 +3335,42 @@ fn dataset_doctor_cmd(args: DatasetDoctorArgs) -> Result<u8> {
         "WATCH" => EXIT_WATCH,
         _ => EXIT_WATCH,
     })
+}
+
+fn aliases_cmd(args: AliasesArgs) -> Result<u8> {
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.query,
+        args.normalize_paths,
+    )?;
+    let out = json!({
+        "mode": "canonical-aliases",
+        "task_id": packet.task_id,
+        "domain": packet.domain,
+        "canonicalization": packet.canonicalization,
+        "triads": packet.triads,
+        "candidate_triads": packet.candidate_triads
+    });
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_aliases_text(&out),
+        OutputFormat::Md => print_aliases_md(&out),
+    }
+    Ok(
+        if out["canonicalization"]["conflict_count"]
+            .as_u64()
+            .unwrap_or(0)
+            > 0
+            || out["canonicalization"]["watch_count"].as_u64().unwrap_or(0) > 0
+        {
+            EXIT_WATCH
+        } else {
+            EXIT_PASS
+        },
+    )
 }
 
 fn budget_cmd(args: BudgetArgs) -> Result<u8> {
@@ -3129,6 +3557,7 @@ fn nanda_6m_budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad
         "mode": "nanda-6m-budget-planner",
         "state": state,
         "verdict": if fits_l3 { "PASS" } else { "WATCH" },
+        "canonicalization": packet.canonicalization,
         "fits_l3": fits_l3,
         "safe_for_hot_core": fits_l3,
         "hard_budget_bytes": nanda_6m::BUDGET_BYTES,
@@ -3292,6 +3721,7 @@ fn nanda_6m_pack_report(
         "state": if packed_ok { "PACKED_FITS_L3" } else { "PACK_REVIEW_REQUIRED" },
         "verdict": if packed_ok { "PASS" } else { "WATCH" },
         "packed_ok": packed_ok,
+        "canonicalization": packet.canonicalization,
         "budget": budget,
         "packed_records": {
             "count": packed_count,
@@ -6215,6 +6645,8 @@ fn builtin_route_trap_packet(noisy: bool) -> Packet {
         triads,
         candidate_triads,
         candidate_answer: String::new(),
+        aliases: vec![],
+        canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
     }
@@ -6289,6 +6721,8 @@ fn extract_packet_from_text(text: &str, task_id: &str, domain: &str, query: &str
         triads,
         candidate_triads: candidates,
         candidate_answer: String::new(),
+        aliases: vec![],
+        canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
     }
@@ -8540,6 +8974,8 @@ fn comb_node(
         triads: source.to_vec(),
         candidate_triads: candidates.to_vec(),
         candidate_answer: packet.candidate_answer.clone(),
+        aliases: packet.aliases.clone(),
+        canonicalization: packet.canonicalization.clone(),
         negative_shortcuts: packet.negative_shortcuts.clone(),
         positive_shortcuts: packet.positive_shortcuts.clone(),
     };
@@ -9579,6 +10015,8 @@ fn packet_from_markdown(
         triads,
         candidate_triads,
         candidate_answer: String::new(),
+        aliases: vec![],
+        canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
     })
@@ -9960,6 +10398,8 @@ fn example_packet(swapped: bool) -> Packet {
         triads,
         candidate_triads,
         candidate_answer: String::new(),
+        aliases: vec![],
+        canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
     }
@@ -10068,6 +10508,8 @@ fn synthetic_packet(idx: usize, kind: &str) -> Packet {
         triads,
         candidate_triads,
         candidate_answer: String::new(),
+        aliases: vec![],
+        canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
     }
