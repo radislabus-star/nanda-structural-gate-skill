@@ -56,6 +56,13 @@
 - v26 proof reports now expose top-level `proof_state`, `answer_ready`,
   `runtime_ready`, `hot_proof`, and `repair` fields so agents can distinguish
   "runtime/packed peak ready" from "safe to answer".
+- v27 proof reports now expose top-level `reason_codes`,
+  `proof_confidence`, and `proof_compare`, so WATCH/VETO states say whether the
+  blocker is a thin field, reversed field, packed peak, focus shift, corpus
+  warning, or runtime budget issue.
+- `nanda proof --suite` / `nanda-proof --suite` now runs a proof regression
+  corpus against expected proof states, top peaks, field states, and reason
+  codes.
 - NANDA-6M version is now `nanda-6m-v24-focused-packet-runtime`.
 
 ## v3.3.0 - 2026-06-18

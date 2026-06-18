@@ -312,11 +312,14 @@ plus `candidate_triads`, `--query-file`, or text `--query`, selects a
 route-balanced window with `--max-triads` defaulting to the 15,000-triad hot
 proof cap, and writes a smaller JSON packet that can be passed to
 `nanda-search`, `nanda-budget`, `nanda-pack6m`, or `nanda-hgate`.
-`nanda-proof` is the v26 one-shot proof pipeline. It runs corpus diagnostics,
+`nanda-proof` is the v27 one-shot proof pipeline. It runs corpus diagnostics,
 builds the focused packet, checks the NANDA-6M runtime contract, runs
 interference search, runs the packed bridge, and returns `ANSWER_READY`,
 `WATCH`, or `VETO`. `ANSWER_READY` requires both the retrieval field and the
 packed peak to be safe; otherwise the output is an explainable review report.
+Inspect top-level `reason_codes`, `proof_confidence`, and `proof_compare`
+before trusting a peak. Use `nanda-proof --suite examples/proof-corpus.json`
+to run the proof regression corpus.
 `nanda-aliases` is the explicit canonicalization diagnostic. If a JSON packet
 contains `aliases`, NANDA applies exact high-confidence variants to `subject`,
 `object`, `route`, and `group` before check/map/search/pack6m. It does not
@@ -553,6 +556,7 @@ nanda-index memory-a.json memory-b.md --out .nanda/index.json
 nanda-dataset-doctor .nanda/index.json --input-format json
 nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
 nanda-proof .nanda/index.json --input-format json --query-file query.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
+nanda-proof --suite examples/proof-corpus.json --input-format json
 nanda-hgate big-flow.json --input-format json --by linked-group
 nanda-search .nanda/focus.json --input-format json --top-k 5
 nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5

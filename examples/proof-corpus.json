@@ -1,0 +1,60 @@
+{
+  "name": "nanda-proof-v27-regression",
+  "cases": [
+    {
+      "id": "route-trap-packed-thin",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "expected_proof_state": "WATCH",
+      "expected_top_peak": "certification",
+      "expected_field_state": "FIELD_FOCUSED",
+      "expected_reason_codes": [
+        "PACKED_PEAK_THIN",
+        "PACKED_PEAK_NOT_SAFE"
+      ]
+    },
+    {
+      "id": "plain-thin-field",
+      "path": "triad-packet.interference-search.json",
+      "expected_proof_state": "WATCH",
+      "expected_top_peak": "certification",
+      "expected_field_state": "FIELD_THIN",
+      "expected_reason_codes": [
+        "FIELD_THIN",
+        "FIELD_NOT_SAFE"
+      ]
+    },
+    {
+      "id": "contested-delivery",
+      "path": "triad-packet.example.json",
+      "expected_proof_state": "WATCH",
+      "expected_top_peak": "delivery",
+      "expected_field_state": "FIELD_CONTESTED",
+      "expected_reason_codes": [
+        "FIELD_CONTESTED",
+        "PACKED_PEAK_NO_PEAK"
+      ]
+    },
+    {
+      "id": "reversed-payment-stop",
+      "path": "triad-packet.polarization-reversed-stop.json",
+      "expected_proof_state": "VETO",
+      "expected_top_peak": "payment-reversed",
+      "expected_field_state": "FIELD_REVERSED",
+      "expected_reason_codes": [
+        "FIELD_REVERSED",
+        "PACKED_PEAK_NO_PEAK"
+      ]
+    },
+    {
+      "id": "route-balanced-focus-thin",
+      "path": "triad-packet.route-balanced-focus.json",
+      "expected_proof_state": "WATCH",
+      "expected_top_peak": "lower-operator-debt-route",
+      "expected_field_state": "FIELD_THIN",
+      "expected_reason_codes": [
+        "FIELD_THIN",
+        "FIELD_NOT_SAFE"
+      ]
+    }
+  ]
+}

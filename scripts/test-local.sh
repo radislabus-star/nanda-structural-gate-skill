@@ -263,12 +263,19 @@ if [[ "$proof_status" -ne 0 && "$proof_status" -ne 3 ]]; then
   exit 1
 fi
 jq -e '.mode == "proof-from-focus"' <<<"$proof_json" >/dev/null
-jq -e '.proof_version == "v26-hot-proof-report"' <<<"$proof_json" >/dev/null
+jq -e '.proof_version == "v27-proof-reason-suite"' <<<"$proof_json" >/dev/null
+jq -e '.reason_codes | length >= 1' <<<"$proof_json" >/dev/null
+jq -e '.proof_confidence.score >= 0' <<<"$proof_json" >/dev/null
+jq -e '.proof_compare.state | length > 0' <<<"$proof_json" >/dev/null
 jq -e '.focused_memory_size <= 12' <<<"$proof_json" >/dev/null
 jq -e '.runtime_contract.focus.state == "PACKED_RUNTIME_READY"' <<<"$proof_json" >/dev/null
 jq empty "$tmp_proof_report"
 jq empty "$tmp_proof_focus"
 rm -f "$tmp_proof_report" "$tmp_proof_focus"
+proof_suite_json="$("$proof" --suite "$root/examples/proof-corpus.json" --input-format json)"
+jq -e '.mode == "proof-suite"' <<<"$proof_suite_json" >/dev/null
+jq -e '.proof_version == "v27-proof-reason-suite"' <<<"$proof_suite_json" >/dev/null
+jq -e '.passed == .total' <<<"$proof_suite_json" >/dev/null
 grep -q '"peak": "certification"' <<<"$search_json"
 first_peak="$(jq -r '.peaks[0].peak' <<<"$search_json")"
 if [[ "$first_peak" != "certification" ]]; then

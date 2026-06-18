@@ -2541,6 +2541,41 @@ pub(crate) struct ProbeSuiteCase {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub(crate) struct ProofSuite {
+    #[serde(default)]
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) cases: Vec<ProofSuiteCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct ProofSuiteCase {
+    #[serde(default)]
+    pub(crate) id: String,
+    pub(crate) path: PathBuf,
+    #[serde(default)]
+    pub(crate) query_file: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) query: String,
+    #[serde(default)]
+    pub(crate) expected_proof_state: String,
+    #[serde(default)]
+    pub(crate) expected_top_peak: String,
+    #[serde(default)]
+    pub(crate) expected_field_state: String,
+    #[serde(default)]
+    pub(crate) expected_reason_codes: Vec<String>,
+    #[serde(default)]
+    pub(crate) group_by: String,
+    #[serde(default)]
+    pub(crate) max_triads: Option<usize>,
+    #[serde(default)]
+    pub(crate) route_cap: Option<usize>,
+    #[serde(default)]
+    pub(crate) route_triad_cap: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct WawSuiteCase {
     #[serde(default)]
     pub(crate) id: String,

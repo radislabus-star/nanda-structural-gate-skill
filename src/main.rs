@@ -319,7 +319,9 @@ struct FocusArgs {
 
 #[derive(Parser)]
 struct ProofArgs {
-    input: PathBuf,
+    input: Option<PathBuf>,
+    #[arg(long)]
+    suite: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "auto")]
     input_format: InputFormat,
     #[arg(long, default_value = "proof")]

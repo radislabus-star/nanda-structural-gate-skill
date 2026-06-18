@@ -103,6 +103,7 @@ scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
 scripts/nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
 scripts/nanda-proof .nanda/index.json --input-format json --query-file query.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
+scripts/nanda-proof --suite examples/proof-corpus.json --input-format json
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
@@ -165,7 +166,12 @@ query as `candidate_triads`, and writes a packet that can go into
 Use `nanda-proof` when the agent needs the whole chain in one report:
 dataset doctor, focused packet, NANDA-6M runtime contract, interference search,
 packed peak, and repair instructions. Treat `ANSWER_READY` as usable, `WATCH`
-as review-only, and `VETO` as a stop signal.
+as review-only, and `VETO` as a stop signal. Inspect top-level
+`reason_codes`, `proof_confidence`, and `proof_compare`: reason codes explain
+why a peak is not answer-ready, confidence is only a review aid, and compare
+shows whether raw search, focused search, and packed peak agree. Use
+`nanda-proof --suite examples/proof-corpus.json --input-format json` after
+core/search/pack changes to catch proof regressions.
 Use `nanda-aliases` when the packet contains explicit `aliases` and you need
 to inspect canonicalization before the gate. NANDA applies only explicit,
 high-confidence aliases; it does not guess equivalence. The alias layer
