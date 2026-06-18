@@ -14,6 +14,7 @@ mod commands;
 mod dataset_doctor;
 mod eval;
 mod feedback;
+mod focus;
 mod io;
 mod map_gate;
 mod model;
@@ -64,6 +65,7 @@ enum Command {
     Extract(ExtractArgs),
     Index(IndexArgs),
     Search(SearchArgs),
+    Focus(FocusArgs),
     Probe(ProbeArgs),
     DatasetDoctor(DatasetDoctorArgs),
     Aliases(AliasesArgs),
@@ -276,6 +278,37 @@ struct SearchArgs {
     route_triad_cap: usize,
     #[arg(long, value_enum, default_value = "route")]
     group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct FocusArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "focus")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long)]
+    query_file: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "auto")]
+    query_format: InputFormat,
+    #[arg(long, default_value_t = nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY)]
+    max_triads: usize,
+    #[arg(long, default_value_t = 256)]
+    route_cap: usize,
+    #[arg(long, default_value_t = 64)]
+    route_triad_cap: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    stdout: bool,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]
@@ -545,6 +578,7 @@ fn run() -> Result<u8> {
         Command::Extract(args) => extract_cmd(args),
         Command::Index(args) => index_cmd(args),
         Command::Search(args) => search_cmd(args),
+        Command::Focus(args) => focus::focus_cmd(args),
         Command::Probe(args) => probe_cmd(args),
         Command::DatasetDoctor(args) => dataset_doctor_cmd(args),
         Command::Aliases(args) => aliases_cmd(args),

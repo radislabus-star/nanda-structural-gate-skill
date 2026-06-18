@@ -43,7 +43,14 @@
 - NANDA-6M now fixes the active proof window at 15,000 triads with 64 default
   field requests. The broad triad arena still stores up to 65,536 records, but
   hot proof requires a focused 15k window.
-- NANDA-6M version is now `nanda-6m-v21-focused-15k-runtime`.
+- NANDA-6M core is now split into focused `wave` and `replay` submodules while
+  preserving the public `nanda_6m::*` API.
+- NANDA-6M support scoring now accumulates signed query projection first and
+  applies triad strength once, reducing the 15k/64 hot-cycle release benchmark
+  from about 105.6 ms/op to about 56.7 ms/op on the local T480 run.
+- `nanda focus` / `nanda-focus` builds a physical route-balanced focused JSON
+  packet with `--max-triads` defaulting to the 15,000-triad hot proof cap.
+- NANDA-6M version is now `nanda-6m-v24-focused-packet-runtime`.
 
 ## v3.3.0 - 2026-06-18
 

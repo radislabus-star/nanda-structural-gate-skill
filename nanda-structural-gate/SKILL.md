@@ -101,7 +101,9 @@ scripts/nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-fo
 scripts/nanda-budget .nanda/index.json --input-format json
 scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
+scripts/nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
 scripts/nanda-search task.json --input-format json --top-k 5
+scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
 scripts/nanda-hgate task.json --input-format json --by linked-group
@@ -154,6 +156,11 @@ Use `nanda-dataset-doctor` before searching large memory packets. Treat WATCH
 as "build a route-balanced focus packet first", especially when it reports
 route imbalance, hub dominance, duplicate CURRENT facts, or weak text-only
 query activation.
+Use `nanda-focus` when a large memory packet needs a physical focused JSON
+packet before retrieval or hot-core planning. It keeps the selected memory
+window under the NANDA-6M 15,000-triad proof cap by default, preserves the
+query as `candidate_triads`, and writes a packet that can go into
+`nanda-search`, `nanda-budget`, `nanda-pack6m`, or `nanda-hgate`.
 Use `nanda-aliases` when the packet contains explicit `aliases` and you need
 to inspect canonicalization before the gate. NANDA applies only explicit,
 high-confidence aliases; it does not guess equivalence. The alias layer
@@ -330,7 +337,8 @@ scripts/nanda-dogfood . --out-dir .nanda/
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index code-flow.json --input-format json --out .nanda/index.json
 scripts/nanda-dataset-doctor .nanda/index.json --input-format json
-scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --route-cap 256 --route-triad-cap 32 --top-k 5
+scripts/nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
+scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
 scripts/nanda-hgate code-flow.json --input-format json --by linked-group
 scripts/nanda-feedback .nanda/search.json --decision reject --note "false shortcut" --out .nanda/reject.json
 scripts/nanda-index code-flow.json .nanda/reject.json --input-format json --out .nanda/index-with-negative-lanes.json

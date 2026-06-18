@@ -129,6 +129,7 @@ evidence-conflict tasks do.
         ├── nanda-index
         ├── nanda-map
         ├── nanda-search
+        ├── nanda-focus
         ├── nanda-probe
         ├── nanda-dataset-doctor
         ├── nanda-aliases
@@ -219,7 +220,9 @@ nanda-budget .nanda/index.json --input-format json
 nanda-pack6m .nanda/index.json --input-format json
 nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000 --lane-iterations 1000000 --lane-sweep-iterations 100000
 nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
+nanda-focus .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --out .nanda/focus.json
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
+nanda-search .nanda/focus.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-noisy.json --input-format json --format text
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3
@@ -302,6 +305,11 @@ exist, text from `--query` or packet `query` is converted into lightweight
 `nanda-dataset-doctor` is the corpus-quality gate. Run it before search on
 large memory packets; it warns about route imbalance, hub dominance, duplicate
 CURRENT facts, oversized direct-search packets, and weak text-only queries.
+`nanda-focus` is the v24 focused packet builder. It takes a large memory packet
+plus `candidate_triads`, `--query-file`, or text `--query`, selects a
+route-balanced window with `--max-triads` defaulting to the 15,000-triad hot
+proof cap, and writes a smaller JSON packet that can be passed to
+`nanda-search`, `nanda-budget`, `nanda-pack6m`, or `nanda-hgate`.
 `nanda-aliases` is the explicit canonicalization diagnostic. If a JSON packet
 contains `aliases`, NANDA applies exact high-confidence variants to `subject`,
 `object`, `route`, and `group` before check/map/search/pack6m. It does not
@@ -309,7 +317,7 @@ guess aliases automatically. Ambiguous or low-confidence aliases return WATCH
 and are shown in `canonicalization.conflicts` or
 `canonicalization.warnings`.
 `nanda-budget` is the NANDA-6M Phase 1 planner. It does not run the packed hot
-core yet; it checks both the broad 6 MiB arena layout and the v21 focused
+core yet; it checks both the broad 6 MiB arena layout and the v24 focused
 15,000-triad proof runtime. It returns `FITS_L3`, `FOCUS_REQUIRED`,
 `SPLIT_REQUIRED`, or `SPILL_REQUIRED`; inspect `runtime_focus` and
 `safe_for_hot_core` before treating the packet as hot-runnable.
@@ -334,10 +342,11 @@ Inspect `packed_lane_store`: it reports the hot compiled lane arena cost. Each
 stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
 Inspect `runtime_contract`: it is the v20 hot attach gate. `PACKED_RUNTIME_READY`
 means the focused packet fits the current `PackedHotCore` workspace contract.
-In v21 the active proof window is intentionally fixed at 15,000 triads with 64
+In v24 the active proof window is intentionally fixed at 15,000 triads with 64
 default field requests. `FOCUS_REQUIRED` means the packet may fit the broad
 65,536-record triad arena, but it is too wide for one 15k hot proof. Do not
-silently spill that case into RAM; focus/split the packet first.
+silently spill that case into RAM; build a `nanda-focus` packet or split the
+packet first.
 Inspect `packed_lane_replay`: it matches feedback shortcuts against current
 stable lane keys, compiles matched keys into current-window `PackedLane64`
 masks, and reports replayed `before_net_dot -> after_net_dot`.
@@ -535,8 +544,9 @@ nanda-dogfood . --out-dir .nanda/
 nanda-extract notes.raw.txt --out .nanda/notes.json
 nanda-index memory-a.json memory-b.md --out .nanda/index.json
 nanda-dataset-doctor .nanda/index.json --input-format json
+nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
 nanda-hgate big-flow.json --input-format json --by linked-group
-nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
+nanda-search .nanda/focus.json --input-format json --top-k 5
 nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
 nanda-feedback .nanda/search.json --decision accept --note "accepted route" --out .nanda/accept.json
 nanda-index memory-a.json .nanda/accept.json --out .nanda/index-with-positive-lanes.json

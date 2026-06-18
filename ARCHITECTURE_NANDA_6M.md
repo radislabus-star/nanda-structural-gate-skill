@@ -146,12 +146,13 @@ and prove `used_bytes <= 6,291,456` for the hot core.
 
 v20 adds a stricter runtime attach contract on top of the broad arena budget.
 v21 makes the product decision explicit: the active proof window is 15,000
-triads with 64 default field requests. The full arena can still hold 65,536
-packed triads, but those records are storage/focus material, not one monolithic
-proof pass. A packet may fit the broad 6 MiB arena while still returning
-`FOCUS_REQUIRED` for one hot-cycle attach. This is intentional: the runtime
-must refuse unfocused work instead of silently spilling score buffers into
-normal RAM.
+triads with 64 default field requests. v24 adds the physical focused-packet
+builder that creates that 15k window before hot proof. The full arena can still
+hold 65,536 packed triads, but those records are storage/focus material, not
+one monolithic proof pass. A packet may fit the broad 6 MiB arena while still
+returning `FOCUS_REQUIRED` for one hot-cycle attach. This is intentional: the
+runtime must refuse unfocused work instead of silently spilling score buffers
+into normal RAM.
 
 The v20 runtime states are:
 
@@ -169,7 +170,7 @@ WORKSPACE_TOO_SMALL
 and preallocated workspace slices, validates the shape, and only then allows
 `run_query`.
 
-The practical v21 rule is:
+The practical v24 rule is:
 
 ```text
 65,536 packed triads = broad arena capacity
@@ -190,10 +191,11 @@ wave_dim:    1,024 i8 dimensions per centroid
 ```
 
 This is not "all memory of the world." The 65,536 record arena is the active
-packed storage envelope. The v21 proof runtime intentionally operates on a
+packed storage envelope. The v24 proof runtime intentionally operates on a
 15,000-triad focus window so the current score/bucket workspace stays inside
-the 6 MiB contract. Large corpora must be reduced by dataset doctor, route
-balancing, query triads, and linked split before they enter the proof window.
+the 6 MiB contract. Large corpora must be reduced by dataset doctor,
+`nanda-focus`, route balancing, query triads, and linked split before they enter
+the proof window.
 
 ## Packed Records
 
@@ -400,10 +402,12 @@ The first implementation must pass these before it is trusted:
    topic.
 6. Positive shortcut fixture boosts the accepted route/group/support shape.
 7. Large unfocused corpus returns `FOCUS_REQUIRED`, not a fake PASS.
-8. Focused corpus returns stable peaks with better margin than lexical
+8. `nanda-focus` writes a route-balanced packet at or below the 15,000-triad
+   proof cap.
+9. Focused corpus returns stable peaks with better margin than lexical
    baseline.
-9. Linux CI must cover deterministic parity with v3.0 fixtures.
-10. Microbench must report bytes used, peak count, query time, and whether the
+10. Linux CI must cover deterministic parity with v3.0 fixtures.
+11. Microbench must report bytes used, peak count, query time, and whether the
     packet stayed in the 6 MiB budget.
 
 ## Migration Plan

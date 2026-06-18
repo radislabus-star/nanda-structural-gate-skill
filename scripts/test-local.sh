@@ -17,6 +17,7 @@ waw="$root/nanda-structural-gate/scripts/nanda-waw"
 feedback="$root/nanda-structural-gate/scripts/nanda-feedback"
 indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
+focus="$root/nanda-structural-gate/scripts/nanda-focus"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
 dataset_doctor="$root/nanda-structural-gate/scripts/nanda-dataset-doctor"
 aliases="$root/nanda-structural-gate/scripts/nanda-aliases"
@@ -238,6 +239,16 @@ jq -e '.hierarchical_decision.global_foreign_pull > 0' <<<"$hgate_splice_json" >
 
 search_json="$("$search" "$root/examples/triad-packet.interference-search.json" --input-format json --top-k 3)"
 grep -q '"mode": "interference-retrieval"' <<<"$search_json"
+
+tmp_focus_packet="$(mktemp)"
+focus_json="$("$focus" "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --max-triads 12 --route-cap 4 --route-triad-cap 4 --out "$tmp_focus_packet")"
+jq -e '.mode == "focused-packet-builder"' <<<"$focus_json" >/dev/null
+jq -e '.focused_memory_size <= 12' <<<"$focus_json" >/dev/null
+jq -e '.runtime_contract.state == "PACKED_RUNTIME_READY"' <<<"$focus_json" >/dev/null
+jq empty "$tmp_focus_packet"
+"$budget" "$tmp_focus_packet" --input-format json >/dev/null
+"$search" "$tmp_focus_packet" --input-format json --top-k 2 >/dev/null
+rm -f "$tmp_focus_packet"
 grep -q '"peak": "certification"' <<<"$search_json"
 first_peak="$(jq -r '.peaks[0].peak' <<<"$search_json")"
 if [[ "$first_peak" != "certification" ]]; then
