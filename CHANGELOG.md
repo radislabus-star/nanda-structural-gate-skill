@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.3.0 - 2026-06-18
+
+Modular router and code-map planning release.
+
+### Added
+
+- `nanda map-code` / `nanda-map-code` refactor-planning command.
+- `dogfood --refactor-plan` to attach code-boundary recommendations to the
+  structural dogfood verdict.
+- Focused Rust modules for `model`, `io`, `map_gate`, `search`, `feedback`,
+  `dataset_doctor`, `eval`, `report`, and `commands/dogfood`.
+
+### Changed
+
+- `src/main.rs` is now a compact CLI router instead of the implementation
+  body.
+- `map-code` now treats `main/run/run_check` as `cli-router`, filters that
+  router from `next_refactors`, and ignores nested test functions.
+- Runtime install and local tests cover `nanda-map-code` and dogfood refactor
+  planning.
+- Clippy is clean with `cargo clippy --all-targets --all-features -- -D warnings`.
+- Core version is now `sparse-triad-v3.3-modular-router`.
+- Engine id is now `nanda-check sparse-triad-v3.3-rust`.
+- Cargo package version is now `3.3.0`.
+
 ## v3.2.0 - 2026-06-18
 
 Canonical aliases release.

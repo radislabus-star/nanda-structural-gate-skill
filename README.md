@@ -408,11 +408,11 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v3.2-canonical-aliases
+core_version: sparse-triad-v3.3-modular-router
 wave_dim: 1024
 ```
 
-`v3.2-canonical-aliases` keeps recursive topology combing, structural peak search,
+`v3.3-modular-router` keeps recursive topology combing, structural peak search,
 reusable memory indexes, arrow-text extraction, feedback packets, regression
 evaluation, release doctor checks, eval corpus loading, JSONL serve mode, and
 richer field interpretation. It adds a WAW corpus where the lexical baseline is
@@ -571,7 +571,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v3.2.0`.
+Current release: `v3.3.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
