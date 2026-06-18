@@ -20,6 +20,7 @@ mod map_gate;
 mod model;
 mod nanda_6m;
 mod pack6m;
+mod proof;
 mod report;
 mod search;
 
@@ -66,6 +67,7 @@ enum Command {
     Index(IndexArgs),
     Search(SearchArgs),
     Focus(FocusArgs),
+    Proof(ProofArgs),
     Probe(ProbeArgs),
     DatasetDoctor(DatasetDoctorArgs),
     Aliases(AliasesArgs),
@@ -309,6 +311,45 @@ struct FocusArgs {
     out: Option<PathBuf>,
     #[arg(long)]
     stdout: bool,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct ProofArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "proof")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long)]
+    query_file: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "auto")]
+    query_format: InputFormat,
+    #[arg(long, default_value_t = nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY)]
+    max_triads: usize,
+    #[arg(long, default_value_t = 256)]
+    route_cap: usize,
+    #[arg(long, default_value_t = 64)]
+    route_triad_cap: usize,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "route")]
+    group_by: PeakGroupBy,
+    #[arg(long, default_value_t = 8)]
+    sample: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    focus_out: Option<PathBuf>,
+    #[arg(long)]
+    include_focused_packet: bool,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]
@@ -579,6 +620,7 @@ fn run() -> Result<u8> {
         Command::Index(args) => index_cmd(args),
         Command::Search(args) => search_cmd(args),
         Command::Focus(args) => focus::focus_cmd(args),
+        Command::Proof(args) => proof::proof_cmd(args),
         Command::Probe(args) => probe_cmd(args),
         Command::DatasetDoctor(args) => dataset_doctor_cmd(args),
         Command::Aliases(args) => aliases_cmd(args),

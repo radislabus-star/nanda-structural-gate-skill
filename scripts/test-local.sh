@@ -18,6 +18,7 @@ feedback="$root/nanda-structural-gate/scripts/nanda-feedback"
 indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
+proof="$root/nanda-structural-gate/scripts/nanda-proof"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
 dataset_doctor="$root/nanda-structural-gate/scripts/nanda-dataset-doctor"
 aliases="$root/nanda-structural-gate/scripts/nanda-aliases"
@@ -249,6 +250,25 @@ jq empty "$tmp_focus_packet"
 "$budget" "$tmp_focus_packet" --input-format json >/dev/null
 "$search" "$tmp_focus_packet" --input-format json --top-k 2 >/dev/null
 rm -f "$tmp_focus_packet"
+
+tmp_proof_report="$(mktemp)"
+tmp_proof_focus="$(mktemp)"
+set +e
+proof_json="$("$proof" "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --max-triads 12 --route-cap 4 --route-triad-cap 4 --focus-out "$tmp_proof_focus" --out "$tmp_proof_report")"
+proof_status=$?
+set -e
+if [[ "$proof_status" -ne 0 && "$proof_status" -ne 3 ]]; then
+  echo "expected proof to PASS or WATCH" >&2
+  echo "$proof_json" >&2
+  exit 1
+fi
+jq -e '.mode == "proof-from-focus"' <<<"$proof_json" >/dev/null
+jq -e '.proof_version == "v26-hot-proof-report"' <<<"$proof_json" >/dev/null
+jq -e '.focused_memory_size <= 12' <<<"$proof_json" >/dev/null
+jq -e '.runtime_contract.focus.state == "PACKED_RUNTIME_READY"' <<<"$proof_json" >/dev/null
+jq empty "$tmp_proof_report"
+jq empty "$tmp_proof_focus"
+rm -f "$tmp_proof_report" "$tmp_proof_focus"
 grep -q '"peak": "certification"' <<<"$search_json"
 first_peak="$(jq -r '.peaks[0].peak' <<<"$search_json")"
 if [[ "$first_peak" != "certification" ]]; then

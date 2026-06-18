@@ -147,12 +147,14 @@ and prove `used_bytes <= 6,291,456` for the hot core.
 v20 adds a stricter runtime attach contract on top of the broad arena budget.
 v21 makes the product decision explicit: the active proof window is 15,000
 triads with 64 default field requests. v24 adds the physical focused-packet
-builder that creates that 15k window before hot proof. The full arena can still
-hold 65,536 packed triads, but those records are storage/focus material, not
-one monolithic proof pass. A packet may fit the broad 6 MiB arena while still
-returning `FOCUS_REQUIRED` for one hot-cycle attach. This is intentional: the
-runtime must refuse unfocused work instead of silently spilling score buffers
-into normal RAM.
+builder that creates that 15k window before hot proof. v25-v26 wrap the chain
+as `nanda-proof`: corpus diagnostics, focused packet, runtime contract,
+interference search, packed bridge, and hot proof report. The full arena can
+still hold 65,536 packed triads, but those records are storage/focus material,
+not one monolithic proof pass. A packet may fit the broad 6 MiB arena while
+still returning `FOCUS_REQUIRED` for one hot-cycle attach. This is intentional:
+the runtime must refuse unfocused work instead of silently spilling score
+buffers into normal RAM.
 
 The v20 runtime states are:
 
@@ -404,10 +406,12 @@ The first implementation must pass these before it is trusted:
 7. Large unfocused corpus returns `FOCUS_REQUIRED`, not a fake PASS.
 8. `nanda-focus` writes a route-balanced packet at or below the 15,000-triad
    proof cap.
-9. Focused corpus returns stable peaks with better margin than lexical
+9. `nanda-proof` returns `ANSWER_READY` only when both the retrieval field and
+   packed peak are safe; otherwise it returns WATCH/VETO with repair tasks.
+10. Focused corpus returns stable peaks with better margin than lexical
    baseline.
-10. Linux CI must cover deterministic parity with v3.0 fixtures.
-11. Microbench must report bytes used, peak count, query time, and whether the
+11. Linux CI must cover deterministic parity with v3.0 fixtures.
+12. Microbench must report bytes used, peak count, query time, and whether the
     packet stayed in the 6 MiB budget.
 
 ## Migration Plan

@@ -50,6 +50,12 @@
   from about 105.6 ms/op to about 56.7 ms/op on the local T480 run.
 - `nanda focus` / `nanda-focus` builds a physical route-balanced focused JSON
   packet with `--max-triads` defaulting to the 15,000-triad hot proof cap.
+- `nanda proof` / `nanda-proof` runs the v25 proof-from-focus pipeline:
+  dataset doctor, focused packet builder, NANDA-6M budget, packed bridge, and
+  interference search in one report.
+- v26 proof reports now expose top-level `proof_state`, `answer_ready`,
+  `runtime_ready`, `hot_proof`, and `repair` fields so agents can distinguish
+  "runtime/packed peak ready" from "safe to answer".
 - NANDA-6M version is now `nanda-6m-v24-focused-packet-runtime`.
 
 ## v3.3.0 - 2026-06-18

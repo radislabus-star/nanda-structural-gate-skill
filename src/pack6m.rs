@@ -57,7 +57,7 @@ pub(crate) fn pack6m_cmd(args: Pack6mArgs) -> Result<u8> {
     })
 }
 
-pub(super) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad]) -> Value {
+pub(crate) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad]) -> Value {
     let active_triads = source.len() + candidates.len();
     let active_lanes = packet.negative_shortcuts.len() + packet.positive_shortcuts.len();
     let mut entities = BTreeSet::<String>::new();
@@ -275,7 +275,7 @@ pub(super) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
     })
 }
 
-pub(super) fn pack_report(
+pub(crate) fn pack_report(
     packet: &Packet,
     source: &[Triad],
     candidates: &[Triad],
