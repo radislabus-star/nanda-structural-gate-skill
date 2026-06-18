@@ -237,6 +237,8 @@ nanda-eval --suite examples/eval-corpus.json
 printf '{"command":"doctor"}\n' | nanda-serve
 nanda-doctor
 nanda-dogfood .
+nanda-map-code src/main.rs
+nanda-dogfood . --refactor-plan --format json
 nanda-self-check
 ```
 
@@ -270,6 +272,10 @@ For code projects, add `--normalize-paths` to collapse paths such as
 `examples/self-dogfood.nanda.json` packet. It is the fast agent-facing readiness
 check: a root `WATCH` is acceptable only when it is size-only, the map is clean,
 and every linked branch is `PASS`.
+`nanda-map-code` is the refactor planning pass for large Rust files. It clusters
+functions, reports cross-cluster dependencies, suggests target files, and marks
+extraction risk. Use `nanda-dogfood . --refactor-plan` when you want the normal
+structural verdict plus code-boundary recommendations in one packet.
 `nanda-report` is agent-first: it returns a JSON decision packet by default.
 Use `--format md` only when a human-facing report is explicitly needed.
 `nanda-map` exposes the core structural map: source/candidate group sizes,

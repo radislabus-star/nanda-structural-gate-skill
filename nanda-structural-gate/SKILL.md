@@ -91,6 +91,8 @@ To inspect the structural wave map directly:
 ```bash
 scripts/nanda-map task.md --domain general
 scripts/nanda-map task.md --domain code --normalize-paths
+scripts/nanda-map-code src/main.rs --format json
+scripts/nanda-dogfood . --refactor-plan --format json
 scripts/nanda-comb task.json --input-format json --depth 2
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index memory-a.json memory-b.md --out .nanda/index.json
@@ -138,6 +140,11 @@ Use `nanda-dogfood .` inside a repository that has
 `examples/self-dogfood.nanda.json` when you need a compact agent readiness
 check. It accepts root `WATCH` only when it is size-only and all linked branches
 pass.
+Use `nanda-map-code` before or during Rust refactors when a large file needs
+module boundaries. It clusters functions, reports cross-cluster dependencies,
+suggests target files, and marks extraction risk. Use
+`nanda-dogfood . --refactor-plan` when you want the structural dogfood verdict
+and code-boundary recommendations in one JSON packet.
 Use `nanda-index` to build a reusable memory packet from triad packets or
 worksheets.
 Use `nanda-extract` when the input is simple notes rather than JSON/Markdown

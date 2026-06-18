@@ -29,6 +29,7 @@ reporter="$root/nanda-structural-gate/scripts/nanda-report"
 split_md="$root/nanda-structural-gate/scripts/nanda-split-md"
 split_packet="$root/nanda-structural-gate/scripts/nanda-split"
 mapper="$root/nanda-structural-gate/scripts/nanda-map"
+code_mapper="$root/nanda-structural-gate/scripts/nanda-map-code"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
@@ -513,6 +514,12 @@ grep -q '"local_pass": 14' <<<"$dogfood_json"
 dogfood_text="$("$dogfood" "$root")"
 grep -q 'ACTION: SAFE_TO_EDIT' <<<"$dogfood_text"
 grep -q 'BRANCHES: 14/14 PASS' <<<"$dogfood_text"
+dogfood_refactor_json="$("$dogfood" "$root" --refactor-plan --format json)"
+jq -e '.refactor_plan.mode == "code-map"' <<<"$dogfood_refactor_json" >/dev/null
+jq -e '.refactor_plan.next_refactors | length > 0' <<<"$dogfood_refactor_json" >/dev/null
+code_map_json="$("$code_mapper" "$root/src/main.rs" --format json)"
+jq -e '.mode == "code-map"' <<<"$code_map_json" >/dev/null
+jq -e '.clusters | length > 0' <<<"$code_map_json" >/dev/null
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null
@@ -608,6 +615,7 @@ fi
 "$probe" --help | grep -q "Usage: nanda probe"
 "$serve" --help | grep -q "Usage: nanda serve"
 "$dogfood" --help | grep -q "Usage: nanda dogfood"
+"$code_mapper" --help | grep -q "Usage: nanda map-code"
 "$split_packet" --help | grep -q "Usage: nanda split"
 "$reporter" --format md --title "Smoke Markdown Report" --domain code --overall "$root/examples/triads.watch-large.md" --route code:"$root/examples/triads.code-flow.md" >/dev/null || test "$?" -eq 3
 
