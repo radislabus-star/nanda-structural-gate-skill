@@ -385,6 +385,7 @@ fn proof_report(
             "lexical_baseline": search["lexical_baseline"],
             "wins_over_lexical_baseline": search["wins_over_lexical_baseline"],
             "coarse_to_fine": search["coarse_to_fine"],
+            "resonant_field": search["resonant_field"],
             "field_interpretation": search["field_interpretation"],
             "peaks": search["peaks"]
         },
@@ -461,6 +462,15 @@ fn proof_reason_codes(
     }
     if !search["safe_to_answer"].as_bool().unwrap_or(false) {
         codes.push("FIELD_NOT_SAFE".to_string());
+    }
+    match search["resonant_field"]["state"].as_str().unwrap_or("") {
+        "WAW_RESONANCE" => codes.push("WAW_RESONANCE".to_string()),
+        "RESONANCE_REVERSED" => codes.push("RESONANCE_REVERSED".to_string()),
+        "FIELD_LEAKING" => codes.push("RESONANCE_FIELD_LEAKING".to_string()),
+        "FIELD_ANTI_DOMINATED" => codes.push("RESONANCE_ANTI_DOMINATED".to_string()),
+        "FIELD_DIFFUSE" => codes.push("RESONANCE_FIELD_DIFFUSE".to_string()),
+        "RESONANCE_REVIEW" => codes.push("RESONANCE_NOT_READY".to_string()),
+        _ => {}
     }
     let packed_state = pack["peak_decision"]["state"]
         .as_str()
@@ -546,9 +556,23 @@ fn proof_confidence(
         "PACKED_LANE_REPLAY_PARTIAL" => 0.55,
         _ => 0.5,
     };
+    let resonance_score = match search["resonant_field"]["state"].as_str().unwrap_or("") {
+        "WAW_RESONANCE" => 1.0,
+        "RESONANCE_REVIEW" => 0.62,
+        "FIELD_LEAKING" => 0.42,
+        "FIELD_DIFFUSE" | "FIELD_ANTI_DOMINATED" => 0.25,
+        "RESONANCE_REVERSED" => 0.0,
+        _ => 0.5,
+    };
     let score = round4(
-        (corpus_score + focus_score + budget_score + search_score + packed_score + replay_score)
-            / 6.0,
+        (corpus_score
+            + focus_score
+            + budget_score
+            + search_score
+            + packed_score
+            + replay_score
+            + resonance_score)
+            / 7.0,
     );
     json!({
         "score": score,
@@ -559,7 +583,8 @@ fn proof_confidence(
             "budget": budget_score,
             "search": search_score,
             "packed": packed_score,
-            "replay": replay_score
+            "replay": replay_score,
+            "resonance": resonance_score
         },
         "read_as": "Structural confidence is a review aid, not a PASS condition. ANSWER_READY still requires safe search and safe packed peak."
     })

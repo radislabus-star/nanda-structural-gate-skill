@@ -320,6 +320,12 @@ packed peak to be safe; otherwise the output is an explainable review report.
 Inspect top-level `reason_codes`, `proof_confidence`, and `proof_compare`
 before trusting a peak. Use `nanda-proof --suite examples/proof-corpus.json`
 to run the proof regression corpus.
+`nanda-search` now emits `resonant_field`, the v28 physical field layer. It
+checks phase lock, standing-wave reflection, route-boundary leakage,
+destructive locality, multiscale agreement, energy conservation,
+frequency/mode scan, temporal phase, coherence memory, and the final
+`waw_status`. Treat `WAW_RESONANCE` as a strong field phenomenon, but still
+require proof/packed gates before final `ANSWER_READY`.
 `nanda-aliases` is the explicit canonicalization diagnostic. If a JSON packet
 contains `aliases`, NANDA applies exact high-confidence variants to `subject`,
 `object`, `route`, and `group` before check/map/search/pack6m. It does not
@@ -700,6 +706,18 @@ reinforced peak:       certification
 reinforced group:      certification-route
 ```
 
+Current resonant field fixture:
+
+```text
+route trap search:      WAW_RESONANCE
+lexical trap:           customs
+structural peak:        certification
+phase:                  PHASE_LOCKED
+standing wave:          STANDING_STABLE
+energy:                 ENERGY_CONTAINED
+proof state:            WATCH if packed peak remains thin
+```
+
 Current heavy 16k finance fixture:
 
 ```bash
@@ -714,6 +732,7 @@ triads:                 16,384
 dataset-doctor:         PASS
 pack6m full corpus:     FOCUS_REQUIRED
 search full corpus:     FIELD_CONTESTED / WATCH
+resonance:              NO_WAW_RESONANCE
 focused proof:          9,620 triads, PACKED_RUNTIME_READY, WATCH
 top_peak:               ai-demand
 ```

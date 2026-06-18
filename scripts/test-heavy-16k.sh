@@ -41,6 +41,10 @@ jq -e '.verdict == "WATCH"' <<<"$search_json" >/dev/null
 jq -e '.top_peak == "ai-demand"' <<<"$search_json" >/dev/null
 jq -e '.field_state == "FIELD_CONTESTED"' <<<"$search_json" >/dev/null
 jq -e '.safe_to_answer == false' <<<"$search_json" >/dev/null
+jq -e '.resonant_field.version == "v28-resonant-field-core"' <<<"$search_json" >/dev/null
+jq -e '.resonant_field.waw_status == "NO_WAW_RESONANCE"' <<<"$search_json" >/dev/null
+jq -e '.resonant_field.phase_lock.state == "PHASE_PARTIAL"' <<<"$search_json" >/dev/null
+jq -e '.resonant_field.standing_wave.state == "STANDING_UNSTABLE"' <<<"$search_json" >/dev/null
 
 set +e
 proof_json="$(nanda-proof "$packet" --input-format json --max-triads 15000 --route-cap 32 --route-triad-cap 600 --format json)"
@@ -57,6 +61,7 @@ jq -e '.runtime_ready == true' <<<"$proof_json" >/dev/null
 jq -e '.proof_state == "WATCH"' <<<"$proof_json" >/dev/null
 jq -e '.field_state == "FIELD_CONTESTED"' <<<"$proof_json" >/dev/null
 jq -e '.reason_codes | index("FIELD_CONTESTED")' <<<"$proof_json" >/dev/null
+jq -e '.reason_codes | index("RESONANCE_FIELD_DIFFUSE")' <<<"$proof_json" >/dev/null
 jq -e '.hot_proof.packed_peak_state == "PACKED_FOCUSED"' <<<"$proof_json" >/dev/null
 
 echo "ok"

@@ -462,6 +462,17 @@ pub(crate) fn interference_search(
         object.insert("corpus".to_string(), corpus_interpretation.clone());
     }
     let coarse_to_fine = coarse_to_fine_trace(&peaks, &query_terms);
+    let resonant_field = resonant_field_report(
+        &peaks,
+        peak_margin,
+        &lexical_baseline,
+        &corpus_interpretation,
+        &route_balanced_focus,
+        &coarse_to_fine,
+        &destructive_interference,
+        &constructive_interference,
+        packet,
+    );
     let field_state_machine = field_state_machine(
         &peaks,
         peak_margin,
@@ -510,6 +521,7 @@ pub(crate) fn interference_search(
             "policy": "confidence multiplied by evidence authority: current/canon > latest/frontier > historical/archive > archive_noise"
         },
         "coarse_to_fine": coarse_to_fine,
+        "resonant_field": resonant_field,
         "field_state_machine": field_state_machine,
         "field_interpretation": field_interpretation,
         "peaks": output_peaks,
@@ -570,6 +582,397 @@ pub(crate) fn search_verdict(field_state: &str, safe_to_answer: bool) -> &'stati
         "FIELD_FOCUSED" | "FIELD_SAFE" | "FIELD_ROUTE_BALANCED" if safe_to_answer => "PASS",
         _ => "WATCH",
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn resonant_field_report(
+    peaks: &[Value],
+    margin: f64,
+    lexical_baseline: &Value,
+    corpus: &Value,
+    route_balanced_focus: &Value,
+    coarse_to_fine: &Value,
+    destructive_interference: &Value,
+    constructive_interference: &Value,
+    packet: &Packet,
+) -> Value {
+    if peaks.is_empty() {
+        return json!({
+            "version": "v28-resonant-field-core",
+            "state": "NO_RESONANCE",
+            "waw_status": "NO_PEAK",
+            "safe_to_answer": false,
+            "read_as": "No field was produced."
+        });
+    }
+    let top = &peaks[0];
+    let second = peaks.get(1);
+    let top_peak = top["peak"].as_str().unwrap_or("");
+    let lexical_peak = lexical_baseline["top_peak"].as_str().unwrap_or("");
+    let top_score = top["score"].as_f64().unwrap_or(0.0);
+    let top_component = top["propagation"]["component_score"]
+        .as_f64()
+        .unwrap_or(0.0);
+    let second_component = second
+        .and_then(|peak| peak["propagation"]["component_score"].as_f64())
+        .unwrap_or(0.0);
+    let component_gap = round4(top_component - second_component);
+    let support = top["supporting_triads"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let anti = top["anti_triads"].as_array().cloned().unwrap_or_default();
+    let support_energy = round4(
+        support
+            .iter()
+            .map(|item| item["score"].as_f64().unwrap_or(0.0).max(0.0))
+            .sum(),
+    );
+    let anti_energy = round4(
+        anti.iter()
+            .map(|item| item["score"].as_f64().unwrap_or(0.0).max(0.0))
+            .sum(),
+    );
+    let total_peak_energy = peaks
+        .iter()
+        .map(|peak| peak["score"].as_f64().unwrap_or(0.0).max(0.0))
+        .sum::<f64>();
+    let leakage_energy = round4((total_peak_energy - top_score.max(0.0)).max(0.0));
+    let energy_total = round4(support_energy + anti_energy + leakage_energy);
+    let leakage_ratio = if energy_total > 0.0 {
+        round4(leakage_energy / energy_total)
+    } else {
+        0.0
+    };
+    let anti_ratio = if support_energy + anti_energy > 0.0 {
+        round4(anti_energy / (support_energy + anti_energy))
+    } else {
+        0.0
+    };
+    let polarity = top["polarization"]["state"].as_str().unwrap_or("");
+    let phase_score = match polarity {
+        "ALIGNED" => round4(
+            (0.45
+                + top["coherence"].as_f64().unwrap_or(0.0)
+                + (0.2 * top["coverage"].as_f64().unwrap_or(0.0)))
+            .min(1.0),
+        ),
+        "UNALIGNED" => round4((0.22 + (0.5 * top["coherence"].as_f64().unwrap_or(0.0))).min(0.72)),
+        "REVERSED" => 0.0,
+        _ => round4((0.12 + (0.4 * top["coherence"].as_f64().unwrap_or(0.0))).min(0.55)),
+    };
+    let reflected_margin =
+        round4((margin + (0.18 * component_gap.max(0.0)) - (0.06 * anti_ratio)).max(0.0));
+    let standing_iterations =
+        standing_wave_iterations(top_peak, top_score, reflected_margin, anti_ratio, polarity);
+    let standing_stable = standing_iterations
+        .last()
+        .map(|item| {
+            item["peak"].as_str().unwrap_or("") == top_peak
+                && item["state"].as_str().unwrap_or("") != "COLLAPSED"
+        })
+        .unwrap_or(false)
+        && reflected_margin >= 0.055;
+    let reflection = round4((anti_ratio * 0.62 + leakage_ratio * 0.38).min(1.0));
+    let boundary_state = if polarity == "REVERSED" {
+        "BOUNDARY_REVERSED"
+    } else if leakage_ratio <= 0.34 && anti_ratio <= 0.48 {
+        "BOUNDARY_CONTAINED"
+    } else if leakage_ratio <= 0.52 {
+        "BOUNDARY_LEAKING"
+    } else {
+        "BOUNDARY_DIFFUSE"
+    };
+    let destructive_state = if destructive_interference["applied"]
+        .as_bool()
+        .unwrap_or(false)
+    {
+        "SHORTCUT_SUPPRESSED"
+    } else if anti_ratio <= 0.35 {
+        "ANTI_LOW"
+    } else {
+        "ANTI_READY"
+    };
+    let multiscale_score = round4(
+        (top["top_triad_score"].as_f64().unwrap_or(0.0).min(1.0)
+            + top["coherence"].as_f64().unwrap_or(0.0).max(0.0)
+            + top["coverage"].as_f64().unwrap_or(0.0).max(0.0)
+            + top_component.clamp(0.0, 1.0))
+            / 4.0,
+    );
+    let scan = resonance_scan(top, peaks, lexical_peak, constructive_interference);
+    let temporal_phase = temporal_phase_report(&support, packet);
+    let memory = coherence_memory_report(packet, top_peak);
+    let lexical_trap = !lexical_peak.is_empty() && lexical_peak != top_peak;
+    let corpus_clean = corpus["verdict"].as_str().unwrap_or("") != "WATCH";
+    let focused_or_balanced = route_balanced_focus["enabled"].as_bool().unwrap_or(false)
+        || coarse_to_fine["state"].as_str().unwrap_or("") == "LOCALIZED";
+    let waw_ready = polarity != "REVERSED"
+        && phase_score >= 0.75
+        && standing_stable
+        && reflected_margin >= 0.055
+        && component_gap >= 0.12
+        && leakage_ratio <= 0.5
+        && anti_ratio <= 0.62
+        && multiscale_score >= 0.36
+        && focused_or_balanced
+        && corpus_clean;
+    let state = if waw_ready {
+        "WAW_RESONANCE"
+    } else if polarity == "REVERSED" {
+        "RESONANCE_REVERSED"
+    } else if leakage_ratio > 0.58 {
+        "FIELD_LEAKING"
+    } else if anti_ratio > 0.65 {
+        "FIELD_ANTI_DOMINATED"
+    } else if reflected_margin < 0.04 {
+        "FIELD_DIFFUSE"
+    } else {
+        "RESONANCE_REVIEW"
+    };
+    json!({
+        "version": "v28-resonant-field-core",
+        "state": state,
+        "waw_status": if waw_ready { "WAW_RESONANCE" } else { "NO_WAW_RESONANCE" },
+        "safe_to_answer": waw_ready,
+        "top_peak": top_peak,
+        "lexical_trap_detected": lexical_trap,
+        "phase_lock": {
+            "state": if phase_score >= 0.75 { "PHASE_LOCKED" } else if phase_score > 0.0 { "PHASE_PARTIAL" } else { "PHASE_REVERSED" },
+            "score": phase_score,
+            "polarity": polarity,
+            "read_as": "Phase lock combines role polarity, wave coherence, and query coverage."
+        },
+        "standing_wave": {
+            "state": if standing_stable { "STANDING_STABLE" } else { "STANDING_UNSTABLE" },
+            "reflected_margin": reflected_margin,
+            "iterations": standing_iterations,
+            "read_as": "The peak is reflected through the field several times; stable peaks keep identity and do not collapse."
+        },
+        "route_boundary": {
+            "state": boundary_state,
+            "reflection": reflection,
+            "leakage_ratio": leakage_ratio,
+            "anti_ratio": anti_ratio,
+            "read_as": "Routes/groups act as membranes: foreign pulls reflect, leak, or diffuse the field."
+        },
+        "destructive_locality": {
+            "state": destructive_state,
+            "applied": destructive_interference["applied"],
+            "suppression_count": destructive_interference["suppressions"].as_array().map(|items| items.len()).unwrap_or(0),
+            "read_as": "Anti-waves should suppress a rejected shortcut path, not erase the whole topic."
+        },
+        "multiscale": {
+            "state": if multiscale_score >= 0.5 { "MULTISCALE_ALIGNED" } else if multiscale_score >= 0.36 { "MULTISCALE_PARTIAL" } else { "MULTISCALE_THIN" },
+            "score": multiscale_score,
+            "triad": top["top_triad_score"],
+            "route": top["coherence"],
+            "coverage": top["coverage"],
+            "component": top_component,
+            "read_as": "A strong field agrees across triad, route, coverage, and propagation scales."
+        },
+        "energy": {
+            "state": if leakage_ratio <= 0.35 { "ENERGY_CONTAINED" } else if leakage_ratio <= 0.55 { "ENERGY_LEAKING" } else { "ENERGY_DIFFUSE" },
+            "support": support_energy,
+            "anti": anti_energy,
+            "leakage": leakage_energy,
+            "total": energy_total,
+            "leakage_ratio": leakage_ratio,
+            "anti_ratio": anti_ratio,
+            "read_as": "Query energy is accounted as support, anti-support, and leakage into rival peaks."
+        },
+        "resonance_scan": scan,
+        "temporal_phase": temporal_phase,
+        "coherence_memory": memory,
+        "waw_threshold": {
+            "requires": [
+                "phase_score >= 0.75",
+                "standing_wave stable",
+                "component_gap >= 0.12",
+                "reflected_margin >= 0.055",
+                "leakage_ratio <= 0.50",
+                "multiscale_score >= 0.36",
+                "corpus not WATCH"
+            ],
+            "passed": waw_ready
+        },
+        "read_as": if waw_ready {
+            "The peak survived phase, reflection, energy, multiscale, and corpus checks. This is a WAW resonance, not just a high score."
+        } else {
+            "The field exposes useful physics, but it did not satisfy the full WAW resonance threshold."
+        }
+    })
+}
+
+fn standing_wave_iterations(
+    top_peak: &str,
+    top_score: f64,
+    reflected_margin: f64,
+    anti_ratio: f64,
+    polarity: &str,
+) -> Vec<Value> {
+    let mut wave = top_score.max(0.0);
+    let mut out = vec![];
+    for idx in 0..4 {
+        let damping = 0.04 * idx as f64;
+        let gain = reflected_margin * (1.0 - damping);
+        let loss = anti_ratio * 0.035;
+        wave = round4((wave + gain - loss).max(0.0));
+        let state = if polarity == "REVERSED" {
+            "COLLAPSED"
+        } else if wave >= top_score.max(0.0) * 0.92 {
+            "PEAK_HELD"
+        } else {
+            "WEAKENED"
+        };
+        out.push(json!({
+            "iteration": idx + 1,
+            "peak": if state == "COLLAPSED" { "" } else { top_peak },
+            "relative_energy": wave,
+            "state": state
+        }));
+    }
+    out
+}
+
+fn resonance_scan(
+    top: &Value,
+    peaks: &[Value],
+    lexical_peak: &str,
+    constructive_interference: &Value,
+) -> Value {
+    let center = &top["center"];
+    let route_peak = top["peak"].as_str().unwrap_or("");
+    let relation_peak = center["relation"].as_str().unwrap_or("");
+    let role_peak = format!(
+        "{}->{}",
+        center["subject_role"].as_str().unwrap_or(""),
+        center["object_role"].as_str().unwrap_or("")
+    );
+    let nearest_rival = peaks
+        .get(1)
+        .and_then(|peak| peak["peak"].as_str())
+        .unwrap_or("");
+    json!({
+        "modes": [
+            {
+                "mode": "route",
+                "peak": route_peak,
+                "state": "ACTIVE"
+            },
+            {
+                "mode": "relation",
+                "peak": relation_peak,
+                "state": if relation_peak.is_empty() { "NO_MODE" } else { "ACTIVE" }
+            },
+            {
+                "mode": "role",
+                "peak": role_peak,
+                "state": "ACTIVE"
+            },
+            {
+                "mode": "lexical",
+                "peak": lexical_peak,
+                "state": if !lexical_peak.is_empty() && lexical_peak != route_peak { "LEXICAL_TRAP" } else { "ALIGNED" }
+            },
+            {
+                "mode": "constructive_memory",
+                "peak": constructive_interference["reinforcements"].as_array().and_then(|items| items.first()).and_then(|item| item["reinforce_peak"].as_str()).unwrap_or(""),
+                "state": if constructive_interference["applied"].as_bool().unwrap_or(false) { "REINFORCED" } else { "NO_REINFORCEMENT" }
+            }
+        ],
+        "nearest_rival": nearest_rival,
+        "read_as": "Different field modes expose whether the same peak wins by route, relation, role, lexical, and learned-memory frequencies."
+    })
+}
+
+fn temporal_phase_report(support: &[Value], packet: &Packet) -> Value {
+    let text = support
+        .iter()
+        .map(|item| {
+            format!(
+                "{} {} {} {}",
+                item["subject"].as_str().unwrap_or(""),
+                item["relation"].as_str().unwrap_or(""),
+                item["object"].as_str().unwrap_or(""),
+                item["evidence"].as_str().unwrap_or("")
+            )
+        })
+        .chain(std::iter::once(packet.query.clone()))
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+    let past = ["past", "previous", "archive", "was", "2024", "2025"]
+        .iter()
+        .filter(|term| text.contains(**term))
+        .count();
+    let current = ["current", "today", "now", "live", "2026-06-18", "snapshot"]
+        .iter()
+        .filter(|term| text.contains(**term))
+        .count();
+    let future = [
+        "future",
+        "forecast",
+        "expect",
+        "scheduled",
+        "tomorrow",
+        "2026-06-19",
+    ]
+    .iter()
+    .filter(|term| text.contains(**term))
+    .count();
+    let total_temporal_hits = past + current + future;
+    let active = if total_temporal_hits == 0 {
+        "none"
+    } else {
+        [("past", past), ("current", current), ("future", future)]
+            .into_iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(label, _)| label)
+            .unwrap_or("none")
+    };
+    let contested = [past, current, future]
+        .iter()
+        .filter(|count| **count > 0)
+        .count()
+        > 1;
+    json!({
+        "state": if contested { "TEMPORAL_CONTESTED" } else if active == "none" { "TEMPORAL_UNSPECIFIED" } else { "TEMPORAL_PHASE_LOCKED" },
+        "dominant_phase": active,
+        "counts": {
+            "past": past,
+            "current": current,
+            "future": future
+        },
+        "read_as": "Past facts, current facts, and future forecasts are treated as different phase bands."
+    })
+}
+
+fn coherence_memory_report(packet: &Packet, top_peak: &str) -> Value {
+    let positive_hits = packet
+        .positive_shortcuts
+        .iter()
+        .filter(|shortcut| {
+            shortcut.reinforce_peak == top_peak
+                || shortcut.reinforce_route == top_peak
+                || shortcut.reinforce_group == top_peak
+        })
+        .count();
+    let negative_hits = packet
+        .negative_shortcuts
+        .iter()
+        .filter(|shortcut| {
+            shortcut.suppress_peak == top_peak
+                || shortcut.suppress_route == top_peak
+                || shortcut.suppress_group == top_peak
+        })
+        .count();
+    json!({
+        "state": if positive_hits > negative_hits { "MEMORY_REINFORCED" } else if negative_hits > 0 { "MEMORY_SUPPRESSED" } else { "MEMORY_NEUTRAL" },
+        "positive_hits": positive_hits,
+        "negative_hits": negative_hits,
+        "read_as": "Coherence memory stores accepted/rejected field shapes as lane feedback, not as final answers."
+    })
 }
 
 pub(crate) fn peak_decision(peaks: &[Value], margin: f64, lexical_peak: &str) -> Value {
@@ -874,6 +1277,11 @@ pub(crate) fn print_search_text(out: &Value) {
         out["peak_margin"].as_f64().unwrap_or(0.0)
     );
     println!(
+        "resonance: {} / {}",
+        out["resonant_field"]["state"].as_str().unwrap_or(""),
+        out["resonant_field"]["waw_status"].as_str().unwrap_or("")
+    );
+    println!(
         "lexical_baseline_top: {}",
         out["lexical_baseline"]["top_peak"].as_str().unwrap_or("")
     );
@@ -926,6 +1334,11 @@ pub(crate) fn print_search_md(out: &Value) {
         out["peak_decision"]["safe_to_answer"]
     );
     println!("- peak_margin: `{}`", out["peak_margin"]);
+    println!(
+        "- resonance: `{}` / `{}`",
+        out["resonant_field"]["state"].as_str().unwrap_or(""),
+        out["resonant_field"]["waw_status"].as_str().unwrap_or("")
+    );
     println!(
         "- lexical_baseline_top: `{}`",
         out["lexical_baseline"]["top_peak"].as_str().unwrap_or("")

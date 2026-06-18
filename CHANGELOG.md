@@ -63,6 +63,13 @@
 - `nanda proof --suite` / `nanda-proof --suite` now runs a proof regression
   corpus against expected proof states, top peaks, field states, and reason
   codes.
+- v28 `nanda search` reports `resonant_field`, a physical field layer for
+  phase lock, standing-wave reflection, route-boundary leakage, destructive
+  locality, multiscale agreement, energy accounting, mode scan, temporal phase,
+  coherence memory, and `WAW_RESONANCE` thresholding.
+- v28 proof reason codes now surface resonance blockers such as
+  `WAW_RESONANCE`, `RESONANCE_FIELD_DIFFUSE`,
+  `RESONANCE_FIELD_LEAKING`, and `RESONANCE_REVERSED`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

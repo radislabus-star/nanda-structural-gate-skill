@@ -172,6 +172,12 @@ why a peak is not answer-ready, confidence is only a review aid, and compare
 shows whether raw search, focused search, and packed peak agree. Use
 `nanda-proof --suite examples/proof-corpus.json --input-format json` after
 core/search/pack changes to catch proof regressions.
+Inspect `resonant_field` after search/proof. It is the v28 physical field
+layer: phase lock, standing-wave reflection, route-boundary leakage,
+destructive locality, multiscale agreement, energy accounting, mode scan,
+temporal phase, coherence memory, and `waw_status`. Treat `WAW_RESONANCE` as a
+strong structural phenomenon, not by itself as final permission to answer; the
+packed/proof gates still decide `ANSWER_READY`.
 Use `nanda-aliases` when the packet contains explicit `aliases` and you need
 to inspect canonicalization before the gate. NANDA applies only explicit,
 high-confidence aliases; it does not guess equivalence. The alias layer

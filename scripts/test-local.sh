@@ -447,6 +447,11 @@ jq -e '.peak_decision.state == "FOCUSED"' <<<"$trap_search_json" >/dev/null
 jq -e '.peak_decision.safe_to_answer == true' <<<"$trap_search_json" >/dev/null
 jq -e '.field_state_machine.state == "FIELD_FOCUSED" and .field_state_machine.safe_to_answer == true' <<<"$trap_search_json" >/dev/null
 jq -e '.field_state_machine.signals.lexical_trap_detected == true' <<<"$trap_search_json" >/dev/null
+jq -e '.resonant_field.version == "v28-resonant-field-core"' <<<"$trap_search_json" >/dev/null
+jq -e '.resonant_field.state == "WAW_RESONANCE" and .resonant_field.waw_status == "WAW_RESONANCE"' <<<"$trap_search_json" >/dev/null
+jq -e '.resonant_field.phase_lock.state == "PHASE_LOCKED"' <<<"$trap_search_json" >/dev/null
+jq -e '.resonant_field.standing_wave.state == "STANDING_STABLE"' <<<"$trap_search_json" >/dev/null
+jq -e '.resonant_field.energy.state == "ENERGY_CONTAINED"' <<<"$trap_search_json" >/dev/null
 jq -e '.field_interpretation.lexical_trap_detected == true' <<<"$trap_search_json" >/dev/null
 jq -e '.field_interpretation.centroid_drift.route.changed == true' <<<"$trap_search_json" >/dev/null
 serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"
