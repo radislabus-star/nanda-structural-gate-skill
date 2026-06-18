@@ -1,3 +1,4 @@
+use crate::*;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -7,6 +8,54 @@ use super::{
     positive_lane_match_ratio, round4, triad_polarity, NegativeShortcut, Packet, PositiveShortcut,
     Triad, CORE_VERSION, WAVE_DIM,
 };
+
+pub(crate) fn budget_cmd(args: BudgetArgs) -> Result<u8> {
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.query,
+        args.normalize_paths,
+    )?;
+    let source = normalize_ids(packet.triads.clone(), "t");
+    let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+    let out = budget_report(&packet, &source, &candidates);
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_budget_text(&out),
+        OutputFormat::Md => print_budget_md(&out),
+    }
+    Ok(if out["fits_l3"].as_bool().unwrap_or(false) {
+        EXIT_PASS
+    } else {
+        EXIT_WATCH
+    })
+}
+
+pub(crate) fn pack6m_cmd(args: Pack6mArgs) -> Result<u8> {
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.query,
+        args.normalize_paths,
+    )?;
+    let source = normalize_ids(packet.triads.clone(), "t");
+    let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+    let out = pack_report(&packet, &source, &candidates, args.sample);
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_pack6m_text(&out),
+        OutputFormat::Md => print_pack6m_md(&out),
+    }
+    Ok(if out["packed_ok"].as_bool().unwrap_or(false) {
+        EXIT_PASS
+    } else {
+        EXIT_WATCH
+    })
+}
 
 pub(super) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad]) -> Value {
     let active_triads = source.len() + candidates.len();
@@ -1710,6 +1759,7 @@ impl IdDictionary {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn pack_triad6m(
     triad: &Triad,
     flags: u16,

@@ -161,7 +161,7 @@ fn bench6m_replay(iterations: u64) -> Value {
 fn bench6m_projection(iterations: u64, triad_count: usize) -> Value {
     let iterations = iterations.max(1);
     let triads = bench6m_triads(triad_count);
-    let query_len = triads.len().min(8).max(1);
+    let query_len = triads.len().clamp(1, 8);
     let mut checksum: u64 = 0;
     let start = Instant::now();
     for idx in 0..iterations {
@@ -218,7 +218,7 @@ fn bench6m_triads(count: usize) -> Vec<nanda_6m::PackedTriad32> {
                 role_pack: (((idx % 16) as u16) << 8) | ((idx % 13) as u16),
                 flags: (idx % 5) as u16,
                 lane_hint: (idx % 17) as u16,
-                check: (0x55aa ^ (idx as u16).wrapping_mul(13)) as u16,
+                check: 0x55aa ^ (idx as u16).wrapping_mul(13),
                 confidence: 160 + (idx % 80) as u8,
                 polarity: (idx % 2) as u8,
             })

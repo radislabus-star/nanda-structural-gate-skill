@@ -516,10 +516,11 @@ grep -q 'ACTION: SAFE_TO_EDIT' <<<"$dogfood_text"
 grep -q 'BRANCHES: 14/14 PASS' <<<"$dogfood_text"
 dogfood_refactor_json="$("$dogfood" "$root" --refactor-plan --format json)"
 jq -e '.refactor_plan.mode == "code-map"' <<<"$dogfood_refactor_json" >/dev/null
-jq -e '.refactor_plan.next_refactors | length > 0' <<<"$dogfood_refactor_json" >/dev/null
+jq -e '.refactor_plan.clusters | length > 0' <<<"$dogfood_refactor_json" >/dev/null
 code_map_json="$("$code_mapper" "$root/src/main.rs" --format json)"
 jq -e '.mode == "code-map"' <<<"$code_map_json" >/dev/null
 jq -e '.clusters | length > 0' <<<"$code_map_json" >/dev/null
+jq -e '.clusters[] | select(.cluster == "cli-router")' <<<"$code_map_json" >/dev/null
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null

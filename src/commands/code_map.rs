@@ -134,7 +134,10 @@ pub(crate) fn report(
 
     let next_refactors = cluster_rows
         .iter()
-        .filter(|row| row["risk"].as_str() != Some("HIGH"))
+        .filter(|row| {
+            row["risk"].as_str() != Some("HIGH")
+                && row["suggested_file"].as_str() != Some("src/main.rs")
+        })
         .take(5)
         .map(|row| {
             json!({
@@ -192,6 +195,9 @@ fn parse_functions(source: &str) -> Vec<FunctionSymbol> {
 }
 
 fn function_name(line: &str) -> Option<String> {
+    if line.starts_with(char::is_whitespace) {
+        return None;
+    }
     let trimmed = line.trim_start();
     let marker = "fn ";
     let start = trimmed.find(marker)? + marker.len();
@@ -205,7 +211,9 @@ fn function_name(line: &str) -> Option<String> {
 
 fn classify_cluster(name: &str) -> String {
     let lower = name.to_ascii_lowercase();
-    let cluster = if lower.contains("dogfood") {
+    let cluster = if matches!(name, "main" | "run" | "run_check") {
+        "cli-router"
+    } else if lower.contains("dogfood") {
         "commands/dogfood"
     } else if lower.contains("pack6m")
         || lower.contains("packed")
@@ -276,6 +284,7 @@ fn suggested_file(cluster: &str) -> &str {
         "eval-benchmark" => "src/eval.rs",
         "io" => "src/io.rs",
         "core-model" => "src/model.rs",
+        "cli-router" => "src/main.rs",
         _ => "src/main.rs",
     }
 }
