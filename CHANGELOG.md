@@ -30,7 +30,11 @@
   construction from cached scores.
 - `nanda bench6m` now includes `--mode support-bucket-build` and
   `--mode support-bucket-build-compile-sweep`.
-- NANDA-6M version is now `nanda-6m-v12-hot-support-bucket-core`.
+- NANDA-6M now has a typed hot-cycle API that runs support scoring, route/group
+  bucket assembly, batched support-field construction, lane compilation, and
+  aligned lane sweep as one cache-resident core call.
+- `nanda bench6m` now includes `--mode hot-cycle`.
+- NANDA-6M version is now `nanda-6m-v19-hot-cycle-core`.
 
 ## v3.3.0 - 2026-06-18
 

@@ -570,6 +570,7 @@ jq -e '.benchmarks.support_score_build.iterations == 100 and .benchmarks.support
 jq -e '.benchmarks.support_score_build_compile_sweep.iterations == 100 and .benchmarks.support_score_build_compile_sweep.kernel == "build_support_scores_fields_and_compile_sweep" and .benchmarks.support_score_build_compile_sweep.fields == 64 and .benchmarks.support_score_build_compile_sweep.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.support_bucket_build.iterations == 100 and .benchmarks.support_bucket_build.kernel == "build_support_score_buckets_and_fields" and .benchmarks.support_bucket_build.fields == 64 and .benchmarks.support_bucket_build.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.support_bucket_build_compile_sweep.iterations == 100 and .benchmarks.support_bucket_build_compile_sweep.kernel == "build_support_score_buckets_fields_and_compile_sweep" and .benchmarks.support_bucket_build_compile_sweep.fields == 64 and .benchmarks.support_bucket_build_compile_sweep.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
+jq -e '.benchmarks.hot_cycle.iterations == 100 and .benchmarks.hot_cycle.kernel == "run_packed_hot_cycle" and .benchmarks.hot_cycle.fields == 64 and .benchmarks.hot_cycle.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
 bench6m_lane_json="$("$bench6m" --mode lane --lane-iterations 1000 --format json)"
 jq -e '.benchmarks.replay == null and .benchmarks.projection == null' <<<"$bench6m_lane_json" >/dev/null
 jq -e '.benchmarks.lane_application.iterations == 1000 and .benchmarks.lane_application.ops_per_second > 0' <<<"$bench6m_lane_json" >/dev/null
@@ -594,6 +595,8 @@ bench6m_support_bucket_build_json="$("$bench6m" --mode support-bucket-build --su
 jq -e '.benchmarks.support_bucket_build.iterations == 10 and .benchmarks.support_bucket_build.fields == 8 and .benchmarks.support_bucket_build.triads_in_memory == 16 and .benchmarks.support_bucket_build.ops_per_second > 0' <<<"$bench6m_support_bucket_build_json" >/dev/null
 bench6m_support_bucket_build_compile_sweep_json="$("$bench6m" --mode support-bucket-build-compile-sweep --support-build-iterations 10 --lane-sweep-width 8 --triads 16 --format json)"
 jq -e '.benchmarks.support_bucket_build_compile_sweep.iterations == 10 and .benchmarks.support_bucket_build_compile_sweep.fields == 8 and .benchmarks.support_bucket_build_compile_sweep.triads_in_memory == 16 and .benchmarks.support_bucket_build_compile_sweep.ops_per_second > 0' <<<"$bench6m_support_bucket_build_compile_sweep_json" >/dev/null
+bench6m_hot_cycle_json="$("$bench6m" --mode hot-cycle --support-build-iterations 10 --lane-sweep-width 8 --triads 16 --format json)"
+jq -e '.benchmarks.hot_cycle.iterations == 10 and .benchmarks.hot_cycle.fields == 8 and .benchmarks.hot_cycle.triads_in_memory == 16 and .benchmarks.hot_cycle.ops_per_second > 0' <<<"$bench6m_hot_cycle_json" >/dev/null
 "$feedback" --help | grep -q "Usage: nanda feedback"
 NANDA_SELF_CHECK_RUNTIME_ONLY=1 "$self_check" | grep -q "verdict: PASS"
 

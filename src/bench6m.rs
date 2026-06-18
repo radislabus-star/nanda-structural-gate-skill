@@ -42,6 +42,7 @@ enum Bench6mMode {
     SupportScoreBuildCompileSweep,
     SupportBucketBuild,
     SupportBucketBuildCompileSweep,
+    HotCycle,
     All,
 }
 
@@ -75,6 +76,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
         args.mode,
         Bench6mMode::SupportBucketBuildCompileSweep | Bench6mMode::All
     );
+    let include_hot_cycle = matches!(args.mode, Bench6mMode::HotCycle | Bench6mMode::All);
     let replay = if include_replay {
         Some(bench6m_replay(args.replay_iterations))
     } else {
@@ -180,6 +182,15 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
+    let hot_cycle = if include_hot_cycle {
+        Some(bench6m_hot_cycle(
+            args.support_build_iterations,
+            args.triads.clamp(1, nanda_6m::TRIAD_CAPACITY),
+            args.lane_sweep_width.clamp(1, nanda_6m::LANE_CAPACITY),
+        ))
+    } else {
+        None
+    };
     let out = json!({
         "mode": "nanda-6m-hot-benchmark",
         "core_version": CORE_VERSION,
@@ -198,7 +209,8 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "support_score_build": support_score_build,
             "support_score_build_compile_sweep": support_score_build_compile_sweep,
             "support_bucket_build": support_bucket_build,
-            "support_bucket_build_compile_sweep": support_bucket_build_compile_sweep
+            "support_bucket_build_compile_sweep": support_bucket_build_compile_sweep,
+            "hot_cycle": hot_cycle
         },
         "interpretation": {
             "replay": "Pure typed replay firewall; no JSON, no file IO, no process spawn.",
@@ -213,6 +225,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "support_score_build_compile_sweep": "Build cached support scores, assemble fields, compile aligned lanes, and apply the sweep.",
             "support_bucket_build": "Build cached support scores, bucket them by route/group, then assemble fields from bucket ranges.",
             "support_bucket_build_compile_sweep": "Build cached support score buckets, assemble fields, compile aligned lanes, and apply the sweep.",
+            "hot_cycle": "Single typed hot-cycle call: score cache, route/group buckets, support fields, lane compilation, and aligned sweep.",
             "not_measured": "CLI startup, JSON parsing, dictionary packing, and report serialization are intentionally excluded."
         }
     });
@@ -697,6 +710,64 @@ fn bench6m_support_bucket_build(
     out
 }
 
+fn bench6m_hot_cycle(iterations: u64, triad_count: usize, field_count: usize) -> Value {
+    let iterations = iterations.max(1);
+    let memory = bench6m_triads(triad_count);
+    let query_len = memory.len().clamp(1, 8);
+    let query = nanda_6m::project_triads(&memory[..query_len]);
+    let requests = bench6m_field_requests(field_count);
+    let mut scores = vec![nanda_6m::PackedTriadSupportScore::default(); memory.len()];
+    let mut route_sorted = vec![nanda_6m::PackedTriadSupportScore::default(); memory.len()];
+    let mut group_sorted = vec![nanda_6m::PackedTriadSupportScore::default(); memory.len()];
+    let mut route_offsets = vec![0u16; nanda_6m::SCORE_BUCKET_CAPACITY + 1];
+    let mut group_offsets = vec![0u16; nanda_6m::SCORE_BUCKET_CAPACITY + 1];
+    let mut cursors = vec![0u16; nanda_6m::SCORE_BUCKET_CAPACITY];
+    let mut fields = vec![nanda_6m::PackedSupportField::default(); field_count];
+    let mut lanes = vec![nanda_6m::PackedLane64::default(); field_count];
+    let mut checksum: u64 = 0;
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let mut workspace = nanda_6m::PackedHotWorkspace {
+            buckets: nanda_6m::PackedBucketWorkspace {
+                scores_out: scores.as_mut_slice(),
+                route_sorted_out: route_sorted.as_mut_slice(),
+                route_offsets_out: route_offsets.as_mut_slice(),
+                group_sorted_out: group_sorted.as_mut_slice(),
+                group_offsets_out: group_offsets.as_mut_slice(),
+                cursors_out: cursors.as_mut_slice(),
+            },
+            fields_out: fields.as_mut_slice(),
+            lanes_out: lanes.as_mut_slice(),
+        };
+        let cycle = nanda_6m::run_packed_hot_cycle(
+            black_box(memory.as_slice()),
+            black_box(&query),
+            black_box(requests.as_slice()),
+            black_box(&mut workspace),
+        );
+        checksum = checksum
+            .wrapping_add(cycle.checksum)
+            .wrapping_add(u64::from(cycle.score_count))
+            .wrapping_add(u64::from(cycle.route_count))
+            .wrapping_add(u64::from(cycle.group_count))
+            .wrapping_add(u64::from(cycle.fields_built))
+            .wrapping_add(u64::from(cycle.lanes_compiled));
+        black_box(cycle);
+    }
+    let elapsed = start.elapsed();
+    let mut out = bench_result_json(
+        iterations,
+        elapsed.as_nanos(),
+        checksum,
+        "run_packed_hot_cycle",
+    );
+    out["triads_in_memory"] = json!(memory.len());
+    out["fields"] = json!(field_count);
+    out["query_triads"] = json!(query_len);
+    out["ns_per_field"] = json!(out["ns_per_op"].as_f64().unwrap_or(0.0) / field_count as f64);
+    out
+}
+
 fn bench6m_projection(iterations: u64, triad_count: usize) -> Value {
     let iterations = iterations.max(1);
     let triads = bench6m_triads(triad_count);
@@ -756,6 +827,19 @@ fn bench6m_support_fields(count: usize) -> Vec<nanda_6m::PackedSupportField> {
                 support_mask_b: 0,
                 anti_mask_a: anti_mask,
                 anti_mask_b: 0,
+            }
+        })
+        .collect()
+}
+
+fn bench6m_field_requests(count: usize) -> Vec<nanda_6m::PackedFieldRequest> {
+    (0..count)
+        .map(|idx| {
+            let key_hash = 0x5000_0000u32.wrapping_add(idx as u32);
+            if idx.is_multiple_of(2) {
+                nanda_6m::PackedFieldRequest::route(1 + (idx as u16 % 7), key_hash)
+            } else {
+                nanda_6m::PackedFieldRequest::group(1 + (idx as u16 % 11), key_hash)
             }
         })
         .collect()
@@ -936,6 +1020,18 @@ fn print_bench6m_text(out: &Value) {
             support["ops_per_second"].as_f64().unwrap_or(0.0)
         );
     }
+    if !out["benchmarks"]["hot_cycle"].is_null() {
+        let support = &out["benchmarks"]["hot_cycle"];
+        println!(
+            "hot-cycle: {} iters / {} triads / {} fields / {:.2} ns/op / {:.2} ns/field / {:.0} ops/s",
+            support["iterations"].as_u64().unwrap_or(0),
+            support["triads_in_memory"].as_u64().unwrap_or(0),
+            support["fields"].as_u64().unwrap_or(0),
+            support["ns_per_op"].as_f64().unwrap_or(0.0),
+            support["ns_per_field"].as_f64().unwrap_or(0.0),
+            support["ops_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
     println!("scope: no JSON, no file IO, no process spawn");
 }
 
@@ -1060,6 +1156,17 @@ fn print_bench6m_md(out: &Value) {
         let support = &out["benchmarks"]["support_bucket_build_compile_sweep"];
         println!(
             "- support-bucket-build+compile-sweep: `{}` iterations, `{}` triads, `{}` fields, `{:.2}` ns/op, `{:.2}` ns/field",
+            support["iterations"].as_u64().unwrap_or(0),
+            support["triads_in_memory"].as_u64().unwrap_or(0),
+            support["fields"].as_u64().unwrap_or(0),
+            support["ns_per_op"].as_f64().unwrap_or(0.0),
+            support["ns_per_field"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["hot_cycle"].is_null() {
+        let support = &out["benchmarks"]["hot_cycle"];
+        println!(
+            "- hot-cycle: `{}` iterations, `{}` triads, `{}` fields, `{:.2}` ns/op, `{:.2}` ns/field",
             support["iterations"].as_u64().unwrap_or(0),
             support["triads_in_memory"].as_u64().unwrap_or(0),
             support["fields"].as_u64().unwrap_or(0),

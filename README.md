@@ -372,6 +372,7 @@ nanda-bench6m --mode support-score-build --support-build-iterations 1000 --lane-
 nanda-bench6m --mode support-score-build-compile-sweep --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
 nanda-bench6m --mode support-bucket-build --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
 nanda-bench6m --mode support-bucket-build-compile-sweep --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
+nanda-bench6m --mode hot-cycle --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
 ```
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,

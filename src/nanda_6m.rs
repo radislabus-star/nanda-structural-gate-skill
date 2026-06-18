@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-pub const VERSION: &str = "nanda-6m-v12-hot-support-bucket-core";
+pub const VERSION: &str = "nanda-6m-v19-hot-cycle-core";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -348,6 +348,74 @@ pub struct PackedTriadSupportScore {
     pub group_id: u16,
     pub record_index: u16,
     pub dot: i64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedFieldRequest {
+    pub axis: PackedAxis,
+    pub top_id: u16,
+    pub key_hash: u32,
+}
+
+impl PackedFieldRequest {
+    pub const fn route(top_id: u16, key_hash: u32) -> Self {
+        Self {
+            axis: PackedAxis::Route,
+            top_id,
+            key_hash,
+        }
+    }
+
+    pub const fn group(top_id: u16, key_hash: u32) -> Self {
+        Self {
+            axis: PackedAxis::Group,
+            top_id,
+            key_hash,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedSupportBatch {
+    pub requested: u16,
+    pub built: u16,
+    pub considered: u16,
+    pub support_count: u16,
+    pub anti_count: u16,
+    pub checksum: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedBucketBuild {
+    pub score_count: u16,
+    pub route_count: u16,
+    pub group_count: u16,
+}
+
+pub struct PackedBucketWorkspace<'a> {
+    pub scores_out: &'a mut [PackedTriadSupportScore],
+    pub route_sorted_out: &'a mut [PackedTriadSupportScore],
+    pub route_offsets_out: &'a mut [u16],
+    pub group_sorted_out: &'a mut [PackedTriadSupportScore],
+    pub group_offsets_out: &'a mut [u16],
+    pub cursors_out: &'a mut [u16],
+}
+
+pub struct PackedHotWorkspace<'a> {
+    pub buckets: PackedBucketWorkspace<'a>,
+    pub fields_out: &'a mut [PackedSupportField],
+    pub lanes_out: &'a mut [PackedLane64],
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedHotCycle {
+    pub score_count: u16,
+    pub route_count: u16,
+    pub group_count: u16,
+    pub fields_built: u16,
+    pub lanes_compiled: u16,
+    pub lane_sweep: PackedLaneSweep,
+    pub checksum: u64,
 }
 
 impl PackedTriadSupportScore {
@@ -707,6 +775,126 @@ pub fn build_packed_support_field_from_score_bucket(
         };
     }
     build_packed_support_field_from_scores(&sorted_scores[start..end], axis, top_id, key_hash)
+}
+
+pub fn build_packed_support_score_buckets(
+    memory: &[PackedTriad32],
+    query: &PackedWave1024,
+    workspace: &mut PackedBucketWorkspace<'_>,
+) -> PackedBucketBuild {
+    let score_count = build_packed_triad_support_scores(memory, query, workspace.scores_out);
+    let score_slice = &workspace.scores_out[..score_count];
+    let route_count = bucket_packed_triad_support_scores(
+        score_slice,
+        PackedAxis::Route,
+        workspace.route_sorted_out,
+        workspace.route_offsets_out,
+        workspace.cursors_out,
+    );
+    let group_count = bucket_packed_triad_support_scores(
+        score_slice,
+        PackedAxis::Group,
+        workspace.group_sorted_out,
+        workspace.group_offsets_out,
+        workspace.cursors_out,
+    );
+    PackedBucketBuild {
+        score_count: score_count.min(usize::from(u16::MAX)) as u16,
+        route_count: route_count.min(usize::from(u16::MAX)) as u16,
+        group_count: group_count.min(usize::from(u16::MAX)) as u16,
+    }
+}
+
+pub fn build_packed_support_fields_from_score_buckets(
+    route_sorted: &[PackedTriadSupportScore],
+    route_offsets: &[u16],
+    group_sorted: &[PackedTriadSupportScore],
+    group_offsets: &[u16],
+    requests: &[PackedFieldRequest],
+    fields_out: &mut [PackedSupportField],
+) -> PackedSupportBatch {
+    let count = requests.len().min(fields_out.len());
+    let mut batch = PackedSupportBatch {
+        requested: requests.len().min(usize::from(u16::MAX)) as u16,
+        built: count.min(usize::from(u16::MAX)) as u16,
+        ..PackedSupportBatch::default()
+    };
+    for (request, field_out) in requests
+        .iter()
+        .copied()
+        .take(count)
+        .zip(fields_out.iter_mut())
+    {
+        let summary = match request.axis {
+            PackedAxis::Route => build_packed_support_field_from_score_bucket(
+                route_sorted,
+                route_offsets,
+                request.axis,
+                request.top_id,
+                request.key_hash,
+            ),
+            PackedAxis::Group => build_packed_support_field_from_score_bucket(
+                group_sorted,
+                group_offsets,
+                request.axis,
+                request.top_id,
+                request.key_hash,
+            ),
+        };
+        *field_out = summary.field;
+        batch.considered = batch.considered.saturating_add(summary.considered);
+        batch.support_count = batch.support_count.saturating_add(summary.support_count);
+        batch.anti_count = batch.anti_count.saturating_add(summary.anti_count);
+        batch.checksum = batch
+            .checksum
+            .wrapping_add(summary.field.positive_dot as u64)
+            .wrapping_add(summary.field.negative_dot as u64)
+            .wrapping_add(u64::from(summary.considered))
+            .wrapping_add(u64::from(summary.support_count))
+            .wrapping_add(u64::from(summary.anti_count));
+    }
+    batch
+}
+
+pub fn run_packed_hot_cycle(
+    memory: &[PackedTriad32],
+    query: &PackedWave1024,
+    requests: &[PackedFieldRequest],
+    workspace: &mut PackedHotWorkspace<'_>,
+) -> PackedHotCycle {
+    let buckets = build_packed_support_score_buckets(memory, query, &mut workspace.buckets);
+    let route_count =
+        usize::from(buckets.route_count).min(workspace.buckets.route_sorted_out.len());
+    let group_count =
+        usize::from(buckets.group_count).min(workspace.buckets.group_sorted_out.len());
+    let batch = build_packed_support_fields_from_score_buckets(
+        &workspace.buckets.route_sorted_out[..route_count],
+        workspace.buckets.route_offsets_out,
+        &workspace.buckets.group_sorted_out[..group_count],
+        workspace.buckets.group_offsets_out,
+        requests,
+        workspace.fields_out,
+    );
+    let field_count = usize::from(batch.built).min(workspace.fields_out.len());
+    let lane_count = field_count.min(workspace.lanes_out.len());
+    let sweep = compile_and_apply_aligned_suppress_anti_lane_sweep(
+        &workspace.fields_out[..field_count],
+        &mut workspace.lanes_out[..lane_count],
+    );
+    PackedHotCycle {
+        score_count: buckets.score_count,
+        route_count: buckets.route_count,
+        group_count: buckets.group_count,
+        fields_built: batch.built,
+        lanes_compiled: sweep.lanes.min(usize::from(u16::MAX)) as u16,
+        lane_sweep: sweep,
+        checksum: batch
+            .checksum
+            .wrapping_add(sweep.checksum)
+            .wrapping_add(sweep.best_after_net_dot as u64)
+            .wrapping_add(sweep.total_delta_dot as u64)
+            .wrapping_add(sweep.focused as u64),
+    }
 }
 
 pub fn compile_suppress_anti_lanes(
@@ -1615,6 +1803,95 @@ mod tests {
 
         assert_eq!(accepted, 3);
         assert_eq!(bucketed, scanned);
+    }
+
+    #[test]
+    fn packed_hot_cycle_builds_fields_and_lanes() {
+        let support = PackedTriad32::new(PackedTriadInput {
+            subject_id: 1,
+            object_id: 2,
+            evidence_ref: 3,
+            wave_seed: 4,
+            relation_id: 5,
+            route_id: 7,
+            group_id: 9,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 0,
+        });
+        let anti = PackedTriad32::new(PackedTriadInput {
+            polarity: 1,
+            ..PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 3,
+                wave_seed: 4,
+                relation_id: 5,
+                route_id: 7,
+                group_id: 9,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 0,
+            }
+        });
+        let foreign = PackedTriad32::new(PackedTriadInput {
+            subject_id: 10,
+            object_id: 20,
+            evidence_ref: 30,
+            wave_seed: 40,
+            relation_id: 5,
+            route_id: 11,
+            group_id: 12,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 0,
+        });
+        let memory = [support, anti, foreign];
+        let query = project_triads(&[support]);
+        let requests = [
+            PackedFieldRequest::route(7, 0x55),
+            PackedFieldRequest::group(9, 0x66),
+        ];
+        let mut scores = [PackedTriadSupportScore::default(); 3];
+        let mut route_sorted = [PackedTriadSupportScore::default(); 3];
+        let mut group_sorted = [PackedTriadSupportScore::default(); 3];
+        let mut route_offsets = [0u16; SCORE_BUCKET_CAPACITY + 1];
+        let mut group_offsets = [0u16; SCORE_BUCKET_CAPACITY + 1];
+        let mut cursors = [0u16; SCORE_BUCKET_CAPACITY];
+        let mut fields = [PackedSupportField::default(); 2];
+        let mut lanes = [PackedLane64::default(); 2];
+        let cycle = {
+            let mut workspace = PackedHotWorkspace {
+                buckets: PackedBucketWorkspace {
+                    scores_out: &mut scores,
+                    route_sorted_out: &mut route_sorted,
+                    route_offsets_out: &mut route_offsets,
+                    group_sorted_out: &mut group_sorted,
+                    group_offsets_out: &mut group_offsets,
+                    cursors_out: &mut cursors,
+                },
+                fields_out: &mut fields,
+                lanes_out: &mut lanes,
+            };
+            run_packed_hot_cycle(&memory, &query, &requests, &mut workspace)
+        };
+
+        assert_eq!(cycle.score_count, 3);
+        assert_eq!(cycle.fields_built, 2);
+        assert_eq!(cycle.lanes_compiled, 2);
+        assert_eq!(fields[0].top_id, 7);
+        assert_eq!(fields[1].top_id, 9);
+        assert!(cycle.lane_sweep.applied > 0);
+        assert!(cycle.checksum > 0);
     }
 
     #[test]
