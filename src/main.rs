@@ -3245,6 +3245,14 @@ fn nanda_6m_pack_report(
     );
     let packed_lane_application =
         packed_lane_application_report(&packed_support, &packed_lanes, &peak_decision);
+    let packed_lane_replay = packed_lane_replay_report(
+        packet,
+        source,
+        candidates,
+        &packed_lane_store,
+        &routes,
+        &groups,
+    );
     let dictionary_ok = blockers.is_empty()
         && relations.len() <= u16::MAX as usize
         && routes.len() <= u16::MAX as usize
@@ -3300,6 +3308,7 @@ fn nanda_6m_pack_report(
         "packed_lanes": packed_lanes,
         "packed_lane_store": packed_lane_store,
         "packed_lane_application": packed_lane_application,
+        "packed_lane_replay": packed_lane_replay,
         "peak_decision": peak_decision,
         "dictionaries": {
             "entities": dictionary_summary(&entities, u32::MAX as usize),
@@ -3865,6 +3874,176 @@ fn packed_axis_lane_application(axis_support: &Value, axis_lane: &Value, axis: &
     })
 }
 
+fn packed_lane_replay_report(
+    packet: &Packet,
+    source: &[Triad],
+    candidates: &[Triad],
+    packed_lane_store: &Value,
+    routes: &IdDictionary,
+    groups: &IdDictionary,
+) -> Value {
+    let query_tokens = packed_replay_tokens(packet, source, candidates);
+    let mut replayed = vec![];
+    if let Some(items) = packed_lane_store["sample"].as_array() {
+        for item in items {
+            let axis = item["axis"].as_str().unwrap_or("");
+            let target_id = item["target_id"].as_u64().unwrap_or(0) as u32;
+            let target_label = match axis {
+                "route" => routes.label(target_id).unwrap_or("__route_default"),
+                "group" => groups.label(target_id).unwrap_or("__group_default"),
+                _ => "__unknown",
+            };
+            for shortcut in &packet.negative_shortcuts {
+                let query_ratio = negative_lane_match_ratio(&query_tokens, shortcut);
+                if query_ratio <= 0.0 || !negative_shortcut_matches_target(shortcut, target_label) {
+                    continue;
+                }
+                replayed.push(packed_lane_replay_item(
+                    item,
+                    axis,
+                    target_label,
+                    "negative_shortcuts",
+                    &shortcut.id,
+                    query_ratio,
+                ));
+            }
+            for shortcut in &packet.positive_shortcuts {
+                let query_ratio = positive_lane_match_ratio(&query_tokens, shortcut);
+                if query_ratio <= 0.0 || !positive_shortcut_matches_target(shortcut, target_label) {
+                    continue;
+                }
+                replayed.push(packed_lane_replay_item(
+                    item,
+                    axis,
+                    target_label,
+                    "positive_shortcuts",
+                    &shortcut.id,
+                    query_ratio,
+                ));
+            }
+        }
+    }
+
+    let compiled_lanes = replayed.len();
+    let before_net_dot: i64 = replayed
+        .iter()
+        .map(|item| item["before_net_dot"].as_i64().unwrap_or(0))
+        .sum();
+    let after_net_dot: i64 = replayed
+        .iter()
+        .map(|item| item["after_net_dot"].as_i64().unwrap_or(0))
+        .sum();
+    let delta_dot = after_net_dot - before_net_dot;
+    let focused = compiled_lanes > 0 && after_net_dot >= 128 && delta_dot >= 64;
+    json!({
+        "mode": "feedback-lane-replay",
+        "source": "negative_shortcuts+positive_shortcuts",
+        "state": if focused { "PACKED_LANE_REPLAY_FOCUSED" } else if compiled_lanes > 0 { "PACKED_LANE_REPLAY_PARTIAL" } else { "PACKED_LANE_REPLAY_NONE" },
+        "safe_to_answer": false,
+        "matched_keys": compiled_lanes,
+        "compiled_lanes": compiled_lanes,
+        "before_net_dot": before_net_dot,
+        "after_net_dot": after_net_dot,
+        "delta_dot": delta_dot,
+        "replay_ready": focused,
+        "sample": replayed
+    })
+}
+
+fn packed_lane_replay_item(
+    item: &Value,
+    axis: &str,
+    target_label: &str,
+    source: &str,
+    shortcut_id: &str,
+    query_ratio: f64,
+) -> Value {
+    json!({
+        "axis": axis,
+        "target_label": target_label,
+        "source": source,
+        "shortcut_id": shortcut_id,
+        "query_match_ratio": round4(query_ratio),
+        "key_hash": item["key_hash"].as_u64().unwrap_or(0),
+        "record_mask_a": item["record_mask_a"].as_u64().unwrap_or(0),
+        "record_mask_b": item["record_mask_b"].as_u64().unwrap_or(0),
+        "protected_support_mask_a": item["protected_support_mask_a"].as_u64().unwrap_or(0),
+        "protected_support_mask_b": item["protected_support_mask_b"].as_u64().unwrap_or(0),
+        "before_net_dot": item["before_net_dot"].as_i64().unwrap_or(0),
+        "after_net_dot": item["after_net_dot"].as_i64().unwrap_or(0),
+        "delta_dot": item["delta_dot"].as_i64().unwrap_or(0),
+        "compiled_storage": item["compiled_storage"].as_str().unwrap_or("hot-packed-lane64")
+    })
+}
+
+fn packed_replay_tokens(
+    packet: &Packet,
+    source: &[Triad],
+    candidates: &[Triad],
+) -> BTreeSet<String> {
+    let mut tokens = BTreeSet::new();
+    tokens.extend(normalized_shortcut_terms(std::slice::from_ref(
+        &packet.query,
+    )));
+    for triad in source.iter().chain(candidates.iter()) {
+        for value in [
+            &triad.subject,
+            &triad.relation,
+            &triad.object,
+            &triad.evidence,
+            &triad.route,
+            &triad.group,
+            &triad.subject_role,
+            &triad.object_role,
+        ] {
+            tokens.extend(normalized_shortcut_terms(std::slice::from_ref(value)));
+        }
+    }
+    tokens
+}
+
+fn negative_shortcut_matches_target(shortcut: &NegativeShortcut, target_label: &str) -> bool {
+    shortcut_label_matches(
+        target_label,
+        [
+            shortcut.prefer_peak.as_str(),
+            shortcut.prefer_route.as_str(),
+            shortcut.prefer_group.as_str(),
+            shortcut.suppress_peak.as_str(),
+            shortcut.suppress_route.as_str(),
+            shortcut.suppress_group.as_str(),
+        ],
+    )
+}
+
+fn positive_shortcut_matches_target(shortcut: &PositiveShortcut, target_label: &str) -> bool {
+    shortcut_label_matches(
+        target_label,
+        [
+            shortcut.reinforce_peak.as_str(),
+            shortcut.reinforce_route.as_str(),
+            shortcut.reinforce_group.as_str(),
+            "",
+            "",
+            "",
+        ],
+    )
+}
+
+fn shortcut_label_matches<'a>(
+    target_label: &str,
+    labels: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    let target = norm(target_label);
+    if target.is_empty() {
+        return false;
+    }
+    labels.into_iter().any(|label| {
+        let label = norm(label);
+        !label.is_empty() && (target == label || target.contains(&label) || label.contains(&target))
+    })
+}
+
 #[derive(Default)]
 struct IdDictionary {
     items: BTreeMap<String, u32>,
@@ -3887,6 +4066,12 @@ impl IdDictionary {
 
     fn len(&self) -> usize {
         self.items.len()
+    }
+
+    fn label(&self, id: u32) -> Option<&str> {
+        self.items
+            .iter()
+            .find_map(|(label, item_id)| (*item_id == id).then_some(label.as_str()))
     }
 }
 
@@ -4113,6 +4298,15 @@ fn print_pack6m_text(out: &Value) {
         out["packed_lane_store"]["bytes"].as_u64().unwrap_or(0)
     );
     println!(
+        "lane replay: {} / matched {}",
+        out["packed_lane_replay"]["state"]
+            .as_str()
+            .unwrap_or("PACKED_LANE_REPLAY_NONE"),
+        out["packed_lane_replay"]["matched_keys"]
+            .as_u64()
+            .unwrap_or(0)
+    );
+    println!(
         "lane applied: {} -> {}",
         out["packed_lane_application"]["raw_state"]
             .as_str()
@@ -4214,6 +4408,15 @@ fn print_pack6m_md(out: &Value) {
         out["packed_lane_store"]["count"].as_u64().unwrap_or(0),
         out["packed_lane_store"]["capacity"].as_u64().unwrap_or(0),
         out["packed_lane_store"]["bytes"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "- lane_replay: `{}` / matched `{}`",
+        out["packed_lane_replay"]["state"]
+            .as_str()
+            .unwrap_or("PACKED_LANE_REPLAY_NONE"),
+        out["packed_lane_replay"]["matched_keys"]
+            .as_u64()
+            .unwrap_or(0)
     );
     println!(
         "- lane_applied: `{} -> {}`",

@@ -315,6 +315,9 @@ compiled into current-window `PackedLane64` masks; record masks are not treated
 as persistent memory.
 Inspect `packed_lane_store`: it reports the hot compiled lane arena cost. Each
 stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
+Inspect `packed_lane_replay`: it matches feedback shortcuts against current
+stable lane keys, compiles matched keys into current-window `PackedLane64`
+masks, and reports replayed `before_net_dot -> after_net_dot`.
 Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for a real hot-loop implementation, but it still keeps

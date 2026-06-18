@@ -214,6 +214,12 @@ indexes.
 rational 6M representation; cold signatures can live outside the hot arena and
 compile into masks for the current focused packet.
 
+`packed_lane_replay` connects feedback memory to the packed core. It matches
+negative/positive shortcut memory against current stable lane keys, compiles
+matched keys into current-window `PackedLane64` masks, and reports replayed
+`before_net_dot -> after_net_dot` without treating the result as final answer
+permission.
+
 `packed_lane_application` is the first single-pass applied-lane diagnostic. It
 applies the preview mask to the support-map and reports whether the adjusted
 field becomes a focused candidate. This is still not an answer gate:
