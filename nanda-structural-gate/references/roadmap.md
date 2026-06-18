@@ -100,5 +100,7 @@ Status: started.
 - `--steps N` runs recurrent wave decode: selected pattern -> query context ->
   next field. The decoder stops honestly with `PATTERN_SATURATED` when no new
   structural continuation is available.
-- Next milestones are token/pattern encoder and a training/eval loop for
+- `nanda-decode-eval` runs continuation regressions for expected top pattern,
+  decoder state, recurrent final state, and minimum completed steps.
+- Next milestones are token/pattern encoder and a training loop for
   continuation quality.

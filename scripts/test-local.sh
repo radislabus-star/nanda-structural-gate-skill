@@ -18,6 +18,7 @@ feedback="$root/nanda-structural-gate/scripts/nanda-feedback"
 indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
 decode="$root/nanda-structural-gate/scripts/nanda-decode"
+decode_eval="$root/nanda-structural-gate/scripts/nanda-decode-eval"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
 proof="$root/nanda-structural-gate/scripts/nanda-proof"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
@@ -64,6 +65,7 @@ jq empty "$root/examples/triad-packet.canonical-alias-conflict.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"
+jq empty "$root/examples/decode-corpus.json"
 
 pass_json="$("$checker" --triads "$root/examples/triad-packet.example.json" --format json)"
 if ! grep -q '"verdict": "PASS"' <<<"$pass_json"; then
@@ -163,7 +165,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v3.6-recurrent-decoder"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v3.7-decode-eval"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -469,6 +471,9 @@ jq -e '.recurrent.enabled == true and .recurrent.requested_steps == 3' <<<"$deco
 jq -e '.recurrent.completed_steps >= 2' <<<"$decode_steps_json" >/dev/null
 jq -e '.recurrent.steps[0].selected_pattern.decode_as == "next_structural_pattern"' <<<"$decode_steps_json" >/dev/null
 jq -e '.recurrent.steps[-1].decoder_state == "PATTERN_READY" or .recurrent.steps[-1].decoder_state == "PATTERN_SATURATED"' <<<"$decode_steps_json" >/dev/null
+decode_eval_json="$("$decode_eval" --suite "$root/examples/decode-corpus.json")"
+jq -e '.mode == "decode-eval-suite" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$decode_eval_json" >/dev/null
+jq -e '.cases[] | select(.id == "route-trap-recurrent-saturates" and .actual_final_decoder_state == "PATTERN_SATURATED")' <<<"$decode_eval_json" >/dev/null
 serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"
 jq -e '.ok == true and .result.mode == "doctor" and .result.healthy == true' <<<"$serve_json" >/dev/null
 tmp_search="$(mktemp)"

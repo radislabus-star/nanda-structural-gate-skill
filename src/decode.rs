@@ -1,4 +1,5 @@
 use crate::*;
+use serde::Deserialize;
 
 pub(crate) fn decode_cmd(args: DecodeArgs) -> Result<u8> {
     let mut packet = load_packet_auto(
@@ -46,6 +47,141 @@ pub(crate) fn decode_cmd(args: DecodeArgs) -> Result<u8> {
         OutputFormat::Md => print_decode_md(&out),
     }
     Ok(EXIT_PASS)
+}
+
+pub(crate) fn decode_eval_cmd(args: DecodeEvalArgs) -> Result<u8> {
+    let text = fs::read_to_string(&args.suite)
+        .with_context(|| format!("read {}", args.suite.display()))?;
+    let suite: DecodeEvalSuite =
+        serde_json::from_str(&text).with_context(|| format!("parse {}", args.suite.display()))?;
+    if suite.cases.is_empty() {
+        return Err(anyhow!(
+            "nanda decode-eval requires a suite with at least one case"
+        ));
+    }
+    let base = args.suite.parent().unwrap_or_else(|| Path::new("."));
+    let mut rows = vec![];
+    let mut passed = 0usize;
+    for case in suite.cases {
+        let path = resolve_suite_path(base, &case.path);
+        let mut packet = load_packet_auto(
+            &path,
+            &args.input_format,
+            "decode-eval",
+            "general",
+            &case.query,
+            args.normalize_paths,
+        )?;
+        let memory = normalize_ids(packet.triads.clone(), "m");
+        let mut query_packet = if let Some(query_file) = &case.query_file {
+            load_packet_auto(
+                &resolve_suite_path(base, query_file),
+                &args.input_format,
+                "decode-eval",
+                "general",
+                &case.query,
+                args.normalize_paths,
+            )?
+        } else {
+            packet.clone()
+        };
+        inherit_aliases_if_needed(&mut query_packet, &packet);
+        let query_text = if !case.query.trim().is_empty() {
+            case.query.clone()
+        } else if !query_packet.query.trim().is_empty() {
+            query_packet.query.clone()
+        } else {
+            packet.query.clone()
+        };
+        packet.query = query_text.clone();
+        let (query, query_source) = search_query_triads(&query_packet, &query_text);
+        let decode_args = DecodeArgs {
+            input: path.clone(),
+            input_format: args.input_format.clone(),
+            task_id: "decode-eval".to_string(),
+            domain: "general".to_string(),
+            query: query_text,
+            query_file: None,
+            query_format: args.input_format.clone(),
+            top_k: case.top_k.unwrap_or(args.top_k),
+            steps: case.steps.unwrap_or(args.steps).clamp(1, 16),
+            search_top_k: args.search_top_k,
+            route_cap: args.route_cap,
+            route_triad_cap: args.route_triad_cap,
+            group_by: args.group_by.clone(),
+            format: OutputFormat::Json,
+            normalize_paths: args.normalize_paths,
+        };
+        let result = recurrent_decode_report(
+            &packet,
+            &memory,
+            &query,
+            query_source,
+            &decode_args,
+            decode_args.steps,
+        );
+        let actual_state = result["decoder_state"].as_str().unwrap_or("").to_string();
+        let actual_top_pattern = result["top_pattern"].as_str().unwrap_or("").to_string();
+        let actual_final_state = result["recurrent"]["final_decoder_state"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        let completed_steps = result["recurrent"]["completed_steps"].as_u64().unwrap_or(0) as usize;
+        let state_ok =
+            case.expected_decoder_state.is_empty() || actual_state == case.expected_decoder_state;
+        let pattern_ok =
+            case.expected_top_pattern.is_empty() || actual_top_pattern == case.expected_top_pattern;
+        let final_ok = case.expected_final_decoder_state.is_empty()
+            || actual_final_state == case.expected_final_decoder_state;
+        let steps_ok = completed_steps >= case.min_completed_steps.unwrap_or(1);
+        let ok = state_ok && pattern_ok && final_ok && steps_ok;
+        if ok {
+            passed += 1;
+        }
+        rows.push(json!({
+            "id": if case.id.is_empty() { path.display().to_string() } else { case.id },
+            "case": path.display().to_string(),
+            "expected_decoder_state": case.expected_decoder_state,
+            "actual_decoder_state": actual_state,
+            "expected_top_pattern": case.expected_top_pattern,
+            "actual_top_pattern": actual_top_pattern,
+            "expected_final_decoder_state": case.expected_final_decoder_state,
+            "actual_final_decoder_state": actual_final_state,
+            "completed_steps": completed_steps,
+            "min_completed_steps": case.min_completed_steps.unwrap_or(1),
+            "ok": ok
+        }));
+    }
+    let total = rows.len();
+    let out = json!({
+        "core_version": CORE_VERSION,
+        "wave_dim": WAVE_DIM,
+        "mode": "decode-eval-suite",
+        "suite": if suite.name.is_empty() { args.suite.display().to_string() } else { suite.name },
+        "passed": passed,
+        "total": total,
+        "accuracy": round4(passed as f64 / total.max(1) as f64),
+        "cases": rows,
+        "interpretation": "Decode eval checks whether the wave decoder produces expected structural continuations and honest recurrent stop states."
+    });
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_decode_eval_text(&out),
+        OutputFormat::Md => print_decode_eval_md(&out),
+    }
+    if passed == total {
+        Ok(EXIT_PASS)
+    } else {
+        Ok(EXIT_VETO)
+    }
+}
+
+fn resolve_suite_path(base: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        base.join(path)
+    }
 }
 
 pub(crate) fn recurrent_decode_report(
@@ -389,6 +525,88 @@ pub(crate) fn print_decode_md(out: &Value) {
             println!("- score: `{}`", pattern["score"]);
             println!("- peak: `{}`", pattern["peak"]);
             println!("- route: `{}`", pattern["route"]);
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct DecodeEvalSuite {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    cases: Vec<DecodeEvalCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct DecodeEvalCase {
+    #[serde(default)]
+    id: String,
+    path: PathBuf,
+    #[serde(default)]
+    query_file: Option<PathBuf>,
+    #[serde(default)]
+    query: String,
+    #[serde(default)]
+    expected_decoder_state: String,
+    #[serde(default)]
+    expected_top_pattern: String,
+    #[serde(default)]
+    expected_final_decoder_state: String,
+    #[serde(default)]
+    min_completed_steps: Option<usize>,
+    #[serde(default)]
+    steps: Option<usize>,
+    #[serde(default)]
+    top_k: Option<usize>,
+}
+
+pub(crate) fn print_decode_eval_text(out: &Value) {
+    println!(
+        "core_version: {}",
+        out["core_version"].as_str().unwrap_or("")
+    );
+    println!(
+        "passed: {}/{}",
+        out["passed"].as_u64().unwrap_or(0),
+        out["total"].as_u64().unwrap_or(0)
+    );
+    if let Some(cases) = out["cases"].as_array() {
+        for case in cases {
+            println!(
+                "- {}: {} pattern={} final={}",
+                case["id"].as_str().unwrap_or(""),
+                if case["ok"].as_bool().unwrap_or(false) {
+                    "ok"
+                } else {
+                    "fail"
+                },
+                case["actual_top_pattern"].as_str().unwrap_or(""),
+                case["actual_final_decoder_state"].as_str().unwrap_or("")
+            );
+        }
+    }
+}
+
+pub(crate) fn print_decode_eval_md(out: &Value) {
+    println!("# NANDA Decode Eval\n");
+    println!(
+        "- core_version: `{}`",
+        out["core_version"].as_str().unwrap_or("")
+    );
+    println!("- passed: `{}/{}`", out["passed"], out["total"]);
+    if let Some(cases) = out["cases"].as_array() {
+        for case in cases {
+            println!(
+                "\n- `{}`: `{}` top=`{}` final=`{}`",
+                case["id"].as_str().unwrap_or(""),
+                if case["ok"].as_bool().unwrap_or(false) {
+                    "ok"
+                } else {
+                    "fail"
+                },
+                case["actual_top_pattern"].as_str().unwrap_or(""),
+                case["actual_final_decoder_state"].as_str().unwrap_or("")
+            );
         }
     }
 }

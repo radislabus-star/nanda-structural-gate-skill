@@ -110,6 +110,7 @@ scripts/nanda-search .nanda/index.json --input-format json --query-file query.js
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
 scripts/nanda-decode .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-decode .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 3 --steps 3
+scripts/nanda-decode-eval --suite examples/decode-corpus.json
 scripts/nanda-hgate task.json --input-format json --by linked-group
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
@@ -247,6 +248,9 @@ roles, polarity, continuity, and support score. Treat it as the first LLMWave
 bridge, not as natural-language generation. Use `--steps N` for recurrent
 decode: each selected pattern is fed back as query context and the field is
 run again. Treat `PATTERN_SATURATED` as an honest stop, not a failure.
+Use `nanda-decode-eval` after changing decoder, scoring, recurrent selection,
+or pattern extraction. It checks expected top pattern, decoder state, recurrent
+final state, and minimum completed recurrent steps.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each
