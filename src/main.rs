@@ -3233,7 +3233,8 @@ fn nanda_6m_pack_report(
         &group_peak,
         sample,
     );
-    let packed_lanes = packed_lane_preview(&packed_support);
+    let packed_lane_keys = packed_lane_keys_report(&packed_support);
+    let packed_lanes = packed_lane_preview(&packed_support, &packed_lane_keys);
     let peak_decision = packed_field_decision(
         &route_peak,
         &group_peak,
@@ -3294,6 +3295,7 @@ fn nanda_6m_pack_report(
             "group": group_peak
         },
         "packed_support": packed_support,
+        "packed_lane_keys": packed_lane_keys,
         "packed_lanes": packed_lanes,
         "packed_lane_application": packed_lane_application,
         "peak_decision": peak_decision,
@@ -3603,16 +3605,68 @@ fn packed_axis_support(
     })
 }
 
-fn packed_lane_preview(packed_support: &Value) -> Value {
+fn packed_lane_keys_report(packed_support: &Value) -> Value {
     json!({
-        "mode": "packed-lane-preview",
+        "mode": "stable-lane-keys",
+        "storage": "cold-stable-signature",
+        "hot_compilation": "record masks are rebuilt for the current focused packet",
         "lane_bytes": nanda_6m::LANE_BYTES,
-        "route": packed_axis_lane_preview(&packed_support["route"]),
-        "group": packed_axis_lane_preview(&packed_support["group"])
+        "route": packed_axis_lane_key(&packed_support["route"], "route"),
+        "group": packed_axis_lane_key(&packed_support["group"], "group")
     })
 }
 
-fn packed_axis_lane_preview(axis_support: &Value) -> Value {
+fn packed_axis_lane_key(axis_support: &Value, axis: &str) -> Value {
+    let top_id = axis_support["top_id"].as_u64().unwrap_or(0);
+    let support_signature = packed_items_signature(&axis_support["support"]);
+    let anti_signature = packed_items_signature(&axis_support["anti"]);
+    let key_material = format!("{axis}|{top_id}|{support_signature}|{anti_signature}");
+    let key_hash = stable_hash32(&key_material);
+    json!({
+        "axis": axis,
+        "target_id": top_id,
+        "key_hash": key_hash,
+        "support_signature": support_signature,
+        "anti_signature": anti_signature,
+        "support_count": axis_support["support_count"].as_u64().unwrap_or(0),
+        "anti_count": axis_support["anti_count"].as_u64().unwrap_or(0),
+        "compile_hint": {
+            "record_mask_a": packed_support_mask(&axis_support["anti"]).0,
+            "record_mask_b": packed_support_mask(&axis_support["anti"]).1,
+            "protected_support_mask_a": packed_support_mask(&axis_support["support"]).0,
+            "protected_support_mask_b": packed_support_mask(&axis_support["support"]).1
+        }
+    })
+}
+
+fn packed_items_signature(items: &Value) -> String {
+    let mut parts = items
+        .as_array()
+        .into_iter()
+        .flat_map(|items| items.iter())
+        .map(|item| {
+            format!(
+                "{}:{}:{}",
+                item["wave_seed"].as_u64().unwrap_or(0),
+                item["polarity"].as_u64().unwrap_or(0),
+                item["confidence"].as_u64().unwrap_or(0)
+            )
+        })
+        .collect::<Vec<_>>();
+    parts.sort();
+    parts.join("|")
+}
+
+fn packed_lane_preview(packed_support: &Value, packed_lane_keys: &Value) -> Value {
+    json!({
+        "mode": "packed-lane-preview",
+        "lane_bytes": nanda_6m::LANE_BYTES,
+        "route": packed_axis_lane_preview(&packed_support["route"], &packed_lane_keys["route"]),
+        "group": packed_axis_lane_preview(&packed_support["group"], &packed_lane_keys["group"])
+    })
+}
+
+fn packed_axis_lane_preview(axis_support: &Value, axis_key: &Value) -> Value {
     let top_id = axis_support["top_id"].as_u64().unwrap_or(0) as u16;
     let positive_dot = axis_support["positive_dot"].as_i64().unwrap_or(0);
     let negative_dot = axis_support["negative_dot"].as_i64().unwrap_or(0);
@@ -3625,7 +3679,7 @@ fn packed_axis_lane_preview(axis_support: &Value) -> Value {
         support_mask_b: anti_mask.1,
         anti_mask_a: support_mask.0,
         anti_mask_b: support_mask.1,
-        lane_id: u32::from(top_id),
+        lane_id: axis_key["key_hash"].as_u64().unwrap_or(u64::from(top_id)) as u32,
         target_route: top_id,
         target_group: top_id,
         target_relation: 0,
@@ -3640,6 +3694,9 @@ fn packed_axis_lane_preview(axis_support: &Value) -> Value {
     json!({
         "state": if has_lane { "LANE_PREVIEW_READY" } else { "NO_ANTI_LANE" },
         "action": if has_lane { "suppress_anti_support" } else { "none" },
+        "key_hash": lane.lane_id,
+        "key_storage": "cold-stable-signature",
+        "compiled_storage": "hot-packed-lane64",
         "target_id": top_id,
         "record_mask_a": lane.support_mask_a,
         "record_mask_b": lane.support_mask_b,
@@ -3990,6 +4047,15 @@ fn print_pack6m_text(out: &Value) {
             .unwrap_or(0)
     );
     println!(
+        "lane key: route {} / hot mask {}",
+        out["packed_lane_keys"]["route"]["key_hash"]
+            .as_u64()
+            .unwrap_or(0),
+        out["packed_lanes"]["route"]["record_mask_a"]
+            .as_u64()
+            .unwrap_or(0)
+    );
+    println!(
         "lane applied: {} -> {}",
         out["packed_lane_application"]["raw_state"]
             .as_str()
@@ -4075,6 +4141,15 @@ fn print_pack6m_md(out: &Value) {
             .unwrap_or(0),
         out["packed_lanes"]["route"]["after_net_dot"]
             .as_i64()
+            .unwrap_or(0)
+    );
+    println!(
+        "- lane_key: `route {} / hot mask {}`",
+        out["packed_lane_keys"]["route"]["key_hash"]
+            .as_u64()
+            .unwrap_or(0),
+        out["packed_lanes"]["route"]["record_mask_a"]
+            .as_u64()
             .unwrap_or(0)
     );
     println!(

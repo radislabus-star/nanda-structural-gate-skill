@@ -201,6 +201,15 @@ possible `net_dot` change if that destructive contribution were suppressed.
 This proves the byte-level lane can target a reading shape before the hot loop
 learns and applies persistent lanes.
 
+The persistent lane identity is not the record mask. `packed_lane_keys` stores
+a cold stable signature over the support/anti-support shape. The current focus
+packet compiles that key into a `PackedLane64` mask for the local record window.
+This keeps the 6 MiB arena cache-resident and avoids treating transient record
+indexes as durable memory.
+The key signature is based on stable projected shape fields such as
+`wave_seed`, polarity, and confidence, not on current dictionary IDs or record
+indexes.
+
 `packed_lane_application` is the first single-pass applied-lane diagnostic. It
 applies the preview mask to the support-map and reports whether the adjusted
 field becomes a focused candidate. This is still not an answer gate:
