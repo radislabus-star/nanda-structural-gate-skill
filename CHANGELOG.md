@@ -19,6 +19,8 @@ NANDA-6M hot benchmark and full-model contract release.
 ### Changed
 
 - Cargo package version is now `3.1.0`.
+- CI no longer builds or installs Windows release wrappers by default. Windows
+  packaging remains manual only.
 
 ## v3.0.1 - 2026-06-18
 
