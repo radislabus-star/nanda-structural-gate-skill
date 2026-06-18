@@ -8,6 +8,47 @@ correctness and UX engine: it parses JSON/Markdown, owns strings, builds maps,
 explains decisions, and is allowed to be convenient. NANDA-6M is the opposite
 layer: a packed hot path with a hard memory budget.
 
+## What "Full 6M Model" Means
+
+In this project, a "full NANDA-6M model" does not mean a general-purpose
+standalone LLM compressed into 6 MiB. That would require token embeddings,
+many learned transformer/SSM/MLP layers, generation logits, decoding, and a
+training pipeline. NANDA-6M is a different object: a cache-resident structural
+field that can sit next to an LLM and decide whether a set of relations forms a
+stable route.
+
+A full NANDA-6M structural model must include all of these inside the 6 MiB hot
+contract:
+
+1. Packed fact memory: fixed `PackedTriad32` relation records.
+2. Query projection: convert the active candidate/query into a compact wave.
+3. Route/group centroids: keep focused structural centers resident.
+4. Constructive lanes: reinforce accepted route/group/support shapes.
+5. Destructive lanes: suppress known false shortcuts without killing a topic.
+6. Replay firewall: distinguish stable peaks from intervention-dependent peaks.
+7. Hierarchical/local gates: split oversized maps and accept only local PASS.
+8. Top-k decision packet: return peak, margin, support, anti-support, and state.
+9. Budget refusal: return `FOCUS_REQUIRED`, `SPLIT_REQUIRED`, or
+   `SPILL_REQUIRED` instead of silently leaving cache.
+10. Cold bridge contract: map text/evidence to IDs before hot execution and map
+    IDs back to explanation after hot execution.
+
+Current v3.0 already has the cold bridge, budget planner, packed records,
+packed projection, centroids, lanes, replay, and firewall diagnostics. It is
+not full yet because the complete search/hierarchy loop is still partly
+assembled by the dynamic CLI layer, and the hot core does not yet own the whole
+fixed-array top-k route decision.
+
+The short definition:
+
+```text
+full NANDA-6M = relation memory + wave projection + centroids + lanes +
+replay firewall + hierarchical route decision, all inside fixed 6 MiB arrays.
+```
+
+Anything involving natural-language generation remains outside the 6 MiB hot
+core. The LLM writes and reads language; NANDA-6M checks the structural field.
+
 The core rule is simple:
 
 ```text

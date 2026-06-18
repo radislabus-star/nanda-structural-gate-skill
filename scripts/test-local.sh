@@ -21,6 +21,7 @@ probe="$root/nanda-structural-gate/scripts/nanda-probe"
 dataset_doctor="$root/nanda-structural-gate/scripts/nanda-dataset-doctor"
 budget="$root/nanda-structural-gate/scripts/nanda-budget"
 pack6m="$root/nanda-structural-gate/scripts/nanda-pack6m"
+bench6m="$root/nanda-structural-gate/scripts/nanda-bench6m"
 serve="$root/nanda-structural-gate/scripts/nanda-serve"
 dogfood="$root/nanda-structural-gate/scripts/nanda-dogfood"
 reporter="$root/nanda-structural-gate/scripts/nanda-report"
@@ -517,6 +518,11 @@ grep -q 'BRANCHES: 14/14 PASS' <<<"$dogfood_text"
 "$dataset_doctor" --help | grep -q "Usage: nanda dataset-doctor"
 "$budget" --help | grep -q "Usage: nanda budget"
 "$pack6m" --help | grep -q "Usage: nanda pack6m"
+"$bench6m" --help | grep -q "Usage: nanda bench6m"
+bench6m_json="$("$bench6m" --replay-iterations 1000 --projection-iterations 10 --triads 8 --format json)"
+jq -e '.mode == "nanda-6m-hot-benchmark"' <<<"$bench6m_json" >/dev/null
+jq -e '.benchmarks.replay.iterations == 1000 and .benchmarks.replay.ns_per_op > 0' <<<"$bench6m_json" >/dev/null
+jq -e '.benchmarks.projection.iterations == 10 and .benchmarks.projection.triads_in_window == 8 and .benchmarks.projection.ns_per_op > 0' <<<"$bench6m_json" >/dev/null
 "$feedback" --help | grep -q "Usage: nanda feedback"
 NANDA_SELF_CHECK_RUNTIME_ONLY=1 "$self_check" | grep -q "verdict: PASS"
 

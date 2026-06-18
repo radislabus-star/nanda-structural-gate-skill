@@ -97,6 +97,7 @@ scripts/nanda-index memory-a.json memory-b.md --out .nanda/index.json
 scripts/nanda-dataset-doctor .nanda/index.json --input-format json
 scripts/nanda-budget .nanda/index.json --input-format json
 scripts/nanda-pack6m .nanda/index.json --input-format json
+scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
@@ -186,6 +187,10 @@ Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for a real hot-loop implementation, but it still keeps
 `safe_to_answer=false`.
+Use `nanda-bench6m` when you need hot-core speed rather than wrapper timing.
+It excludes process startup, JSON parsing, dictionary packing, file I/O, and
+report serialization. It measures `nanda_6m::evaluate_replay` and the
+in-memory packed projection/centroid scoring path.
 Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with

@@ -133,6 +133,7 @@ evidence-conflict tasks do.
         ├── nanda-dataset-doctor
         ├── nanda-budget
         ├── nanda-pack6m
+        ├── nanda-bench6m
         ├── nanda-serve
         └── nanda-self-check
 ```
@@ -215,6 +216,7 @@ nanda-extract examples/route-trap.raw.txt --out .nanda/route-trap.json
 nanda-index examples/triad-packet.interference-search-route-trap.json --input-format json --out .nanda/index.json
 nanda-budget .nanda/index.json --input-format json
 nanda-pack6m .nanda/index.json --input-format json
+nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-noisy.json --input-format json --format text
@@ -333,6 +335,17 @@ Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for a real hot-loop implementation, but it still keeps
 `safe_to_answer=false`.
+`nanda-bench6m` is the hot-core microbenchmark. It intentionally excludes CLI
+startup, JSON parsing, dictionary packing, file I/O, and report serialization.
+It measures the typed replay firewall (`evaluate_replay`) and the in-memory
+packed 1024-dimensional projection/centroid scoring path. Use it when you need
+real kernel timing rather than wrapper timing:
+
+```bash
+nanda-bench6m --format text
+nanda-bench6m --mode replay --replay-iterations 5000000 --format json
+nanda-bench6m --mode projection --projection-iterations 20000 --triads 64
+```
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.
@@ -544,7 +557,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v3.0.1`.
+Current release: `v3.1.0`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:

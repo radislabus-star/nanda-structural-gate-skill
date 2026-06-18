@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.1.0 - 2026-06-18
+
+NANDA-6M hot benchmark and full-model contract release.
+
+### Added
+
+- `nanda bench6m` / `nanda-bench6m` hot-core microbenchmark.
+- Replay-firewall benchmark for `nanda_6m::evaluate_replay` without JSON,
+  file I/O, process startup, or report serialization.
+- Packed projection benchmark for 1024-dimensional in-memory projection,
+  centroid construction, and centroid scoring.
+- Runtime, Linux install, Windows install, README, and skill documentation for
+  `nanda-bench6m`.
+- `ARCHITECTURE_NANDA_6M.md` section defining what a "full NANDA-6M model"
+  means in this project.
+
+### Changed
+
+- Cargo package version is now `3.1.0`.
+
 ## v3.0.1 - 2026-06-18
 
 Windows CI and wrapper fix.

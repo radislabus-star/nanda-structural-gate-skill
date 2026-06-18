@@ -31,6 +31,7 @@ $Commands = @(
     "dataset-doctor",
     "budget",
     "pack6m",
+    "bench6m",
     "serve",
     "dogfood",
     "report",
