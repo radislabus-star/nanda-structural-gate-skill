@@ -102,5 +102,8 @@ Status: started.
   structural continuation is available.
 - `nanda-decode-eval` runs continuation regressions for expected top pattern,
   decoder state, recurrent final state, and minimum completed steps.
-- Next milestones are token/pattern encoder and a training loop for
-  continuation quality.
+- `nanda-encode` is the first token/pattern encoder: raw text -> deterministic
+  token waves -> 1024-dimensional pattern signature -> preview query triads.
+- Next milestone is a training loop for continuation quality: accepted decoder
+  continuations should reinforce future pattern selection, rejected
+  continuations should suppress local false forms.

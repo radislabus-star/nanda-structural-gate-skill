@@ -17,6 +17,7 @@ waw="$root/nanda-structural-gate/scripts/nanda-waw"
 feedback="$root/nanda-structural-gate/scripts/nanda-feedback"
 indexer="$root/nanda-structural-gate/scripts/nanda-index"
 search="$root/nanda-structural-gate/scripts/nanda-search"
+encode="$root/nanda-structural-gate/scripts/nanda-encode"
 decode="$root/nanda-structural-gate/scripts/nanda-decode"
 decode_eval="$root/nanda-structural-gate/scripts/nanda-decode-eval"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
@@ -165,7 +166,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v3.7-decode-eval"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v3.8-pattern-encoder"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -502,6 +503,13 @@ jq -e '.resonance_memory.applications[0].peak == "certification"' <<<"$positive_
 jq -e '.resonant_field.coherence_memory.resonance_positive_hits == 1' <<<"$positive_search_json" >/dev/null
 jq -e '.peaks[0].positive_lane_boost > 0' <<<"$positive_search_json" >/dev/null
 jq -e '.peaks[0].resonance_memory_boost > 0' <<<"$positive_search_json" >/dev/null
+encode_json="$("$encode" --text "declaration requires protocols" --as-query-packet --input "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3)"
+jq -e '.mode == "wave-pattern-encoder"' <<<"$encode_json" >/dev/null
+jq -e '.encoder_version == "v33-token-pattern-encoder"' <<<"$encode_json" >/dev/null
+jq -e '.token_count == 3 and (.field.signature_hex | length) == 256' <<<"$encode_json" >/dev/null
+jq -e '.preview_candidate_triads | length >= 2' <<<"$encode_json" >/dev/null
+jq -e '.query_packet.candidate_triads | length >= 2' <<<"$encode_json" >/dev/null
+jq -e '.packet_similarity.top_similar_triads | length == 3' <<<"$encode_json" >/dev/null
 tmp_feedback2="$(mktemp)"
 tmp_positive_learned_index="$(mktemp)"
 "$feedback" "$tmp_search" --decision accept --note "route trap accepted" --out "$tmp_feedback2" >/dev/null

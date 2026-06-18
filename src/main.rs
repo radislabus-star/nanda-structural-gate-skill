@@ -13,6 +13,7 @@ mod bench6m;
 mod commands;
 mod dataset_doctor;
 mod decode;
+mod encode;
 mod eval;
 mod feedback;
 mod focus;
@@ -28,6 +29,7 @@ mod search;
 use aliases::{canonicalize_packet, inherit_aliases_if_needed, AliasRule, CanonicalizationReport};
 pub(crate) use dataset_doctor::*;
 pub(crate) use decode::*;
+pub(crate) use encode::*;
 pub(crate) use eval::*;
 pub(crate) use feedback::*;
 pub(crate) use io::*;
@@ -37,8 +39,8 @@ pub(crate) use report::*;
 pub(crate) use search::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v3.7-decode-eval";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v3.7-rust";
+const CORE_VERSION: &str = "sparse-triad-v3.8-pattern-encoder";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v3.8-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -68,6 +70,7 @@ enum Command {
     Extract(ExtractArgs),
     Index(IndexArgs),
     Search(SearchArgs),
+    Encode(EncodeArgs),
     Decode(DecodeArgs),
     DecodeEval(DecodeEvalArgs),
     Focus(FocusArgs),
@@ -284,6 +287,30 @@ struct SearchArgs {
     route_triad_cap: usize,
     #[arg(long, value_enum, default_value = "route")]
     group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct EncodeArgs {
+    #[arg(long, default_value = "")]
+    text: String,
+    #[arg(long)]
+    text_file: Option<PathBuf>,
+    #[arg(long)]
+    input: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "encode")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long)]
+    as_query_packet: bool,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]
@@ -682,6 +709,7 @@ fn run() -> Result<u8> {
         Command::Extract(args) => extract_cmd(args),
         Command::Index(args) => index_cmd(args),
         Command::Search(args) => search_cmd(args),
+        Command::Encode(args) => encode_cmd(args),
         Command::Decode(args) => decode_cmd(args),
         Command::DecodeEval(args) => decode_eval_cmd(args),
         Command::Focus(args) => focus::focus_cmd(args),

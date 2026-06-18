@@ -82,7 +82,10 @@
   requested depth or `PATTERN_SATURATED`.
 - v32 adds `nanda decode-eval` / `nanda-decode-eval` and
   `examples/decode-corpus.json` for decoder continuation regressions.
-- Core version is now `sparse-triad-v3.7-decode-eval`.
+- v33 adds `nanda encode` / `nanda-encode`, the deterministic token/pattern
+  encoder that turns raw text into a 1024-dimensional wave signature and
+  optional query packet.
+- Core version is now `sparse-triad-v3.8-pattern-encoder`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

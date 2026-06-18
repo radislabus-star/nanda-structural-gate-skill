@@ -108,6 +108,7 @@ scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5
+scripts/nanda-encode --text "declaration requires protocols" --as-query-packet
 scripts/nanda-decode .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-decode .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 3 --steps 3
 scripts/nanda-decode-eval --suite examples/decode-corpus.json
@@ -241,6 +242,10 @@ Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with
 support, anti-triads, missing edges, and an answer projection.
+Use `nanda-encode` when raw text needs to enter the wave path. It produces a
+deterministic token/pattern field signature plus preview candidate triads; with
+`--as-query-packet`, the output can feed the same search/decode workflow after
+inspection.
 Use `nanda-decode` when the next step is pattern continuation rather than
 retrieval. It runs the same interference field and emits ranked
 `next_structural_pattern` candidates: `subject`, `relation`, `object`, route,

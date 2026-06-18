@@ -129,6 +129,7 @@ evidence-conflict tasks do.
         ├── nanda-index
         ├── nanda-map
         ├── nanda-search
+        ├── nanda-encode
         ├── nanda-decode
         ├── nanda-decode-eval
         ├── nanda-focus
@@ -230,6 +231,7 @@ nanda-search .nanda/focus.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search-noisy.json --input-format json --format text
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3
+nanda-encode --text "declaration requires protocols" --as-query-packet
 nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 5
 nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 --steps 3
 nanda-decode-eval --suite examples/decode-corpus.json
@@ -331,6 +333,12 @@ destructive locality, multiscale agreement, energy conservation,
 frequency/mode scan, temporal phase, coherence memory, and the final
 `waw_status`. Treat `WAW_RESONANCE` as a strong field phenomenon, but still
 require proof/packed gates before final `ANSWER_READY`.
+`nanda-encode` is the v33 text-to-wave bridge. It tokenizes text, projects
+tokens into deterministic position-bound waves, superposes them into a
+1024-dimensional field signature, and can emit preview candidate triads with
+`--as-query-packet`. Use it when a raw phrase needs to enter `nanda-search` or
+`nanda-decode` without pretending that text and structural triads are already
+the same representation.
 `nanda-decode` is the first LLMWave bridge. It runs the same interference
 field as `nanda-search`, then decodes the top field into ranked
 `next_structural_pattern` candidates. It does not generate prose yet; it emits
@@ -480,7 +488,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v3.7-decode-eval
+core_version: sparse-triad-v3.8-pattern-encoder
 wave_dim: 1024
 ```
 
