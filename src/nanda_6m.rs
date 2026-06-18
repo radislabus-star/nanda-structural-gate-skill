@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-pub const VERSION: &str = "nanda-6m-v9-hot-triad-support-score-core";
+pub const VERSION: &str = "nanda-6m-v10-hot-query-energy-core";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -496,12 +496,13 @@ pub fn build_packed_support_field(
             anti_count,
         };
     }
+    let query_energy = query.energy_i64();
     for (index, triad) in memory.iter().copied().enumerate() {
         if axis.triad_id(triad) != top_id {
             continue;
         }
         considered = considered.saturating_add(1);
-        let score = score_triad_projection(query, &triad);
+        let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
         if score.dot > 0 {
             field.positive_dot += score.dot;
             support_count = support_count.saturating_add(1);
@@ -901,6 +902,16 @@ impl PackedWave1024 {
             max_abs,
         }
     }
+
+    pub fn energy_i64(&self) -> i64 {
+        self.values
+            .iter()
+            .map(|value| {
+                let value = i64::from(*value);
+                value * value
+            })
+            .sum()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -941,10 +952,17 @@ pub fn score_centroid(query: &PackedWave1024, centroid: &PackedCentroid1024) -> 
 }
 
 pub fn score_triad_projection(query: &PackedWave1024, triad: &PackedTriad32) -> PeakScore {
+    score_triad_projection_with_query_energy(query, triad, query.energy_i64())
+}
+
+pub fn score_triad_projection_with_query_energy(
+    query: &PackedWave1024,
+    triad: &PackedTriad32,
+    query_energy: i64,
+) -> PeakScore {
     let mut state = projection_seed(triad);
     let strength = i64::from(projection_strength(triad));
     let mut dot: i64 = 0;
-    let mut query_energy: i64 = 0;
     let mut triad_energy: i64 = 0;
     for query_value in query.values {
         state = mix64(state);
@@ -955,7 +973,6 @@ pub fn score_triad_projection(query: &PackedWave1024, triad: &PackedTriad32) -> 
         };
         let query_value = i64::from(query_value);
         dot += query_value * projected;
-        query_energy += query_value * query_value;
         triad_energy += projected * projected;
     }
     let denom = ((query_energy as f64).sqrt() * (triad_energy as f64).sqrt()).max(1.0);

@@ -589,6 +589,7 @@ fn packed_axis_support(
 ) -> Value {
     let support_summary =
         nanda_6m::build_packed_support_field(memory, query, axis.packed_axis(), top_id, 0);
+    let query_energy = query.energy_i64();
     let mut rows = memory
         .iter()
         .enumerate()
@@ -600,7 +601,8 @@ fn packed_axis_support(
             if id != top_id || top_id == 0 {
                 return None;
             }
-            let score = nanda_6m::score_triad_projection(query, triad);
+            let score =
+                nanda_6m::score_triad_projection_with_query_energy(query, triad, query_energy);
             Some(json!({
                 "record_index": index,
                 "route_id": triad.route_id,

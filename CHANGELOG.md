@@ -20,7 +20,9 @@
   `--mode support-build-compile-sweep`.
 - NANDA-6M support build now scores single packed triads directly without
   constructing temporary one-triad centroids.
-- NANDA-6M version is now `nanda-6m-v9-hot-triad-support-score-core`.
+- NANDA-6M support scoring reuses precomputed query energy inside support-field
+  scans.
+- NANDA-6M version is now `nanda-6m-v10-hot-query-energy-core`.
 
 ## v3.3.0 - 2026-06-18
 
