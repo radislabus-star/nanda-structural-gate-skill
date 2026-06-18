@@ -14,6 +14,12 @@ pub(super) struct Bench6mArgs {
     replay_iterations: u64,
     #[arg(long, default_value_t = 10_000)]
     projection_iterations: u64,
+    #[arg(long, default_value_t = 1_000_000)]
+    lane_iterations: u64,
+    #[arg(long, default_value_t = 100_000)]
+    lane_sweep_iterations: u64,
+    #[arg(long, default_value_t = 64)]
+    lane_sweep_width: usize,
     #[arg(long, default_value_t = 64)]
     triads: usize,
     #[arg(long, value_enum, default_value = "text")]
@@ -24,12 +30,24 @@ pub(super) struct Bench6mArgs {
 enum Bench6mMode {
     Replay,
     Projection,
+    Lane,
+    LaneSweep,
+    AlignedLaneSweep,
+    AlignedCompileSweep,
     All,
 }
 
 pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     let include_replay = matches!(args.mode, Bench6mMode::Replay | Bench6mMode::All);
     let include_projection = matches!(args.mode, Bench6mMode::Projection | Bench6mMode::All);
+    let include_lane = matches!(args.mode, Bench6mMode::Lane | Bench6mMode::All);
+    let include_lane_sweep = matches!(args.mode, Bench6mMode::LaneSweep | Bench6mMode::All);
+    let include_aligned_lane_sweep =
+        matches!(args.mode, Bench6mMode::AlignedLaneSweep | Bench6mMode::All);
+    let include_aligned_compile_sweep = matches!(
+        args.mode,
+        Bench6mMode::AlignedCompileSweep | Bench6mMode::All
+    );
     let replay = if include_replay {
         Some(bench6m_replay(args.replay_iterations))
     } else {
@@ -43,6 +61,38 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
+    let lane_application = if include_lane {
+        Some(bench6m_lane_application(args.lane_iterations))
+    } else {
+        None
+    };
+    let lane_sweep = if include_lane_sweep {
+        Some(bench6m_lane_sweep(
+            args.lane_sweep_iterations,
+            args.lane_sweep_width.clamp(1, nanda_6m::LANE_CAPACITY),
+            LaneSweepKernel::Search,
+        ))
+    } else {
+        None
+    };
+    let aligned_lane_sweep = if include_aligned_lane_sweep {
+        Some(bench6m_lane_sweep(
+            args.lane_sweep_iterations,
+            args.lane_sweep_width.clamp(1, nanda_6m::LANE_CAPACITY),
+            LaneSweepKernel::Aligned,
+        ))
+    } else {
+        None
+    };
+    let aligned_compile_sweep = if include_aligned_compile_sweep {
+        Some(bench6m_lane_sweep(
+            args.lane_sweep_iterations,
+            args.lane_sweep_width.clamp(1, nanda_6m::LANE_CAPACITY),
+            LaneSweepKernel::AlignedCompile,
+        ))
+    } else {
+        None
+    };
     let out = json!({
         "mode": "nanda-6m-hot-benchmark",
         "core_version": CORE_VERSION,
@@ -51,11 +101,19 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
         "wave_dim": nanda_6m::WAVE_DIM,
         "benchmarks": {
             "replay": replay,
-            "projection": projection
+            "projection": projection,
+            "lane_application": lane_application,
+            "lane_sweep": lane_sweep,
+            "aligned_lane_sweep": aligned_lane_sweep,
+            "aligned_compile_sweep": aligned_compile_sweep
         },
         "interpretation": {
             "replay": "Pure typed replay firewall; no JSON, no file IO, no process spawn.",
             "projection": "Packed 1024-dimensional projection plus centroid scoring over an in-memory triad window.",
+            "lane_application": "Packed suppress-anti-support lane compilation/application over typed support fields.",
+            "lane_sweep": "Batch packed suppress-anti-support lane sweep over typed support fields and compiled lane arena.",
+            "aligned_lane_sweep": "Fast batch lane sweep for pre-aligned field/lane windows with no arena search.",
+            "aligned_compile_sweep": "Fused batch lane compilation and aligned application over support fields.",
             "not_measured": "CLI startup, JSON parsing, dictionary packing, and report serialization are intentionally excluded."
         }
     });
@@ -158,6 +216,130 @@ fn bench6m_replay(iterations: u64) -> Value {
     bench_result_json(iterations, elapsed.as_nanos(), checksum, "evaluate_replay")
 }
 
+fn bench6m_lane_application(iterations: u64) -> Value {
+    let iterations = iterations.max(1);
+    let fields = [
+        nanda_6m::PackedSupportField {
+            top_id: 7,
+            key_hash: 0x1234,
+            positive_dot: 288,
+            negative_dot: -256,
+            support_mask_a: 0b0001_0000,
+            support_mask_b: 0,
+            anti_mask_a: 0b0110_0000,
+            anti_mask_b: 0,
+        },
+        nanda_6m::PackedSupportField {
+            top_id: 9,
+            key_hash: 0x5678,
+            positive_dot: 320,
+            negative_dot: -64,
+            support_mask_a: 0b0000_0011,
+            support_mask_b: 0,
+            anti_mask_a: 0b0000_1100,
+            anti_mask_b: 0,
+        },
+        nanda_6m::PackedSupportField {
+            top_id: 11,
+            key_hash: 0x9abc,
+            positive_dot: 256,
+            negative_dot: 0,
+            support_mask_a: 0b0000_1111,
+            support_mask_b: 0,
+            anti_mask_a: 0,
+            anti_mask_b: 0,
+        },
+        nanda_6m::PackedSupportField {
+            top_id: 13,
+            key_hash: 0xdef0,
+            positive_dot: 96,
+            negative_dot: -32,
+            support_mask_a: 0b0011_0000,
+            support_mask_b: 0,
+            anti_mask_a: 0b1100_0000,
+            anti_mask_b: 0,
+        },
+    ];
+    let mut checksum: u64 = 0;
+    let start = Instant::now();
+    for idx in 0..iterations {
+        let field = black_box(fields[(idx as usize) & 3]);
+        let application = nanda_6m::compile_and_apply_suppress_anti_lane(field);
+        checksum = checksum
+            .wrapping_add(application.after_net_dot as u64)
+            .wrapping_add(application.delta_dot as u64)
+            .wrapping_add(application.lane.lane_id as u64)
+            .wrapping_add(u64::from(application.focused_candidate));
+        black_box(application);
+    }
+    let elapsed = start.elapsed();
+    bench_result_json(
+        iterations,
+        elapsed.as_nanos(),
+        checksum,
+        "compile_and_apply_suppress_anti_lane",
+    )
+}
+
+#[derive(Clone, Copy)]
+enum LaneSweepKernel {
+    Search,
+    Aligned,
+    AlignedCompile,
+}
+
+fn bench6m_lane_sweep(iterations: u64, width: usize, kernel: LaneSweepKernel) -> Value {
+    let iterations = iterations.max(1);
+    let fields = bench6m_support_fields(width);
+    let mut lanes = vec![nanda_6m::PackedLane64::default(); fields.len()];
+    let compiled = if matches!(kernel, LaneSweepKernel::AlignedCompile) {
+        fields.len()
+    } else {
+        nanda_6m::compile_suppress_anti_lanes(&fields, &mut lanes)
+    };
+    let mut checksum: u64 = 0;
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let sweep = match kernel {
+            LaneSweepKernel::Search => nanda_6m::apply_suppress_anti_lane_sweep(
+                black_box(fields.as_slice()),
+                black_box(lanes.as_slice()),
+            ),
+            LaneSweepKernel::Aligned => nanda_6m::apply_aligned_suppress_anti_lane_sweep(
+                black_box(fields.as_slice()),
+                black_box(lanes.as_slice()),
+            ),
+            LaneSweepKernel::AlignedCompile => {
+                nanda_6m::compile_and_apply_aligned_suppress_anti_lane_sweep(
+                    black_box(fields.as_slice()),
+                    black_box(lanes.as_mut_slice()),
+                )
+            }
+        };
+        checksum = checksum
+            .wrapping_add(sweep.checksum)
+            .wrapping_add(sweep.best_after_net_dot as u64)
+            .wrapping_add(sweep.total_delta_dot as u64)
+            .wrapping_add(sweep.focused as u64);
+        black_box(sweep);
+    }
+    let elapsed = start.elapsed();
+    let mut out = bench_result_json(
+        iterations,
+        elapsed.as_nanos(),
+        checksum,
+        match kernel {
+            LaneSweepKernel::Search => "apply_suppress_anti_lane_sweep",
+            LaneSweepKernel::Aligned => "apply_aligned_suppress_anti_lane_sweep",
+            LaneSweepKernel::AlignedCompile => "compile_and_apply_aligned_suppress_anti_lane_sweep",
+        },
+    );
+    out["fields"] = json!(fields.len());
+    out["compiled_lanes"] = json!(compiled);
+    out["ns_per_field"] = json!(out["ns_per_op"].as_f64().unwrap_or(0.0) / fields.len() as f64);
+    out
+}
+
 fn bench6m_projection(iterations: u64, triad_count: usize) -> Value {
     let iterations = iterations.max(1);
     let triads = bench6m_triads(triad_count);
@@ -189,6 +371,37 @@ fn bench6m_projection(iterations: u64, triad_count: usize) -> Value {
     out["triads_in_window"] = json!(triad_count);
     out["query_triads"] = json!(query_len);
     out
+}
+
+fn bench6m_support_fields(count: usize) -> Vec<nanda_6m::PackedSupportField> {
+    (0..count)
+        .map(|idx| {
+            let idx = idx as u32;
+            let positive_dot = 96 + i64::from((idx % 8) * 32);
+            let negative_dot = if idx.is_multiple_of(3) {
+                -i64::from(64 + (idx % 5) * 32)
+            } else if idx.is_multiple_of(5) {
+                -32
+            } else {
+                0
+            };
+            let anti_mask = if negative_dot < 0 {
+                1u64 << ((idx % 63) + 1)
+            } else {
+                0
+            };
+            nanda_6m::PackedSupportField {
+                top_id: (1 + (idx % 127)) as u16,
+                key_hash: 0x1000_0000u32.wrapping_add(idx.wrapping_mul(97)),
+                positive_dot,
+                negative_dot,
+                support_mask_a: 1u64 << (idx % 64),
+                support_mask_b: 0,
+                anti_mask_a: anti_mask,
+                anti_mask_b: 0,
+            }
+        })
+        .collect()
 }
 
 fn bench_result_json(iterations: u64, elapsed_ns: u128, checksum: u64, kernel: &str) -> Value {
@@ -252,6 +465,48 @@ fn print_bench6m_text(out: &Value) {
             projection["ops_per_second"].as_f64().unwrap_or(0.0)
         );
     }
+    if !out["benchmarks"]["lane_application"].is_null() {
+        let lane = &out["benchmarks"]["lane_application"];
+        println!(
+            "lane: {} iters / {:.2} ns/op / {:.0} ops/s",
+            lane["iterations"].as_u64().unwrap_or(0),
+            lane["ns_per_op"].as_f64().unwrap_or(0.0),
+            lane["ops_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["lane_sweep"].is_null() {
+        let sweep = &out["benchmarks"]["lane_sweep"];
+        println!(
+            "lane-sweep: {} iters / {} fields / {:.2} ns/op / {:.2} ns/field / {:.0} ops/s",
+            sweep["iterations"].as_u64().unwrap_or(0),
+            sweep["fields"].as_u64().unwrap_or(0),
+            sweep["ns_per_op"].as_f64().unwrap_or(0.0),
+            sweep["ns_per_field"].as_f64().unwrap_or(0.0),
+            sweep["ops_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["aligned_lane_sweep"].is_null() {
+        let sweep = &out["benchmarks"]["aligned_lane_sweep"];
+        println!(
+            "aligned-lane-sweep: {} iters / {} fields / {:.2} ns/op / {:.2} ns/field / {:.0} ops/s",
+            sweep["iterations"].as_u64().unwrap_or(0),
+            sweep["fields"].as_u64().unwrap_or(0),
+            sweep["ns_per_op"].as_f64().unwrap_or(0.0),
+            sweep["ns_per_field"].as_f64().unwrap_or(0.0),
+            sweep["ops_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["aligned_compile_sweep"].is_null() {
+        let sweep = &out["benchmarks"]["aligned_compile_sweep"];
+        println!(
+            "aligned-compile-sweep: {} iters / {} fields / {:.2} ns/op / {:.2} ns/field / {:.0} ops/s",
+            sweep["iterations"].as_u64().unwrap_or(0),
+            sweep["fields"].as_u64().unwrap_or(0),
+            sweep["ns_per_op"].as_f64().unwrap_or(0.0),
+            sweep["ns_per_field"].as_f64().unwrap_or(0.0),
+            sweep["ops_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
     println!("scope: no JSON, no file IO, no process spawn");
 }
 
@@ -277,6 +532,44 @@ fn print_bench6m_md(out: &Value) {
             projection["iterations"].as_u64().unwrap_or(0),
             projection["triads_in_window"].as_u64().unwrap_or(0),
             projection["ns_per_op"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["lane_application"].is_null() {
+        let lane = &out["benchmarks"]["lane_application"];
+        println!(
+            "- lane: `{}` iterations, `{:.2}` ns/op",
+            lane["iterations"].as_u64().unwrap_or(0),
+            lane["ns_per_op"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["lane_sweep"].is_null() {
+        let sweep = &out["benchmarks"]["lane_sweep"];
+        println!(
+            "- lane-sweep: `{}` iterations, `{}` fields, `{:.2}` ns/op, `{:.2}` ns/field",
+            sweep["iterations"].as_u64().unwrap_or(0),
+            sweep["fields"].as_u64().unwrap_or(0),
+            sweep["ns_per_op"].as_f64().unwrap_or(0.0),
+            sweep["ns_per_field"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["aligned_lane_sweep"].is_null() {
+        let sweep = &out["benchmarks"]["aligned_lane_sweep"];
+        println!(
+            "- aligned-lane-sweep: `{}` iterations, `{}` fields, `{:.2}` ns/op, `{:.2}` ns/field",
+            sweep["iterations"].as_u64().unwrap_or(0),
+            sweep["fields"].as_u64().unwrap_or(0),
+            sweep["ns_per_op"].as_f64().unwrap_or(0.0),
+            sweep["ns_per_field"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["aligned_compile_sweep"].is_null() {
+        let sweep = &out["benchmarks"]["aligned_compile_sweep"];
+        println!(
+            "- aligned-compile-sweep: `{}` iterations, `{}` fields, `{:.2}` ns/op, `{:.2}` ns/field",
+            sweep["iterations"].as_u64().unwrap_or(0),
+            sweep["fields"].as_u64().unwrap_or(0),
+            sweep["ns_per_op"].as_f64().unwrap_or(0.0),
+            sweep["ns_per_field"].as_f64().unwrap_or(0.0)
         );
     }
     println!("- scope: no JSON, no file IO, no process spawn");

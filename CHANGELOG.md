@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- NANDA-6M lane preview/application now calls the packed hot-core
+  `nanda_6m` lane compiler and applier instead of using JSON-derived lane
+  deltas as the source of truth.
+- `nanda bench6m` now includes a packed lane application kernel benchmark and
+  `--mode lane`.
+- `nanda bench6m` now includes `--mode lane-sweep` for batch packed lane arena
+  application over support fields.
+- `nanda bench6m` now includes `--mode aligned-lane-sweep` for direct
+  field/lane windows without arena search.
+- `nanda bench6m` now includes `--mode aligned-compile-sweep` for fused aligned
+  lane compilation and application.
+- NANDA-6M version is now `nanda-6m-v8-hot-compile-sweep-core`.
+
 ## v3.3.0 - 2026-06-18
 
 Modular router and code-map planning release.

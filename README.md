@@ -217,7 +217,7 @@ nanda-extract examples/route-trap.raw.txt --out .nanda/route-trap.json
 nanda-index examples/triad-packet.interference-search-route-trap.json --input-format json --out .nanda/index.json
 nanda-budget .nanda/index.json --input-format json
 nanda-pack6m .nanda/index.json --input-format json
-nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
+nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000 --lane-iterations 1000000 --lane-sweep-iterations 100000
 nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
@@ -351,14 +351,20 @@ ready for a real hot-loop implementation, but it still keeps
 `safe_to_answer=false`.
 `nanda-bench6m` is the hot-core microbenchmark. It intentionally excludes CLI
 startup, JSON parsing, dictionary packing, file I/O, and report serialization.
-It measures the typed replay firewall (`evaluate_replay`) and the in-memory
-packed 1024-dimensional projection/centroid scoring path. Use it when you need
-real kernel timing rather than wrapper timing:
+It measures the typed replay firewall (`evaluate_replay`), the in-memory packed
+1024-dimensional projection/centroid scoring path, and packed lane
+compile/application. It also measures unordered lane-arena sweep, aligned
+field/lane sweep, and fused aligned compile+sweep over a packed support window.
+Use it when you need real kernel timing rather than wrapper timing:
 
 ```bash
 nanda-bench6m --format text
 nanda-bench6m --mode replay --replay-iterations 5000000 --format json
 nanda-bench6m --mode projection --projection-iterations 20000 --triads 64
+nanda-bench6m --mode lane --lane-iterations 5000000 --format json
+nanda-bench6m --mode lane-sweep --lane-sweep-iterations 1000000 --lane-sweep-width 64 --format json
+nanda-bench6m --mode aligned-lane-sweep --lane-sweep-iterations 1000000 --lane-sweep-width 64 --format json
+nanda-bench6m --mode aligned-compile-sweep --lane-sweep-iterations 1000000 --lane-sweep-width 64 --format json
 ```
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,

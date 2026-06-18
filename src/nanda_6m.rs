@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-pub const VERSION: &str = "nanda-6m-v4-hot-replay-core";
+pub const VERSION: &str = "nanda-6m-v8-hot-compile-sweep-core";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -21,6 +21,8 @@ pub const TRIAD_BYTES: usize = 32;
 pub const CENTROID_BYTES: usize = 1024;
 pub const LANE_BYTES: usize = 64;
 pub const QUERY_WAVE_BYTES: usize = WAVE_DIM * core::mem::size_of::<i16>();
+pub const LANE_FOCUSED_NET_DOT: i64 = 128;
+pub const LANE_FOCUSED_DELTA_DOT: i64 = 64;
 
 pub const TRIAD_CAPACITY: usize = TRIAD_ARENA_BYTES / TRIAD_BYTES;
 pub const CENTROID_CAPACITY: usize = CENTROID_ARENA_BYTES / CENTROID_BYTES;
@@ -175,6 +177,223 @@ pub struct PackedLane64 {
     pub action: u8,
     pub strength: u8,
     pub reserved: [u8; 14],
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedSupportField {
+    pub top_id: u16,
+    pub key_hash: u32,
+    pub positive_dot: i64,
+    pub negative_dot: i64,
+    pub support_mask_a: u64,
+    pub support_mask_b: u64,
+    pub anti_mask_a: u64,
+    pub anti_mask_b: u64,
+}
+
+impl PackedSupportField {
+    pub const fn before_net_dot(self) -> i64 {
+        self.positive_dot + self.negative_dot
+    }
+
+    pub const fn has_anti_support(self) -> bool {
+        self.negative_dot < 0 && (self.anti_mask_a != 0 || self.anti_mask_b != 0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedLaneApplication {
+    pub lane: PackedLane64,
+    pub lane_ready: bool,
+    pub improved: bool,
+    pub focused_candidate: bool,
+    pub before_net_dot: i64,
+    pub after_net_dot: i64,
+    pub delta_dot: i64,
+    pub suppressed_negative_dot: i64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedLaneSweep {
+    pub fields: usize,
+    pub lanes: usize,
+    pub applied: usize,
+    pub improved: usize,
+    pub focused: usize,
+    pub best_index: u16,
+    pub best_after_net_dot: i64,
+    pub best_delta_dot: i64,
+    pub total_delta_dot: i64,
+    pub checksum: u64,
+}
+
+pub fn compile_suppress_anti_lane(field: PackedSupportField) -> PackedLane64 {
+    let has_lane = field.has_anti_support();
+    PackedLane64 {
+        support_mask_a: field.anti_mask_a,
+        support_mask_b: field.anti_mask_b,
+        anti_mask_a: field.support_mask_a,
+        anti_mask_b: field.support_mask_b,
+        lane_id: field.key_hash,
+        target_route: field.top_id,
+        target_group: field.top_id,
+        target_relation: 0,
+        accepted_count: 0,
+        rejected_count: if has_lane { 1 } else { 0 },
+        margin_hint: field
+            .before_net_dot()
+            .clamp(i64::from(i16::MIN), i64::from(i16::MAX)) as i16,
+        action: if has_lane { 1 } else { 0 },
+        strength: if has_lane { 255 } else { 0 },
+        reserved: [0; 14],
+    }
+}
+
+pub fn apply_suppress_anti_lane(
+    field: PackedSupportField,
+    lane: PackedLane64,
+) -> PackedLaneApplication {
+    let before = field.before_net_dot();
+    let lane_ready = lane.action == 1
+        && lane.strength > 0
+        && (lane.support_mask_a != 0 || lane.support_mask_b != 0);
+    let after = if lane_ready {
+        field.positive_dot
+    } else {
+        before
+    };
+    let delta = after - before;
+    let improved = lane_ready && delta > 0 && after > before;
+    let focused_candidate =
+        lane_ready && after >= LANE_FOCUSED_NET_DOT && delta >= LANE_FOCUSED_DELTA_DOT;
+    PackedLaneApplication {
+        lane,
+        lane_ready,
+        improved,
+        focused_candidate,
+        before_net_dot: before,
+        after_net_dot: after,
+        delta_dot: delta,
+        suppressed_negative_dot: if lane_ready { field.negative_dot } else { 0 },
+    }
+}
+
+pub fn compile_and_apply_suppress_anti_lane(field: PackedSupportField) -> PackedLaneApplication {
+    apply_suppress_anti_lane(field, compile_suppress_anti_lane(field))
+}
+
+pub fn compile_suppress_anti_lanes(
+    fields: &[PackedSupportField],
+    lanes_out: &mut [PackedLane64],
+) -> usize {
+    let count = fields.len().min(lanes_out.len());
+    for (field, out) in fields.iter().take(count).zip(lanes_out.iter_mut()) {
+        *out = compile_suppress_anti_lane(*field);
+    }
+    count
+}
+
+pub fn apply_suppress_anti_lane_sweep(
+    fields: &[PackedSupportField],
+    lanes: &[PackedLane64],
+) -> PackedLaneSweep {
+    let mut sweep = PackedLaneSweep {
+        fields: fields.len(),
+        lanes: lanes.len(),
+        best_after_net_dot: i64::MIN,
+        ..PackedLaneSweep::default()
+    };
+    for (idx, field) in fields.iter().enumerate() {
+        let lane = matching_lane(*field, lanes).unwrap_or_default();
+        let applied = apply_suppress_anti_lane(*field, lane);
+        accumulate_lane_application(&mut sweep, idx, applied);
+    }
+    if fields.is_empty() {
+        sweep.best_after_net_dot = 0;
+    }
+    sweep
+}
+
+pub fn apply_aligned_suppress_anti_lane_sweep(
+    fields: &[PackedSupportField],
+    lanes: &[PackedLane64],
+) -> PackedLaneSweep {
+    let count = fields.len().min(lanes.len());
+    let mut sweep = PackedLaneSweep {
+        fields: fields.len(),
+        lanes: lanes.len(),
+        best_after_net_dot: i64::MIN,
+        ..PackedLaneSweep::default()
+    };
+    for idx in 0..count {
+        let applied = apply_suppress_anti_lane(fields[idx], lanes[idx]);
+        accumulate_lane_application(&mut sweep, idx, applied);
+    }
+    if count == 0 {
+        sweep.best_after_net_dot = 0;
+    }
+    sweep
+}
+
+pub fn compile_and_apply_aligned_suppress_anti_lane_sweep(
+    fields: &[PackedSupportField],
+    lanes_out: &mut [PackedLane64],
+) -> PackedLaneSweep {
+    let count = fields.len().min(lanes_out.len());
+    let mut sweep = PackedLaneSweep {
+        fields: fields.len(),
+        lanes: lanes_out.len(),
+        best_after_net_dot: i64::MIN,
+        ..PackedLaneSweep::default()
+    };
+    for idx in 0..count {
+        let lane = compile_suppress_anti_lane(fields[idx]);
+        lanes_out[idx] = lane;
+        let applied = apply_suppress_anti_lane(fields[idx], lane);
+        accumulate_lane_application(&mut sweep, idx, applied);
+    }
+    if count == 0 {
+        sweep.best_after_net_dot = 0;
+    }
+    sweep
+}
+
+fn matching_lane(field: PackedSupportField, lanes: &[PackedLane64]) -> Option<PackedLane64> {
+    lanes
+        .iter()
+        .copied()
+        .find(|lane| lane.lane_id == field.key_hash && lane.target_route == field.top_id)
+}
+
+fn accumulate_lane_application(
+    sweep: &mut PackedLaneSweep,
+    idx: usize,
+    applied: PackedLaneApplication,
+) {
+    if applied.lane_ready {
+        sweep.applied += 1;
+    }
+    if applied.improved {
+        sweep.improved += 1;
+    }
+    if applied.focused_candidate {
+        sweep.focused += 1;
+    }
+    if applied.after_net_dot > sweep.best_after_net_dot
+        || (applied.after_net_dot == sweep.best_after_net_dot
+            && applied.delta_dot > sweep.best_delta_dot)
+    {
+        sweep.best_index = idx.min(usize::from(u16::MAX)) as u16;
+        sweep.best_after_net_dot = applied.after_net_dot;
+        sweep.best_delta_dot = applied.delta_dot;
+    }
+    sweep.total_delta_dot += applied.delta_dot;
+    sweep.checksum = sweep
+        .checksum
+        .wrapping_add(applied.after_net_dot as u64)
+        .wrapping_add(applied.delta_dot as u64)
+        .wrapping_add(applied.lane.lane_id as u64)
+        .wrapping_add(u64::from(applied.focused_candidate));
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -647,6 +866,213 @@ mod tests {
         let foreign_score = score_centroid(&query, &foreign);
         assert!(matching_score.cosine > foreign_score.cosine);
         assert!(matching_score.cosine > 0.5);
+    }
+
+    #[test]
+    fn packed_lane_application_suppresses_anti_support() {
+        let field = PackedSupportField {
+            top_id: 7,
+            key_hash: 0x1234,
+            positive_dot: 256,
+            negative_dot: -160,
+            support_mask_a: 0b0011,
+            support_mask_b: 0,
+            anti_mask_a: 0b0100,
+            anti_mask_b: 0,
+        };
+
+        let applied = compile_and_apply_suppress_anti_lane(field);
+
+        assert!(applied.lane_ready);
+        assert!(applied.improved);
+        assert!(applied.focused_candidate);
+        assert_eq!(applied.before_net_dot, 96);
+        assert_eq!(applied.after_net_dot, 256);
+        assert_eq!(applied.delta_dot, 160);
+        assert_eq!(applied.suppressed_negative_dot, -160);
+        assert_eq!(applied.lane.support_mask_a, field.anti_mask_a);
+        assert_eq!(applied.lane.anti_mask_a, field.support_mask_a);
+        assert_eq!(applied.lane.action, 1);
+        assert_eq!(applied.lane.strength, 255);
+    }
+
+    #[test]
+    fn packed_lane_application_noops_without_anti_support() {
+        let field = PackedSupportField {
+            top_id: 7,
+            key_hash: 0x1234,
+            positive_dot: 256,
+            negative_dot: 0,
+            support_mask_a: 0b0011,
+            support_mask_b: 0,
+            anti_mask_a: 0,
+            anti_mask_b: 0,
+        };
+
+        let applied = compile_and_apply_suppress_anti_lane(field);
+
+        assert!(!applied.lane_ready);
+        assert!(!applied.improved);
+        assert!(!applied.focused_candidate);
+        assert_eq!(applied.before_net_dot, 256);
+        assert_eq!(applied.after_net_dot, 256);
+        assert_eq!(applied.delta_dot, 0);
+        assert_eq!(applied.suppressed_negative_dot, 0);
+        assert_eq!(applied.lane.action, 0);
+        assert_eq!(applied.lane.strength, 0);
+    }
+
+    #[test]
+    fn packed_lane_sweep_applies_matching_lanes() {
+        let fields = [
+            PackedSupportField {
+                top_id: 1,
+                key_hash: 0x1001,
+                positive_dot: 288,
+                negative_dot: -256,
+                support_mask_a: 0b0001,
+                support_mask_b: 0,
+                anti_mask_a: 0b0110,
+                anti_mask_b: 0,
+            },
+            PackedSupportField {
+                top_id: 2,
+                key_hash: 0x1002,
+                positive_dot: 96,
+                negative_dot: -32,
+                support_mask_a: 0b1000,
+                support_mask_b: 0,
+                anti_mask_a: 0b0010,
+                anti_mask_b: 0,
+            },
+            PackedSupportField {
+                top_id: 3,
+                key_hash: 0x1003,
+                positive_dot: 256,
+                negative_dot: 0,
+                support_mask_a: 0b1111,
+                support_mask_b: 0,
+                anti_mask_a: 0,
+                anti_mask_b: 0,
+            },
+        ];
+        let mut lanes = [PackedLane64::default(); 3];
+        let compiled = compile_suppress_anti_lanes(&fields, &mut lanes);
+
+        let sweep = apply_suppress_anti_lane_sweep(&fields, &lanes);
+
+        assert_eq!(compiled, 3);
+        assert_eq!(sweep.fields, 3);
+        assert_eq!(sweep.lanes, 3);
+        assert_eq!(sweep.applied, 2);
+        assert_eq!(sweep.improved, 2);
+        assert_eq!(sweep.focused, 1);
+        assert_eq!(sweep.best_index, 0);
+        assert_eq!(sweep.best_after_net_dot, 288);
+        assert_eq!(sweep.best_delta_dot, 256);
+        assert_eq!(sweep.total_delta_dot, 288);
+        assert!(sweep.checksum > 0);
+    }
+
+    #[test]
+    fn aligned_packed_lane_sweep_matches_search_sweep() {
+        let fields = [
+            PackedSupportField {
+                top_id: 1,
+                key_hash: 0x1001,
+                positive_dot: 288,
+                negative_dot: -256,
+                support_mask_a: 0b0001,
+                support_mask_b: 0,
+                anti_mask_a: 0b0110,
+                anti_mask_b: 0,
+            },
+            PackedSupportField {
+                top_id: 2,
+                key_hash: 0x1002,
+                positive_dot: 192,
+                negative_dot: -64,
+                support_mask_a: 0b1000,
+                support_mask_b: 0,
+                anti_mask_a: 0b0010,
+                anti_mask_b: 0,
+            },
+        ];
+        let mut lanes = [PackedLane64::default(); 2];
+        compile_suppress_anti_lanes(&fields, &mut lanes);
+
+        let search_sweep = apply_suppress_anti_lane_sweep(&fields, &lanes);
+        let aligned_sweep = apply_aligned_suppress_anti_lane_sweep(&fields, &lanes);
+
+        assert_eq!(aligned_sweep, search_sweep);
+        assert_eq!(aligned_sweep.applied, 2);
+        assert_eq!(aligned_sweep.focused, 2);
+        assert_eq!(aligned_sweep.best_index, 0);
+    }
+
+    #[test]
+    fn compile_and_apply_aligned_sweep_matches_two_pass_path() {
+        let fields = [
+            PackedSupportField {
+                top_id: 1,
+                key_hash: 0x1001,
+                positive_dot: 288,
+                negative_dot: -256,
+                support_mask_a: 0b0001,
+                support_mask_b: 0,
+                anti_mask_a: 0b0110,
+                anti_mask_b: 0,
+            },
+            PackedSupportField {
+                top_id: 2,
+                key_hash: 0x1002,
+                positive_dot: 192,
+                negative_dot: -64,
+                support_mask_a: 0b1000,
+                support_mask_b: 0,
+                anti_mask_a: 0b0010,
+                anti_mask_b: 0,
+            },
+        ];
+        let mut two_pass_lanes = [PackedLane64::default(); 2];
+        let mut fused_lanes = [PackedLane64::default(); 2];
+        compile_suppress_anti_lanes(&fields, &mut two_pass_lanes);
+
+        let two_pass = apply_aligned_suppress_anti_lane_sweep(&fields, &two_pass_lanes);
+        let fused = compile_and_apply_aligned_suppress_anti_lane_sweep(&fields, &mut fused_lanes);
+
+        assert_eq!(fused, two_pass);
+        assert_eq!(fused_lanes, two_pass_lanes);
+        assert_eq!(fused.applied, 2);
+        assert_eq!(fused.focused, 2);
+    }
+
+    #[test]
+    fn packed_lane_sweep_noops_without_matching_lanes() {
+        let fields = [PackedSupportField {
+            top_id: 1,
+            key_hash: 0x1001,
+            positive_dot: 288,
+            negative_dot: -256,
+            support_mask_a: 0b0001,
+            support_mask_b: 0,
+            anti_mask_a: 0b0110,
+            anti_mask_b: 0,
+        }];
+        let lanes = [PackedLane64 {
+            lane_id: 0x9999,
+            target_route: 1,
+            ..PackedLane64::default()
+        }];
+
+        let sweep = apply_suppress_anti_lane_sweep(&fields, &lanes);
+
+        assert_eq!(sweep.applied, 0);
+        assert_eq!(sweep.improved, 0);
+        assert_eq!(sweep.focused, 0);
+        assert_eq!(sweep.best_after_net_dot, 32);
+        assert_eq!(sweep.best_delta_dot, 0);
+        assert_eq!(sweep.total_delta_dot, 0);
     }
 
     fn replay_input(

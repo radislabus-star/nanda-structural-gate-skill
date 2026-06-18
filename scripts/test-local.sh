@@ -560,6 +560,22 @@ bench6m_json="$("$bench6m" --replay-iterations 1000 --projection-iterations 10 -
 jq -e '.mode == "nanda-6m-hot-benchmark"' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.replay.iterations == 1000 and .benchmarks.replay.ns_per_op > 0' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.projection.iterations == 10 and .benchmarks.projection.triads_in_window == 8 and .benchmarks.projection.ns_per_op > 0' <<<"$bench6m_json" >/dev/null
+jq -e '.benchmarks.lane_application.iterations == 1000000 and .benchmarks.lane_application.kernel == "compile_and_apply_suppress_anti_lane" and .benchmarks.lane_application.ns_per_op > 0' <<<"$bench6m_json" >/dev/null
+jq -e '.benchmarks.lane_sweep.iterations == 100000 and .benchmarks.lane_sweep.kernel == "apply_suppress_anti_lane_sweep" and .benchmarks.lane_sweep.fields == 64 and .benchmarks.lane_sweep.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
+jq -e '.benchmarks.aligned_lane_sweep.iterations == 100000 and .benchmarks.aligned_lane_sweep.kernel == "apply_aligned_suppress_anti_lane_sweep" and .benchmarks.aligned_lane_sweep.fields == 64 and .benchmarks.aligned_lane_sweep.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
+jq -e '.benchmarks.aligned_compile_sweep.iterations == 100000 and .benchmarks.aligned_compile_sweep.kernel == "compile_and_apply_aligned_suppress_anti_lane_sweep" and .benchmarks.aligned_compile_sweep.fields == 64 and .benchmarks.aligned_compile_sweep.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
+bench6m_lane_json="$("$bench6m" --mode lane --lane-iterations 1000 --format json)"
+jq -e '.benchmarks.replay == null and .benchmarks.projection == null' <<<"$bench6m_lane_json" >/dev/null
+jq -e '.benchmarks.lane_application.iterations == 1000 and .benchmarks.lane_application.ops_per_second > 0' <<<"$bench6m_lane_json" >/dev/null
+bench6m_lane_sweep_json="$("$bench6m" --mode lane-sweep --lane-sweep-iterations 1000 --lane-sweep-width 8 --format json)"
+jq -e '.benchmarks.replay == null and .benchmarks.projection == null and .benchmarks.lane_application == null and .benchmarks.aligned_lane_sweep == null' <<<"$bench6m_lane_sweep_json" >/dev/null
+jq -e '.benchmarks.lane_sweep.iterations == 1000 and .benchmarks.lane_sweep.fields == 8 and .benchmarks.lane_sweep.compiled_lanes == 8 and .benchmarks.lane_sweep.ops_per_second > 0' <<<"$bench6m_lane_sweep_json" >/dev/null
+bench6m_aligned_lane_sweep_json="$("$bench6m" --mode aligned-lane-sweep --lane-sweep-iterations 1000 --lane-sweep-width 8 --format json)"
+jq -e '.benchmarks.replay == null and .benchmarks.projection == null and .benchmarks.lane_application == null and .benchmarks.lane_sweep == null and .benchmarks.aligned_compile_sweep == null' <<<"$bench6m_aligned_lane_sweep_json" >/dev/null
+jq -e '.benchmarks.aligned_lane_sweep.iterations == 1000 and .benchmarks.aligned_lane_sweep.fields == 8 and .benchmarks.aligned_lane_sweep.compiled_lanes == 8 and .benchmarks.aligned_lane_sweep.ops_per_second > 0' <<<"$bench6m_aligned_lane_sweep_json" >/dev/null
+bench6m_aligned_compile_sweep_json="$("$bench6m" --mode aligned-compile-sweep --lane-sweep-iterations 1000 --lane-sweep-width 8 --format json)"
+jq -e '.benchmarks.replay == null and .benchmarks.projection == null and .benchmarks.lane_application == null and .benchmarks.lane_sweep == null and .benchmarks.aligned_lane_sweep == null' <<<"$bench6m_aligned_compile_sweep_json" >/dev/null
+jq -e '.benchmarks.aligned_compile_sweep.iterations == 1000 and .benchmarks.aligned_compile_sweep.fields == 8 and .benchmarks.aligned_compile_sweep.compiled_lanes == 8 and .benchmarks.aligned_compile_sweep.ops_per_second > 0' <<<"$bench6m_aligned_compile_sweep_json" >/dev/null
 "$feedback" --help | grep -q "Usage: nanda feedback"
 NANDA_SELF_CHECK_RUNTIME_ONLY=1 "$self_check" | grep -q "verdict: PASS"
 

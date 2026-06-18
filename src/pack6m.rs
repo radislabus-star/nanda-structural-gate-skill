@@ -819,48 +819,87 @@ fn packed_lane_store_item(axis_key: &Value, axis_lane: &Value, axis: &str) -> Op
     }))
 }
 
-fn packed_axis_lane_preview(axis_support: &Value, axis_key: &Value) -> Value {
+fn packed_axis_support_field(axis_support: &Value, key_hash: u32) -> nanda_6m::PackedSupportField {
     let top_id = axis_support["top_id"].as_u64().unwrap_or(0) as u16;
     let positive_dot = axis_support["positive_dot"].as_i64().unwrap_or(0);
     let negative_dot = axis_support["negative_dot"].as_i64().unwrap_or(0);
-    let before_net = axis_support["net_dot"].as_i64().unwrap_or(0);
-    let anti_mask = packed_support_mask(&axis_support["anti"]);
     let support_mask = packed_support_mask(&axis_support["support"]);
-    let has_lane = negative_dot < 0 && (anti_mask.0 != 0 || anti_mask.1 != 0);
-    let lane = nanda_6m::PackedLane64 {
-        support_mask_a: anti_mask.0,
-        support_mask_b: anti_mask.1,
-        anti_mask_a: support_mask.0,
-        anti_mask_b: support_mask.1,
-        lane_id: axis_key["key_hash"].as_u64().unwrap_or(u64::from(top_id)) as u32,
-        target_route: top_id,
-        target_group: top_id,
+    let anti_mask = packed_support_mask(&axis_support["anti"]);
+    nanda_6m::PackedSupportField {
+        top_id,
+        key_hash,
+        positive_dot,
+        negative_dot,
+        support_mask_a: support_mask.0,
+        support_mask_b: support_mask.1,
+        anti_mask_a: anti_mask.0,
+        anti_mask_b: anti_mask.1,
+    }
+}
+
+fn packed_lane_from_preview(
+    axis_lane: &Value,
+    field: nanda_6m::PackedSupportField,
+) -> nanda_6m::PackedLane64 {
+    nanda_6m::PackedLane64 {
+        support_mask_a: axis_lane["record_mask_a"].as_u64().unwrap_or(0),
+        support_mask_b: axis_lane["record_mask_b"].as_u64().unwrap_or(0),
+        anti_mask_a: axis_lane["protected_support_mask_a"].as_u64().unwrap_or(0),
+        anti_mask_b: axis_lane["protected_support_mask_b"].as_u64().unwrap_or(0),
+        lane_id: axis_lane["key_hash"]
+            .as_u64()
+            .unwrap_or(u64::from(field.key_hash)) as u32,
+        target_route: axis_lane["target_id"]
+            .as_u64()
+            .unwrap_or(u64::from(field.top_id)) as u16,
+        target_group: axis_lane["target_id"]
+            .as_u64()
+            .unwrap_or(u64::from(field.top_id)) as u16,
         target_relation: 0,
         accepted_count: 0,
-        rejected_count: if has_lane { 1 } else { 0 },
-        margin_hint: before_net.clamp(i64::from(i16::MIN), i64::from(i16::MAX)) as i16,
-        action: if has_lane { 1 } else { 0 },
-        strength: if has_lane { 255 } else { 0 },
+        rejected_count: if axis_lane["state"].as_str() == Some("LANE_PREVIEW_READY") {
+            1
+        } else {
+            0
+        },
+        margin_hint: field
+            .before_net_dot()
+            .clamp(i64::from(i16::MIN), i64::from(i16::MAX)) as i16,
+        action: if axis_lane["state"].as_str() == Some("LANE_PREVIEW_READY") {
+            1
+        } else {
+            0
+        },
+        strength: axis_lane["strength"].as_u64().unwrap_or(0) as u8,
         reserved: [0; 14],
-    };
-    let after_net = if has_lane { positive_dot } else { before_net };
+    }
+}
+
+fn packed_axis_lane_preview(axis_support: &Value, axis_key: &Value) -> Value {
+    let key_hash = axis_key["key_hash"]
+        .as_u64()
+        .unwrap_or_else(|| axis_support["top_id"].as_u64().unwrap_or(0)) as u32;
+    let field = packed_axis_support_field(axis_support, key_hash);
+    let applied = nanda_6m::compile_and_apply_suppress_anti_lane(field);
+    let lane = applied.lane;
     json!({
-        "state": if has_lane { "LANE_PREVIEW_READY" } else { "NO_ANTI_LANE" },
-        "action": if has_lane { "suppress_anti_support" } else { "none" },
+        "state": if applied.lane_ready { "LANE_PREVIEW_READY" } else { "NO_ANTI_LANE" },
+        "action": if applied.lane_ready { "suppress_anti_support" } else { "none" },
         "key_hash": lane.lane_id,
         "key_storage": "cold-stable-signature",
         "compiled_storage": "hot-packed-lane64",
-        "target_id": top_id,
+        "application_core": "nanda_6m::compile_and_apply_suppress_anti_lane",
+        "target_id": field.top_id,
         "record_mask_a": lane.support_mask_a,
         "record_mask_b": lane.support_mask_b,
         "protected_support_mask_a": lane.anti_mask_a,
         "protected_support_mask_b": lane.anti_mask_b,
         "strength": lane.strength,
-        "before_net_dot": before_net,
-        "suppressed_negative_dot": if has_lane { negative_dot } else { 0 },
-        "after_net_dot": after_net,
-        "delta_dot": after_net - before_net,
-        "interpretation": if has_lane {
+        "before_net_dot": applied.before_net_dot,
+        "suppressed_negative_dot": applied.suppressed_negative_dot,
+        "after_net_dot": applied.after_net_dot,
+        "delta_dot": applied.delta_dot,
+        "interpretation": if applied.lane_ready {
             "Preview only: suppressing the current anti-support records would remove the destructive contribution without changing positive support."
         } else {
             "No negative contribution was found for this packed axis."
@@ -933,19 +972,15 @@ fn packed_lane_application_report(
 }
 
 fn packed_axis_lane_application(axis_support: &Value, axis_lane: &Value, axis: &str) -> Value {
-    let before_net = axis_lane["before_net_dot"]
-        .as_i64()
-        .unwrap_or_else(|| axis_support["net_dot"].as_i64().unwrap_or(0));
-    let after_net = axis_lane["after_net_dot"].as_i64().unwrap_or(before_net);
-    let delta = axis_lane["delta_dot"]
-        .as_i64()
-        .unwrap_or(after_net - before_net);
-    let lane_ready = axis_lane["state"].as_str() == Some("LANE_PREVIEW_READY");
-    let focused = lane_ready && after_net >= 128 && delta >= 64;
-    let improved = lane_ready && delta > 0 && after_net > before_net;
-    let state = if focused {
+    let key_hash = axis_lane["key_hash"]
+        .as_u64()
+        .unwrap_or_else(|| axis_support["top_id"].as_u64().unwrap_or(0)) as u32;
+    let field = packed_axis_support_field(axis_support, key_hash);
+    let lane = packed_lane_from_preview(axis_lane, field);
+    let applied = nanda_6m::apply_suppress_anti_lane(field, lane);
+    let state = if applied.focused_candidate {
         "LANE_AXIS_FOCUSED_CANDIDATE"
-    } else if improved {
+    } else if applied.improved {
         "LANE_AXIS_IMPROVED"
     } else {
         "LANE_NO_EFFECT"
@@ -953,17 +988,18 @@ fn packed_axis_lane_application(axis_support: &Value, axis_lane: &Value, axis: &
     json!({
         "axis": axis,
         "state": state,
-        "improved": improved,
-        "before_net_dot": before_net,
-        "after_net_dot": after_net,
-        "delta_dot": delta,
-        "suppressed_negative_dot": axis_lane["suppressed_negative_dot"].as_i64().unwrap_or(0),
+        "application_core": "nanda_6m::apply_suppress_anti_lane",
+        "improved": applied.improved,
+        "before_net_dot": applied.before_net_dot,
+        "after_net_dot": applied.after_net_dot,
+        "delta_dot": applied.delta_dot,
+        "suppressed_negative_dot": applied.suppressed_negative_dot,
         "support_count": axis_support["support_count"].as_u64().unwrap_or(0),
         "anti_count": axis_support["anti_count"].as_u64().unwrap_or(0),
-        "record_mask_a": axis_lane["record_mask_a"].as_u64().unwrap_or(0),
-        "record_mask_b": axis_lane["record_mask_b"].as_u64().unwrap_or(0),
-        "protected_support_mask_a": axis_lane["protected_support_mask_a"].as_u64().unwrap_or(0),
-        "protected_support_mask_b": axis_lane["protected_support_mask_b"].as_u64().unwrap_or(0)
+        "record_mask_a": applied.lane.support_mask_a,
+        "record_mask_b": applied.lane.support_mask_b,
+        "protected_support_mask_a": applied.lane.anti_mask_a,
+        "protected_support_mask_b": applied.lane.anti_mask_b
     })
 }
 
