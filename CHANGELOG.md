@@ -15,6 +15,9 @@
   field/lane windows without arena search.
 - `nanda bench6m` now includes `--mode aligned-compile-sweep` for fused aligned
   lane compilation and application.
+- NANDA-6M has typed packed peak decision and support-field builder contracts.
+- `nanda bench6m` now includes `--mode support-build` and
+  `--mode support-build-compile-sweep`.
 - NANDA-6M version is now `nanda-6m-v8-hot-compile-sweep-core`.
 
 ## v3.3.0 - 2026-06-18

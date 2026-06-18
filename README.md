@@ -354,8 +354,9 @@ startup, JSON parsing, dictionary packing, file I/O, and report serialization.
 It measures the typed replay firewall (`evaluate_replay`), the in-memory packed
 1024-dimensional projection/centroid scoring path, and packed lane
 compile/application. It also measures unordered lane-arena sweep, aligned
-field/lane sweep, and fused aligned compile+sweep over a packed support window.
-Use it when you need real kernel timing rather than wrapper timing:
+field/lane sweep, fused aligned compile+sweep, support-field building from
+packed triads, and support-build+compile+sweep. Use it when you need real
+kernel timing rather than wrapper timing:
 
 ```bash
 nanda-bench6m --format text
@@ -365,6 +366,8 @@ nanda-bench6m --mode lane --lane-iterations 5000000 --format json
 nanda-bench6m --mode lane-sweep --lane-sweep-iterations 1000000 --lane-sweep-width 64 --format json
 nanda-bench6m --mode aligned-lane-sweep --lane-sweep-iterations 1000000 --lane-sweep-width 64 --format json
 nanda-bench6m --mode aligned-compile-sweep --lane-sweep-iterations 1000000 --lane-sweep-width 64 --format json
+nanda-bench6m --mode support-build --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
+nanda-bench6m --mode support-build-compile-sweep --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
 ```
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,

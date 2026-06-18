@@ -21,6 +21,8 @@ pub const TRIAD_BYTES: usize = 32;
 pub const CENTROID_BYTES: usize = 1024;
 pub const LANE_BYTES: usize = 64;
 pub const QUERY_WAVE_BYTES: usize = WAVE_DIM * core::mem::size_of::<i16>();
+pub const PACKED_MIN_FOCUS_SCORE: f64 = 0.01;
+pub const PACKED_MIN_FOCUS_MARGIN: f64 = 0.003;
 pub const LANE_FOCUSED_NET_DOT: i64 = 128;
 pub const LANE_FOCUSED_DELTA_DOT: i64 = 64;
 
@@ -191,6 +193,154 @@ pub struct PackedSupportField {
     pub anti_mask_b: u64,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PackedAxis {
+    #[default]
+    Route,
+    Group,
+}
+
+impl PackedAxis {
+    pub const fn triad_id(self, triad: PackedTriad32) -> u16 {
+        match self {
+            Self::Route => triad.route_id,
+            Self::Group => triad.group_id,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PackedAxisPeakState {
+    Found = 1,
+    Thin = 2,
+    Contested = 3,
+    #[default]
+    NoPeak = 4,
+}
+
+impl PackedAxisPeakState {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Found => "PEAK_FOUND",
+            Self::Thin => "PEAK_THIN",
+            Self::Contested => "PEAK_CONTESTED",
+            Self::NoPeak => "NO_PEAK",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PackedAxisPeak {
+    pub top_id: u16,
+    pub top_score: f64,
+    pub second_id: u16,
+    pub second_score: f64,
+    pub margin: f64,
+    pub state: PackedAxisPeakState,
+}
+
+impl PackedAxisPeak {
+    pub fn evaluate(top_id: u16, top_score: f64, second_id: u16, second_score: f64) -> Self {
+        let margin = top_score - second_score;
+        let state = if top_id == 0 || top_score <= 0.0 {
+            PackedAxisPeakState::NoPeak
+        } else if top_score < PACKED_MIN_FOCUS_SCORE {
+            PackedAxisPeakState::Thin
+        } else if margin < PACKED_MIN_FOCUS_MARGIN {
+            PackedAxisPeakState::Contested
+        } else {
+            PackedAxisPeakState::Found
+        };
+        Self {
+            top_id,
+            top_score,
+            second_id,
+            second_score,
+            margin,
+            state,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PackedDecisionState {
+    Focused = 1,
+    Thin = 2,
+    Contested = 3,
+    NoPeak = 4,
+    EmptyMemory = 5,
+    MemoryFallback = 6,
+    EmptyQuery = 7,
+    #[default]
+    Review = 255,
+}
+
+impl PackedDecisionState {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Focused => "PACKED_FOCUSED",
+            Self::Thin => "PACKED_THIN",
+            Self::Contested => "PACKED_CONTESTED",
+            Self::NoPeak => "PACKED_NO_PEAK",
+            Self::EmptyMemory => "PACKED_EMPTY_MEMORY",
+            Self::MemoryFallback => "PACKED_MEMORY_FALLBACK",
+            Self::EmptyQuery => "PACKED_EMPTY_QUERY",
+            Self::Review => "PACKED_REVIEW_REQUIRED",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PackedPeakDecision {
+    pub state: PackedDecisionState,
+    pub verdict_pass: bool,
+    pub safe_to_answer: bool,
+    pub query_energy: u64,
+    pub memory_records: u16,
+    pub query_records: u16,
+    pub route: PackedAxisPeak,
+    pub group: PackedAxisPeak,
+}
+
+impl PackedPeakDecision {
+    pub const fn verdict_str(self) -> &'static str {
+        if self.verdict_pass {
+            "PASS"
+        } else {
+            "WATCH"
+        }
+    }
+
+    pub const fn reason(self) -> &'static str {
+        match self.state {
+            PackedDecisionState::EmptyMemory => {
+                "No memory/source triads were packed, so centroids cannot be trusted."
+            }
+            PackedDecisionState::MemoryFallback => {
+                "No candidate/query triads were packed; projection uses memory fallback for diagnostics only."
+            }
+            PackedDecisionState::EmptyQuery => "Candidate/query projection has zero energy.",
+            PackedDecisionState::NoPeak => "At least one centroid axis has no positive peak.",
+            PackedDecisionState::Thin => {
+                "A peak exists, but cosine strength is below the packed focus threshold."
+            }
+            PackedDecisionState::Contested => "Top centroid is too close to the runner-up.",
+            PackedDecisionState::Focused => "Route and group axes both expose strong packed peaks.",
+            PackedDecisionState::Review => "Packed peak decision requires review.",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedSupportSummary {
+    pub field: PackedSupportField,
+    pub considered: u16,
+    pub support_count: u16,
+    pub anti_count: u16,
+}
+
 impl PackedSupportField {
     pub const fn before_net_dot(self) -> i64 {
         self.positive_dot + self.negative_dot
@@ -280,6 +430,95 @@ pub fn apply_suppress_anti_lane(
 
 pub fn compile_and_apply_suppress_anti_lane(field: PackedSupportField) -> PackedLaneApplication {
     apply_suppress_anti_lane(field, compile_suppress_anti_lane(field))
+}
+
+pub fn evaluate_packed_peak_decision(
+    route: PackedAxisPeak,
+    group: PackedAxisPeak,
+    query_energy: u64,
+    memory_count: usize,
+    query_count: usize,
+) -> PackedPeakDecision {
+    let memory_records = memory_count.min(usize::from(u16::MAX)) as u16;
+    let query_records = query_count.min(usize::from(u16::MAX)) as u16;
+    let state = if memory_count == 0 {
+        PackedDecisionState::EmptyMemory
+    } else if query_count == 0 {
+        PackedDecisionState::MemoryFallback
+    } else if query_energy == 0 {
+        PackedDecisionState::EmptyQuery
+    } else if route.state == PackedAxisPeakState::NoPeak
+        || group.state == PackedAxisPeakState::NoPeak
+    {
+        PackedDecisionState::NoPeak
+    } else if route.state == PackedAxisPeakState::Thin || group.state == PackedAxisPeakState::Thin {
+        PackedDecisionState::Thin
+    } else if route.state == PackedAxisPeakState::Contested
+        || group.state == PackedAxisPeakState::Contested
+    {
+        PackedDecisionState::Contested
+    } else {
+        PackedDecisionState::Focused
+    };
+    let verdict_pass = state == PackedDecisionState::Focused;
+    PackedPeakDecision {
+        state,
+        verdict_pass,
+        safe_to_answer: verdict_pass,
+        query_energy,
+        memory_records,
+        query_records,
+        route,
+        group,
+    }
+}
+
+pub fn build_packed_support_field(
+    memory: &[PackedTriad32],
+    query: &PackedWave1024,
+    axis: PackedAxis,
+    top_id: u16,
+    key_hash: u32,
+) -> PackedSupportSummary {
+    let mut field = PackedSupportField {
+        top_id,
+        key_hash,
+        ..PackedSupportField::default()
+    };
+    let mut considered = 0u16;
+    let mut support_count = 0u16;
+    let mut anti_count = 0u16;
+    if top_id == 0 {
+        return PackedSupportSummary {
+            field,
+            considered,
+            support_count,
+            anti_count,
+        };
+    }
+    for (index, triad) in memory.iter().copied().enumerate() {
+        if axis.triad_id(triad) != top_id {
+            continue;
+        }
+        considered = considered.saturating_add(1);
+        let centroid = centroid_from_triads(core::slice::from_ref(&triad));
+        let score = score_centroid(query, &centroid);
+        if score.dot > 0 {
+            field.positive_dot += score.dot;
+            support_count = support_count.saturating_add(1);
+            set_support_mask(&mut field.support_mask_a, &mut field.support_mask_b, index);
+        } else if score.dot < 0 {
+            field.negative_dot += score.dot;
+            anti_count = anti_count.saturating_add(1);
+            set_support_mask(&mut field.anti_mask_a, &mut field.anti_mask_b, index);
+        }
+    }
+    PackedSupportSummary {
+        field,
+        considered,
+        support_count,
+        anti_count,
+    }
 }
 
 pub fn compile_suppress_anti_lanes(
@@ -394,6 +633,14 @@ fn accumulate_lane_application(
         .wrapping_add(applied.delta_dot as u64)
         .wrapping_add(applied.lane.lane_id as u64)
         .wrapping_add(u64::from(applied.focused_candidate));
+}
+
+fn set_support_mask(mask_a: &mut u64, mask_b: &mut u64, index: usize) {
+    if index < 64 {
+        *mask_a |= 1u64 << index;
+    } else if index < 128 {
+        *mask_b |= 1u64 << (index - 64);
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -866,6 +1113,99 @@ mod tests {
         let foreign_score = score_centroid(&query, &foreign);
         assert!(matching_score.cosine > foreign_score.cosine);
         assert!(matching_score.cosine > 0.5);
+    }
+
+    #[test]
+    fn packed_axis_peak_and_decision_are_typed() {
+        let route = PackedAxisPeak::evaluate(3, 0.02, 2, 0.01);
+        let group = PackedAxisPeak::evaluate(4, 0.03, 5, 0.01);
+        let decision = evaluate_packed_peak_decision(route, group, 128, 4, 2);
+
+        assert_eq!(route.state, PackedAxisPeakState::Found);
+        assert_eq!(route.state.as_str(), "PEAK_FOUND");
+        assert_eq!(decision.state, PackedDecisionState::Focused);
+        assert_eq!(decision.state.as_str(), "PACKED_FOCUSED");
+        assert_eq!(decision.verdict_str(), "PASS");
+        assert!(decision.safe_to_answer);
+
+        let thin = PackedAxisPeak::evaluate(3, 0.001, 2, 0.0);
+        let thin_decision = evaluate_packed_peak_decision(thin, group, 128, 4, 2);
+        assert_eq!(thin_decision.state, PackedDecisionState::Thin);
+        assert_eq!(thin_decision.verdict_str(), "WATCH");
+        assert!(!thin_decision.safe_to_answer);
+    }
+
+    #[test]
+    fn packed_support_builder_splits_positive_and_anti_support() {
+        let support = PackedTriad32::new(PackedTriadInput {
+            subject_id: 1,
+            object_id: 2,
+            evidence_ref: 3,
+            wave_seed: 4,
+            relation_id: 5,
+            route_id: 7,
+            group_id: 9,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 0,
+        });
+        let anti = PackedTriad32::new(PackedTriadInput {
+            polarity: 1,
+            ..PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 3,
+                wave_seed: 4,
+                relation_id: 5,
+                route_id: 7,
+                group_id: 9,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 0,
+            }
+        });
+        let foreign = PackedTriad32::new(PackedTriadInput {
+            route_id: 11,
+            ..PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 5,
+                wave_seed: 9,
+                relation_id: 5,
+                route_id: 7,
+                group_id: 9,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 0,
+            }
+        });
+        let query = project_triads(&[support]);
+        let summary = build_packed_support_field(
+            &[support, anti, foreign],
+            &query,
+            PackedAxis::Route,
+            7,
+            0x55,
+        );
+
+        assert_eq!(summary.field.top_id, 7);
+        assert_eq!(summary.field.key_hash, 0x55);
+        assert_eq!(summary.considered, 2);
+        assert_eq!(summary.support_count, 1);
+        assert_eq!(summary.anti_count, 1);
+        assert!(summary.field.positive_dot > 0);
+        assert!(summary.field.negative_dot < 0);
+        assert_eq!(summary.field.support_mask_a & 0b001, 0b001);
+        assert_eq!(summary.field.anti_mask_a & 0b010, 0b010);
     }
 
     #[test]

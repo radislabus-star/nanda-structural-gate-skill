@@ -422,6 +422,15 @@ enum CentroidAxis6m {
     Group,
 }
 
+impl CentroidAxis6m {
+    const fn packed_axis(self) -> nanda_6m::PackedAxis {
+        match self {
+            Self::Route => nanda_6m::PackedAxis::Route,
+            Self::Group => nanda_6m::PackedAxis::Group,
+        }
+    }
+}
+
 fn packed_centroid_report(
     packed: &[nanda_6m::PackedTriad32],
     query: &nanda_6m::PackedWave1024,
@@ -475,30 +484,32 @@ fn packed_centroid_report(
 fn packed_peak_summary(rows: &[Value]) -> Value {
     let top = rows.first();
     let second = rows.get(1);
+    let top_id = top.and_then(|item| item["id"].as_u64()).unwrap_or(0) as u16;
     let top_score = top
         .and_then(|item| item["score"]["cosine"].as_f64())
         .unwrap_or(0.0);
+    let second_id = second.and_then(|item| item["id"].as_u64()).unwrap_or(0) as u16;
     let second_score = second
         .and_then(|item| item["score"]["cosine"].as_f64())
         .unwrap_or(0.0);
-    let margin = top_score - second_score;
-    let state = if top.is_none() || top_score <= 0.0 {
-        "NO_PEAK"
-    } else if top_score < 0.01 {
-        "PEAK_THIN"
-    } else if margin < 0.003 {
-        "PEAK_CONTESTED"
-    } else {
-        "PEAK_FOUND"
-    };
+    let peak = nanda_6m::PackedAxisPeak::evaluate(top_id, top_score, second_id, second_score);
     json!({
-        "top_id": top.and_then(|item| item["id"].as_u64()).unwrap_or(0),
+        "top_id": peak.top_id,
         "top_score": round4(top_score),
-        "second_id": second.and_then(|item| item["id"].as_u64()).unwrap_or(0),
+        "second_id": peak.second_id,
         "second_score": round4(second_score),
-        "margin": round4(margin),
-        "state": state
+        "margin": round4(peak.margin),
+        "state": peak.state.as_str()
     })
+}
+
+fn packed_axis_peak_from_value(value: &Value) -> nanda_6m::PackedAxisPeak {
+    nanda_6m::PackedAxisPeak::evaluate(
+        value["top_id"].as_u64().unwrap_or(0) as u16,
+        value["top_score"].as_f64().unwrap_or(0.0),
+        value["second_id"].as_u64().unwrap_or(0) as u16,
+        value["second_score"].as_f64().unwrap_or(0.0),
+    )
 }
 
 fn packed_field_decision(
@@ -508,89 +519,37 @@ fn packed_field_decision(
     memory_count: usize,
     query_count: usize,
 ) -> Value {
-    let route_state = route_peak["state"].as_str().unwrap_or("NO_PEAK");
-    let group_state = group_peak["state"].as_str().unwrap_or("NO_PEAK");
-    let route_id = route_peak["top_id"].as_u64().unwrap_or(0);
-    let group_id = group_peak["top_id"].as_u64().unwrap_or(0);
-    let route_score = route_peak["top_score"].as_f64().unwrap_or(0.0);
-    let group_score = group_peak["top_score"].as_f64().unwrap_or(0.0);
-    let route_margin = route_peak["margin"].as_f64().unwrap_or(0.0);
-    let group_margin = group_peak["margin"].as_f64().unwrap_or(0.0);
-
-    let (state, verdict, safe_to_answer, reason) = if memory_count == 0 {
-        (
-            "PACKED_EMPTY_MEMORY",
-            "WATCH",
-            false,
-            "No memory/source triads were packed, so centroids cannot be trusted.",
-        )
-    } else if query_count == 0 {
-        (
-            "PACKED_MEMORY_FALLBACK",
-            "WATCH",
-            false,
-            "No candidate/query triads were packed; projection uses memory fallback for diagnostics only.",
-        )
-    } else if query_energy == 0 {
-        (
-            "PACKED_EMPTY_QUERY",
-            "WATCH",
-            false,
-            "Candidate/query projection has zero energy.",
-        )
-    } else if route_state == "NO_PEAK" || group_state == "NO_PEAK" {
-        (
-            "PACKED_NO_PEAK",
-            "WATCH",
-            false,
-            "At least one centroid axis has no positive peak.",
-        )
-    } else if route_state == "PEAK_THIN" || group_state == "PEAK_THIN" {
-        (
-            "PACKED_THIN",
-            "WATCH",
-            false,
-            "A peak exists, but cosine strength is below the packed focus threshold.",
-        )
-    } else if route_state == "PEAK_CONTESTED" || group_state == "PEAK_CONTESTED" {
-        (
-            "PACKED_CONTESTED",
-            "WATCH",
-            false,
-            "Top centroid is too close to the runner-up.",
-        )
-    } else {
-        (
-            "PACKED_FOCUSED",
-            "PASS",
-            true,
-            "Route and group axes both expose strong packed peaks.",
-        )
-    };
+    let decision = nanda_6m::evaluate_packed_peak_decision(
+        packed_axis_peak_from_value(route_peak),
+        packed_axis_peak_from_value(group_peak),
+        query_energy,
+        memory_count,
+        query_count,
+    );
 
     json!({
-        "state": state,
-        "verdict": verdict,
-        "safe_to_answer": safe_to_answer,
-        "reason": reason,
+        "state": decision.state.as_str(),
+        "verdict": decision.verdict_str(),
+        "safe_to_answer": decision.safe_to_answer,
+        "reason": decision.reason(),
         "thresholds": {
-            "min_focus_score": 0.01,
-            "min_focus_margin": 0.003
+            "min_focus_score": nanda_6m::PACKED_MIN_FOCUS_SCORE,
+            "min_focus_margin": nanda_6m::PACKED_MIN_FOCUS_MARGIN
         },
-        "query_energy": query_energy,
-        "memory_records": memory_count,
-        "query_records": query_count,
+        "query_energy": decision.query_energy,
+        "memory_records": decision.memory_records,
+        "query_records": decision.query_records,
         "route": {
-            "top_id": route_id,
-            "state": route_state,
-            "top_score": round4(route_score),
-            "margin": round4(route_margin)
+            "top_id": decision.route.top_id,
+            "state": decision.route.state.as_str(),
+            "top_score": round4(decision.route.top_score),
+            "margin": round4(decision.route.margin)
         },
         "group": {
-            "top_id": group_id,
-            "state": group_state,
-            "top_score": round4(group_score),
-            "margin": round4(group_margin)
+            "top_id": decision.group.top_id,
+            "state": decision.group.state.as_str(),
+            "top_score": round4(decision.group.top_score),
+            "margin": round4(decision.group.margin)
         }
     })
 }
@@ -628,6 +587,8 @@ fn packed_axis_support(
     top_id: u16,
     sample: usize,
 ) -> Value {
+    let support_summary =
+        nanda_6m::build_packed_support_field(memory, query, axis.packed_axis(), top_id, 0);
     let mut rows = memory
         .iter()
         .enumerate()
@@ -666,22 +627,6 @@ fn packed_axis_support(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let considered = rows.len();
-    let mut positive_dot: i64 = 0;
-    let mut negative_dot: i64 = 0;
-    let mut support_count = 0usize;
-    let mut anti_count = 0usize;
-    for row in &rows {
-        let dot = row["dot"].as_i64().unwrap_or(0);
-        if dot > 0 {
-            positive_dot += dot;
-            support_count += 1;
-        } else if dot < 0 {
-            negative_dot += dot;
-            anti_count += 1;
-        }
-    }
-
     let support = rows
         .iter()
         .filter(|row| row["dot"].as_i64().unwrap_or(0) > 0)
@@ -698,12 +643,12 @@ fn packed_axis_support(
 
     json!({
         "top_id": top_id,
-        "considered": considered,
-        "support_count": support_count,
-        "anti_count": anti_count,
-        "positive_dot": positive_dot,
-        "negative_dot": negative_dot,
-        "net_dot": positive_dot + negative_dot,
+        "considered": support_summary.considered,
+        "support_count": support_summary.support_count,
+        "anti_count": support_summary.anti_count,
+        "positive_dot": support_summary.field.positive_dot,
+        "negative_dot": support_summary.field.negative_dot,
+        "net_dot": support_summary.field.before_net_dot(),
         "support": support,
         "anti": anti
     })
