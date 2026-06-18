@@ -29,6 +29,8 @@ $Commands = @(
     "search",
     "probe",
     "dataset-doctor",
+    "budget",
+    "pack6m",
     "serve",
     "dogfood",
     "report",

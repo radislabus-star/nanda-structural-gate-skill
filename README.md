@@ -544,7 +544,7 @@ scripts/test-edge-cases.sh
 
 ## Release
 
-Current release: `v3.0.0`.
+Current release: `v3.0.1`.
 
 Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:

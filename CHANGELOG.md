@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.0.1 - 2026-06-18
+
+Windows CI and wrapper fix.
+
+### Added
+
+- GitHub Actions `windows-latest` job with Rust tests, release build,
+  PowerShell install smoke, `nanda-doctor.cmd`, `nanda-pack6m.cmd`, and
+  `nanda-self-check.cmd`.
+
+### Fixed
+
+- `scripts/install-windows.ps1` now generates Windows `.cmd` wrappers for
+  `nanda-budget.cmd` and `nanda-pack6m.cmd`.
+
+### Changed
+
+- Cargo package version is now `3.0.1`.
+
 ## v3.0.0 - 2026-06-18
 
 Hot replay-core boundary release.
