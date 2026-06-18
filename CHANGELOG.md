@@ -22,7 +22,11 @@
   constructing temporary one-triad centroids.
 - NANDA-6M support scoring reuses precomputed query energy inside support-field
   scans.
-- NANDA-6M version is now `nanda-6m-v10-hot-query-energy-core`.
+- NANDA-6M now has per-triad support score caches and support-field assembly
+  from cached route/group dot scores.
+- `nanda bench6m` now includes `--mode support-score-build` and
+  `--mode support-score-build-compile-sweep`.
+- NANDA-6M version is now `nanda-6m-v11-hot-support-score-cache-core`.
 
 ## v3.3.0 - 2026-06-18
 

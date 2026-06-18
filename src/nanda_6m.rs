@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-pub const VERSION: &str = "nanda-6m-v10-hot-query-energy-core";
+pub const VERSION: &str = "nanda-6m-v11-hot-support-score-cache-core";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -341,6 +341,23 @@ pub struct PackedSupportSummary {
     pub anti_count: u16,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedTriadSupportScore {
+    pub route_id: u16,
+    pub group_id: u16,
+    pub record_index: u16,
+    pub dot: i64,
+}
+
+impl PackedTriadSupportScore {
+    pub const fn axis_id(self, axis: PackedAxis) -> u16 {
+        match axis {
+            PackedAxis::Route => self.route_id,
+            PackedAxis::Group => self.group_id,
+        }
+    }
+}
+
 impl PackedSupportField {
     pub const fn before_net_dot(self) -> i64 {
         self.positive_dot + self.negative_dot
@@ -511,6 +528,84 @@ pub fn build_packed_support_field(
             field.negative_dot += score.dot;
             anti_count = anti_count.saturating_add(1);
             set_support_mask(&mut field.anti_mask_a, &mut field.anti_mask_b, index);
+        }
+    }
+    PackedSupportSummary {
+        field,
+        considered,
+        support_count,
+        anti_count,
+    }
+}
+
+pub fn build_packed_triad_support_scores(
+    memory: &[PackedTriad32],
+    query: &PackedWave1024,
+    scores_out: &mut [PackedTriadSupportScore],
+) -> usize {
+    let count = memory.len().min(scores_out.len());
+    let query_energy = query.energy_i64();
+    for (index, (triad, out)) in memory
+        .iter()
+        .copied()
+        .take(count)
+        .zip(scores_out.iter_mut())
+        .enumerate()
+    {
+        let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
+        *out = PackedTriadSupportScore {
+            route_id: triad.route_id,
+            group_id: triad.group_id,
+            record_index: index.min(usize::from(u16::MAX)) as u16,
+            dot: score.dot,
+        };
+    }
+    count
+}
+
+pub fn build_packed_support_field_from_scores(
+    scores: &[PackedTriadSupportScore],
+    axis: PackedAxis,
+    top_id: u16,
+    key_hash: u32,
+) -> PackedSupportSummary {
+    let mut field = PackedSupportField {
+        top_id,
+        key_hash,
+        ..PackedSupportField::default()
+    };
+    let mut considered = 0u16;
+    let mut support_count = 0u16;
+    let mut anti_count = 0u16;
+    if top_id == 0 {
+        return PackedSupportSummary {
+            field,
+            considered,
+            support_count,
+            anti_count,
+        };
+    }
+    for score in scores.iter().copied() {
+        if score.axis_id(axis) != top_id {
+            continue;
+        }
+        considered = considered.saturating_add(1);
+        if score.dot > 0 {
+            field.positive_dot += score.dot;
+            support_count = support_count.saturating_add(1);
+            set_support_mask(
+                &mut field.support_mask_a,
+                &mut field.support_mask_b,
+                usize::from(score.record_index),
+            );
+        } else if score.dot < 0 {
+            field.negative_dot += score.dot;
+            anti_count = anti_count.saturating_add(1);
+            set_support_mask(
+                &mut field.anti_mask_a,
+                &mut field.anti_mask_b,
+                usize::from(score.record_index),
+            );
         }
     }
     PackedSupportSummary {
@@ -1277,6 +1372,53 @@ mod tests {
         assert!(summary.field.negative_dot < 0);
         assert_eq!(summary.field.support_mask_a & 0b001, 0b001);
         assert_eq!(summary.field.anti_mask_a & 0b010, 0b010);
+    }
+
+    #[test]
+    fn packed_support_score_cache_matches_direct_builder() {
+        let support = PackedTriad32::new(PackedTriadInput {
+            subject_id: 1,
+            object_id: 2,
+            evidence_ref: 3,
+            wave_seed: 4,
+            relation_id: 5,
+            route_id: 7,
+            group_id: 9,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 0,
+        });
+        let anti = PackedTriad32::new(PackedTriadInput {
+            polarity: 1,
+            ..PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 3,
+                wave_seed: 4,
+                relation_id: 5,
+                route_id: 7,
+                group_id: 9,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 0,
+            }
+        });
+        let memory = [support, anti];
+        let query = project_triads(&[support]);
+        let direct = build_packed_support_field(&memory, &query, PackedAxis::Route, 7, 0x55);
+        let mut scores = [PackedTriadSupportScore::default(); 2];
+        let count = build_packed_triad_support_scores(&memory, &query, &mut scores);
+        let cached =
+            build_packed_support_field_from_scores(&scores[..count], PackedAxis::Route, 7, 0x55);
+
+        assert_eq!(count, 2);
+        assert_eq!(cached, direct);
     }
 
     #[test]

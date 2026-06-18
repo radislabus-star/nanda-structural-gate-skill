@@ -38,6 +38,8 @@ enum Bench6mMode {
     AlignedCompileSweep,
     SupportBuild,
     SupportBuildCompileSweep,
+    SupportScoreBuild,
+    SupportScoreBuildCompileSweep,
     All,
 }
 
@@ -56,6 +58,12 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     let include_support_build_compile_sweep = matches!(
         args.mode,
         Bench6mMode::SupportBuildCompileSweep | Bench6mMode::All
+    );
+    let include_support_score_build =
+        matches!(args.mode, Bench6mMode::SupportScoreBuild | Bench6mMode::All);
+    let include_support_score_build_compile_sweep = matches!(
+        args.mode,
+        Bench6mMode::SupportScoreBuildCompileSweep | Bench6mMode::All
     );
     let replay = if include_replay {
         Some(bench6m_replay(args.replay_iterations))
@@ -122,6 +130,26 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
+    let support_score_build = if include_support_score_build {
+        Some(bench6m_support_score_build(
+            args.support_build_iterations,
+            args.triads.clamp(1, nanda_6m::TRIAD_CAPACITY),
+            args.lane_sweep_width.clamp(1, nanda_6m::LANE_CAPACITY),
+            false,
+        ))
+    } else {
+        None
+    };
+    let support_score_build_compile_sweep = if include_support_score_build_compile_sweep {
+        Some(bench6m_support_score_build(
+            args.support_build_iterations,
+            args.triads.clamp(1, nanda_6m::TRIAD_CAPACITY),
+            args.lane_sweep_width.clamp(1, nanda_6m::LANE_CAPACITY),
+            true,
+        ))
+    } else {
+        None
+    };
     let out = json!({
         "mode": "nanda-6m-hot-benchmark",
         "core_version": CORE_VERSION,
@@ -136,7 +164,9 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "aligned_lane_sweep": aligned_lane_sweep,
             "aligned_compile_sweep": aligned_compile_sweep,
             "support_build": support_build,
-            "support_build_compile_sweep": support_build_compile_sweep
+            "support_build_compile_sweep": support_build_compile_sweep,
+            "support_score_build": support_score_build,
+            "support_score_build_compile_sweep": support_score_build_compile_sweep
         },
         "interpretation": {
             "replay": "Pure typed replay firewall; no JSON, no file IO, no process spawn.",
@@ -147,6 +177,8 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "aligned_compile_sweep": "Fused batch lane compilation and aligned application over support fields.",
             "support_build": "Build typed support fields from packed memory triads and a query wave.",
             "support_build_compile_sweep": "Build typed support fields, compile aligned lanes, and apply the sweep.",
+            "support_score_build": "Build per-triad support scores once, then assemble support fields from cached dots.",
+            "support_score_build_compile_sweep": "Build cached support scores, assemble fields, compile aligned lanes, and apply the sweep.",
             "not_measured": "CLI startup, JSON parsing, dictionary packing, and report serialization are intentionally excluded."
         }
     });
@@ -444,6 +476,83 @@ fn bench6m_support_build(
     out
 }
 
+fn bench6m_support_score_build(
+    iterations: u64,
+    triad_count: usize,
+    field_count: usize,
+    with_compile_sweep: bool,
+) -> Value {
+    let iterations = iterations.max(1);
+    let memory = bench6m_triads(triad_count);
+    let query_len = memory.len().clamp(1, 8);
+    let query = nanda_6m::project_triads(&memory[..query_len]);
+    let mut scores = vec![nanda_6m::PackedTriadSupportScore::default(); memory.len()];
+    let mut fields = vec![nanda_6m::PackedSupportField::default(); field_count];
+    let mut lanes = vec![nanda_6m::PackedLane64::default(); field_count];
+    let mut checksum: u64 = 0;
+    let start = Instant::now();
+    for iter in 0..iterations {
+        let score_count = nanda_6m::build_packed_triad_support_scores(
+            black_box(memory.as_slice()),
+            black_box(&query),
+            black_box(scores.as_mut_slice()),
+        );
+        let score_slice = &scores[..score_count];
+        for (field_idx, field) in fields.iter_mut().enumerate() {
+            let axis = if (field_idx + iter as usize).is_multiple_of(2) {
+                nanda_6m::PackedAxis::Route
+            } else {
+                nanda_6m::PackedAxis::Group
+            };
+            let top_id = match axis {
+                nanda_6m::PackedAxis::Route => 1 + ((field_idx as u16 + iter as u16) % 7),
+                nanda_6m::PackedAxis::Group => 1 + ((field_idx as u16 + iter as u16) % 11),
+            };
+            let summary = nanda_6m::build_packed_support_field_from_scores(
+                black_box(score_slice),
+                axis,
+                top_id,
+                0x3000_0000u32.wrapping_add(field_idx as u32),
+            );
+            *field = summary.field;
+            checksum = checksum
+                .wrapping_add(summary.field.positive_dot as u64)
+                .wrapping_add(summary.field.negative_dot as u64)
+                .wrapping_add(u64::from(summary.considered))
+                .wrapping_add(u64::from(summary.support_count))
+                .wrapping_add(u64::from(summary.anti_count));
+        }
+        if with_compile_sweep {
+            let sweep = nanda_6m::compile_and_apply_aligned_suppress_anti_lane_sweep(
+                black_box(fields.as_slice()),
+                black_box(lanes.as_mut_slice()),
+            );
+            checksum = checksum
+                .wrapping_add(sweep.checksum)
+                .wrapping_add(sweep.best_after_net_dot as u64)
+                .wrapping_add(sweep.total_delta_dot as u64)
+                .wrapping_add(sweep.focused as u64);
+            black_box(sweep);
+        }
+    }
+    let elapsed = start.elapsed();
+    let mut out = bench_result_json(
+        iterations,
+        elapsed.as_nanos(),
+        checksum,
+        if with_compile_sweep {
+            "build_support_scores_fields_and_compile_sweep"
+        } else {
+            "build_support_scores_and_fields"
+        },
+    );
+    out["triads_in_memory"] = json!(memory.len());
+    out["fields"] = json!(field_count);
+    out["query_triads"] = json!(query_len);
+    out["ns_per_field"] = json!(out["ns_per_op"].as_f64().unwrap_or(0.0) / field_count as f64);
+    out
+}
+
 fn bench6m_projection(iterations: u64, triad_count: usize) -> Value {
     let iterations = iterations.max(1);
     let triads = bench6m_triads(triad_count);
@@ -635,6 +744,30 @@ fn print_bench6m_text(out: &Value) {
             support["ops_per_second"].as_f64().unwrap_or(0.0)
         );
     }
+    if !out["benchmarks"]["support_score_build"].is_null() {
+        let support = &out["benchmarks"]["support_score_build"];
+        println!(
+            "support-score-build: {} iters / {} triads / {} fields / {:.2} ns/op / {:.2} ns/field / {:.0} ops/s",
+            support["iterations"].as_u64().unwrap_or(0),
+            support["triads_in_memory"].as_u64().unwrap_or(0),
+            support["fields"].as_u64().unwrap_or(0),
+            support["ns_per_op"].as_f64().unwrap_or(0.0),
+            support["ns_per_field"].as_f64().unwrap_or(0.0),
+            support["ops_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["support_score_build_compile_sweep"].is_null() {
+        let support = &out["benchmarks"]["support_score_build_compile_sweep"];
+        println!(
+            "support-score-build+compile-sweep: {} iters / {} triads / {} fields / {:.2} ns/op / {:.2} ns/field / {:.0} ops/s",
+            support["iterations"].as_u64().unwrap_or(0),
+            support["triads_in_memory"].as_u64().unwrap_or(0),
+            support["fields"].as_u64().unwrap_or(0),
+            support["ns_per_op"].as_f64().unwrap_or(0.0),
+            support["ns_per_field"].as_f64().unwrap_or(0.0),
+            support["ops_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
     println!("scope: no JSON, no file IO, no process spawn");
 }
 
@@ -715,6 +848,28 @@ fn print_bench6m_md(out: &Value) {
         let support = &out["benchmarks"]["support_build_compile_sweep"];
         println!(
             "- support-build+compile-sweep: `{}` iterations, `{}` triads, `{}` fields, `{:.2}` ns/op, `{:.2}` ns/field",
+            support["iterations"].as_u64().unwrap_or(0),
+            support["triads_in_memory"].as_u64().unwrap_or(0),
+            support["fields"].as_u64().unwrap_or(0),
+            support["ns_per_op"].as_f64().unwrap_or(0.0),
+            support["ns_per_field"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["support_score_build"].is_null() {
+        let support = &out["benchmarks"]["support_score_build"];
+        println!(
+            "- support-score-build: `{}` iterations, `{}` triads, `{}` fields, `{:.2}` ns/op, `{:.2}` ns/field",
+            support["iterations"].as_u64().unwrap_or(0),
+            support["triads_in_memory"].as_u64().unwrap_or(0),
+            support["fields"].as_u64().unwrap_or(0),
+            support["ns_per_op"].as_f64().unwrap_or(0.0),
+            support["ns_per_field"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["support_score_build_compile_sweep"].is_null() {
+        let support = &out["benchmarks"]["support_score_build_compile_sweep"];
+        println!(
+            "- support-score-build+compile-sweep: `{}` iterations, `{}` triads, `{}` fields, `{:.2}` ns/op, `{:.2}` ns/field",
             support["iterations"].as_u64().unwrap_or(0),
             support["triads_in_memory"].as_u64().unwrap_or(0),
             support["fields"].as_u64().unwrap_or(0),
