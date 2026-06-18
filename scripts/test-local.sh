@@ -154,7 +154,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v2.9-replay-firewall"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v3.0-hot-replay-core"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -358,6 +358,7 @@ jq -e '.packed_lane_replay.touch_policy.mode == "observer-to-compute-sweep" and 
 jq -e '.packed_lane_replay.stability_sweep[0].label == "observer" and .packed_lane_replay.stability_sweep[3].label == "full_touch"' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_replay.computational_effect.state == "REPLAY_COMPUTE_NONE" and .packed_lane_replay.computational_effect.safe_to_answer == false' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_replay_decision.mode == "replay-adjusted-peak-firewall" and .packed_replay_decision.stability_verdict == "NO_REPLAY_EVIDENCE"' <<<"$pack6m_json" >/dev/null
+jq -e '.packed_replay_decision.core == "nanda_6m::evaluate_replay" and .packed_replay_decision.hot_compatible == true' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_replay_decision.firewall.blocks_direct_pass == true and .packed_replay_decision.safe_to_answer == false' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_application.mode == "single-pass-suppress-anti-support"' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_application.raw_state == "PACKED_THIN" and .packed_lane_application.state == "PACKED_LANE_FOCUSED_CANDIDATE"' <<<"$pack6m_json" >/dev/null

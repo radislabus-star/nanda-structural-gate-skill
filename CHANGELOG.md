@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.0.0 - 2026-06-18
+
+Hot replay-core boundary release.
+
+### Added
+
+- Typed replay structs/enums in `src/nanda_6m.rs`: raw peak state, replay
+  compute state, replay field state, replay stability state, replay verdict,
+  replay action, replay touch, replay decision input, and replay decision.
+- `nanda_6m::evaluate_replay`, a pure hot-compatible replay firewall function
+  with no JSON, strings, maps, or serde in the decision path.
+- JSON bridge parity: `packed_replay_decision` is now built from typed
+  `evaluate_replay` output and reports `core="nanda_6m::evaluate_replay"` plus
+  `hot_compatible=true`.
+- Hot-module unit tests for no replay evidence, stable-with-replay,
+  rescued-thin-field, destabilized-field, and full-touch-required cases.
+
+### Changed
+
+- Cargo package version is now `3.0.0`.
+- Core version is now `sparse-triad-v3.0-hot-replay-core`.
+- Engine id is now `nanda-check sparse-triad-v3.0-rust`.
+- NANDA-6M version is now `nanda-6m-v4-hot-replay-core`.
+
 ## v2.9.0 - 2026-06-18
 
 Replay-firewall release.

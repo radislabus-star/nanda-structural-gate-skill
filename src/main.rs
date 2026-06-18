@@ -12,8 +12,8 @@ use std::process::ExitCode;
 mod nanda_6m;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v2.9-replay-firewall";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v2.9-rust";
+const CORE_VERSION: &str = "sparse-triad-v3.0-hot-replay-core";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v3.0-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -4066,45 +4066,33 @@ fn packed_replay_decision_report(raw_decision: &Value, replay: &Value) -> Value 
     let matched_keys = replay["matched_keys"].as_u64().unwrap_or(0);
     let soft = replay_touch(replay, "soft_touch");
     let full = replay_touch(replay, "full_touch");
-    let soft_field_state = soft["field_state"].as_str().unwrap_or("FIELD_OBSERVED");
-    let full_field_state = full["field_state"].as_str().unwrap_or("FIELD_OBSERVED");
-    let full_after = full["after_net_dot"].as_i64().unwrap_or(0);
-
-    let stability_verdict = if matched_keys == 0 {
-        "NO_REPLAY_EVIDENCE"
-    } else if stability_state == "DESTABILIZING_REPLAY"
-        || full_field_state == "FIELD_WEAKENED_BY_REPLAY"
-    {
-        "REPLAY_DESTABILIZED_FIELD"
-    } else if raw_state == "PACKED_THIN" && soft_field_state == "FIELD_FOCUSED_BY_REPLAY" {
-        "REPLAY_RESCUED_THIN_FIELD"
-    } else if raw_safe && stability_state == "STABLE_UNDER_SOFT_TOUCH" {
-        "STABLE_WITH_REPLAY"
-    } else if stability_state == "FULL_TOUCH_REQUIRED" {
-        "REPLAY_TOO_STRONG_REQUIRED"
-    } else if compute_state == "REPLAY_COMPUTE_READY" {
-        "REPLAY_COMPUTE_READY_REVIEW"
+    let typed = nanda_6m::evaluate_replay(nanda_6m::ReplayDecisionInput {
+        raw_state: parse_raw_peak_state(raw_state),
+        raw_safe_to_answer: raw_safe,
+        raw_verdict_pass: raw_decision["verdict"].as_str() == Some("PASS"),
+        matched_keys,
+        observer_net_dot: replay["before_net_dot"].as_i64().unwrap_or(0),
+        full_delta_dot: replay["delta_dot"].as_i64().unwrap_or(0),
+        soft: parse_replay_touch(&soft),
+        full: parse_replay_touch(&full),
+        stability_state: parse_replay_stability_state(stability_state),
+        compute_state: parse_replay_compute_state(compute_state),
+    });
+    let stability_verdict = typed.verdict.as_str();
+    let verdict = if typed.output_veto {
+        "VETO"
+    } else if typed.output_pass {
+        "PASS"
+    } else if typed.verdict == nanda_6m::ReplayVerdict::NoReplayEvidence {
+        raw_decision["verdict"].as_str().unwrap_or("WATCH")
     } else {
-        "REPLAY_WEAK_OR_AMBIGUOUS"
-    };
-
-    let action = match stability_verdict {
-        "STABLE_WITH_REPLAY" => "KEEP_GATE_DECISION",
-        "REPLAY_RESCUED_THIN_FIELD" => "REVIEW_REPLAY_RESCUED_FIELD",
-        "REPLAY_DESTABILIZED_FIELD" => "STOP_REPAIR_OR_SPLIT",
-        "REPLAY_TOO_STRONG_REQUIRED" => "REVIEW_INTERVENTION_DEPENDENCE",
-        "NO_REPLAY_EVIDENCE" => "USE_RAW_DECISION",
-        _ => "REVIEW_REPLAY_EFFECT",
-    };
-    let verdict = match stability_verdict {
-        "REPLAY_DESTABILIZED_FIELD" => "VETO",
-        "NO_REPLAY_EVIDENCE" => raw_decision["verdict"].as_str().unwrap_or("WATCH"),
-        "STABLE_WITH_REPLAY" if raw_safe => "PASS",
-        _ => "WATCH",
+        "WATCH"
     };
 
     json!({
         "mode": "replay-adjusted-peak-firewall",
+        "core": "nanda_6m::evaluate_replay",
+        "hot_compatible": true,
         "raw_state": raw_state,
         "raw_safe_to_answer": raw_safe,
         "replay_state": replay_state,
@@ -4112,22 +4100,72 @@ fn packed_replay_decision_report(raw_decision: &Value, replay: &Value) -> Value 
         "stability_state": stability_state,
         "stability_verdict": stability_verdict,
         "verdict": verdict,
-        "action": action,
-        "safe_to_answer": false,
+        "action": typed.action.as_str(),
+        "safe_to_answer": typed.safe_to_answer,
         "firewall": {
             "rule": "replay may shape or rescue the packed field, but cannot grant final answer permission",
             "blocks_direct_pass": true,
             "requires_structural_gate": true
         },
         "adjusted_field": {
-            "observer_net_dot": replay["before_net_dot"].as_i64().unwrap_or(0),
-            "soft_touch_net_dot": soft["after_net_dot"].as_i64().unwrap_or(0),
-            "full_touch_net_dot": full_after,
-            "full_delta_dot": replay["delta_dot"].as_i64().unwrap_or(0),
-            "matched_keys": matched_keys
+            "observer_net_dot": typed.observer_net_dot,
+            "soft_touch_net_dot": typed.soft_touch_net_dot,
+            "full_touch_net_dot": typed.full_touch_net_dot,
+            "full_delta_dot": typed.full_delta_dot,
+            "matched_keys": typed.matched_keys
         },
-        "reason": packed_replay_decision_reason(stability_verdict, raw_state, raw_safe)
+        "reason": packed_replay_decision_reason(typed.verdict, raw_state, raw_safe)
     })
+}
+
+fn parse_raw_peak_state(value: &str) -> nanda_6m::RawPeakState {
+    match value {
+        "PACKED_FOCUSED" => nanda_6m::RawPeakState::Focused,
+        "PACKED_THIN" => nanda_6m::RawPeakState::Thin,
+        "PACKED_CONTESTED" => nanda_6m::RawPeakState::Contested,
+        "PACKED_NO_PEAK" | "PACKED_EMPTY_MEMORY" | "PACKED_EMPTY_QUERY" => {
+            nanda_6m::RawPeakState::NoPeak
+        }
+        _ => nanda_6m::RawPeakState::Review,
+    }
+}
+
+fn parse_replay_compute_state(value: &str) -> nanda_6m::ReplayComputeState {
+    match value {
+        "REPLAY_COMPUTE_READY" => nanda_6m::ReplayComputeState::Ready,
+        "REPLAY_COMPUTE_WEAK" => nanda_6m::ReplayComputeState::Weak,
+        _ => nanda_6m::ReplayComputeState::None,
+    }
+}
+
+fn parse_replay_field_state(value: &str) -> nanda_6m::ReplayFieldState {
+    match value {
+        "FIELD_FOCUSED_BY_REPLAY" => nanda_6m::ReplayFieldState::Focused,
+        "FIELD_IMPROVED_BY_REPLAY" => nanda_6m::ReplayFieldState::Improved,
+        "FIELD_WEAKENED_BY_REPLAY" => nanda_6m::ReplayFieldState::Weakened,
+        _ => nanda_6m::ReplayFieldState::Observed,
+    }
+}
+
+fn parse_replay_stability_state(value: &str) -> nanda_6m::ReplayStabilityState {
+    match value {
+        "STABLE_UNDER_SOFT_TOUCH" => nanda_6m::ReplayStabilityState::StableUnderSoftTouch,
+        "FULL_TOUCH_REQUIRED" => nanda_6m::ReplayStabilityState::FullTouchRequired,
+        "WEAK_CONSTRUCTIVE_REPLAY" => nanda_6m::ReplayStabilityState::WeakConstructive,
+        "DESTABILIZING_REPLAY" => nanda_6m::ReplayStabilityState::Destabilizing,
+        "NO_REPLAY_SHIFT" => nanda_6m::ReplayStabilityState::NoShift,
+        _ => nanda_6m::ReplayStabilityState::NoReplayField,
+    }
+}
+
+fn parse_replay_touch(value: &Value) -> nanda_6m::ReplayTouch {
+    nanda_6m::ReplayTouch {
+        after_net_dot: value["after_net_dot"].as_i64().unwrap_or(0),
+        delta_dot: value["delta_dot"].as_i64().unwrap_or(0),
+        field_state: parse_replay_field_state(
+            value["field_state"].as_str().unwrap_or("FIELD_OBSERVED"),
+        ),
+    }
 }
 
 fn replay_touch(replay: &Value, label: &str) -> Value {
@@ -4152,27 +4190,27 @@ fn replay_touch(replay: &Value, label: &str) -> Value {
 }
 
 fn packed_replay_decision_reason(
-    stability_verdict: &str,
+    stability_verdict: nanda_6m::ReplayVerdict,
     raw_state: &str,
     raw_safe: bool,
 ) -> &'static str {
     match stability_verdict {
-        "STABLE_WITH_REPLAY" => {
+        nanda_6m::ReplayVerdict::StableWithReplay => {
             "Raw packed field was already acceptable and replay remains stable under soft touch."
         }
-        "REPLAY_RESCUED_THIN_FIELD" => {
+        nanda_6m::ReplayVerdict::ReplayRescuedThinField => {
             "Raw packed field was thin, but matched feedback lanes focus it under soft touch; keep under WATCH for structural review."
         }
-        "REPLAY_DESTABILIZED_FIELD" => {
+        nanda_6m::ReplayVerdict::ReplayDestabilizedField => {
             "Replay weakens or destabilizes the packed field; do not trust the raw peak."
         }
-        "REPLAY_TOO_STRONG_REQUIRED" => {
+        nanda_6m::ReplayVerdict::ReplayTooStrongRequired => {
             "Replay only focuses the field under full-strength intervention; treat the peak as intervention-dependent."
         }
-        "NO_REPLAY_EVIDENCE" if raw_safe => {
+        nanda_6m::ReplayVerdict::NoReplayEvidence if raw_safe => {
             "No feedback lane matched; rely on the raw packed decision."
         }
-        "NO_REPLAY_EVIDENCE" => {
+        nanda_6m::ReplayVerdict::NoReplayEvidence => {
             "No feedback lane matched; replay provides no extra evidence for the raw packed decision."
         }
         _ if raw_state == "PACKED_THIN" => {
