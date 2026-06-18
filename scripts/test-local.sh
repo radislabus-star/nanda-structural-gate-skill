@@ -325,6 +325,7 @@ budget_json="$("$budget" "$root/examples/triad-packet.interference-search-route-
 jq -e '.mode == "nanda-6m-budget-planner"' <<<"$budget_json" >/dev/null
 jq -e '.state == "FITS_L3"' <<<"$budget_json" >/dev/null
 jq -e '.safe_for_hot_core == true' <<<"$budget_json" >/dev/null
+jq -e '.runtime_focus.state == "PACKED_RUNTIME_READY" and .runtime_focus.focus_triads_capacity == 15000 and .runtime_focus.default_focus_field_requests == 64' <<<"$budget_json" >/dev/null
 jq -e '.hard_budget_bytes == 6291456' <<<"$budget_json" >/dev/null
 jq -e '.capacity.triads == 65536' <<<"$budget_json" >/dev/null
 pack6m_json="$("$pack6m" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json)"
@@ -360,6 +361,7 @@ jq -e '.packed_lane_store.mode == "packed-lane-store" and .packed_lane_store.sto
 jq -e '.packed_lane_store.capacity == 16384 and .packed_lane_store.count == 2 and .packed_lane_store.bytes == 128' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_store.sample[0].key_hash == .packed_lanes.route.key_hash and .packed_lane_store.sample[0].record_mask_a == 96' <<<"$pack6m_json" >/dev/null
 jq -e '.runtime_contract.mode == "packed-hot-runtime-contract" and .runtime_contract.state == "PACKED_RUNTIME_READY" and .runtime_contract.ready == true' <<<"$pack6m_json" >/dev/null
+jq -e '.runtime_contract.focus_triads_capacity == 15000 and .runtime_contract.focus_window_fits == true and .runtime_contract.default_focus_field_requests == 64' <<<"$pack6m_json" >/dev/null
 jq -e '.runtime_contract.workspace_model.score_arrays == 3 and .runtime_contract.workspace_model.score_bytes == 16 and .runtime_contract.workspace_model.support_field_bytes == 56' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_replay.mode == "feedback-lane-replay" and .packed_lane_replay.state == "PACKED_LANE_REPLAY_NONE" and .packed_lane_replay.matched_keys == 0' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_replay.touch_policy.mode == "observer-to-compute-sweep" and .packed_lane_replay.stability_state == "NO_REPLAY_FIELD"' <<<"$pack6m_json" >/dev/null
@@ -574,6 +576,7 @@ jq -e '.benchmarks.support_bucket_build.iterations == 100 and .benchmarks.suppor
 jq -e '.benchmarks.support_bucket_build_compile_sweep.iterations == 100 and .benchmarks.support_bucket_build_compile_sweep.kernel == "build_support_score_buckets_fields_and_compile_sweep" and .benchmarks.support_bucket_build_compile_sweep.fields == 64 and .benchmarks.support_bucket_build_compile_sweep.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.hot_cycle.iterations == 100 and .benchmarks.hot_cycle.kernel == "run_packed_hot_cycle" and .benchmarks.hot_cycle.fields == 64 and .benchmarks.hot_cycle.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.hot_cycle.runtime_contract.state == "PACKED_RUNTIME_READY" and .benchmarks.hot_cycle.runtime_contract.ready == true and .benchmarks.hot_cycle.runtime_contract.workspace_fits == true' <<<"$bench6m_json" >/dev/null
+jq -e '.benchmarks.hot_cycle.runtime_contract.focus_triads_capacity == 15000 and .benchmarks.hot_cycle.runtime_contract.default_focus_field_requests == 64' <<<"$bench6m_json" >/dev/null
 bench6m_lane_json="$("$bench6m" --mode lane --lane-iterations 1000 --format json)"
 jq -e '.benchmarks.replay == null and .benchmarks.projection == null' <<<"$bench6m_lane_json" >/dev/null
 jq -e '.benchmarks.lane_application.iterations == 1000 and .benchmarks.lane_application.ops_per_second > 0' <<<"$bench6m_lane_json" >/dev/null

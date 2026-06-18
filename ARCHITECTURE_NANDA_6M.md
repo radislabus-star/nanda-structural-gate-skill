@@ -145,12 +145,13 @@ This is the NANDA-6M law. Any implementation must be able to print this budget
 and prove `used_bytes <= 6,291,456` for the hot core.
 
 v20 adds a stricter runtime attach contract on top of the broad arena budget.
-The full arena can hold 65,536 packed triads, but the current hot-cycle
-algorithm also needs temporary score and bucket arrays inside the 786,432 byte
-workspace. Therefore a packet may fit the broad 6 MiB arena while still
-returning `FOCUS_REQUIRED` for one hot-cycle attach. This is intentional: the
-runtime must refuse unfocused work instead of silently spilling score buffers
-into normal RAM.
+v21 makes the product decision explicit: the active proof window is 15,000
+triads with 64 default field requests. The full arena can still hold 65,536
+packed triads, but those records are storage/focus material, not one monolithic
+proof pass. A packet may fit the broad 6 MiB arena while still returning
+`FOCUS_REQUIRED` for one hot-cycle attach. This is intentional: the runtime
+must refuse unfocused work instead of silently spilling score buffers into
+normal RAM.
 
 The v20 runtime states are:
 
@@ -168,20 +169,31 @@ WORKSPACE_TOO_SMALL
 and preallocated workspace slices, validates the shape, and only then allows
 `run_query`.
 
+The practical v21 rule is:
+
+```text
+65,536 packed triads = broad arena capacity
+15,000 packed triads = active focused proof capacity
+64 field requests    = default proof width
+```
+
 ## Capacity Target
 
 The first NANDA-6M target is:
 
 ```text
-triads:     65,536 packed triads
+triad arena: 65,536 packed triads
+proof focus: 15,000 packed triads
 centroids:   2,048 route/group centroids
 lanes:      16,384 constructive/destructive lanes
 wave_dim:    1,024 i8 dimensions per centroid
 ```
 
-This is not "all memory of the world." It is the focused active field. Large
-corpora must be reduced by dataset doctor, route balancing, query triads, and
-coarse-to-fine focus before they enter NANDA-6M.
+This is not "all memory of the world." The 65,536 record arena is the active
+packed storage envelope. The v21 proof runtime intentionally operates on a
+15,000-triad focus window so the current score/bucket workspace stays inside
+the 6 MiB contract. Large corpora must be reduced by dataset doctor, route
+balancing, query triads, and linked split before they enter the proof window.
 
 ## Packed Records
 

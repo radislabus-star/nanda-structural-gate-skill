@@ -26,7 +26,7 @@ pub(crate) fn budget_cmd(args: BudgetArgs) -> Result<u8> {
         OutputFormat::Text => print_budget_text(&out),
         OutputFormat::Md => print_budget_md(&out),
     }
-    Ok(if out["fits_l3"].as_bool().unwrap_or(false) {
+    Ok(if out["safe_for_hot_core"].as_bool().unwrap_or(false) {
         EXIT_PASS
     } else {
         EXIT_WATCH
@@ -145,6 +145,13 @@ pub(super) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
     let lanes_ok = active_lanes <= nanda_6m::LANE_CAPACITY;
     let hot_bytes_ok = estimated_hot_bytes <= nanda_6m::BUDGET_BYTES;
     let fits_l3 = budget_usage.fits();
+    let runtime_focus = nanda_6m::validate_packed_runtime(nanda_6m::PackedRuntimeShape {
+        memory_records: active_triads,
+        centroids: centroid_count,
+        resident_lanes: active_lanes,
+        field_requests: nanda_6m::RUNTIME_FOCUS_FIELD_REQUESTS,
+    });
+    let safe_for_hot_core = runtime_focus.ready();
     let mut blockers = vec![];
     if !triads_ok {
         blockers.push(json!({
@@ -178,7 +185,17 @@ pub(super) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
             "repair": "reduce active triads, centroids, or lanes before hot execution"
         }));
     }
-    let state = if fits_l3 {
+    if fits_l3 && !safe_for_hot_core {
+        blockers.push(json!({
+            "state": runtime_focus.state.as_str(),
+            "count": active_triads,
+            "focus_triads_capacity": runtime_focus.focus_triads_capacity,
+            "workspace_required_bytes": runtime_focus.workspace_required_bytes,
+            "workspace_budget_bytes": runtime_focus.workspace_budget_bytes,
+            "repair": "focus or split active triads before the 15k hot proof runtime"
+        }));
+    }
+    let state = if fits_l3 && safe_for_hot_core {
         "FITS_L3"
     } else if !hot_bytes_ok {
         "SPILL_REQUIRED"
@@ -192,10 +209,21 @@ pub(super) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
         "nanda_6m_version": nanda_6m::VERSION,
         "mode": "nanda-6m-budget-planner",
         "state": state,
-        "verdict": if fits_l3 { "PASS" } else { "WATCH" },
+        "verdict": if safe_for_hot_core { "PASS" } else { "WATCH" },
         "canonicalization": packet.canonicalization,
         "fits_l3": fits_l3,
-        "safe_for_hot_core": fits_l3,
+        "safe_for_hot_core": safe_for_hot_core,
+        "runtime_focus": {
+            "state": runtime_focus.state.as_str(),
+            "ready": runtime_focus.ready(),
+            "focus_triads_capacity": runtime_focus.focus_triads_capacity,
+            "focus_window_fits": runtime_focus.focus_window_fits,
+            "default_focus_field_requests": nanda_6m::RUNTIME_FOCUS_FIELD_REQUESTS,
+            "workspace_fits": runtime_focus.workspace_fits,
+            "workspace_required_bytes": runtime_focus.workspace_required_bytes,
+            "workspace_budget_bytes": runtime_focus.workspace_budget_bytes,
+            "max_memory_records_for_requests": runtime_focus.max_memory_records_for_requests
+        },
         "hard_budget_bytes": nanda_6m::BUDGET_BYTES,
         "reserved_core_bytes": reserved_core_bytes,
         "estimated_hot_bytes": estimated_hot_bytes,
@@ -236,7 +264,11 @@ pub(super) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
         },
         "blockers": blockers,
         "next": if fits_l3 {
-            "Packet can enter the future NANDA-6M packed hot core."
+            if safe_for_hot_core {
+                "Packet can enter the NANDA-6M focused 15k packed hot core."
+            } else {
+                "Packet fits broad arenas but must be focused or split before the 15k hot proof runtime."
+            }
         } else {
             "Do not run as one hot packet; focus, split, or reduce lanes before NANDA-6M execution."
         }
@@ -355,7 +387,7 @@ pub(super) fn pack_report(
         && routes.len() <= u16::MAX as usize
         && groups.len() <= u16::MAX as usize
         && roles.len() <= u8::MAX as usize;
-    let packed_ok = budget["fits_l3"].as_bool().unwrap_or(false) && dictionary_ok;
+    let packed_ok = budget["safe_for_hot_core"].as_bool().unwrap_or(false) && dictionary_ok;
     json!({
         "core_version": CORE_VERSION,
         "nanda_6m_version": nanda_6m::VERSION,
@@ -793,6 +825,9 @@ fn packed_runtime_contract_report(
         "active_hot_bytes": usage.active_hot_bytes,
         "workspace_required_bytes": usage.workspace_required_bytes,
         "workspace_budget_bytes": usage.workspace_budget_bytes,
+        "focus_triads_capacity": usage.focus_triads_capacity,
+        "focus_window_fits": usage.focus_window_fits,
+        "default_focus_field_requests": nanda_6m::RUNTIME_FOCUS_FIELD_REQUESTS,
         "max_memory_records_for_requests": usage.max_memory_records_for_requests,
         "shape": {
             "memory_records": usage.shape.memory_records,

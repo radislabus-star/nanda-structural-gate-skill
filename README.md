@@ -309,9 +309,10 @@ guess aliases automatically. Ambiguous or low-confidence aliases return WATCH
 and are shown in `canonicalization.conflicts` or
 `canonicalization.warnings`.
 `nanda-budget` is the NANDA-6M Phase 1 planner. It does not run the packed hot
-core yet; it checks whether a packet could fit the planned 6 MiB
-cache-resident layout and returns `FITS_L3`, `FOCUS_REQUIRED`,
-`SPLIT_REQUIRED`, or `SPILL_REQUIRED`.
+core yet; it checks both the broad 6 MiB arena layout and the v21 focused
+15,000-triad proof runtime. It returns `FITS_L3`, `FOCUS_REQUIRED`,
+`SPLIT_REQUIRED`, or `SPILL_REQUIRED`; inspect `runtime_focus` and
+`safe_for_hot_core` before treating the packet as hot-runnable.
 `nanda-pack6m` is the first cold-to-hot bridge. It builds deterministic
 dictionaries and sample `PackedTriad32` records from a packet, proving that the
 string/JSON world can be reduced to the planned fixed records before packed
@@ -333,9 +334,10 @@ Inspect `packed_lane_store`: it reports the hot compiled lane arena cost. Each
 stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
 Inspect `runtime_contract`: it is the v20 hot attach gate. `PACKED_RUNTIME_READY`
 means the focused packet fits the current `PackedHotCore` workspace contract.
-`FOCUS_REQUIRED` means the packet may fit the broad 6 MiB arenas but the current
-hot-cycle score/bucket workspace cannot process it as one focused field. Do not
-silently spill that case into RAM; reduce active triads or field requests first.
+In v21 the active proof window is intentionally fixed at 15,000 triads with 64
+default field requests. `FOCUS_REQUIRED` means the packet may fit the broad
+65,536-record triad arena, but it is too wide for one 15k hot proof. Do not
+silently spill that case into RAM; focus/split the packet first.
 Inspect `packed_lane_replay`: it matches feedback shortcuts against current
 stable lane keys, compiles matched keys into current-window `PackedLane64`
 masks, and reports replayed `before_net_dot -> after_net_dot`.

@@ -878,6 +878,9 @@ fn runtime_usage_json(usage: nanda_6m::PackedRuntimeUsage) -> Value {
         "active_hot_bytes": usage.active_hot_bytes,
         "workspace_required_bytes": usage.workspace_required_bytes,
         "workspace_budget_bytes": usage.workspace_budget_bytes,
+        "focus_triads_capacity": usage.focus_triads_capacity,
+        "focus_window_fits": usage.focus_window_fits,
+        "default_focus_field_requests": nanda_6m::RUNTIME_FOCUS_FIELD_REQUESTS,
         "max_memory_records_for_requests": usage.max_memory_records_for_requests,
         "shape": {
             "memory_records": usage.shape.memory_records,

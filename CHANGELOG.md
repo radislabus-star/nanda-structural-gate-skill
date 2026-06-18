@@ -40,7 +40,10 @@
 - `nanda pack6m` and `nanda bench6m --mode hot-cycle` now report
   `runtime_contract`, including `PACKED_RUNTIME_READY`, `FOCUS_REQUIRED`,
   `SPLIT_REQUIRED`, `SPILL_REQUIRED`, and `WORKSPACE_TOO_SMALL`.
-- NANDA-6M version is now `nanda-6m-v20-packed-runtime-contract`.
+- NANDA-6M now fixes the active proof window at 15,000 triads with 64 default
+  field requests. The broad triad arena still stores up to 65,536 records, but
+  hot proof requires a focused 15k window.
+- NANDA-6M version is now `nanda-6m-v21-focused-15k-runtime`.
 
 ## v3.3.0 - 2026-06-18
 

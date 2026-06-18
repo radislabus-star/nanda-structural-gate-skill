@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-pub const VERSION: &str = "nanda-6m-v20-packed-runtime-contract";
+pub const VERSION: &str = "nanda-6m-v21-focused-15k-runtime";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -30,6 +30,8 @@ pub const TRIAD_CAPACITY: usize = TRIAD_ARENA_BYTES / TRIAD_BYTES;
 pub const CENTROID_CAPACITY: usize = CENTROID_ARENA_BYTES / CENTROID_BYTES;
 pub const LANE_CAPACITY: usize = LANE_ARENA_BYTES / LANE_BYTES;
 pub const SCORE_BUCKET_CAPACITY: usize = CENTROID_CAPACITY;
+pub const RUNTIME_FOCUS_TRIAD_CAPACITY: usize = 15_000;
+pub const RUNTIME_FOCUS_FIELD_REQUESTS: usize = 64;
 pub const RUNTIME_SCORE_ARRAYS: usize = 3;
 pub const RUNTIME_OFFSET_ARRAYS: usize = 2;
 pub const RUNTIME_CURSOR_ARRAYS: usize = 1;
@@ -469,8 +471,10 @@ pub struct PackedRuntimeUsage {
     pub active_hot_bytes: usize,
     pub workspace_required_bytes: usize,
     pub workspace_budget_bytes: usize,
+    pub focus_triads_capacity: usize,
     pub max_memory_records_for_requests: usize,
     pub fits_l3: bool,
+    pub focus_window_fits: bool,
     pub workspace_fits: bool,
 }
 
@@ -556,6 +560,7 @@ pub fn validate_packed_runtime(shape: PackedRuntimeShape) -> PackedRuntimeUsage 
         lanes: shape.resident_lanes,
     }
     .fits();
+    let focus_window_fits = shape.memory_records <= RUNTIME_FOCUS_TRIAD_CAPACITY;
     let workspace_fits = workspace_required_bytes <= WORKSPACE_BYTES;
     let state = if shape.memory_records == 0 {
         PackedRuntimeState::EmptyMemory
@@ -568,7 +573,7 @@ pub fn validate_packed_runtime(shape: PackedRuntimeShape) -> PackedRuntimeUsage 
         PackedRuntimeState::SpillRequired
     } else if shape.centroids > CENTROID_CAPACITY {
         PackedRuntimeState::SplitRequired
-    } else if !workspace_fits {
+    } else if !focus_window_fits || !workspace_fits {
         PackedRuntimeState::FocusRequired
     } else {
         PackedRuntimeState::Ready
@@ -579,8 +584,10 @@ pub fn validate_packed_runtime(shape: PackedRuntimeShape) -> PackedRuntimeUsage 
         active_hot_bytes,
         workspace_required_bytes,
         workspace_budget_bytes: WORKSPACE_BYTES,
+        focus_triads_capacity: RUNTIME_FOCUS_TRIAD_CAPACITY,
         max_memory_records_for_requests,
         fits_l3,
+        focus_window_fits,
         workspace_fits,
     }
 }
@@ -1678,8 +1685,29 @@ mod tests {
         });
         assert_eq!(focused.state, PackedRuntimeState::Ready);
         assert!(focused.ready());
+        assert!(focused.focus_window_fits);
         assert!(focused.workspace_fits);
         assert!(focused.max_memory_records_for_requests > 10_000);
+
+        let focused_15k = validate_packed_runtime(PackedRuntimeShape {
+            memory_records: RUNTIME_FOCUS_TRIAD_CAPACITY,
+            centroids: 18,
+            resident_lanes: 2,
+            field_requests: RUNTIME_FOCUS_FIELD_REQUESTS,
+        });
+        assert_eq!(focused_15k.state, PackedRuntimeState::Ready);
+        assert!(focused_15k.focus_window_fits);
+        assert!(focused_15k.workspace_fits);
+
+        let just_over_focus = validate_packed_runtime(PackedRuntimeShape {
+            memory_records: RUNTIME_FOCUS_TRIAD_CAPACITY + 1,
+            centroids: 18,
+            resident_lanes: 2,
+            field_requests: RUNTIME_FOCUS_FIELD_REQUESTS,
+        });
+        assert_eq!(just_over_focus.state, PackedRuntimeState::FocusRequired);
+        assert!(!just_over_focus.focus_window_fits);
+        assert!(just_over_focus.workspace_fits);
 
         let unfocused = validate_packed_runtime(PackedRuntimeShape {
             memory_records: TRIAD_CAPACITY,
@@ -1689,6 +1717,7 @@ mod tests {
         });
         assert_eq!(unfocused.state, PackedRuntimeState::FocusRequired);
         assert!(!unfocused.ready());
+        assert!(!unfocused.focus_window_fits);
         assert!(!unfocused.workspace_fits);
         assert!(unfocused.workspace_required_bytes > WORKSPACE_BYTES);
     }
