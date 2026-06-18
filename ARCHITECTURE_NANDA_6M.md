@@ -144,6 +144,30 @@ Total                   6,291,456 B
 This is the NANDA-6M law. Any implementation must be able to print this budget
 and prove `used_bytes <= 6,291,456` for the hot core.
 
+v20 adds a stricter runtime attach contract on top of the broad arena budget.
+The full arena can hold 65,536 packed triads, but the current hot-cycle
+algorithm also needs temporary score and bucket arrays inside the 786,432 byte
+workspace. Therefore a packet may fit the broad 6 MiB arena while still
+returning `FOCUS_REQUIRED` for one hot-cycle attach. This is intentional: the
+runtime must refuse unfocused work instead of silently spilling score buffers
+into normal RAM.
+
+The v20 runtime states are:
+
+```text
+PACKED_RUNTIME_READY
+FOCUS_REQUIRED
+SPLIT_REQUIRED
+SPILL_REQUIRED
+EMPTY_MEMORY
+EMPTY_QUERY
+WORKSPACE_TOO_SMALL
+```
+
+`PackedHotCore::attach` is the hot boundary. It accepts already packed memory
+and preallocated workspace slices, validates the shape, and only then allows
+`run_query`.
+
 ## Capacity Target
 
 The first NANDA-6M target is:

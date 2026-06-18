@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-pub const VERSION: &str = "nanda-6m-v19-hot-cycle-core";
+pub const VERSION: &str = "nanda-6m-v20-packed-runtime-contract";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -30,6 +30,9 @@ pub const TRIAD_CAPACITY: usize = TRIAD_ARENA_BYTES / TRIAD_BYTES;
 pub const CENTROID_CAPACITY: usize = CENTROID_ARENA_BYTES / CENTROID_BYTES;
 pub const LANE_CAPACITY: usize = LANE_ARENA_BYTES / LANE_BYTES;
 pub const SCORE_BUCKET_CAPACITY: usize = CENTROID_CAPACITY;
+pub const RUNTIME_SCORE_ARRAYS: usize = 3;
+pub const RUNTIME_OFFSET_ARRAYS: usize = 2;
+pub const RUNTIME_CURSOR_ARRAYS: usize = 1;
 
 pub const RESERVED_CORE_BYTES: usize = HEADER_BYTES
     + TRIAD_ARENA_BYTES
@@ -182,6 +185,7 @@ pub struct PackedLane64 {
     pub reserved: [u8; 14],
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PackedSupportField {
     pub top_id: u16,
@@ -194,6 +198,7 @@ pub struct PackedSupportField {
     pub anti_mask_b: u64,
 }
 
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PackedAxis {
     #[default]
@@ -342,6 +347,7 @@ pub struct PackedSupportSummary {
     pub anti_count: u16,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PackedTriadSupportScore {
     pub route_id: u16,
@@ -350,6 +356,7 @@ pub struct PackedTriadSupportScore {
     pub dot: i64,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PackedFieldRequest {
     pub axis: PackedAxis,
@@ -418,6 +425,76 @@ pub struct PackedHotCycle {
     pub checksum: u64,
 }
 
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PackedRuntimeState {
+    Ready = 1,
+    FocusRequired = 2,
+    SplitRequired = 3,
+    SpillRequired = 4,
+    EmptyMemory = 5,
+    EmptyQuery = 6,
+    WorkspaceTooSmall = 7,
+    #[default]
+    Review = 255,
+}
+
+impl PackedRuntimeState {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Ready => "PACKED_RUNTIME_READY",
+            Self::FocusRequired => "FOCUS_REQUIRED",
+            Self::SplitRequired => "SPLIT_REQUIRED",
+            Self::SpillRequired => "SPILL_REQUIRED",
+            Self::EmptyMemory => "EMPTY_MEMORY",
+            Self::EmptyQuery => "EMPTY_QUERY",
+            Self::WorkspaceTooSmall => "WORKSPACE_TOO_SMALL",
+            Self::Review => "PACKED_RUNTIME_REVIEW",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedRuntimeShape {
+    pub memory_records: usize,
+    pub centroids: usize,
+    pub resident_lanes: usize,
+    pub field_requests: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedRuntimeUsage {
+    pub state: PackedRuntimeState,
+    pub shape: PackedRuntimeShape,
+    pub active_hot_bytes: usize,
+    pub workspace_required_bytes: usize,
+    pub workspace_budget_bytes: usize,
+    pub max_memory_records_for_requests: usize,
+    pub fits_l3: bool,
+    pub workspace_fits: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedRuntimeRun {
+    pub usage: PackedRuntimeUsage,
+    pub cycle: PackedHotCycle,
+    pub ran: bool,
+}
+
+impl PackedRuntimeUsage {
+    pub fn ready(self) -> bool {
+        self.state == PackedRuntimeState::Ready
+    }
+}
+
+pub struct PackedHotCore<'a> {
+    memory: &'a [PackedTriad32],
+    centroids: usize,
+    resident_lanes: usize,
+    request_capacity: usize,
+    workspace: PackedHotWorkspace<'a>,
+}
+
 impl PackedTriadSupportScore {
     pub const fn axis_id(self, axis: PackedAxis) -> u16 {
         match axis {
@@ -434,6 +511,168 @@ impl PackedSupportField {
 
     pub const fn has_anti_support(self) -> bool {
         self.negative_dot < 0 && (self.anti_mask_a != 0 || self.anti_mask_b != 0)
+    }
+}
+
+pub const fn packed_runtime_fixed_workspace_bytes() -> usize {
+    QUERY_WAVE_BYTES
+        + (RUNTIME_OFFSET_ARRAYS * (SCORE_BUCKET_CAPACITY + 1) * core::mem::size_of::<u16>())
+        + (RUNTIME_CURSOR_ARRAYS * SCORE_BUCKET_CAPACITY * core::mem::size_of::<u16>())
+}
+
+pub const fn packed_runtime_workspace_bytes(memory_records: usize, field_requests: usize) -> usize {
+    packed_runtime_fixed_workspace_bytes()
+        + (memory_records * RUNTIME_SCORE_ARRAYS * core::mem::size_of::<PackedTriadSupportScore>())
+        + (field_requests
+            * (core::mem::size_of::<PackedFieldRequest>()
+                + core::mem::size_of::<PackedSupportField>()
+                + core::mem::size_of::<PackedLane64>()))
+}
+
+pub const fn max_runtime_memory_records_for_requests(field_requests: usize) -> usize {
+    let per_record = RUNTIME_SCORE_ARRAYS * core::mem::size_of::<PackedTriadSupportScore>();
+    let fixed = packed_runtime_workspace_bytes(0, field_requests);
+    if per_record == 0 || fixed >= WORKSPACE_BYTES {
+        0
+    } else {
+        (WORKSPACE_BYTES - fixed) / per_record
+    }
+}
+
+pub fn validate_packed_runtime(shape: PackedRuntimeShape) -> PackedRuntimeUsage {
+    let active_hot_bytes = BudgetUsage {
+        active_triads: shape.memory_records,
+        centroids: shape.centroids,
+        lanes: shape.resident_lanes,
+    }
+    .estimated_hot_bytes();
+    let workspace_required_bytes =
+        packed_runtime_workspace_bytes(shape.memory_records, shape.field_requests);
+    let max_memory_records_for_requests =
+        max_runtime_memory_records_for_requests(shape.field_requests);
+    let fits_l3 = BudgetUsage {
+        active_triads: shape.memory_records,
+        centroids: shape.centroids,
+        lanes: shape.resident_lanes,
+    }
+    .fits();
+    let workspace_fits = workspace_required_bytes <= WORKSPACE_BYTES;
+    let state = if shape.memory_records == 0 {
+        PackedRuntimeState::EmptyMemory
+    } else if shape.field_requests == 0 {
+        PackedRuntimeState::EmptyQuery
+    } else if shape.memory_records > TRIAD_CAPACITY
+        || shape.resident_lanes > LANE_CAPACITY
+        || active_hot_bytes > BUDGET_BYTES
+    {
+        PackedRuntimeState::SpillRequired
+    } else if shape.centroids > CENTROID_CAPACITY {
+        PackedRuntimeState::SplitRequired
+    } else if !workspace_fits {
+        PackedRuntimeState::FocusRequired
+    } else {
+        PackedRuntimeState::Ready
+    };
+    PackedRuntimeUsage {
+        state,
+        shape,
+        active_hot_bytes,
+        workspace_required_bytes,
+        workspace_budget_bytes: WORKSPACE_BYTES,
+        max_memory_records_for_requests,
+        fits_l3,
+        workspace_fits,
+    }
+}
+
+pub fn validate_packed_hot_workspace(
+    workspace: &PackedHotWorkspace<'_>,
+    memory_records: usize,
+    field_requests: usize,
+) -> bool {
+    workspace.buckets.scores_out.len() >= memory_records
+        && workspace.buckets.route_sorted_out.len() >= memory_records
+        && workspace.buckets.group_sorted_out.len() >= memory_records
+        && workspace.buckets.route_offsets_out.len() > SCORE_BUCKET_CAPACITY
+        && workspace.buckets.group_offsets_out.len() > SCORE_BUCKET_CAPACITY
+        && workspace.buckets.cursors_out.len() >= SCORE_BUCKET_CAPACITY
+        && workspace.fields_out.len() >= field_requests
+        && workspace.lanes_out.len() >= field_requests
+}
+
+impl<'a> PackedHotCore<'a> {
+    pub fn attach(
+        memory: &'a [PackedTriad32],
+        centroids: usize,
+        resident_lanes: usize,
+        request_capacity: usize,
+        workspace: PackedHotWorkspace<'a>,
+    ) -> Result<Self, PackedRuntimeUsage> {
+        let shape = PackedRuntimeShape {
+            memory_records: memory.len(),
+            centroids,
+            resident_lanes,
+            field_requests: request_capacity,
+        };
+        let mut usage = validate_packed_runtime(shape);
+        if usage.ready()
+            && !validate_packed_hot_workspace(&workspace, memory.len(), request_capacity)
+        {
+            usage.state = PackedRuntimeState::WorkspaceTooSmall;
+            usage.workspace_fits = false;
+        }
+        if usage.ready() {
+            Ok(Self {
+                memory,
+                centroids,
+                resident_lanes,
+                request_capacity,
+                workspace,
+            })
+        } else {
+            Err(usage)
+        }
+    }
+
+    pub fn usage_for_requests(&self, field_requests: usize) -> PackedRuntimeUsage {
+        validate_packed_runtime(PackedRuntimeShape {
+            memory_records: self.memory.len(),
+            centroids: self.centroids,
+            resident_lanes: self.resident_lanes,
+            field_requests,
+        })
+    }
+
+    pub fn run_query(
+        &mut self,
+        query: &PackedWave1024,
+        requests: &[PackedFieldRequest],
+    ) -> PackedRuntimeRun {
+        let mut usage = self.usage_for_requests(requests.len());
+        if requests.len() > self.request_capacity
+            || !validate_packed_hot_workspace(&self.workspace, self.memory.len(), requests.len())
+        {
+            usage.state = PackedRuntimeState::WorkspaceTooSmall;
+            usage.workspace_fits = false;
+            return PackedRuntimeRun {
+                usage,
+                cycle: PackedHotCycle::default(),
+                ran: false,
+            };
+        }
+        if !usage.ready() {
+            return PackedRuntimeRun {
+                usage,
+                cycle: PackedHotCycle::default(),
+                ran: false,
+            };
+        }
+        let cycle = run_packed_hot_cycle(self.memory, query, requests, &mut self.workspace);
+        PackedRuntimeRun {
+            usage,
+            cycle,
+            ran: true,
+        }
     }
 }
 
@@ -1399,6 +1638,9 @@ mod tests {
         assert_eq!(core::mem::size_of::<PackedCentroid1024>(), CENTROID_BYTES);
         assert_eq!(core::mem::size_of::<PackedLane64>(), LANE_BYTES);
         assert_eq!(core::mem::size_of::<PackedWave1024>(), QUERY_WAVE_BYTES);
+        assert_eq!(core::mem::size_of::<PackedTriadSupportScore>(), 16);
+        assert_eq!(core::mem::size_of::<PackedFieldRequest>(), 8);
+        assert_eq!(core::mem::size_of::<PackedSupportField>(), 56);
     }
 
     #[test]
@@ -1424,6 +1666,75 @@ mod tests {
             lanes: 0,
         }
         .fits());
+    }
+
+    #[test]
+    fn runtime_contract_refuses_unfocused_hot_workspace() {
+        let focused = validate_packed_runtime(PackedRuntimeShape {
+            memory_records: 64,
+            centroids: 18,
+            resident_lanes: 2,
+            field_requests: 64,
+        });
+        assert_eq!(focused.state, PackedRuntimeState::Ready);
+        assert!(focused.ready());
+        assert!(focused.workspace_fits);
+        assert!(focused.max_memory_records_for_requests > 10_000);
+
+        let unfocused = validate_packed_runtime(PackedRuntimeShape {
+            memory_records: TRIAD_CAPACITY,
+            centroids: 2,
+            resident_lanes: 0,
+            field_requests: 64,
+        });
+        assert_eq!(unfocused.state, PackedRuntimeState::FocusRequired);
+        assert!(!unfocused.ready());
+        assert!(!unfocused.workspace_fits);
+        assert!(unfocused.workspace_required_bytes > WORKSPACE_BYTES);
+    }
+
+    #[test]
+    fn packed_hot_core_refuses_short_workspace() {
+        let memory = [PackedTriad32::new(PackedTriadInput {
+            subject_id: 1,
+            object_id: 2,
+            evidence_ref: 3,
+            wave_seed: 4,
+            relation_id: 5,
+            route_id: 7,
+            group_id: 9,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 0,
+        })];
+        let mut scores: [PackedTriadSupportScore; 0] = [];
+        let mut route_sorted = [PackedTriadSupportScore::default(); 1];
+        let mut group_sorted = [PackedTriadSupportScore::default(); 1];
+        let mut route_offsets = [0u16; SCORE_BUCKET_CAPACITY + 1];
+        let mut group_offsets = [0u16; SCORE_BUCKET_CAPACITY + 1];
+        let mut cursors = [0u16; SCORE_BUCKET_CAPACITY];
+        let mut fields = [PackedSupportField::default(); 1];
+        let mut lanes = [PackedLane64::default(); 1];
+        let workspace = PackedHotWorkspace {
+            buckets: PackedBucketWorkspace {
+                scores_out: &mut scores,
+                route_sorted_out: &mut route_sorted,
+                route_offsets_out: &mut route_offsets,
+                group_sorted_out: &mut group_sorted,
+                group_offsets_out: &mut group_offsets,
+                cursors_out: &mut cursors,
+            },
+            fields_out: &mut fields,
+            lanes_out: &mut lanes,
+        };
+        let err = match PackedHotCore::attach(&memory, 2, 0, 1, workspace) {
+            Ok(_) => panic!("short workspace must be refused"),
+            Err(err) => err,
+        };
+        assert_eq!(err.state, PackedRuntimeState::WorkspaceTooSmall);
     }
 
     #[test]
@@ -1869,8 +2180,8 @@ mod tests {
         let mut cursors = [0u16; SCORE_BUCKET_CAPACITY];
         let mut fields = [PackedSupportField::default(); 2];
         let mut lanes = [PackedLane64::default(); 2];
-        let cycle = {
-            let mut workspace = PackedHotWorkspace {
+        let run = {
+            let workspace = PackedHotWorkspace {
                 buckets: PackedBucketWorkspace {
                     scores_out: &mut scores,
                     route_sorted_out: &mut route_sorted,
@@ -1882,9 +2193,16 @@ mod tests {
                 fields_out: &mut fields,
                 lanes_out: &mut lanes,
             };
-            run_packed_hot_cycle(&memory, &query, &requests, &mut workspace)
+            let mut core = match PackedHotCore::attach(&memory, 4, 0, requests.len(), workspace) {
+                Ok(core) => core,
+                Err(err) => panic!("focused hot core attach failed: {err:?}"),
+            };
+            core.run_query(&query, &requests)
         };
+        let cycle = run.cycle;
 
+        assert!(run.ran);
+        assert_eq!(run.usage.state, PackedRuntimeState::Ready);
         assert_eq!(cycle.score_count, 3);
         assert_eq!(cycle.fields_built, 2);
         assert_eq!(cycle.lanes_compiled, 2);

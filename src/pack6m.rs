@@ -326,6 +326,12 @@ pub(super) fn pack_report(
     let packed_lane_keys = packed_lane_keys_report(&packed_support);
     let packed_lanes = packed_lane_preview(&packed_support, &packed_lane_keys);
     let packed_lane_store = packed_lane_store_report(&packed_lane_keys, &packed_lanes);
+    let runtime_contract = packed_runtime_contract_report(
+        memory_packed.len(),
+        route_centroids.len() + group_centroids.len(),
+        packed_lane_store["count"].as_u64().unwrap_or(0) as usize,
+        2,
+    );
     let peak_decision = packed_field_decision(
         &route_peak,
         &group_peak,
@@ -399,6 +405,7 @@ pub(super) fn pack_report(
         "packed_lane_keys": packed_lane_keys,
         "packed_lanes": packed_lanes,
         "packed_lane_store": packed_lane_store,
+        "runtime_contract": runtime_contract,
         "packed_lane_application": packed_lane_application,
         "packed_lane_replay": packed_lane_replay,
         "packed_replay_decision": packed_replay_decision,
@@ -763,6 +770,56 @@ fn packed_lane_store_item(axis_key: &Value, axis_lane: &Value, axis: &str) -> Op
         "key_storage": axis_lane["key_storage"].as_str().unwrap_or("cold-stable-signature"),
         "compiled_storage": axis_lane["compiled_storage"].as_str().unwrap_or("hot-packed-lane64")
     }))
+}
+
+fn packed_runtime_contract_report(
+    memory_records: usize,
+    centroids: usize,
+    resident_lanes: usize,
+    field_requests: usize,
+) -> Value {
+    let usage = nanda_6m::validate_packed_runtime(nanda_6m::PackedRuntimeShape {
+        memory_records,
+        centroids,
+        resident_lanes,
+        field_requests,
+    });
+    json!({
+        "mode": "packed-hot-runtime-contract",
+        "state": usage.state.as_str(),
+        "ready": usage.ready(),
+        "fits_l3": usage.fits_l3,
+        "workspace_fits": usage.workspace_fits,
+        "active_hot_bytes": usage.active_hot_bytes,
+        "workspace_required_bytes": usage.workspace_required_bytes,
+        "workspace_budget_bytes": usage.workspace_budget_bytes,
+        "max_memory_records_for_requests": usage.max_memory_records_for_requests,
+        "shape": {
+            "memory_records": usage.shape.memory_records,
+            "centroids": usage.shape.centroids,
+            "resident_lanes": usage.shape.resident_lanes,
+            "field_requests": usage.shape.field_requests
+        },
+        "workspace_model": {
+            "score_arrays": nanda_6m::RUNTIME_SCORE_ARRAYS,
+            "offset_arrays": nanda_6m::RUNTIME_OFFSET_ARRAYS,
+            "cursor_arrays": nanda_6m::RUNTIME_CURSOR_ARRAYS,
+            "score_bytes": core::mem::size_of::<nanda_6m::PackedTriadSupportScore>(),
+            "field_request_bytes": core::mem::size_of::<nanda_6m::PackedFieldRequest>(),
+            "support_field_bytes": core::mem::size_of::<nanda_6m::PackedSupportField>(),
+            "lane_bytes": nanda_6m::LANE_BYTES
+        },
+        "repair": match usage.state {
+            nanda_6m::PackedRuntimeState::Ready => "Hot runtime can attach this focused packet.",
+            nanda_6m::PackedRuntimeState::FocusRequired => "Reduce active triads or field requests before hot runtime attach.",
+            nanda_6m::PackedRuntimeState::SplitRequired => "Split route/group topology before hot runtime attach.",
+            nanda_6m::PackedRuntimeState::SpillRequired => "Packet exceeds fixed hot arenas; do not spill silently into RAM.",
+            nanda_6m::PackedRuntimeState::EmptyMemory => "Add memory/source triads before hot runtime attach.",
+            nanda_6m::PackedRuntimeState::EmptyQuery => "Add at least one field request before hot runtime attach.",
+            nanda_6m::PackedRuntimeState::WorkspaceTooSmall => "Allocate a workspace matching the runtime shape.",
+            nanda_6m::PackedRuntimeState::Review => "Runtime contract requires review."
+        }
+    })
 }
 
 fn packed_axis_support_field(axis_support: &Value, key_hash: u32) -> nanda_6m::PackedSupportField {

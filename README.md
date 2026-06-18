@@ -331,6 +331,11 @@ compiled into current-window `PackedLane64` masks; record masks are not treated
 as persistent memory.
 Inspect `packed_lane_store`: it reports the hot compiled lane arena cost. Each
 stored runtime lane is 64 bytes, so the 1 MiB arena holds 16,384 compiled lanes.
+Inspect `runtime_contract`: it is the v20 hot attach gate. `PACKED_RUNTIME_READY`
+means the focused packet fits the current `PackedHotCore` workspace contract.
+`FOCUS_REQUIRED` means the packet may fit the broad 6 MiB arenas but the current
+hot-cycle score/bucket workspace cannot process it as one focused field. Do not
+silently spill that case into RAM; reduce active triads or field requests first.
 Inspect `packed_lane_replay`: it matches feedback shortcuts against current
 stable lane keys, compiles matched keys into current-window `PackedLane64`
 masks, and reports replayed `before_net_dot -> after_net_dot`.
@@ -355,7 +360,8 @@ It measures the typed replay firewall (`evaluate_replay`), the in-memory packed
 1024-dimensional projection/centroid scoring path, and packed lane
 compile/application. It also measures unordered lane-arena sweep, aligned
 field/lane sweep, fused aligned compile+sweep, support-field building from
-packed triads, score-cached support-field building, and compile+sweep variants.
+packed triads, score-cached support-field building, compile+sweep variants, and
+the v20 `PackedHotCore` runtime contract around the full hot-cycle.
 Use it when you need real kernel timing rather than wrapper timing:
 
 ```bash

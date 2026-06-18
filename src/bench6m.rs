@@ -724,27 +724,38 @@ fn bench6m_hot_cycle(iterations: u64, triad_count: usize, field_count: usize) ->
     let mut cursors = vec![0u16; nanda_6m::SCORE_BUCKET_CAPACITY];
     let mut fields = vec![nanda_6m::PackedSupportField::default(); field_count];
     let mut lanes = vec![nanda_6m::PackedLane64::default(); field_count];
+    let workspace = nanda_6m::PackedHotWorkspace {
+        buckets: nanda_6m::PackedBucketWorkspace {
+            scores_out: scores.as_mut_slice(),
+            route_sorted_out: route_sorted.as_mut_slice(),
+            route_offsets_out: route_offsets.as_mut_slice(),
+            group_sorted_out: group_sorted.as_mut_slice(),
+            group_offsets_out: group_offsets.as_mut_slice(),
+            cursors_out: cursors.as_mut_slice(),
+        },
+        fields_out: fields.as_mut_slice(),
+        lanes_out: lanes.as_mut_slice(),
+    };
+    let runtime_centroids = 18;
+    let runtime_usage = nanda_6m::validate_packed_runtime(nanda_6m::PackedRuntimeShape {
+        memory_records: memory.len(),
+        centroids: runtime_centroids,
+        resident_lanes: 0,
+        field_requests: requests.len(),
+    });
+    let mut core = nanda_6m::PackedHotCore::attach(
+        memory.as_slice(),
+        runtime_centroids,
+        0,
+        requests.len(),
+        workspace,
+    )
+    .unwrap_or_else(|usage| panic!("bench hot-cycle runtime contract refused: {usage:?}"));
     let mut checksum: u64 = 0;
     let start = Instant::now();
     for _ in 0..iterations {
-        let mut workspace = nanda_6m::PackedHotWorkspace {
-            buckets: nanda_6m::PackedBucketWorkspace {
-                scores_out: scores.as_mut_slice(),
-                route_sorted_out: route_sorted.as_mut_slice(),
-                route_offsets_out: route_offsets.as_mut_slice(),
-                group_sorted_out: group_sorted.as_mut_slice(),
-                group_offsets_out: group_offsets.as_mut_slice(),
-                cursors_out: cursors.as_mut_slice(),
-            },
-            fields_out: fields.as_mut_slice(),
-            lanes_out: lanes.as_mut_slice(),
-        };
-        let cycle = nanda_6m::run_packed_hot_cycle(
-            black_box(memory.as_slice()),
-            black_box(&query),
-            black_box(requests.as_slice()),
-            black_box(&mut workspace),
-        );
+        let run = core.run_query(black_box(&query), black_box(requests.as_slice()));
+        let cycle = run.cycle;
         checksum = checksum
             .wrapping_add(cycle.checksum)
             .wrapping_add(u64::from(cycle.score_count))
@@ -765,6 +776,7 @@ fn bench6m_hot_cycle(iterations: u64, triad_count: usize, field_count: usize) ->
     out["fields"] = json!(field_count);
     out["query_triads"] = json!(query_len);
     out["ns_per_field"] = json!(out["ns_per_op"].as_f64().unwrap_or(0.0) / field_count as f64);
+    out["runtime_contract"] = runtime_usage_json(runtime_usage);
     out
 }
 
@@ -854,6 +866,25 @@ fn bench_result_json(iterations: u64, elapsed_ns: u128, checksum: u64, kernel: &
         "ns_per_op": ns_per_op,
         "ops_per_second": 1_000_000_000.0 / ns_per_op.max(0.000001),
         "checksum": checksum
+    })
+}
+
+fn runtime_usage_json(usage: nanda_6m::PackedRuntimeUsage) -> Value {
+    json!({
+        "state": usage.state.as_str(),
+        "ready": usage.ready(),
+        "fits_l3": usage.fits_l3,
+        "workspace_fits": usage.workspace_fits,
+        "active_hot_bytes": usage.active_hot_bytes,
+        "workspace_required_bytes": usage.workspace_required_bytes,
+        "workspace_budget_bytes": usage.workspace_budget_bytes,
+        "max_memory_records_for_requests": usage.max_memory_records_for_requests,
+        "shape": {
+            "memory_records": usage.shape.memory_records,
+            "centroids": usage.shape.centroids,
+            "resident_lanes": usage.shape.resident_lanes,
+            "field_requests": usage.shape.field_requests
+        }
     })
 }
 

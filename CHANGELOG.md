@@ -34,7 +34,13 @@
   bucket assembly, batched support-field construction, lane compilation, and
   aligned lane sweep as one cache-resident core call.
 - `nanda bench6m` now includes `--mode hot-cycle`.
-- NANDA-6M version is now `nanda-6m-v19-hot-cycle-core`.
+- NANDA-6M now has a packed runtime contract around `PackedHotCore`: it
+  validates active memory, centroid count, resident lanes, field requests, and
+  hot workspace bytes before attaching the runtime.
+- `nanda pack6m` and `nanda bench6m --mode hot-cycle` now report
+  `runtime_contract`, including `PACKED_RUNTIME_READY`, `FOCUS_REQUIRED`,
+  `SPLIT_REQUIRED`, `SPILL_REQUIRED`, and `WORKSPACE_TOO_SMALL`.
+- NANDA-6M version is now `nanda-6m-v20-packed-runtime-contract`.
 
 ## v3.3.0 - 2026-06-18
 
