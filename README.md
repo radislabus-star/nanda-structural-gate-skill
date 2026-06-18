@@ -700,6 +700,28 @@ reinforced peak:       certification
 reinforced group:      certification-route
 ```
 
+Current heavy 16k finance fixture:
+
+```bash
+scripts/generate-finance-16k-fixture.js .nanda/finance-16k-risk-cluster.json
+scripts/test-heavy-16k.sh
+```
+
+Expected shape:
+
+```text
+triads:                 16,384
+dataset-doctor:         PASS
+pack6m full corpus:     FOCUS_REQUIRED
+search full corpus:     FIELD_CONTESTED / WATCH
+focused proof:          9,620 triads, PACKED_RUNTIME_READY, WATCH
+top_peak:               ai-demand
+```
+
+The generated JSON is intentionally not committed because it is about 6 MB.
+Use this as an explicit load test when changing focus, proof, packed runtime
+contracts, or finance-style route clustering.
+
 ## Roadmap
 
 See [GOAL.md](GOAL.md), [ARCHITECTURE.md](ARCHITECTURE.md), and

@@ -63,6 +63,10 @@
 - `nanda proof --suite` / `nanda-proof --suite` now runs a proof regression
   corpus against expected proof states, top peaks, field states, and reason
   codes.
+- Added an explicit heavy 16k finance fixture generator and
+  `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
+  16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior
+  without committing a multi-megabyte JSON fixture.
 - NANDA-6M version is now `nanda-6m-v24-focused-packet-runtime`.
 
 ## v3.3.0 - 2026-06-18
