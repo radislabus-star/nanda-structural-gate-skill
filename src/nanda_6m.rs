@@ -6,7 +6,7 @@
 
 #![allow(dead_code)]
 
-pub const VERSION: &str = "nanda-6m-v8-hot-compile-sweep-core";
+pub const VERSION: &str = "nanda-6m-v9-hot-triad-support-score-core";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -501,8 +501,7 @@ pub fn build_packed_support_field(
             continue;
         }
         considered = considered.saturating_add(1);
-        let centroid = centroid_from_triads(core::slice::from_ref(&triad));
-        let score = score_centroid(query, &centroid);
+        let score = score_triad_projection(query, &triad);
         if score.dot > 0 {
             field.positive_dot += score.dot;
             support_count = support_count.saturating_add(1);
@@ -941,6 +940,33 @@ pub fn score_centroid(query: &PackedWave1024, centroid: &PackedCentroid1024) -> 
     query.score_centroid(centroid)
 }
 
+pub fn score_triad_projection(query: &PackedWave1024, triad: &PackedTriad32) -> PeakScore {
+    let mut state = projection_seed(triad);
+    let strength = i64::from(projection_strength(triad));
+    let mut dot: i64 = 0;
+    let mut query_energy: i64 = 0;
+    let mut triad_energy: i64 = 0;
+    for query_value in query.values {
+        state = mix64(state);
+        let projected = if (state & 1) == 0 {
+            -strength
+        } else {
+            strength
+        };
+        let query_value = i64::from(query_value);
+        dot += query_value * projected;
+        query_energy += query_value * query_value;
+        triad_energy += projected * projected;
+    }
+    let denom = ((query_energy as f64).sqrt() * (triad_energy as f64).sqrt()).max(1.0);
+    PeakScore {
+        dot,
+        query_energy,
+        centroid_energy: triad_energy,
+        cosine: dot as f64 / denom,
+    }
+}
+
 fn projection_seed(triad: &PackedTriad32) -> u64 {
     let mut state = u64::from(triad.wave_seed) << 32 | u64::from(triad.check);
     state ^= u64::from(triad.subject_id).rotate_left(7);
@@ -1113,6 +1139,34 @@ mod tests {
         let foreign_score = score_centroid(&query, &foreign);
         assert!(matching_score.cosine > foreign_score.cosine);
         assert!(matching_score.cosine > 0.5);
+    }
+
+    #[test]
+    fn direct_triad_projection_score_matches_single_triad_centroid() {
+        let triad = PackedTriad32::new(PackedTriadInput {
+            subject_id: 1,
+            object_id: 2,
+            evidence_ref: 3,
+            wave_seed: 4,
+            relation_id: 5,
+            route_id: 6,
+            group_id: 7,
+            role_pack: 0x0201,
+            flags: 1,
+            lane_hint: 0,
+            check: 8,
+            confidence: 230,
+            polarity: 9,
+        });
+        let query = project_triads(&[triad]);
+        let centroid = centroid_from_triads(&[triad]);
+        let centroid_score = score_centroid(&query, &centroid);
+        let direct_score = score_triad_projection(&query, &triad);
+
+        assert_eq!(direct_score.dot, centroid_score.dot);
+        assert_eq!(direct_score.query_energy, centroid_score.query_energy);
+        assert_eq!(direct_score.centroid_energy, centroid_score.centroid_energy);
+        assert!((direct_score.cosine - centroid_score.cosine).abs() < f64::EPSILON);
     }
 
     #[test]

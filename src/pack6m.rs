@@ -600,8 +600,7 @@ fn packed_axis_support(
             if id != top_id || top_id == 0 {
                 return None;
             }
-            let centroid = nanda_6m::centroid_from_triads(std::slice::from_ref(triad));
-            let score = nanda_6m::score_centroid(query, &centroid);
+            let score = nanda_6m::score_triad_projection(query, triad);
             Some(json!({
                 "record_index": index,
                 "route_id": triad.route_id,

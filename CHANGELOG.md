@@ -18,7 +18,9 @@
 - NANDA-6M has typed packed peak decision and support-field builder contracts.
 - `nanda bench6m` now includes `--mode support-build` and
   `--mode support-build-compile-sweep`.
-- NANDA-6M version is now `nanda-6m-v8-hot-compile-sweep-core`.
+- NANDA-6M support build now scores single packed triads directly without
+  constructing temporary one-triad centroids.
+- NANDA-6M version is now `nanda-6m-v9-hot-triad-support-score-core`.
 
 ## v3.3.0 - 2026-06-18
 
