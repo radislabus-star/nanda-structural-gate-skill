@@ -1,5 +1,23 @@
 use crate::*;
 
+type FeedbackLanes = (
+    Vec<NegativeShortcut>,
+    Vec<PositiveShortcut>,
+    Vec<ResonanceMemory>,
+);
+
+type ResonanceMemoryKey = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+);
+
 pub(crate) fn probe_cmd(args: ProbeArgs) -> Result<u8> {
     if let Some(suite_path) = &args.suite {
         return probe_suite_cmd(&args, suite_path);
@@ -283,12 +301,10 @@ pub(crate) fn probe_report(plain: &Value, negative: &Value, negative_lanes: usiz
 pub(crate) fn load_feedback_negative_shortcuts(
     path: &Path,
 ) -> Result<Option<Vec<NegativeShortcut>>> {
-    Ok(load_feedback_lanes(path)?.map(|(negative, _)| negative))
+    Ok(load_feedback_lanes(path)?.map(|(negative, _, _)| negative))
 }
 
-pub(crate) fn load_feedback_lanes(
-    path: &Path,
-) -> Result<Option<(Vec<NegativeShortcut>, Vec<PositiveShortcut>)>> {
+pub(crate) fn load_feedback_lanes(path: &Path) -> Result<Option<FeedbackLanes>> {
     if !path
         .extension()
         .and_then(|ext| ext.to_str())
@@ -316,7 +332,14 @@ pub(crate) fn load_feedback_lanes(
         .into_iter()
         .map(serde_json::from_value)
         .collect::<std::result::Result<Vec<PositiveShortcut>, _>>()?;
-    Ok(Some((negative, positive)))
+    let resonance = value["resonance_memory"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(serde_json::from_value)
+        .collect::<std::result::Result<Vec<ResonanceMemory>, _>>()?;
+    Ok(Some((negative, positive, resonance)))
 }
 
 #[allow(clippy::type_complexity)]
@@ -467,6 +490,73 @@ pub(crate) fn merge_positive_shortcuts(shortcuts: Vec<PositiveShortcut>) -> Vec<
     merged.into_values().collect()
 }
 
+pub(crate) fn merge_resonance_memory(memories: Vec<ResonanceMemory>) -> Vec<ResonanceMemory> {
+    let mut merged: BTreeMap<ResonanceMemoryKey, ResonanceMemory> = BTreeMap::new();
+    for mut memory in memories {
+        if memory.observations == 0 {
+            memory.observations = 1;
+        }
+        match memory.decision.as_str() {
+            "reject" if memory.rejected_count == 0 => memory.rejected_count = memory.observations,
+            "accept" if memory.accepted_count == 0 => memory.accepted_count = memory.observations,
+            _ => {}
+        }
+        memory.support_terms = normalized_shortcut_terms(&memory.support_terms)
+            .into_iter()
+            .collect::<Vec<_>>();
+        memory.anti_terms = normalized_shortcut_terms(&memory.anti_terms)
+            .into_iter()
+            .collect::<Vec<_>>();
+        let key = (
+            norm(&memory.decision),
+            norm(&memory.peak),
+            norm(&memory.route),
+            norm(&memory.relation),
+            norm(&memory.role_mode),
+            norm(&memory.waw_status),
+            norm(&memory.field_state),
+            memory.support_terms.join("|"),
+            memory.anti_terms.join("|"),
+        );
+        merged
+            .entry(key)
+            .and_modify(|existing| {
+                existing.observations += memory.observations;
+                existing.accepted_count += memory.accepted_count;
+                existing.rejected_count += memory.rejected_count;
+                if existing.phase_state.is_empty() {
+                    existing.phase_state = memory.phase_state.clone();
+                }
+                if existing.standing_state.is_empty() {
+                    existing.standing_state = memory.standing_state.clone();
+                }
+                if existing.energy_state.is_empty() {
+                    existing.energy_state = memory.energy_state.clone();
+                }
+                if existing.boundary_state.is_empty() {
+                    existing.boundary_state = memory.boundary_state.clone();
+                }
+                if existing.temporal_phase.is_empty() {
+                    existing.temporal_phase = memory.temporal_phase.clone();
+                }
+                if !memory.source_feedback.is_empty() {
+                    if existing.source_feedback.is_empty() {
+                        existing.source_feedback = memory.source_feedback.clone();
+                    } else if !existing
+                        .source_feedback
+                        .split(';')
+                        .any(|item| item == memory.source_feedback)
+                    {
+                        existing.source_feedback.push(';');
+                        existing.source_feedback.push_str(&memory.source_feedback);
+                    }
+                }
+            })
+            .or_insert(memory);
+    }
+    merged.into_values().collect()
+}
+
 pub(crate) fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
     let text = fs::read_to_string(&args.input)
         .with_context(|| format!("read {}", args.input.display()))?;
@@ -516,23 +606,31 @@ pub(crate) fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
         vec![]
     };
     let decision = feedback_decision_label(&args.decision);
+    let resonance_memory = vec![resonance_memory_from_search(
+        &search,
+        decision,
+        args.input.display().to_string(),
+    )];
     let reinforcement = match args.decision {
         FeedbackDecision::Accept => json!({
             "reinforce_peak": peak_name,
             "reinforce_support": support_ids,
             "suppress_foreign": anti_ids,
-            "positive_shortcuts": positive_shortcuts
+            "positive_shortcuts": positive_shortcuts,
+            "resonance_memory": resonance_memory
         }),
         FeedbackDecision::Reject => json!({
             "reject_peak": peak_name,
             "suppress_support": support_ids,
             "inspect_alternatives": anti_ids,
-            "negative_shortcuts": negative_shortcuts
+            "negative_shortcuts": negative_shortcuts,
+            "resonance_memory": resonance_memory
         }),
         FeedbackDecision::Watch => json!({
             "watch_peak": peak_name,
             "needs_evidence": support_ids,
-            "possible_foreign_pull": anti_ids
+            "possible_foreign_pull": anti_ids,
+            "resonance_memory": resonance_memory
         }),
     };
     let feedback = json!({
@@ -552,12 +650,87 @@ pub(crate) fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
         "anti_ids": anti_ids,
         "negative_shortcuts": negative_shortcuts,
         "positive_shortcuts": positive_shortcuts,
+        "resonance_memory": resonance_memory,
         "memory_patch": reinforcement,
-        "interpretation": "Feedback is a compact trace for later memory tuning. Reject feedback creates a negative shortcut; accept feedback creates a positive shortcut that can boost the same supported route in later search."
+        "interpretation": "Feedback is a compact trace for later memory tuning. Reject feedback creates a negative shortcut; accept feedback creates a positive shortcut and a resonance-memory form that can later reinforce or suppress the same field shape."
     });
     let output = serde_json::to_string_pretty(&feedback)? + "\n";
     write_or_print(args.out, args.stdout, output)?;
     Ok(EXIT_PASS)
+}
+
+pub(crate) fn resonance_memory_from_search(
+    search: &Value,
+    decision: &str,
+    source_feedback: String,
+) -> ResonanceMemory {
+    let top_peak = search["peaks"].as_array().and_then(|peaks| peaks.first());
+    let peak = top_peak
+        .and_then(|peak| peak["peak"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let route = top_peak
+        .and_then(|peak| peak["center"]["route"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let relation = top_peak
+        .and_then(|peak| peak["center"]["relation"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let role_mode = top_peak
+        .map(|peak| {
+            format!(
+                "{}->{}",
+                peak["center"]["subject_role"].as_str().unwrap_or(""),
+                peak["center"]["object_role"].as_str().unwrap_or("")
+            )
+        })
+        .unwrap_or_default();
+    let support_terms = top_peak
+        .and_then(|peak| peak["supporting_triads"].as_array())
+        .map(|items| support_terms_from_items(items))
+        .unwrap_or_default();
+    let anti_terms = top_peak
+        .and_then(|peak| peak["anti_triads"].as_array())
+        .map(|items| support_terms_from_items(items))
+        .unwrap_or_default();
+    let field = &search["resonant_field"];
+    ResonanceMemory {
+        id: format!(
+            "res-{}",
+            slug(&format!("{decision}-{peak}-{route}-{relation}"))
+        ),
+        decision: decision.to_string(),
+        peak,
+        route,
+        relation,
+        role_mode,
+        waw_status: field["waw_status"].as_str().unwrap_or("").to_string(),
+        field_state: field["state"].as_str().unwrap_or("").to_string(),
+        phase_state: field["phase_lock"]["state"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        standing_state: field["standing_wave"]["state"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        energy_state: field["energy"]["state"].as_str().unwrap_or("").to_string(),
+        boundary_state: field["route_boundary"]["state"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        temporal_phase: field["temporal_phase"]["state"]
+            .as_str()
+            .unwrap_or("")
+            .to_string(),
+        support_terms,
+        anti_terms,
+        source_feedback,
+        observations: 1,
+        accepted_count: usize::from(decision == "accept"),
+        rejected_count: usize::from(decision == "reject"),
+    }
 }
 
 pub(crate) fn feedback_decision_label(decision: &FeedbackDecision) -> &'static str {
@@ -712,6 +885,165 @@ pub(crate) fn apply_negative_lanes(
         "applied": !suppressions.is_empty(),
         "negative_lanes": shortcuts.len(),
         "suppressions": suppressions
+    })
+}
+
+pub(crate) fn apply_resonance_memory(peaks: &mut [Value], memories: &[ResonanceMemory]) -> Value {
+    let mut applications = vec![];
+    if memories.is_empty() || peaks.is_empty() {
+        return json!({
+            "applied": false,
+            "resonance_forms": memories.len(),
+            "applications": applications,
+            "read_as": "Resonance memory stores accepted/rejected field shapes and softly replays them against similar peaks."
+        });
+    }
+    for memory in memories {
+        for peak in peaks.iter_mut() {
+            if !resonance_memory_matches_peak(peak, memory) {
+                continue;
+            }
+            let support_ratio = resonance_memory_support_ratio(peak, memory);
+            if support_ratio <= 0.0 {
+                continue;
+            }
+            let old_score = peak["score"].as_f64().unwrap_or(0.0);
+            match memory.decision.as_str() {
+                "accept" => {
+                    let accepted = memory.accepted_count.max(memory.observations.max(1));
+                    let boost = round4(
+                        ((0.035 + accepted.saturating_sub(1) as f64 * 0.012) * support_ratio)
+                            .min(0.14),
+                    );
+                    let new_score = round4((old_score + boost).min(1.5));
+                    if let Some(object) = peak.as_object_mut() {
+                        object.insert("score".to_string(), json!(new_score));
+                        object.insert("raw_score".to_string(), json!(round4(old_score)));
+                        object.insert("resonance_memory_boost".to_string(), json!(boost));
+                    }
+                    applications.push(resonance_memory_application(
+                        memory,
+                        peak,
+                        "reinforce",
+                        boost,
+                        support_ratio,
+                    ));
+                }
+                "reject" => {
+                    let rejected = memory.rejected_count.max(memory.observations.max(1));
+                    let penalty = round4(
+                        ((0.05 + rejected.saturating_sub(1) as f64 * 0.018) * support_ratio)
+                            .min(0.2),
+                    );
+                    let new_score = round4((old_score - penalty).max(0.0));
+                    if let Some(object) = peak.as_object_mut() {
+                        object.insert("score".to_string(), json!(new_score));
+                        object.insert("raw_score".to_string(), json!(round4(old_score)));
+                        object.insert("resonance_memory_penalty".to_string(), json!(penalty));
+                    }
+                    applications.push(resonance_memory_application(
+                        memory,
+                        peak,
+                        "suppress",
+                        penalty,
+                        support_ratio,
+                    ));
+                }
+                _ => {
+                    applications.push(resonance_memory_application(
+                        memory,
+                        peak,
+                        "observe",
+                        0.0,
+                        support_ratio,
+                    ));
+                }
+            }
+        }
+    }
+    json!({
+        "applied": applications.iter().any(|item| item["action"].as_str().unwrap_or("") != "observe"),
+        "resonance_forms": memories.len(),
+        "applications": applications,
+        "read_as": "Accepted resonance forms softly reinforce matching field shapes; rejected forms softly suppress matching bad shapes. This is not a PASS by itself."
+    })
+}
+
+fn resonance_memory_matches_peak(peak: &Value, memory: &ResonanceMemory) -> bool {
+    let peak_name = peak["peak"].as_str().unwrap_or("");
+    let route = peak["center"]["route"].as_str().unwrap_or("");
+    let relation = peak["center"]["relation"].as_str().unwrap_or("");
+    let role_mode = format!(
+        "{}->{}",
+        peak["center"]["subject_role"].as_str().unwrap_or(""),
+        peak["center"]["object_role"].as_str().unwrap_or("")
+    );
+    let label_match = [memory.peak.as_str(), memory.route.as_str()]
+        .iter()
+        .any(|label| {
+            let label = norm(label);
+            !label.is_empty() && (label == norm(peak_name) || label == norm(route))
+        });
+    let relation_match =
+        memory.relation.trim().is_empty() || norm(&memory.relation) == norm(relation);
+    let role_match =
+        memory.role_mode.trim().is_empty() || norm(&memory.role_mode) == norm(&role_mode);
+    label_match && relation_match && role_match
+}
+
+fn resonance_memory_support_ratio(peak: &Value, memory: &ResonanceMemory) -> f64 {
+    let terms = normalized_shortcut_terms(&memory.support_terms);
+    if terms.is_empty() {
+        return 1.0;
+    }
+    let mut peak_terms = BTreeSet::new();
+    if let Some(items) = peak["supporting_triads"].as_array() {
+        for item in items.iter().take(8) {
+            for key in ["subject", "relation", "object", "route", "group"] {
+                if let Some(value) = item[key].as_str() {
+                    peak_terms.extend(normalized_shortcut_terms(&[value.to_string()]));
+                }
+            }
+        }
+    }
+    if peak_terms.is_empty() {
+        return 0.0;
+    }
+    let hits = terms.intersection(&peak_terms).count();
+    let ratio = hits as f64 / terms.len() as f64;
+    if ratio >= 0.35 {
+        round4(ratio)
+    } else {
+        0.0
+    }
+}
+
+fn resonance_memory_application(
+    memory: &ResonanceMemory,
+    peak: &Value,
+    action: &str,
+    delta: f64,
+    support_ratio: f64,
+) -> Value {
+    json!({
+        "memory": memory.id,
+        "action": action,
+        "peak": peak["peak"].as_str().unwrap_or(""),
+        "route": peak["center"]["route"].as_str().unwrap_or(""),
+        "relation": peak["center"]["relation"].as_str().unwrap_or(""),
+        "role_mode": format!(
+            "{}->{}",
+            peak["center"]["subject_role"].as_str().unwrap_or(""),
+            peak["center"]["object_role"].as_str().unwrap_or("")
+        ),
+        "delta": round4(delta),
+        "support_match_ratio": round4(support_ratio),
+        "source_decision": memory.decision,
+        "waw_status": memory.waw_status,
+        "field_state": memory.field_state,
+        "observations": memory.observations,
+        "accepted_count": memory.accepted_count,
+        "rejected_count": memory.rejected_count
     })
 }
 

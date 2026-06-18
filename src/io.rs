@@ -20,6 +20,7 @@ pub(crate) fn load_packet(path: Option<&Path>) -> Result<Packet> {
             canonicalization: CanonicalizationReport::default(),
             negative_shortcuts: vec![],
             positive_shortcuts: vec![],
+            resonance_memory: vec![],
         }),
     }
 }
@@ -79,6 +80,7 @@ pub(crate) fn init_task(args: InitTaskArgs) -> Result<u8> {
         canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
+        resonance_memory: vec![],
     };
     let output = serde_json::to_string_pretty(&packet)? + "\n";
     write_or_print(

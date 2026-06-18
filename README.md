@@ -326,6 +326,13 @@ destructive locality, multiscale agreement, energy conservation,
 frequency/mode scan, temporal phase, coherence memory, and the final
 `waw_status`. Treat `WAW_RESONANCE` as a strong field phenomenon, but still
 require proof/packed gates before final `ANSWER_READY`.
+`nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
+or watched shape of the field itself. It stores the peak, route, relation,
+role mode, WAW status, phase/standing-wave/energy/boundary states, and compact
+support/anti terms. `nanda-index` merges these forms, and later
+`nanda-search` softly replays them as `resonance_memory`: accepted forms
+reinforce similar peaks and rejected forms suppress similar bad field shapes.
+This is a learned interference hint, not a standalone PASS.
 `nanda-aliases` is the explicit canonicalization diagnostic. If a JSON packet
 contains `aliases`, NANDA applies exact high-confidence variants to `subject`,
 `object`, `route`, and `group` before check/map/search/pack6m. It does not
@@ -413,9 +420,11 @@ or `{"command":"search","packet":...}`.
 `nanda-feedback` is the feedback-memory surface. It records whether a search
 peak was accepted, rejected, or kept under WATCH, together with margin, support
 ids, anti ids, and a compact memory patch. Reject feedback emits
-`negative_shortcuts`; accept feedback emits `positive_shortcuts`. `nanda-index`
-can carry both into future search, so rejected shortcuts are suppressed and
-accepted routes are constructively reinforced.
+`negative_shortcuts`; accept feedback emits `positive_shortcuts`; all decisions
+emit `resonance_memory` so the honest or dishonest field form can be recognized
+again. `nanda-index` can carry these into future search, so rejected shortcuts
+are suppressed, accepted routes are constructively reinforced, and matching
+resonance forms are softly replayed without granting automatic safety.
 `nanda-probe` compares the same search before and after negative lanes. Use it
 before claiming destructive interference helped. `nanda probe --suite` runs a
 probe regression corpus. `SHIFTED_TO_REVIEW` means the false shortcut moved,
@@ -455,7 +464,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v3.3-modular-router
+core_version: sparse-triad-v3.4-resonance-memory
 wave_dim: 1024
 ```
 

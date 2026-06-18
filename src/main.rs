@@ -35,8 +35,8 @@ pub(crate) use report::*;
 pub(crate) use search::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v3.3-modular-router";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v3.3-rust";
+const CORE_VERSION: &str = "sparse-triad-v3.4-resonance-memory";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v3.4-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;

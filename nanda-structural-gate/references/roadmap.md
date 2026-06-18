@@ -73,3 +73,16 @@ Use domains where LLMs often confuse routes:
 
 The project is useful only if it produces fewer structural mistakes than an LLM
 alone and gives a clear `WATCH`/`VETO` when evidence is insufficient.
+
+## Phase 29 - Resonance Learner
+
+Status: implemented.
+
+- `nanda-feedback` records field-shape memory for accept/reject/WATCH
+  decisions.
+- `nanda-index` merges duplicate `resonance_memory` forms and accumulates
+  observations.
+- `nanda-search` softly replays accepted forms as reinforcement and rejected
+  forms as suppression.
+- Search output reports which form was replayed and keeps the replay separate
+  from the final trust gate.

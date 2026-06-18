@@ -70,6 +70,10 @@
 - v28 proof reason codes now surface resonance blockers such as
   `WAW_RESONANCE`, `RESONANCE_FIELD_DIFFUSE`,
   `RESONANCE_FIELD_LEAKING`, and `RESONANCE_REVERSED`.
+- v29 feedback now records `resonance_memory`, a learned field-shape memory
+  for accepted/rejected/WATCH peaks. `nanda-index` merges these forms and
+  `nanda-search` softly replays them to reinforce known honest resonance forms
+  or suppress known bad field shapes without treating memory as proof.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

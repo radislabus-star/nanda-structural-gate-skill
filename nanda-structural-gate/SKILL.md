@@ -178,6 +178,11 @@ destructive locality, multiscale agreement, energy accounting, mode scan,
 temporal phase, coherence memory, and `waw_status`. Treat `WAW_RESONANCE` as a
 strong structural phenomenon, not by itself as final permission to answer; the
 packed/proof gates still decide `ANSWER_READY`.
+Inspect `resonance_memory` after search when feedback has been indexed. It is
+the v29 learned field-shape replay layer: accepted forms softly reinforce
+similar peaks, rejected forms softly suppress similar bad shapes, and WATCH
+forms are reported as observations. Treat it as evidence about which
+interference forms have been honest before, not as proof by itself.
 Use `nanda-aliases` when the packet contains explicit `aliases` and you need
 to inspect canonicalization before the gate. NANDA applies only explicit,
 high-confidence aliases; it does not guess equivalence. The alias layer
@@ -261,7 +266,10 @@ was useful. It writes an accept/reject/WATCH memory trace that can be kept next
 to the task index. Reject feedback emits `negative_shortcuts`; accept feedback
 emits `positive_shortcuts`. Include feedback JSON in `nanda-index` to suppress
 the same false shortcut later or constructively reinforce an accepted
-route/group/support shape.
+route/group/support shape. All feedback decisions also emit `resonance_memory`:
+peak, route, relation, role mode, WAW status, phase/standing/energy/boundary
+states, and support/anti terms. Index it when you want future search to
+recognize honest or dishonest interference forms.
 Use `nanda-probe` before claiming that destructive interference helped. It
 compares plain search with negative-lane search. Use `nanda probe --suite`
 before changing probe or negative-lane behavior. Treat `IMPROVED` as usable

@@ -434,6 +434,7 @@ pub(crate) fn interference_search(
         apply_negative_lanes(&mut peaks, query, &packet.negative_shortcuts);
     let constructive_interference =
         apply_positive_lanes(&mut peaks, query, &packet.positive_shortcuts);
+    let resonance_memory = apply_resonance_memory(&mut peaks, &packet.resonance_memory);
     peaks.sort_by(|a, b| {
         b["score"]
             .as_f64()
@@ -516,6 +517,7 @@ pub(crate) fn interference_search(
         "peak_decision": peak_decision,
         "destructive_interference": destructive_interference,
         "constructive_interference": constructive_interference,
+        "resonance_memory": resonance_memory,
         "source_weighting": {
             "enabled": true,
             "policy": "confidence multiplied by evidence authority: current/canon > latest/frontier > historical/archive > archive_noise"
@@ -967,10 +969,28 @@ fn coherence_memory_report(packet: &Packet, top_peak: &str) -> Value {
                 || shortcut.suppress_group == top_peak
         })
         .count();
+    let resonance_positive_hits = packet
+        .resonance_memory
+        .iter()
+        .filter(|memory| {
+            memory.decision == "accept" && (memory.peak == top_peak || memory.route == top_peak)
+        })
+        .count();
+    let resonance_negative_hits = packet
+        .resonance_memory
+        .iter()
+        .filter(|memory| {
+            memory.decision == "reject" && (memory.peak == top_peak || memory.route == top_peak)
+        })
+        .count();
+    let total_positive = positive_hits + resonance_positive_hits;
+    let total_negative = negative_hits + resonance_negative_hits;
     json!({
-        "state": if positive_hits > negative_hits { "MEMORY_REINFORCED" } else if negative_hits > 0 { "MEMORY_SUPPRESSED" } else { "MEMORY_NEUTRAL" },
+        "state": if total_positive > total_negative { "MEMORY_REINFORCED" } else if total_negative > 0 { "MEMORY_SUPPRESSED" } else { "MEMORY_NEUTRAL" },
         "positive_hits": positive_hits,
         "negative_hits": negative_hits,
+        "resonance_positive_hits": resonance_positive_hits,
+        "resonance_negative_hits": resonance_negative_hits,
         "read_as": "Coherence memory stores accepted/rejected field shapes as lane feedback, not as final answers."
     })
 }

@@ -162,7 +162,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v3.3-modular-router"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v3.4-resonance-memory"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -466,21 +466,32 @@ jq -e '.decision == "accept"' "$tmp_feedback" >/dev/null
 jq -e '.peak == "certification"' "$tmp_feedback" >/dev/null
 jq -e '.memory_patch.reinforce_peak == "certification"' "$tmp_feedback" >/dev/null
 jq -e '.positive_shortcuts[0].reinforce_peak == "certification"' "$tmp_feedback" >/dev/null
+jq -e '.resonance_memory[0].decision == "accept"' "$tmp_feedback" >/dev/null
+jq -e '.resonance_memory[0].peak == "certification"' "$tmp_feedback" >/dev/null
+jq -e '.resonance_memory[0].waw_status == "WAW_RESONANCE"' "$tmp_feedback" >/dev/null
 tmp_positive_index="$(mktemp)"
 "$indexer" "$root/examples/triad-packet.interference-search-route-trap.json" "$tmp_feedback" --input-format json --out "$tmp_positive_index" >/dev/null
 jq -e '.positive_shortcuts[0].accepted_count == 1' "$tmp_positive_index" >/dev/null
+jq -e '.resonance_memory[0].accepted_count == 1' "$tmp_positive_index" >/dev/null
 positive_search_json="$("$search" "$tmp_positive_index" --input-format json --query-file "$root/examples/triad-packet.interference-search-route-trap.json" --query-format json --top-k 3)"
 jq -e '.constructive_interference.applied == true' <<<"$positive_search_json" >/dev/null
 jq -e '.constructive_interference.reinforcements[0].reinforce_peak == "certification"' <<<"$positive_search_json" >/dev/null
+jq -e '.resonance_memory.applied == true' <<<"$positive_search_json" >/dev/null
+jq -e '.resonance_memory.applications[0].action == "reinforce"' <<<"$positive_search_json" >/dev/null
+jq -e '.resonance_memory.applications[0].peak == "certification"' <<<"$positive_search_json" >/dev/null
+jq -e '.resonant_field.coherence_memory.resonance_positive_hits == 1' <<<"$positive_search_json" >/dev/null
 jq -e '.peaks[0].positive_lane_boost > 0' <<<"$positive_search_json" >/dev/null
+jq -e '.peaks[0].resonance_memory_boost > 0' <<<"$positive_search_json" >/dev/null
 tmp_feedback2="$(mktemp)"
 tmp_positive_learned_index="$(mktemp)"
 "$feedback" "$tmp_search" --decision accept --note "route trap accepted" --out "$tmp_feedback2" >/dev/null
 "$indexer" "$root/examples/triad-packet.interference-search-route-trap.json" "$tmp_feedback" "$tmp_feedback2" --input-format json --out "$tmp_positive_learned_index" >/dev/null
 jq -e '.positive_shortcuts[0].accepted_count == 2' "$tmp_positive_learned_index" >/dev/null
+jq -e '.resonance_memory[0].accepted_count == 2' "$tmp_positive_learned_index" >/dev/null
 learned_positive_json="$("$search" "$tmp_positive_learned_index" --input-format json --query-file "$root/examples/triad-packet.interference-search-route-trap.json" --query-format json --top-k 3)"
 jq -e '.constructive_interference.reinforcements[0].effective_boost > 0.08' <<<"$learned_positive_json" >/dev/null
 jq -e '.constructive_interference.reinforcements[0].accepted_count == 2' <<<"$learned_positive_json" >/dev/null
+jq -e '.resonance_memory.applications[0].accepted_count == 2' <<<"$learned_positive_json" >/dev/null
 rm -f "$tmp_search" "$tmp_feedback" "$tmp_positive_index"
 rm -f "$tmp_feedback2" "$tmp_positive_learned_index"
 tmp_index="$(mktemp)"
@@ -527,18 +538,25 @@ jq -e '.negative_shortcuts[0].suppress_route == "customs"' "$tmp_negative_feedba
 jq -e '.negative_shortcuts[0].suppress_group == "customs-shortcut"' "$tmp_negative_feedback" >/dev/null
 jq -e '.negative_shortcuts[0].prefer_peak == "certification"' "$tmp_negative_feedback" >/dev/null
 jq -e '.negative_shortcuts[0].support_terms | length > 0' "$tmp_negative_feedback" >/dev/null
+jq -e '.resonance_memory[0].decision == "reject"' "$tmp_negative_feedback" >/dev/null
+jq -e '.resonance_memory[0].peak == "customs"' "$tmp_negative_feedback" >/dev/null
 "$indexer" "$root/examples/triad-packet.negative-shortcut-base.json" "$tmp_negative_feedback" --input-format json --out "$tmp_negative_index" >/dev/null
 indexed_negative_json="$("$search" "$tmp_negative_index" --input-format json --query-file "$root/examples/triad-packet.negative-shortcut-base.json" --query-format json --top-k 3)"
 jq -e '.peaks[0].peak == "certification"' <<<"$indexed_negative_json" >/dev/null
 jq -e '.destructive_interference.applied == true' <<<"$indexed_negative_json" >/dev/null
+jq -e '.resonance_memory.applied == true' <<<"$indexed_negative_json" >/dev/null
+jq -e '.resonance_memory.applications[] | select(.action == "suppress" and .peak == "customs")' <<<"$indexed_negative_json" >/dev/null
+jq -e '.resonant_field.coherence_memory.resonance_negative_hits == 0' <<<"$indexed_negative_json" >/dev/null
 tmp_negative_feedback2="$(mktemp)"
 tmp_negative_learned_index="$(mktemp)"
 "$feedback" "$tmp_negative_search" --decision reject --note "customs shortcut" --out "$tmp_negative_feedback2" >/dev/null
 "$indexer" "$root/examples/triad-packet.negative-shortcut-base.json" "$tmp_negative_feedback" "$tmp_negative_feedback2" --input-format json --out "$tmp_negative_learned_index" >/dev/null
 jq -e '.negative_shortcuts[0].rejected_count == 2' "$tmp_negative_learned_index" >/dev/null
+jq -e '.resonance_memory[0].rejected_count == 2' "$tmp_negative_learned_index" >/dev/null
 learned_negative_json="$("$search" "$tmp_negative_learned_index" --input-format json --query-file "$root/examples/triad-packet.negative-shortcut-base.json" --query-format json --top-k 3)"
 jq -e '.destructive_interference.suppressions[0].effective_penalty > 0.18' <<<"$learned_negative_json" >/dev/null
 jq -e '.destructive_interference.suppressions[0].rejected_count == 2' <<<"$learned_negative_json" >/dev/null
+jq -e '.resonance_memory.applications[] | select(.action == "suppress" and .rejected_count == 2)' <<<"$learned_negative_json" >/dev/null
 rm -f "$tmp_negative_search" "$tmp_negative_feedback" "$tmp_negative_index"
 rm -f "$tmp_negative_feedback2" "$tmp_negative_learned_index"
 tmp_extract="$(mktemp)"

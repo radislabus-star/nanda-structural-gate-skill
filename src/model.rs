@@ -918,10 +918,12 @@ pub(crate) fn index_cmd(args: IndexArgs) -> Result<u8> {
     let mut triads = vec![];
     let mut negative_shortcuts = vec![];
     let mut positive_shortcuts = vec![];
+    let mut resonance_memory = vec![];
     for input in &args.inputs {
-        if let Some((negative, positive)) = load_feedback_lanes(input)? {
+        if let Some((negative, positive, resonance)) = load_feedback_lanes(input)? {
             negative_shortcuts.extend(negative);
             positive_shortcuts.extend(positive);
+            resonance_memory.extend(resonance);
             continue;
         }
         let packet = load_packet_auto(
@@ -938,10 +940,12 @@ pub(crate) fn index_cmd(args: IndexArgs) -> Result<u8> {
         }
         negative_shortcuts.extend(packet.negative_shortcuts);
         positive_shortcuts.extend(packet.positive_shortcuts);
+        resonance_memory.extend(packet.resonance_memory);
     }
     let triads = dedup_triads(triads);
     let negative_shortcuts = merge_negative_shortcuts(negative_shortcuts);
     let positive_shortcuts = merge_positive_shortcuts(positive_shortcuts);
+    let resonance_memory = merge_resonance_memory(resonance_memory);
     let packet = json!({
         "task_id": args.task_id,
         "domain": args.domain,
@@ -951,6 +955,7 @@ pub(crate) fn index_cmd(args: IndexArgs) -> Result<u8> {
         "candidate_answer": "",
         "negative_shortcuts": negative_shortcuts,
         "positive_shortcuts": positive_shortcuts,
+        "resonance_memory": resonance_memory,
         "index": {
             "core_version": CORE_VERSION,
             "wave_dim": WAVE_DIM,
@@ -1055,6 +1060,7 @@ pub(crate) fn extract_packet_from_text(
         canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
+        resonance_memory: vec![],
     }
 }
 
@@ -1921,6 +1927,7 @@ pub(crate) fn packet_from_markdown(
         canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
+        resonance_memory: vec![],
     })
 }
 
@@ -2192,6 +2199,7 @@ pub(crate) fn example_packet(swapped: bool) -> Packet {
         canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
+        resonance_memory: vec![],
     }
 }
 
@@ -2302,6 +2310,7 @@ pub(crate) fn synthetic_packet(idx: usize, kind: &str) -> Packet {
         canonicalization: CanonicalizationReport::default(),
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
+        resonance_memory: vec![],
     }
 }
 
@@ -2430,6 +2439,8 @@ pub(crate) struct Packet {
     pub(crate) negative_shortcuts: Vec<NegativeShortcut>,
     #[serde(default)]
     pub(crate) positive_shortcuts: Vec<PositiveShortcut>,
+    #[serde(default)]
+    pub(crate) resonance_memory: Vec<ResonanceMemory>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -2484,6 +2495,48 @@ pub(crate) struct PositiveShortcut {
     pub(crate) support_terms: Vec<String>,
     #[serde(default)]
     pub(crate) reason: String,
+    #[serde(default)]
+    pub(crate) source_feedback: String,
+    #[serde(default = "default_one_usize")]
+    pub(crate) observations: usize,
+    #[serde(default)]
+    pub(crate) accepted_count: usize,
+    #[serde(default)]
+    pub(crate) rejected_count: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct ResonanceMemory {
+    #[serde(default)]
+    pub(crate) id: String,
+    #[serde(default)]
+    pub(crate) decision: String,
+    #[serde(default)]
+    pub(crate) peak: String,
+    #[serde(default)]
+    pub(crate) route: String,
+    #[serde(default)]
+    pub(crate) relation: String,
+    #[serde(default)]
+    pub(crate) role_mode: String,
+    #[serde(default)]
+    pub(crate) waw_status: String,
+    #[serde(default)]
+    pub(crate) field_state: String,
+    #[serde(default)]
+    pub(crate) phase_state: String,
+    #[serde(default)]
+    pub(crate) standing_state: String,
+    #[serde(default)]
+    pub(crate) energy_state: String,
+    #[serde(default)]
+    pub(crate) boundary_state: String,
+    #[serde(default)]
+    pub(crate) temporal_phase: String,
+    #[serde(default)]
+    pub(crate) support_terms: Vec<String>,
+    #[serde(default)]
+    pub(crate) anti_terms: Vec<String>,
     #[serde(default)]
     pub(crate) source_feedback: String,
     #[serde(default = "default_one_usize")]
