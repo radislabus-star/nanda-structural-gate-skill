@@ -37,8 +37,8 @@ pub(crate) use report::*;
 pub(crate) use search::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v3.5-wave-decoder";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v3.5-rust";
+const CORE_VERSION: &str = "sparse-triad-v3.6-recurrent-decoder";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v3.6-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -306,6 +306,8 @@ struct DecodeArgs {
     query_format: InputFormat,
     #[arg(long, default_value_t = 5)]
     top_k: usize,
+    #[arg(long, default_value_t = 1)]
+    steps: usize,
     #[arg(long, default_value_t = 8)]
     search_top_k: usize,
     #[arg(long, default_value_t = 256)]

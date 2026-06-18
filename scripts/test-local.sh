@@ -163,7 +163,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v3.5-wave-decoder"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v3.6-recurrent-decoder"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -463,6 +463,12 @@ jq -e '.source_search.top_peak == "certification"' <<<"$decode_json" >/dev/null
 jq -e '.patterns | length >= 3' <<<"$decode_json" >/dev/null
 jq -e '.patterns[0].decode_as == "next_structural_pattern"' <<<"$decode_json" >/dev/null
 jq -e '.patterns[0].subject_role != "" and .patterns[0].object_role != ""' <<<"$decode_json" >/dev/null
+decode_steps_json="$("$decode" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3 --steps 3)"
+jq -e '.decoder_version == "v31-recurrent-wave-decoder"' <<<"$decode_steps_json" >/dev/null
+jq -e '.recurrent.enabled == true and .recurrent.requested_steps == 3' <<<"$decode_steps_json" >/dev/null
+jq -e '.recurrent.completed_steps >= 2' <<<"$decode_steps_json" >/dev/null
+jq -e '.recurrent.steps[0].selected_pattern.decode_as == "next_structural_pattern"' <<<"$decode_steps_json" >/dev/null
+jq -e '.recurrent.steps[-1].decoder_state == "PATTERN_READY" or .recurrent.steps[-1].decoder_state == "PATTERN_SATURATED"' <<<"$decode_steps_json" >/dev/null
 serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"
 jq -e '.ok == true and .result.mode == "doctor" and .result.healthy == true' <<<"$serve_json" >/dev/null
 tmp_search="$(mktemp)"

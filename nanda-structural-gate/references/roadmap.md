@@ -97,5 +97,8 @@ Status: started.
   `subject -> relation -> object`, route, role, polarity, continuity, and
   support score.
 - This is the first LLMWave bridge: field peak -> next pattern distribution.
-- Next milestones are token/pattern encoder, recurrent wave steps, and a
-  training/eval loop for continuation quality.
+- `--steps N` runs recurrent wave decode: selected pattern -> query context ->
+  next field. The decoder stops honestly with `PATTERN_SATURATED` when no new
+  structural continuation is available.
+- Next milestones are token/pattern encoder and a training/eval loop for
+  continuation quality.

@@ -77,7 +77,10 @@
 - v30 adds `nanda decode` / `nanda-decode`, the first LLMWave bridge. It runs
   the interference field and decodes ranked `next_structural_pattern`
   candidates instead of natural-language text.
-- Core version is now `sparse-triad-v3.5-wave-decoder`.
+- v31 adds recurrent decoding through `nanda decode --steps N`: selected
+  patterns are fed back as query context and the field is re-run until the
+  requested depth or `PATTERN_SATURATED`.
+- Core version is now `sparse-triad-v3.6-recurrent-decoder`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

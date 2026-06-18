@@ -230,6 +230,7 @@ nanda-search examples/triad-packet.interference-search.json --input-format json 
 nanda-search examples/triad-packet.interference-search-noisy.json --input-format json --format text
 nanda-search examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3
 nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 5
+nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 --steps 3
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
@@ -332,7 +333,10 @@ require proof/packed gates before final `ANSWER_READY`.
 field as `nanda-search`, then decodes the top field into ranked
 `next_structural_pattern` candidates. It does not generate prose yet; it emits
 candidate `subject -> relation -> object` continuations with route, role,
-polarity, continuity, and support scores.
+polarity, continuity, and support scores. With `--steps N`, it recurrently
+feeds the selected pattern back into the query context and re-runs the field.
+`PATTERN_SATURATED` means the current field has no new structural continuation
+under the selected window.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact
@@ -471,7 +475,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v3.5-wave-decoder
+core_version: sparse-triad-v3.6-recurrent-decoder
 wave_dim: 1024
 ```
 

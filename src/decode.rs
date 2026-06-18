@@ -32,17 +32,14 @@ pub(crate) fn decode_cmd(args: DecodeArgs) -> Result<u8> {
     };
     packet.query = query_text.clone();
     let (query, query_source) = search_query_triads(&query_packet, &query_text);
-    let focus = route_balanced_focus(&memory, &query, args.route_cap, args.route_triad_cap);
-    let search = interference_search(
+    let out = recurrent_decode_report(
         &packet,
-        &focus.memory,
+        &memory,
         &query,
-        args.search_top_k.max(args.top_k),
-        &args.group_by,
         query_source,
-        focus.metadata,
+        &args,
+        args.steps.clamp(1, 16),
     );
-    let out = decode_report(&packet, &query, &search, args.top_k);
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
         OutputFormat::Text => print_decode_text(&out),
@@ -51,11 +48,98 @@ pub(crate) fn decode_cmd(args: DecodeArgs) -> Result<u8> {
     Ok(EXIT_PASS)
 }
 
-pub(crate) fn decode_report(
+pub(crate) fn recurrent_decode_report(
     packet: &Packet,
+    memory: &[Triad],
+    query: &[Triad],
+    query_source: &str,
+    args: &DecodeArgs,
+    steps: usize,
+) -> Value {
+    let mut current_query = query.to_vec();
+    let mut step_reports = vec![];
+    for step_idx in 0..steps {
+        let focus =
+            route_balanced_focus(memory, &current_query, args.route_cap, args.route_triad_cap);
+        let search = interference_search(
+            packet,
+            &focus.memory,
+            &current_query,
+            args.search_top_k.max(args.top_k),
+            &args.group_by,
+            query_source,
+            focus.metadata,
+        );
+        let mut step =
+            decode_step_report(packet, &current_query, &search, args.top_k, step_idx + 1);
+        if let Some(selected) = select_recurrent_pattern(&step["patterns"], &current_query) {
+            let next = pattern_to_query_triad(&selected, step_idx + 1);
+            if let Some(object) = step.as_object_mut() {
+                object.insert("selected_pattern".to_string(), selected);
+                object.insert("selected_query_triad".to_string(), triad_json(&next));
+            }
+            current_query.push(next);
+        } else {
+            if let Some(object) = step.as_object_mut() {
+                object.insert("decoder_state".to_string(), json!("PATTERN_SATURATED"));
+                object.insert("safe_to_generate".to_string(), json!(false));
+                object.insert("selected_pattern".to_string(), json!(null));
+                object.insert("selected_query_triad".to_string(), json!(null));
+            }
+            step_reports.push(step);
+            break;
+        }
+        step_reports.push(step);
+    }
+    let first = step_reports.first().cloned().unwrap_or_else(|| {
+        json!({
+            "decoder_state": "NO_PATTERN",
+            "safe_to_generate": false,
+            "top_pattern": "",
+            "patterns": []
+        })
+    });
+    let final_step = step_reports
+        .last()
+        .cloned()
+        .unwrap_or_else(|| first.clone());
+    json!({
+        "core_version": CORE_VERSION,
+        "wave_dim": WAVE_DIM,
+        "mode": "wave-pattern-decoder",
+        "decoder_version": if steps > 1 { "v31-recurrent-wave-decoder" } else { "v30-pattern-store-wave-decoder" },
+        "task_id": packet.task_id,
+        "domain": packet.domain,
+        "query": first["query"],
+        "source_search": first["source_search"],
+        "decoder_state": first["decoder_state"],
+        "safe_to_generate": first["safe_to_generate"],
+        "top_pattern": first["top_pattern"],
+        "patterns": first["patterns"],
+        "recurrent": {
+            "enabled": steps > 1,
+            "requested_steps": steps,
+            "completed_steps": step_reports.len(),
+            "final_decoder_state": final_step["decoder_state"],
+            "final_top_pattern": final_step["top_pattern"],
+            "final_context": current_query.iter().map(triad_json).collect::<Vec<_>>(),
+            "steps": step_reports,
+            "read_as": "Each recurrent step decodes a next structural pattern, feeds it back as query context, and re-runs the field."
+        },
+        "read_as": if steps > 1 {
+            "This is a recurrent LLMWave bridge: field peak -> next structural pattern -> updated field context."
+        } else {
+            "This is the first LLMWave bridge: it decodes the interference field into ranked next structural patterns, not natural-language text."
+        }
+    })
+}
+
+pub(crate) fn decode_step_report(
+    _packet: &Packet,
     query: &[Triad],
     search: &Value,
     top_k: usize,
+    step: usize,
 ) -> Value {
     let mut candidates = decode_candidates(search, query);
     candidates.sort_by(|a, b| {
@@ -92,12 +176,7 @@ pub(crate) fn decode_report(
         "PATTERN_REVIEW"
     };
     json!({
-        "core_version": CORE_VERSION,
-        "wave_dim": WAVE_DIM,
-        "mode": "wave-pattern-decoder",
-        "decoder_version": "v30-pattern-store-wave-decoder",
-        "task_id": packet.task_id,
-        "domain": packet.domain,
+        "step": step,
         "query": search["query"],
         "source_search": {
             "verdict": search["verdict"],
@@ -111,8 +190,7 @@ pub(crate) fn decode_report(
         "decoder_state": decoder_state,
         "safe_to_generate": decoder_state == "PATTERN_READY",
         "top_pattern": top_candidate,
-        "patterns": candidates,
-        "read_as": "This is the first LLMWave bridge: it decodes the interference field into ranked next structural patterns, not natural-language text."
+        "patterns": candidates
     })
 }
 
@@ -193,6 +271,46 @@ fn decode_candidates(search: &Value, query: &[Triad]) -> Vec<Value> {
         }
     }
     by_key.into_values().collect()
+}
+
+fn select_recurrent_pattern(patterns: &Value, current_query: &[Triad]) -> Option<Value> {
+    let items = patterns.as_array()?;
+    let current = current_query
+        .iter()
+        .map(|triad| {
+            (
+                norm(&triad.subject),
+                norm(&triad.relation),
+                norm(&triad.object),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    items
+        .iter()
+        .find(|item| {
+            let key = (
+                norm(item["subject"].as_str().unwrap_or("")),
+                norm(item["relation"].as_str().unwrap_or("")),
+                norm(item["object"].as_str().unwrap_or("")),
+            );
+            !current.contains(&key)
+        })
+        .cloned()
+}
+
+fn pattern_to_query_triad(pattern: &Value, step: usize) -> Triad {
+    Triad {
+        id: format!("qd{step}"),
+        subject: pattern["subject"].as_str().unwrap_or("").to_string(),
+        relation: pattern["relation"].as_str().unwrap_or("").to_string(),
+        object: pattern["object"].as_str().unwrap_or("").to_string(),
+        evidence: "recurrent_decode".to_string(),
+        confidence: pattern["score"].as_f64().unwrap_or(0.72).clamp(0.1, 1.0),
+        subject_role: pattern["subject_role"].as_str().unwrap_or("").to_string(),
+        object_role: pattern["object_role"].as_str().unwrap_or("").to_string(),
+        route: pattern["route"].as_str().unwrap_or("").to_string(),
+        group: "decoded-context".to_string(),
+    }
 }
 
 fn pattern_continuity(query_terms: &BTreeSet<String>, item: &Value) -> f64 {
