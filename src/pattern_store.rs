@@ -1318,15 +1318,22 @@ fn llmwave_contract_report(
     let polarity = llmwave_polarity_lens(decode);
     let cleanup_lens = llmwave_cleanup_lens(cleanup, cleanup_dictionary);
     let token = llmwave_token_lens(packet, tokens, proof, cleanup_dictionary);
+    let field = llmwave_field_report(packet, text, tokens, decode, hrr, attractor, capacity);
+    let field_snapshot = llmwave_field_snapshot(packet, text, tokens, decode, anti_wave);
+    let convex = llmwave_convex_lens(decode, &field_snapshot);
+    let concave = llmwave_concave_lens(decode);
+    let prism = llmwave_prism_lens(decode, &convex, anti_wave);
     let selected_name = llmwave_lens_name(selected);
     let selected_lens = match selected {
         LlmwaveLensKind::Pattern => pattern.clone(),
         LlmwaveLensKind::Polarity => polarity.clone(),
         LlmwaveLensKind::Cleanup => cleanup_lens.clone(),
         LlmwaveLensKind::Token => token.clone(),
+        LlmwaveLensKind::Convex => convex.clone(),
+        LlmwaveLensKind::Concave => concave.clone(),
+        LlmwaveLensKind::Prism => prism.clone(),
     };
     let selected_ready = selected_lens["ready"].as_bool().unwrap_or(false);
-    let field = llmwave_field_report(packet, text, tokens, decode, hrr, attractor, capacity);
     let hot_budget = llmwave_hot_budget_report(packet, capacity, hot_cycle);
     let baseline = llmwave_baseline_compare(tokens, decode);
     let state = if selected_ready && proof["state"].as_str() == Some("LLMWAVE_PROOF_READY") {
@@ -1345,18 +1352,23 @@ fn llmwave_contract_report(
         "selected": selected_name,
         "selected_lens": selected_lens,
         "field": field,
+        "field_snapshot": field_snapshot,
         "lenses": {
             "pattern": pattern,
             "polarity": polarity,
             "cleanup": cleanup_lens,
-            "token": token
+            "token": token,
+            "convex": convex,
+            "concave": concave,
+            "prism": prism
         },
+        "lens_taxonomy": llmwave_lens_taxonomy(),
         "baseline_compare": baseline,
         "hot_budget": hot_budget,
         "proof_state": proof["state"],
         "answer_ready": state == "LLMWAVE_LENS_READY",
         "anti_wave_state": anti_wave["state"],
-        "read_as": "v67 separates the wave field from the readout lens. A lens can expose a usable continuation only when cleanup, polarity, hot budget, and proof state agree."
+        "read_as": "v80 separates the wave field from lens optics. Convex gathers peaks, concave splits contested peaks, and prism explains peak contributions."
     })
 }
 
@@ -1366,7 +1378,21 @@ fn llmwave_lens_name(kind: &LlmwaveLensKind) -> &'static str {
         LlmwaveLensKind::Polarity => "polarity",
         LlmwaveLensKind::Cleanup => "cleanup",
         LlmwaveLensKind::Token => "token",
+        LlmwaveLensKind::Convex => "convex",
+        LlmwaveLensKind::Concave => "concave",
+        LlmwaveLensKind::Prism => "prism",
     }
+}
+
+fn llmwave_lens_taxonomy() -> Value {
+    json!({
+        "version": "v76-lens-taxonomy",
+        "active": ["pattern", "polarity", "cleanup", "token", "convex", "concave", "prism"],
+        "planned": ["role", "temporal", "energy", "anti", "microscope", "telescope"],
+        "convex": "gather weak aligned signals into a stable peak",
+        "concave": "separate a mixed or contested peak into rival branches",
+        "prism": "explain a peak by route, relation, role path, and polarity contribution"
+    })
 }
 
 fn llmwave_field_report(
@@ -1395,6 +1421,55 @@ fn llmwave_field_report(
         "capacity_state": capacity["state"],
         "estimated_crosstalk": capacity["estimated_crosstalk"],
         "read_as": "Shared LLMWave field before choosing a readout lens."
+    })
+}
+
+fn llmwave_field_snapshot(
+    packet: &Packet,
+    text: &str,
+    tokens: &[String],
+    decode: &Value,
+    anti_wave: &Value,
+) -> Value {
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let energy = patterns
+        .iter()
+        .map(|item| item["score"].as_f64().unwrap_or(0.0).max(0.0))
+        .sum::<f64>();
+    let top_score = patterns
+        .first()
+        .and_then(|item| item["score"].as_f64())
+        .unwrap_or(0.0);
+    let second_score = patterns
+        .get(1)
+        .and_then(|item| item["score"].as_f64())
+        .unwrap_or(0.0);
+    let fingerprint_source = json!({
+        "text": text,
+        "tokens": tokens,
+        "memory_triads": packet.triads.len(),
+        "continuation_memory": packet.continuation_memory.len(),
+        "top_peak": decode["source_search"]["top_peak"],
+        "top_pattern": decode["top_pattern"],
+        "top_score": round4(top_score),
+        "patterns": patterns.iter().take(8).map(pattern_label_value).collect::<Vec<_>>(),
+        "anti_wave_state": anti_wave["state"]
+    });
+    let digest = Sha256::digest(fingerprint_source.to_string().as_bytes());
+    json!({
+        "version": "v77-field-snapshot",
+        "snapshot_id": format!("{:x}", digest)[..16].to_string(),
+        "input_kind": if text.trim().is_empty() { "structural-prefix" } else { "text-prefix" },
+        "token_count": tokens.len(),
+        "pattern_count": patterns.len(),
+        "energy": round4(energy),
+        "top_score": round4(top_score),
+        "second_score": round4(second_score),
+        "margin": round4((top_score - second_score).max(0.0)),
+        "top_peak": decode["source_search"]["top_peak"],
+        "top_pattern": decode["top_pattern"],
+        "anti_wave_state": anti_wave["state"],
+        "read_as": "Field Snapshot is the cold repeatable fingerprint of the wave before lens optics read it."
     })
 }
 
@@ -1506,6 +1581,253 @@ fn llmwave_cleanup_lens(cleanup: &Value, cleanup_dictionary: &Value) -> Value {
         "anchors": anchors,
         "read_as": "Cleanup Lens maps noisy decoded peaks to known clean patterns and keeps ambiguity under WATCH."
     })
+}
+
+fn llmwave_convex_lens(decode: &Value, snapshot: &Value) -> Value {
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let mut basins: BTreeMap<String, Value> = BTreeMap::new();
+    for item in &patterns {
+        let key = item["route"]
+            .as_str()
+            .filter(|value| !value.trim().is_empty())
+            .or_else(|| item["peak"].as_str())
+            .unwrap_or("unrouted")
+            .to_string();
+        let score = item["score"].as_f64().unwrap_or(0.0).max(0.0);
+        let support_row = json!({
+            "triad": item["triad"],
+            "pattern": pattern_label_value(item),
+            "score": round4(score),
+            "relation": item["relation"],
+            "polarity": item["polarity"]
+        });
+        basins
+            .entry(key.clone())
+            .and_modify(|basin| {
+                let total = basin["total_score"].as_f64().unwrap_or(0.0) + score;
+                let count = basin["support_count"].as_u64().unwrap_or(0) + 1;
+                basin["total_score"] = json!(round4(total));
+                basin["support_count"] = json!(count);
+                if score > basin["top_score"].as_f64().unwrap_or(0.0) {
+                    basin["top_score"] = json!(round4(score));
+                    basin["top_pattern"] = json!(pattern_label_value(item));
+                }
+                if let Some(support) = basin["support"].as_array_mut() {
+                    support.push(support_row.clone());
+                    support.sort_by(|a, b| {
+                        b["score"]
+                            .as_f64()
+                            .unwrap_or(0.0)
+                            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                    support.truncate(5);
+                }
+            })
+            .or_insert_with(|| {
+                json!({
+                    "basin": key,
+                    "total_score": round4(score),
+                    "top_score": round4(score),
+                    "support_count": 1,
+                    "top_pattern": pattern_label_value(item),
+                    "support": [support_row]
+                })
+            });
+    }
+    let mut rows = basins.into_values().collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["total_score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["total_score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    for row in &mut rows {
+        let total = row["total_score"].as_f64().unwrap_or(0.0);
+        let top = row["top_score"].as_f64().unwrap_or(0.0);
+        let count = row["support_count"].as_u64().unwrap_or(1).max(1) as f64;
+        row["coherence"] = json!(round4((total / count).min(top).max(0.0)));
+        row["gather_gain"] = json!(round4((total - top).max(0.0)));
+    }
+    let top_total = rows
+        .first()
+        .and_then(|row| row["total_score"].as_f64())
+        .unwrap_or(0.0);
+    let second_total = rows
+        .get(1)
+        .and_then(|row| row["total_score"].as_f64())
+        .unwrap_or(0.0);
+    let margin = round4((top_total - second_total).max(0.0));
+    let support_count = rows
+        .first()
+        .and_then(|row| row["support_count"].as_u64())
+        .unwrap_or(0);
+    let ready = !rows.is_empty() && support_count >= 2 && margin >= 0.03;
+    rows.truncate(5);
+    json!({
+        "kind": "convex",
+        "version": "v78-convex-gathering-lens",
+        "state": if ready { "CONVEX_LENS_READY" } else if rows.is_empty() { "CONVEX_LENS_EMPTY" } else { "CONVEX_LENS_REVIEW" },
+        "ready": ready,
+        "top_basin": rows.first().map(|row| row["basin"].clone()).unwrap_or(Value::Null),
+        "top_pattern": rows.first().map(|row| row["top_pattern"].clone()).unwrap_or(Value::Null),
+        "margin": margin,
+        "basins": rows,
+        "snapshot_id": snapshot["snapshot_id"],
+        "read_as": "Convex Lens gathers aligned weak pattern waves into a route basin and reports whether one basin dominates."
+    })
+}
+
+fn llmwave_concave_lens(decode: &Value) -> Value {
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let top_score = patterns
+        .first()
+        .and_then(|item| item["score"].as_f64())
+        .unwrap_or(0.0)
+        .max(0.0);
+    let mut branches = patterns
+        .iter()
+        .take(8)
+        .map(|item| {
+            let score = item["score"].as_f64().unwrap_or(0.0).max(0.0);
+            json!({
+                "pattern": pattern_label_value(item),
+                "score": round4(score),
+                "delta_from_top": round4((top_score - score).max(0.0)),
+                "route": item["route"],
+                "group": item["group"],
+                "relation": item["relation"],
+                "polarity": item["polarity"],
+                "competing": top_score > 0.0 && score >= top_score * 0.70
+            })
+        })
+        .collect::<Vec<_>>();
+    branches.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let competing = branches
+        .iter()
+        .filter(|branch| branch["competing"].as_bool().unwrap_or(false))
+        .count();
+    let second_score = branches
+        .get(1)
+        .and_then(|branch| branch["score"].as_f64())
+        .unwrap_or(0.0);
+    let separation = round4((top_score - second_score).max(0.0));
+    let state = if branches.is_empty() {
+        "CONCAVE_LENS_EMPTY"
+    } else if competing >= 2 || separation < 0.04 {
+        "CONCAVE_LENS_SPLIT"
+    } else {
+        "CONCAVE_LENS_SINGLE"
+    };
+    json!({
+        "kind": "concave",
+        "version": "v79-concave-separation-lens",
+        "state": state,
+        "ready": !branches.is_empty(),
+        "competing_branches": competing,
+        "separation": separation,
+        "branches": branches,
+        "read_as": "Concave Lens spreads a mixed peak into rival continuations instead of forcing one answer."
+    })
+}
+
+fn llmwave_prism_lens(decode: &Value, convex: &Value, anti_wave: &Value) -> Value {
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let routes = prism_dimension(&patterns, "route");
+    let relations = prism_dimension(&patterns, "relation");
+    let polarities = prism_dimension(&patterns, "polarity");
+    let role_paths = patterns
+        .iter()
+        .map(|item| {
+            let key = format!(
+                "{}->{}",
+                item["subject_role"].as_str().unwrap_or("unknown"),
+                item["object_role"].as_str().unwrap_or("unknown")
+            );
+            let score = item["score"].as_f64().unwrap_or(0.0).max(0.0);
+            (key, score)
+        })
+        .collect::<Vec<_>>();
+    let role_paths = aggregate_prism_pairs(role_paths);
+    let top_pattern = patterns
+        .first()
+        .map(pattern_label_value)
+        .map(Value::String)
+        .unwrap_or(Value::Null);
+    let ready = !patterns.is_empty();
+    json!({
+        "kind": "prism",
+        "version": "v80-prism-explanation-lens",
+        "state": if ready { "PRISM_LENS_READY" } else { "PRISM_LENS_EMPTY" },
+        "ready": ready,
+        "top_pattern": top_pattern,
+        "dominant_basin": convex["top_basin"],
+        "contributions": {
+            "routes": routes,
+            "relations": relations,
+            "role_paths": role_paths,
+            "polarities": polarities
+        },
+        "anti_wave_state": anti_wave["state"],
+        "explain_peak": {
+            "snapshot_route": decode["source_search"]["top_peak"],
+            "field_state": decode["source_search"]["field_state"],
+            "top_score": patterns.first().map(|item| item["score"].clone()).unwrap_or(Value::Null),
+            "why_visible": "top pattern is explained by route basin, relation contribution, role path, polarity, and any anti-wave state"
+        },
+        "read_as": "Prism Lens decomposes one visible peak into the structural contributions that made it visible."
+    })
+}
+
+fn prism_dimension(patterns: &[Value], field: &str) -> Vec<Value> {
+    let pairs = patterns
+        .iter()
+        .map(|item| {
+            let key = item[field]
+                .as_str()
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or("unknown")
+                .to_string();
+            let score = item["score"].as_f64().unwrap_or(0.0).max(0.0);
+            (key, score)
+        })
+        .collect::<Vec<_>>();
+    aggregate_prism_pairs(pairs)
+}
+
+fn aggregate_prism_pairs(pairs: Vec<(String, f64)>) -> Vec<Value> {
+    let mut totals: BTreeMap<String, (f64, usize)> = BTreeMap::new();
+    for (key, score) in pairs {
+        let entry = totals.entry(key).or_insert((0.0, 0));
+        entry.0 += score;
+        entry.1 += 1;
+    }
+    let mut rows = totals
+        .into_iter()
+        .map(|(key, (score, count))| {
+            json!({
+                "key": key,
+                "score": round4(score),
+                "support_count": count
+            })
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    rows.truncate(5);
+    rows
 }
 
 #[derive(Clone, Debug)]

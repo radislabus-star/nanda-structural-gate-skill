@@ -1,6 +1,6 @@
 # LLMWave Field + Lens Contract
 
-Status: v67 implementation contract.
+Status: v80 implementation contract.
 Updated: 2026-06-19.
 
 LLMWave is not a prose generator yet. It is the next layer above the NANDA
@@ -54,6 +54,17 @@ not decide by itself which view is being read.
 
 A lens is a readout/projection over the field. The same field can be read
 through different lenses.
+
+Before a lens reads the field, LLMWave emits a repeatable `field_snapshot`:
+
+- `snapshot_id`;
+- token and pattern counts;
+- energy, top score, second score, and margin;
+- top peak and top pattern;
+- anti-wave state.
+
+The snapshot is cold metadata. It is meant for comparison, regression checks,
+and explaining how a lens changed the visible field.
 
 ### Pattern Lens
 
@@ -164,6 +175,62 @@ Trust:
 - anti-wave may suppress one false prefix+next shape without killing the token
   topic.
 
+### Convex Lens
+
+Purpose: gather aligned weak pattern waves into a route basin.
+
+Input:
+
+```text
+decoded field candidates
+```
+
+Output:
+
+```text
+top basin, gathered score, support count, gain, and supporting patterns
+```
+
+Trust:
+
+- `CONVEX_LENS_READY` means one basin dominates and has multi-pattern support;
+- `CONVEX_LENS_REVIEW` means a basin exists but the margin or support is too
+  thin;
+- the lens answers "what peak forms if aligned signals are gathered?"
+
+### Concave Lens
+
+Purpose: separate a mixed or contested peak into rival branches.
+
+Output:
+
+```text
+branch list, score separation, and competing branch count
+```
+
+Trust:
+
+- `CONCAVE_LENS_SPLIT` means multiple branches remain close enough to inspect;
+- `CONCAVE_LENS_SINGLE` means the field does not currently need spreading;
+- this lens is a review aid, not an answer permission by itself.
+
+### Prism Lens
+
+Purpose: explain one visible peak by its spectral structural contributions.
+
+Output dimensions:
+
+- route;
+- relation;
+- role path;
+- polarity;
+- anti-wave state.
+
+Trust:
+
+- `PRISM_LENS_READY` means the peak has an explanation surface;
+- it does not prove truth; it shows why the field made the peak visible.
+
 ### Future Lenses
 
 - Role Lens: subject/object/action/attribute readout.
@@ -224,6 +291,9 @@ Minimum lenses:
 - Polarity Lens;
 - Cleanup Lens;
 - Token Lens.
+- Convex Lens;
+- Concave Lens;
+- Prism Lens.
 
 Minimum baselines:
 
@@ -237,10 +307,22 @@ v67 is done when:
 
 - `nanda-llmwave --lens pattern` reports a v67 contract;
 - the contract exposes field, lens, baseline, hot budget, and proof state;
-- Pattern/Polarity/Cleanup lenses have explicit states;
+- Pattern/Polarity/Cleanup/Token/Convex/Concave/Prism lenses have explicit
+  states;
 - ambiguous or reversed readouts return WATCH, not forced PASS;
 - tests verify v67 fields on the existing LLMWave corpus;
 - no existing v60 proof behavior regresses.
+
+## v80 Optics Core
+
+v80 is done when:
+
+- `field_snapshot.version == "v77-field-snapshot"`;
+- `lens_taxonomy.version == "v76-lens-taxonomy"`;
+- `--lens convex` reports `v78-convex-gathering-lens`;
+- `--lens concave` reports `v79-concave-separation-lens`;
+- `--lens prism` reports `v80-prism-explanation-lens`;
+- local tests verify the three optics lenses on the route-trap fixture.
 
 ## Research Anchors
 

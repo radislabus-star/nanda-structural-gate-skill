@@ -262,6 +262,9 @@ nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --train
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens polarity
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "customs declaration requires" --lens token
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens convex
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens concave
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens prism
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -425,7 +428,12 @@ the v67 `llmwave_contract` Field + Lens readout. v68-v75 add Token Lens:
 token-pattern records, position-phase prefix waves, next-token resonance,
 token cleanup, shortcut-specific token anti-wave, and a token eval corpus. Use
 `--lens pattern`, `--lens polarity`, `--lens cleanup`, or `--lens token` to
-inspect the active lens. Treat
+inspect the active lens. v76-v80 add the first LLMWave optics core:
+`lens_taxonomy`, repeatable `field_snapshot`, Convex Lens for gathering aligned
+weak signals into a route basin, Concave Lens for splitting contested peaks,
+and Prism Lens for explaining route/relation/role/polarity contributions. Use
+`--lens convex`, `--lens concave`, or `--lens prism` when the question is not
+"what is the top answer?" but "how did the field form this peak?" Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.

@@ -12,6 +12,10 @@
   prefix waves with position phase, next-token resonance, token cleanup,
   shortcut-specific token anti-wave, token eval corpus, and a compact
   `nanda-serve` `llmwave_token` request.
+- v76-v80 add the first LLMWave optics core: lens taxonomy, repeatable field
+  snapshots, Convex Lens for gathering aligned weak signals into a route
+  basin, Concave Lens for splitting contested peaks, and Prism Lens for
+  explaining route/relation/role/polarity contributions.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

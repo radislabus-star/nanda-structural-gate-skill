@@ -125,6 +125,9 @@ scripts/nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --train
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens polarity
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "customs declaration requires" --lens token
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens convex
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens concave
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens prism
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
