@@ -145,6 +145,7 @@ evidence-conflict tasks do.
         ├── nanda-llmwave
         ├── nanda-llmwave-eval
         ├── nanda-demo
+        ├── nanda-cache
         ├── nanda-focus
         ├── nanda-proof
         ├── nanda-probe
@@ -237,9 +238,11 @@ nanda-budget .nanda/index.json --input-format json
 nanda-pack6m .nanda/index.json --input-format json
 nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000 --lane-iterations 1000000 --lane-sweep-iterations 100000
 nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
+nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
 nanda-focus .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --out .nanda/focus.json
 nanda-proof .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
 nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast
+nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast --cache-dir .nanda/cache
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
 nanda-search .nanda/focus.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
@@ -342,6 +345,9 @@ plus `candidate_triads`, `--query-file`, or text `--query`, selects a
 route-balanced window with `--max-triads` defaulting to the 15,000-triad hot
 proof cap, and writes a smaller JSON packet that can be passed to
 `nanda-search`, `nanda-budget`, `nanda-pack6m`, or `nanda-hgate`.
+`nanda-cache build` is the v64 reusable focus-cache builder. It stores a
+focused packet under a key derived from corpus content, query text/source, and
+focus caps. Use it before repeated large-corpus `nanda-proof --fast` queries.
 `nanda-proof` is the v27 one-shot proof pipeline. It runs corpus diagnostics,
 builds the focused packet, checks the NANDA-6M runtime contract, runs
 interference search, runs the packed bridge, and returns `ANSWER_READY`,
@@ -356,6 +362,10 @@ packed proof, but explicitly marks `raw_search_summary.skipped=true`, adds
 `RAW_SEARCH_SKIPPED`, and reports `proof_compare.state` as
 `FOCUSED_PACKED_ALIGNED` or `FOCUSED_ONLY_REVIEW` instead of pretending the
 full raw/focused compare ran.
+Use `nanda-proof --cache-dir .nanda/cache` to reuse a focused packet created by
+`nanda-cache build`; inspect `focus_cache.state`. `CACHE_HIT` means the focus
+window was reused, `CACHE_MISS` means it was rebuilt in memory, and
+`CACHE_WRITTEN` appears only when `--write-cache` is passed.
 `nanda-search` now emits `resonant_field`, the v28 physical field layer. It
 checks phase lock, standing-wave reflection, route-boundary leakage,
 destructive locality, multiscale agreement, energy conservation,

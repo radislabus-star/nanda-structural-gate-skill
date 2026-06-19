@@ -71,6 +71,8 @@ fn proof_report_from_args(args: &ProofArgs) -> Result<Value> {
         args.normalize_paths,
         args.include_focused_packet || args.focus_out.is_some(),
         args.fast,
+        args.cache_dir.as_ref(),
+        args.write_cache,
     )
 }
 
@@ -92,6 +94,8 @@ fn run_proof_once(
     normalize_paths: bool,
     include_focused_packet: bool,
     fast: bool,
+    cache_dir: Option<&PathBuf>,
+    write_cache: bool,
 ) -> Result<Value> {
     let mut packet = load_packet_auto(
         input,
@@ -126,15 +130,18 @@ fn run_proof_once(
     let memory = normalize_ids(packet.triads.clone(), "m");
     let (query, query_source) = search_query_triads(&query_packet, &query_text);
     let corpus = corpus_diagnostics(&memory, &query, &packet.query, route_cap);
-    let focus_build = focus::build_focused_packet(
+    let (focus_build, cache_report) = load_or_build_focus(
         &packet,
         &memory,
         &query,
+        &query_text,
         query_source,
         max_triads,
         route_cap,
         route_triad_cap,
-    );
+        cache_dir,
+        write_cache,
+    )?;
     let focused_source = normalize_ids(focus_build.packet.triads.clone(), "m");
     let focused_query = normalize_ids(focus_build.packet.candidate_triads.clone(), "q");
     let budget = pack6m::budget_report(&focus_build.packet, &focused_source, &focused_query);
@@ -172,6 +179,7 @@ fn run_proof_once(
         search,
         include_focused_packet,
         fast,
+        cache_report,
     ))
 }
 
@@ -218,6 +226,8 @@ pub(crate) fn proof_suite_cmd(args: &ProofArgs, suite_path: &Path) -> Result<u8>
             args.normalize_paths,
             false,
             args.fast,
+            None,
+            false,
         )?;
         let actual_codes = value_string_array(&result["reason_codes"]);
         let state_ok = case.expected_proof_state.is_empty()
@@ -296,6 +306,83 @@ fn value_string_array(value: &Value) -> Vec<String> {
 }
 
 #[allow(clippy::too_many_arguments)]
+fn load_or_build_focus(
+    packet: &Packet,
+    memory: &[Triad],
+    query: &[Triad],
+    query_text: &str,
+    query_source: &str,
+    max_triads: usize,
+    route_cap: usize,
+    route_triad_cap: usize,
+    cache_dir: Option<&PathBuf>,
+    write_cache: bool,
+) -> Result<(focus::FocusBuild, Value)> {
+    let Some(cache_dir) = cache_dir else {
+        let build = focus::build_focused_packet(
+            packet,
+            memory,
+            query,
+            query_source,
+            max_triads,
+            route_cap,
+            route_triad_cap,
+        );
+        return Ok((
+            build,
+            json!({
+                "enabled": false,
+                "state": "CACHE_DISABLED"
+            }),
+        ));
+    };
+    let record = focus_cache::cache_record(
+        cache_dir,
+        packet,
+        query_text,
+        query_source,
+        max_triads,
+        route_cap,
+        route_triad_cap,
+    )?;
+    if let Some(build) = focus_cache::load_focus_cache(&record)? {
+        return Ok((
+            build,
+            json!({
+                "enabled": true,
+                "state": "CACHE_HIT",
+                "key": record.key,
+                "packet_path": record.packet_path.display().to_string(),
+                "manifest_path": record.manifest_path.display().to_string()
+            }),
+        ));
+    }
+    let build = focus::build_focused_packet(
+        packet,
+        memory,
+        query,
+        query_source,
+        max_triads,
+        route_cap,
+        route_triad_cap,
+    );
+    let mut report = json!({
+        "enabled": true,
+        "state": "CACHE_MISS",
+        "key": record.key,
+        "packet_path": record.packet_path.display().to_string(),
+        "manifest_path": record.manifest_path.display().to_string(),
+        "write_cache": write_cache
+    });
+    if write_cache {
+        report["write"] =
+            focus_cache::write_focus_cache(&record, &build, "nanda-proof --write-cache")?;
+        report["state"] = json!("CACHE_WRITTEN");
+    }
+    Ok((build, report))
+}
+
+#[allow(clippy::too_many_arguments)]
 fn proof_report(
     packet: &Packet,
     focused_packet: &Packet,
@@ -307,6 +394,7 @@ fn proof_report(
     search: Value,
     include_focused_packet: bool,
     fast: bool,
+    cache_report: Value,
 ) -> Value {
     let runtime_ready = focus["runtime_contract"]["ready"]
         .as_bool()
@@ -370,6 +458,7 @@ fn proof_report(
         "field_state": field_state,
         "peak_margin": search["peak_margin"],
         "runtime_ready": runtime_ready,
+        "focus_cache": cache_report,
         "runtime_contract": {
             "focus": focus["runtime_contract"].clone(),
             "budget": budget["runtime_focus"].clone(),

@@ -27,6 +27,7 @@ pattern_bank="$root/nanda-structural-gate/scripts/nanda-pattern-bank"
 llmwave="$root/nanda-structural-gate/scripts/nanda-llmwave"
 llmwave_eval="$root/nanda-structural-gate/scripts/nanda-llmwave-eval"
 demo="$root/nanda-structural-gate/scripts/nanda-demo"
+cache="$root/nanda-structural-gate/scripts/nanda-cache"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
 proof="$root/nanda-structural-gate/scripts/nanda-proof"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
@@ -288,6 +289,12 @@ jq -e '.runtime_contract.focus.state == "PACKED_RUNTIME_READY"' <<<"$proof_json"
 jq empty "$tmp_proof_report"
 jq empty "$tmp_proof_focus"
 rm -f "$tmp_proof_report" "$tmp_proof_focus"
+tmp_cache="$(mktemp -d)"
+cache_build_json="$("$cache" build "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --query "lower operator debt route" --out-dir "$tmp_cache")"
+jq -e '.mode == "focus-cache-build" and .version == "v64-focus-cache" and .focused_memory_size > 0' <<<"$cache_build_json" >/dev/null
+cache_proof_json="$("$proof" "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --query "lower operator debt route" --fast --cache-dir "$tmp_cache")"
+jq -e '.proof_mode == "fast-focused" and .focus_cache.state == "CACHE_HIT" and (.reason_codes | index("RAW_SEARCH_SKIPPED"))' <<<"$cache_proof_json" >/dev/null
+rm -rf "$tmp_cache"
 proof_suite_json="$("$proof" --suite "$root/examples/proof-corpus.json" --input-format json)"
 jq -e '.mode == "proof-suite"' <<<"$proof_suite_json" >/dev/null
 jq -e '.proof_version == "v27-proof-reason-suite"' <<<"$proof_suite_json" >/dev/null

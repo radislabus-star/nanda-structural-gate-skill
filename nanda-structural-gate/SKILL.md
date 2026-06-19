@@ -101,9 +101,11 @@ scripts/nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-fo
 scripts/nanda-budget .nanda/index.json --input-format json
 scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
+scripts/nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
 scripts/nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
 scripts/nanda-proof .nanda/index.json --input-format json --query-file query.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
 scripts/nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast
+scripts/nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast --cache-dir .nanda/cache
 scripts/nanda-proof --suite examples/proof-corpus.json --input-format json
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
@@ -178,6 +180,11 @@ packet before retrieval or hot-core planning. It keeps the selected memory
 window under the NANDA-6M 15,000-triad proof cap by default, preserves the
 query as `candidate_triads`, and writes a packet that can go into
 `nanda-search`, `nanda-budget`, `nanda-pack6m`, or `nanda-hgate`.
+Use `nanda-cache build` before repeated large-corpus proof queries. It stores a
+focused packet keyed by corpus content, query text/source, and focus caps.
+Then run `nanda-proof --fast --cache-dir .nanda/cache`; inspect
+`focus_cache.state`. Treat `CACHE_HIT` as reused focus, `CACHE_MISS` as rebuilt
+focus, and `CACHE_WRITTEN` as an explicit `--write-cache` update.
 Use `nanda-proof` when the agent needs the whole chain in one report:
 dataset doctor, focused packet, NANDA-6M runtime contract, interference search,
 packed peak, and repair instructions. Treat `ANSWER_READY` as usable, `WATCH`

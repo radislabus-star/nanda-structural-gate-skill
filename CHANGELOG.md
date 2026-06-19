@@ -4,6 +4,10 @@
 
 ### Changed
 
+- v64 adds a reusable focused-packet cache: `nanda-cache build` writes a
+  query/corpus/cap keyed focus packet, and `nanda-proof --cache-dir` reports
+  `CACHE_HIT`, `CACHE_MISS`, or `CACHE_WRITTEN` while keeping proof semantics
+  explicit.
 - v63 adds `nanda-proof --fast`, an explicit large-corpus focused proof mode.
   It skips full raw search only when requested, reports
   `raw_search_summary.skipped=true`, adds `RAW_SEARCH_SKIPPED`, and keeps

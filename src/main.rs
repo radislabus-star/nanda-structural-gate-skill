@@ -17,6 +17,7 @@ mod encode;
 mod eval;
 mod feedback;
 mod focus;
+mod focus_cache;
 mod io;
 mod map_gate;
 mod model;
@@ -86,6 +87,10 @@ enum Command {
     Llmwave(LlmwaveArgs),
     LlmwaveEval(LlmwaveEvalArgs),
     Demo(DemoArgs),
+    Cache {
+        #[command(subcommand)]
+        command: CacheCommand,
+    },
     Focus(FocusArgs),
     Proof(ProofArgs),
     Probe(ProbeArgs),
@@ -639,6 +644,44 @@ struct ProofArgs {
     include_focused_packet: bool,
     #[arg(long)]
     fast: bool,
+    #[arg(long)]
+    cache_dir: Option<PathBuf>,
+    #[arg(long)]
+    write_cache: bool,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Subcommand)]
+enum CacheCommand {
+    Build(CacheBuildArgs),
+}
+
+#[derive(Parser)]
+struct CacheBuildArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "cache")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long)]
+    query_file: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "auto")]
+    query_format: InputFormat,
+    #[arg(long, default_value_t = nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY)]
+    max_triads: usize,
+    #[arg(long, default_value_t = 256)]
+    route_cap: usize,
+    #[arg(long, default_value_t = 64)]
+    route_triad_cap: usize,
+    #[arg(long, default_value = ".nanda/cache")]
+    out_dir: PathBuf,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]
@@ -918,6 +961,7 @@ fn run() -> Result<u8> {
         Command::Llmwave(args) => llmwave_cmd(args),
         Command::LlmwaveEval(args) => llmwave_eval_cmd(args),
         Command::Demo(args) => demo_cmd(args),
+        Command::Cache { command } => focus_cache::cache_cmd(command),
         Command::Focus(args) => focus::focus_cmd(args),
         Command::Proof(args) => proof::proof_cmd(args),
         Command::Probe(args) => probe_cmd(args),
