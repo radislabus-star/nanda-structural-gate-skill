@@ -124,6 +124,8 @@
 - v61 adds `nanda-demo`, a human/agent-facing weak-spot surface over the v60
   proof packet, plus `examples/demo-corpus.json` with ready, anti-wave, and
   review cases.
+- The skill and README now make `nanda-demo` the required weak-spot check
+  before using an LLMWave peak as support for a relation-heavy answer.
 - Core version is now `sparse-triad-v6.0-llmwave-proof`.
 - Cargo package version is now `6.0.0`.
 - Added an explicit heavy 16k finance fixture generator and

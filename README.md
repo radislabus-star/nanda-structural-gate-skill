@@ -394,6 +394,19 @@ v58 hot-cycle readiness, v59 proof summary, and the v60 public demo packet.
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 `examples/demo-corpus.json` keeps three demo modes honest: proof-ready,
 anti-wave-visible, and review-only.
+
+Recommended agent rule:
+
+```text
+relation-heavy task
+  -> extract/build triad packet
+  -> nanda-check / nanda-search / nanda-proof as needed
+  -> if using an LLMWave peak as support, run nanda-demo
+  -> answer only when state=PUBLIC_DEMO_READY and weak_spots=[]
+```
+
+If `nanda-demo` returns `PUBLIC_DEMO_REVIEW` or any weak spot, treat the peak
+as a repair hint rather than an answer route.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact

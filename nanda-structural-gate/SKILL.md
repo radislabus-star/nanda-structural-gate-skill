@@ -293,6 +293,12 @@ state, input, top pattern, proof state, compact signals, weak spots, safe
 claim, and boundary. Use `nanda-demo --suite examples/demo-corpus.json` after
 changing demo/proof behavior; it must keep ready, anti-wave, and review cases
 legible.
+Agent rule: if you intend to use an LLMWave peak as support for a relation-heavy
+answer, run or inspect `nanda-demo` first. Treat `PUBLIC_DEMO_READY` with empty
+`weak_spots` as usable structural support. Treat `PUBLIC_DEMO_REVIEW` or any
+non-empty `weak_spots` as unresolved: split, focus, repair the packet, or say
+WATCH instead of giving a confident answer. Do not cite the demo as proof of
+truth; it is a weak-spot dashboard over structural wave retrieval.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each
