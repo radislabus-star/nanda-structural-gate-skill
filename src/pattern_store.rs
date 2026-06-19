@@ -164,6 +164,21 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
         &packed_hot_cycle,
         &decode,
     );
+    let llmwave_contract = llmwave_contract_report(
+        &packet,
+        &text,
+        &tokens,
+        &decode,
+        &hrr_binding,
+        &cleanup_memory,
+        &cleanup_dictionary,
+        &attractor_trace,
+        &superposition_capacity,
+        &anti_wave_audit,
+        &packed_hot_cycle,
+        &proof_summary,
+        &args.lens,
+    );
     let public_demo = llmwave_public_demo_report(&proof_summary, &decode, &text);
     let feedback_preview = if args.train {
         decode_feedback_preview(&decode, &args.decision, &args.note)
@@ -191,11 +206,12 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
         "capacity_curve": capacity_curve,
         "packed_hot_cycle": packed_hot_cycle,
         "proof_summary": proof_summary,
+        "llmwave_contract": llmwave_contract,
         "public_demo": public_demo,
         "pattern_store": compact_pattern_store_report(&packet, 3),
         "decode": decode,
         "feedback_preview": feedback_preview,
-        "read_as": "LLMWave v60 loop: raw text -> wave write/query -> HRR binding -> structural decode -> cleanup/energy/capacity/anti-wave audit -> packed readiness -> proof summary -> demo card."
+        "read_as": "LLMWave v67 loop: raw text -> field excitation -> selected lens -> structural decode -> cleanup/energy/capacity/anti-wave audit -> packed readiness -> proof summary -> demo card."
     });
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
@@ -421,7 +437,8 @@ fn run_llmwave_eval_case(
         "capacity": case.expected_capacity_state.is_empty() || report["superposition_capacity"]["state"].as_str() == Some(case.expected_capacity_state.as_str()),
         "anti_wave": case.expected_anti_wave_state.is_empty() || report["anti_wave_audit"]["state"].as_str() == Some(case.expected_anti_wave_state.as_str()),
         "proof": case.expected_proof_state.is_empty() || report["proof_summary"]["state"].as_str() == Some(case.expected_proof_state.as_str()),
-        "demo": case.expected_demo_state.is_empty() || report["public_demo"]["state"].as_str() == Some(case.expected_demo_state.as_str())
+        "demo": case.expected_demo_state.is_empty() || report["public_demo"]["state"].as_str() == Some(case.expected_demo_state.as_str()),
+        "llmwave_contract": report["llmwave_contract"]["state"].as_str() == Some("LLMWAVE_LENS_READY")
     });
     let ok = checks
         .as_object()
@@ -445,6 +462,7 @@ fn run_llmwave_eval_case(
             "capacity_curve": report["capacity_curve"]["state"],
             "hot_cycle": report["packed_hot_cycle"]["state"],
             "proof": report["proof_summary"]["state"],
+            "llmwave_contract": report["llmwave_contract"]["state"],
             "demo": report["public_demo"]["state"]
         },
         "checks": checks,
@@ -514,6 +532,21 @@ fn llmwave_report_from_packet(
         &packed_hot_cycle,
         &decode,
     );
+    let llmwave_contract = llmwave_contract_report(
+        &packet,
+        text,
+        &tokens,
+        &decode,
+        &hrr_binding,
+        &cleanup_memory,
+        &cleanup_dictionary,
+        &attractor_trace,
+        &superposition_capacity,
+        &anti_wave_audit,
+        &packed_hot_cycle,
+        &proof_summary,
+        &LlmwaveLensKind::Pattern,
+    );
     let public_demo = llmwave_public_demo_report(&proof_summary, &decode, text);
     json!({
         "core_version": CORE_VERSION,
@@ -530,6 +563,7 @@ fn llmwave_report_from_packet(
         "capacity_curve": capacity_curve,
         "packed_hot_cycle": packed_hot_cycle,
         "proof_summary": proof_summary,
+        "llmwave_contract": llmwave_contract,
         "public_demo": public_demo,
         "decode": decode
     })
@@ -1218,6 +1252,268 @@ fn llmwave_public_demo_report(proof: &Value, decode: &Value, text: &str) -> Valu
         "safe_claim": "This is structural wave retrieval/proof, not standalone natural-language understanding.",
         "read_as": "v60 is the public demo surface: one compact packet that can be shown without hiding proof state."
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn llmwave_contract_report(
+    packet: &Packet,
+    text: &str,
+    tokens: &[String],
+    decode: &Value,
+    hrr: &Value,
+    cleanup: &Value,
+    cleanup_dictionary: &Value,
+    attractor: &Value,
+    capacity: &Value,
+    anti_wave: &Value,
+    hot_cycle: &Value,
+    proof: &Value,
+    selected: &LlmwaveLensKind,
+) -> Value {
+    let pattern = llmwave_pattern_lens(decode, proof, cleanup_dictionary);
+    let polarity = llmwave_polarity_lens(decode);
+    let cleanup_lens = llmwave_cleanup_lens(cleanup, cleanup_dictionary);
+    let selected_name = llmwave_lens_name(selected);
+    let selected_lens = match selected {
+        LlmwaveLensKind::Pattern => pattern.clone(),
+        LlmwaveLensKind::Polarity => polarity.clone(),
+        LlmwaveLensKind::Cleanup => cleanup_lens.clone(),
+    };
+    let selected_ready = selected_lens["ready"].as_bool().unwrap_or(false);
+    let field = llmwave_field_report(packet, text, tokens, decode, hrr, attractor, capacity);
+    let hot_budget = llmwave_hot_budget_report(packet, capacity, hot_cycle);
+    let baseline = llmwave_baseline_compare(tokens, decode);
+    let state = if selected_ready && proof["state"].as_str() == Some("LLMWAVE_PROOF_READY") {
+        "LLMWAVE_LENS_READY"
+    } else if selected_lens["state"]
+        .as_str()
+        .is_some_and(|state| state.contains("REVERSED") || state.contains("AMBIGUOUS"))
+    {
+        "LLMWAVE_LENS_WATCH"
+    } else {
+        "LLMWAVE_LENS_REVIEW"
+    };
+    json!({
+        "version": "v67-field-lens-contract",
+        "state": state,
+        "selected": selected_name,
+        "selected_lens": selected_lens,
+        "field": field,
+        "lenses": {
+            "pattern": pattern,
+            "polarity": polarity,
+            "cleanup": cleanup_lens
+        },
+        "baseline_compare": baseline,
+        "hot_budget": hot_budget,
+        "proof_state": proof["state"],
+        "answer_ready": state == "LLMWAVE_LENS_READY",
+        "anti_wave_state": anti_wave["state"],
+        "read_as": "v67 separates the wave field from the readout lens. A lens can expose a usable continuation only when cleanup, polarity, hot budget, and proof state agree."
+    })
+}
+
+fn llmwave_lens_name(kind: &LlmwaveLensKind) -> &'static str {
+    match kind {
+        LlmwaveLensKind::Pattern => "pattern",
+        LlmwaveLensKind::Polarity => "polarity",
+        LlmwaveLensKind::Cleanup => "cleanup",
+    }
+}
+
+fn llmwave_field_report(
+    packet: &Packet,
+    text: &str,
+    tokens: &[String],
+    decode: &Value,
+    hrr: &Value,
+    attractor: &Value,
+    capacity: &Value,
+) -> Value {
+    json!({
+        "input_kind": if text.trim().is_empty() { "structural-prefix" } else { "text-prefix" },
+        "tokens": tokens.len(),
+        "memory_triads": packet.triads.len(),
+        "continuation_memory": packet.continuation_memory.len(),
+        "query_triads": decode["recurrent"]["steps"]
+            .as_array()
+            .and_then(|steps| steps.first())
+            .and_then(|step| step["query"].as_array())
+            .map_or(0, Vec::len),
+        "field_state": decode["source_search"]["field_state"],
+        "top_peak": decode["source_search"]["top_peak"],
+        "hrr_state": hrr["state"],
+        "attractor_state": attractor["state"],
+        "capacity_state": capacity["state"],
+        "estimated_crosstalk": capacity["estimated_crosstalk"],
+        "read_as": "Shared LLMWave field before choosing a readout lens."
+    })
+}
+
+fn llmwave_pattern_lens(decode: &Value, proof: &Value, cleanup_dictionary: &Value) -> Value {
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let top_pattern = decode["top_pattern"].as_str().unwrap_or("");
+    let cleanup_ready = matches!(
+        cleanup_dictionary["state"].as_str().unwrap_or(""),
+        "CLEANUP_DICTIONARY_READY" | "CLEANUP_DICTIONARY_EMPTY"
+    );
+    let proof_ready = proof["state"].as_str() == Some("LLMWAVE_PROOF_READY");
+    let ready = !top_pattern.is_empty() && cleanup_ready && proof_ready;
+    let candidates = patterns
+        .iter()
+        .take(5)
+        .map(|item| {
+            json!({
+                "pattern": pattern_label_value(item),
+                "score": item["score"],
+                "route": item["route"],
+                "polarity": item["polarity"],
+                "continuity": item["continuity"],
+                "peak": item["peak"],
+                "safe_to_use": ready && item["polarity"].as_str().unwrap_or("") != "REVERSED"
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "kind": "pattern",
+        "state": if ready { "PATTERN_LENS_READY" } else if top_pattern.is_empty() { "PATTERN_LENS_EMPTY" } else { "PATTERN_LENS_REVIEW" },
+        "ready": ready,
+        "top_pattern": top_pattern,
+        "candidates": candidates,
+        "cleanup_state": cleanup_dictionary["state"],
+        "proof_state": proof["state"],
+        "read_as": "Pattern Lens reads the field as ranked next structural continuations."
+    })
+}
+
+fn llmwave_polarity_lens(decode: &Value) -> Value {
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let mut directional = 0usize;
+    let mut reversed = 0usize;
+    let mut unknown = 0usize;
+    for item in &patterns {
+        let polarity = item["polarity"].as_str().unwrap_or("");
+        if polarity.contains("REVERSED") {
+            reversed += 1;
+        } else if polarity.contains("->") || polarity == "ALIGNED" {
+            directional += 1;
+        } else {
+            unknown += 1;
+        }
+    }
+    let top_polarity = patterns
+        .first()
+        .and_then(|item| item["polarity"].as_str())
+        .unwrap_or("");
+    let state = if top_polarity.contains("REVERSED") {
+        "POLARITY_LENS_REVERSED"
+    } else if top_polarity.contains("->") || top_polarity == "ALIGNED" {
+        "POLARITY_LENS_DIRECTIONAL"
+    } else if top_polarity.is_empty() {
+        "POLARITY_LENS_EMPTY"
+    } else {
+        "POLARITY_LENS_AMBIGUOUS"
+    };
+    json!({
+        "kind": "polarity",
+        "state": state,
+        "ready": state == "POLARITY_LENS_DIRECTIONAL",
+        "top_polarity": top_polarity,
+        "directional": directional,
+        "reversed": reversed,
+        "unknown": unknown,
+        "stop_signal": state == "POLARITY_LENS_REVERSED",
+        "read_as": "Polarity Lens reads direction, role reversal, and negation risk before using a continuation."
+    })
+}
+
+fn llmwave_cleanup_lens(cleanup: &Value, cleanup_dictionary: &Value) -> Value {
+    let items = cleanup["items"].as_array().cloned().unwrap_or_default();
+    let state = if cleanup_dictionary["ambiguous"].as_u64().unwrap_or(0) > 0 {
+        "CLEANUP_LENS_AMBIGUOUS"
+    } else if cleanup_dictionary["exact"].as_u64().unwrap_or(0) > 0 {
+        "CLEANUP_LENS_EXACT"
+    } else if cleanup_dictionary["near"].as_u64().unwrap_or(0) > 0 {
+        "CLEANUP_LENS_NEAR"
+    } else {
+        "CLEANUP_LENS_EMPTY"
+    };
+    let anchors = items
+        .iter()
+        .take(5)
+        .map(|item| {
+            json!({
+                "raw_pattern": item["raw_pattern"],
+                "nearest_pattern": item["nearest_pattern"],
+                "score": item["score"],
+                "state": item["state"]
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "kind": "cleanup",
+        "state": state,
+        "ready": matches!(state, "CLEANUP_LENS_EXACT" | "CLEANUP_LENS_NEAR"),
+        "dictionary_state": cleanup_dictionary["state"],
+        "anchors": anchors,
+        "read_as": "Cleanup Lens maps noisy decoded peaks to known clean patterns and keeps ambiguity under WATCH."
+    })
+}
+
+fn llmwave_hot_budget_report(packet: &Packet, capacity: &Value, hot_cycle: &Value) -> Value {
+    let pattern_bytes =
+        (packet.triads.len() + packet.continuation_memory.len()) * PACKED_PATTERN_BYTES;
+    json!({
+        "hot_budget_bytes": nanda_6m::BUDGET_BYTES,
+        "pattern_arena_bytes": PATTERN_STORE_ARENA_BYTES,
+        "pattern_record_bytes": PACKED_PATTERN_BYTES,
+        "estimated_pattern_bytes": pattern_bytes,
+        "active_patterns": capacity["active_patterns"],
+        "fits_pattern_arena": pattern_bytes <= PATTERN_STORE_ARENA_BYTES,
+        "hot_cycle_state": hot_cycle["state"],
+        "rule": "JSON/text stay cold; packed records, lanes, centroids, and lens readout stay hot."
+    })
+}
+
+fn llmwave_baseline_compare(tokens: &[String], decode: &Value) -> Value {
+    let top_pattern = decode["top_pattern"].as_str().unwrap_or("");
+    let lexical = lexical_overlap_with_pattern(tokens, top_pattern);
+    let graph_hint = decode["patterns"]
+        .as_array()
+        .and_then(|items| items.first())
+        .and_then(|item| item["continuity"].as_f64())
+        .unwrap_or(0.0);
+    let field_score = decode["patterns"]
+        .as_array()
+        .and_then(|items| items.first())
+        .and_then(|item| item["score"].as_f64())
+        .unwrap_or(0.0);
+    json!({
+        "version": "v67-lens-baseline-compare",
+        "lexical_overlap": round4(lexical),
+        "graph_next_edge_hint": round4(graph_hint),
+        "field_top_score": round4(field_score),
+        "field_beats_lexical_hint": field_score > lexical + 0.05,
+        "baselines": ["token-overlap", "graph-continuity", "current-decode"],
+        "read_as": "v67 keeps cheap baselines visible before calling a lens readout interesting."
+    })
+}
+
+fn lexical_overlap_with_pattern(tokens: &[String], pattern: &str) -> f64 {
+    let token_set = tokens
+        .iter()
+        .map(|token| norm(token))
+        .filter(|token| token.len() >= 2)
+        .collect::<BTreeSet<_>>();
+    let pattern_terms = norm(pattern)
+        .split(|ch: char| !ch.is_ascii_alphanumeric())
+        .filter(|term| term.len() >= 2)
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    if token_set.is_empty() || pattern_terms.is_empty() {
+        return 0.0;
+    }
+    token_set.intersection(&pattern_terms).count() as f64 / pattern_terms.len() as f64
 }
 
 #[derive(Clone, Debug, Deserialize)]

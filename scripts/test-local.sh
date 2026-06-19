@@ -556,9 +556,13 @@ jq -e '.capacity_curve.version == "v57-superposition-capacity-baseline" and .cap
 jq -e '.packed_hot_cycle.version == "v58-packed-hot-cycle-bridge" and .packed_hot_cycle.state == "LLMWAVE_HOT_READY"' <<<"$llmwave_json" >/dev/null
 jq -e '.proof_summary.version == "v59-llmwave-proof-command-contract" and .proof_summary.state == "LLMWAVE_PROOF_READY"' <<<"$llmwave_json" >/dev/null
 jq -e '.public_demo.version == "v60-public-demo-packet" and .public_demo.state == "PUBLIC_DEMO_READY"' <<<"$llmwave_json" >/dev/null
+jq -e '.llmwave_contract.version == "v67-field-lens-contract" and .llmwave_contract.state == "LLMWAVE_LENS_READY" and .llmwave_contract.selected == "pattern" and .llmwave_contract.lenses.pattern.state == "PATTERN_LENS_READY" and .llmwave_contract.lenses.cleanup.state == "CLEANUP_LENS_EXACT"' <<<"$llmwave_json" >/dev/null
 jq -e '.decode.top_pattern == "declaration -> requires -> protocols" and .feedback_preview.enabled == true' <<<"$llmwave_json" >/dev/null
+llmwave_polarity_json="$("$llmwave" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --lens polarity)"
+jq -e '.llmwave_contract.selected == "polarity" and .llmwave_contract.selected_lens.state == "POLARITY_LENS_DIRECTIONAL" and .llmwave_contract.state == "LLMWAVE_LENS_READY"' <<<"$llmwave_polarity_json" >/dev/null
 llmwave_eval_json="$("$llmwave_eval" --suite "$root/examples/llmwave-corpus.json")"
 jq -e '.mode == "llmwave-eval-suite" and .version == "v53-llmwave-proof-suite" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$llmwave_eval_json" >/dev/null
+jq -e '.cases[].states.llmwave_contract == "LLMWAVE_LENS_READY"' <<<"$llmwave_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "route-trap-reject-applies-anti-wave" and .states.anti_wave == "ANTI_WAVE_APPLIED")' <<<"$llmwave_eval_json" >/dev/null
 demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"
 jq -e '.mode == "llmwave-demo" and .version == "v62-demo-raw-text-adapter" and .state == "PUBLIC_DEMO_READY" and (.weak_spots | length) == 0' <<<"$demo_json" >/dev/null

@@ -2409,6 +2409,13 @@ pub(crate) enum PatternBankMode {
     Apply,
 }
 
+#[derive(Clone, ValueEnum)]
+pub(crate) enum LlmwaveLensKind {
+    Pattern,
+    Polarity,
+    Cleanup,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Triad {
     #[serde(default)]

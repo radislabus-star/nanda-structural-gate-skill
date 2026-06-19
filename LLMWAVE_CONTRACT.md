@@ -1,0 +1,216 @@
+# LLMWave Field + Lens Contract
+
+Status: v67 implementation contract.
+Updated: 2026-06-19.
+
+LLMWave is not a prose generator yet. It is the next layer above the NANDA
+interference field: a compact wave/VSA memory that stores structural patterns
+in superposition and reads them through explicit lenses.
+
+```text
+prefix / context
+  -> field excitation
+  -> selected lens
+  -> stable candidate peaks
+  -> cleanup / polarity / energy checks
+  -> top-k continuation candidates
+  -> proof state
+```
+
+## Definition
+
+LLMWave is:
+
+- a field over encoded text and structural patterns;
+- a packed pattern memory with cleanup and replay;
+- a lens readout layer over the same field;
+- a proof contract that says whether the readout is usable.
+
+LLMWave is not:
+
+- a JSON gate renamed as a language model;
+- a table of next n-grams;
+- a RAG wrapper;
+- a natural-language claim without readout and proof state.
+
+## Field
+
+The field owns the shared state:
+
+- encoded query/prefix triads;
+- memory/source triads;
+- decoded structural continuations;
+- compact pattern store;
+- HRR binding probes;
+- attractor/energy trace;
+- superposition/capacity state;
+- anti-wave and cleanup reports;
+- hot-cycle readiness.
+
+The field may contain many possible continuations in superposition. It does
+not decide by itself which view is being read.
+
+## Lenses
+
+A lens is a readout/projection over the field. The same field can be read
+through different lenses.
+
+### Pattern Lens
+
+Purpose: choose the next structural pattern.
+
+Input:
+
+```text
+text prefix or structural query
+```
+
+Output:
+
+```text
+top-k subject -> relation -> object continuations
+```
+
+Trust:
+
+- requires a decoded top pattern;
+- requires cleanup not to be ambiguous;
+- requires the proof summary to be ready or explicitly WATCH.
+
+### Polarity Lens
+
+Purpose: read direction and negation.
+
+It must distinguish:
+
+```text
+bank -> gives credit -> company
+company -> gives credit -> bank
+allowed
+not allowed
+```
+
+Output states:
+
+```text
+ALIGNED
+DIRECTIONAL
+REVERSED
+NEGATED
+ROLE_SWAPPED
+DIRECTION_AMBIGUOUS
+```
+
+`DIRECTIONAL` covers role paths such as
+`document->requires->evidence`.
+
+Trust:
+
+- `REVERSED`, `NEGATED`, or `ROLE_SWAPPED` cannot be accepted as a clean
+  continuation without explicit proof context.
+
+### Cleanup Lens
+
+Purpose: map a raw decoded peak to known clean patterns.
+
+Output states:
+
+```text
+EXACT
+NEAR
+AMBIGUOUS
+EMPTY
+```
+
+Trust:
+
+- `EXACT` and strong `NEAR` can support a readout;
+- `AMBIGUOUS` is WATCH;
+- `EMPTY` means the field found no cleanup anchor.
+
+### Future Lenses
+
+- Token Lens: next token/phrase readout.
+- Role Lens: subject/object/action/attribute readout.
+- Position Lens: ordering and distance readout.
+- Energy Lens: basin stability and route jumps.
+- Anti Lens: shortcut-specific suppression readout.
+- Spectral Lens: mode/frequency contribution readout.
+
+## Hot Budget
+
+The hot LLMWave path must keep the NANDA-6M rule:
+
+```text
+hot core budget:       <= 6 MiB
+active focus window:   <= 15,000 patterns/triads
+pattern record target: 32 or 64 bytes
+JSON/reporting:        cold layer, not hot loop
+```
+
+Cold layer:
+
+- text;
+- aliases;
+- tokenizer;
+- dictionaries;
+- corpus focus;
+- evidence and documents.
+
+Hot layer:
+
+- packed pattern records;
+- centroids;
+- lanes;
+- replay;
+- lens readout state.
+
+## v67 MVP
+
+`nanda-llmwave` must expose:
+
+```json
+{
+  "llmwave_contract": {
+    "version": "v67-field-lens-contract",
+    "state": "LLMWAVE_LENS_READY",
+    "field": {},
+    "selected_lens": {},
+    "lenses": {},
+    "baseline_compare": {},
+    "hot_budget": {}
+  }
+}
+```
+
+Minimum lenses:
+
+- Pattern Lens;
+- Polarity Lens;
+- Cleanup Lens.
+
+Minimum baselines:
+
+- lexical token overlap;
+- graph next-edge hint;
+- current decode top pattern.
+
+## Success Criteria
+
+v67 is done when:
+
+- `nanda-llmwave --lens pattern` reports a v67 contract;
+- the contract exposes field, lens, baseline, hot budget, and proof state;
+- Pattern/Polarity/Cleanup lenses have explicit states;
+- ambiguous or reversed readouts return WATCH, not forced PASS;
+- tests verify v67 fields on the existing LLMWave corpus;
+- no existing v60 proof behavior regresses.
+
+## Research Anchors
+
+- HRR / Plate: binding and unbinding are role/filler lenses.
+- VSA / HDC: bundling, binding, permutation, cleanup are field operations.
+- Kanerva SDM: address activation is a memory lens.
+- Hopfield / modern associative memory: energy readout is a stability lens.
+- Superposition work: compression must be measured with crosstalk.
+- Fourier / Nanda grokking: wave claims require ablation and baselines.

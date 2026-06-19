@@ -4,6 +4,10 @@
 
 ### Changed
 
+- v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
+  `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
+  lenses, baseline compare, and hot-budget status; `--lens` selects the active
+  readout.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

@@ -512,6 +512,8 @@ struct LlmwaveArgs {
     route_triad_cap: usize,
     #[arg(long, value_enum, default_value = "route")]
     group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "pattern")]
+    lens: LlmwaveLensKind,
     #[arg(long)]
     train: bool,
     #[arg(long, value_enum, default_value = "accept")]

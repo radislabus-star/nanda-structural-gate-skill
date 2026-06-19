@@ -260,6 +260,7 @@ nanda-pattern-capacity
 nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --train
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens polarity
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
 nanda-demo --from-text examples/demo-task.raw.txt --task-id demo-raw --domain certification --text "declaration requires protocols"
@@ -416,7 +417,11 @@ decode, with checks for top-pattern movement or score reinforcement.
 a cleanup-memory bank. `nanda-llmwave` reports v47 HRR binding, v48 cleanup,
 v49 attractor energy, v50 capacity, v51 anti-wave audit, v54 packed HRR,
 v55 cleanup thresholds, v56 anti-wave locality, v57 capacity baseline,
-v58 hot-cycle readiness, v59 proof summary, and the v60 public demo packet.
+v58 hot-cycle readiness, v59 proof summary, the v60 public demo packet, and
+the v67 `llmwave_contract` Field + Lens readout. Use `--lens pattern`,
+`--lens polarity`, or `--lens cleanup` to inspect the active lens. Treat
+`LLMWAVE_LENS_READY` as a usable structural readout and
+`LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
