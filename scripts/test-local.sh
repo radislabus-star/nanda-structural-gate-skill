@@ -22,6 +22,7 @@ decode="$root/nanda-structural-gate/scripts/nanda-decode"
 decode_eval="$root/nanda-structural-gate/scripts/nanda-decode-eval"
 pattern_store="$root/nanda-structural-gate/scripts/nanda-pattern-store"
 pattern_capacity="$root/nanda-structural-gate/scripts/nanda-pattern-capacity"
+pattern_eval="$root/nanda-structural-gate/scripts/nanda-pattern-eval"
 llmwave="$root/nanda-structural-gate/scripts/nanda-llmwave"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
 proof="$root/nanda-structural-gate/scripts/nanda-proof"
@@ -70,6 +71,7 @@ jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"
 jq empty "$root/examples/decode-corpus.json"
+jq empty "$root/examples/pattern-learning-corpus.json"
 
 pass_json="$("$checker" --triads "$root/examples/triad-packet.example.json" --format json)"
 if ! grep -q '"verdict": "PASS"' <<<"$pass_json"; then
@@ -169,7 +171,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v4.0-llmwave-runtime"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v4.1-learning-eval"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -497,6 +499,11 @@ jq -e '.mode == "compact-pattern-store" and .packed_pattern_bytes == 32 and .rec
 pattern_capacity_json="$("$pattern_capacity")"
 jq -e '.mode == "llmwave-pattern-capacity" and .pattern_store_capacity == 16384' <<<"$pattern_capacity_json" >/dev/null
 jq -e '.rows[] | select(.patterns == 65536 and .fits_pattern_arena == false)' <<<"$pattern_capacity_json" >/dev/null
+pattern_eval_json="$("$pattern_eval" --suite "$root/examples/pattern-learning-corpus.json")"
+jq -e '.mode == "pattern-learning-eval-suite" and .version == "v41-learning-effect-eval" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$pattern_eval_json" >/dev/null
+jq -e '.learning_effect.changed_top == 1 and .learning_effect.reinforced_same_top == 1' <<<"$pattern_eval_json" >/dev/null
+jq -e '.cases[] | select(.id == "reject-top-continuation-changes-ranking" and .learning_changed_top == true and .actual_action == "suppress")' <<<"$pattern_eval_json" >/dev/null
+jq -e '.cases[] | select(.id == "accept-top-continuation-reinforces-score" and .training_applied == true and .actual_action == "reinforce")' <<<"$pattern_eval_json" >/dev/null
 llmwave_json="$("$llmwave" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --train)"
 jq -e '.mode == "llmwave-mini-loop" and .version == "v39-encode-decode-train-loop"' <<<"$llmwave_json" >/dev/null
 jq -e '.decode.top_pattern == "declaration -> requires -> protocols" and .feedback_preview.enabled == true' <<<"$llmwave_json" >/dev/null

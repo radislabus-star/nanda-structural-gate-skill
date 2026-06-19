@@ -119,5 +119,8 @@ Status: started.
   feedback preview.
 - v40 NANDA-6M pattern runtime: budget/pack reports include the compact pattern
   arena contract.
+- v41 learning eval: `nanda-pattern-eval` measures baseline decode against
+  trained decode and proves whether continuation feedback moved or reinforced
+  the next-pattern field.
 - Next milestone is making pattern replay participate earlier in the packed
   hot cycle, not only in cold decode ranking.

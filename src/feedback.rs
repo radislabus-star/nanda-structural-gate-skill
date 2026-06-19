@@ -797,7 +797,7 @@ fn decode_feedback_cmd(args: FeedbackArgs, decode: Value) -> Result<u8> {
     Ok(EXIT_PASS)
 }
 
-fn continuation_memory_from_decode(
+pub(crate) fn continuation_memory_from_decode(
     decode: &Value,
     decision: &str,
     note: &str,

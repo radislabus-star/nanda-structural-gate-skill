@@ -95,7 +95,9 @@
 - v39 adds `nanda-llmwave`, a raw text -> encode -> decode -> feedback-preview
   mini-loop.
 - v40 reports the NANDA-6M pattern runtime contract in budget/pack outputs.
-- Core version is now `sparse-triad-v4.0-llmwave-runtime`.
+- v41 adds `nanda-pattern-eval` and `examples/pattern-learning-corpus.json`
+  to measure baseline vs trained decode learning effects.
+- Core version is now `sparse-triad-v4.1-learning-eval`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

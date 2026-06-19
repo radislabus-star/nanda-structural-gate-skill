@@ -134,6 +134,7 @@ evidence-conflict tasks do.
         ├── nanda-decode-eval
         ├── nanda-pattern-store
         ├── nanda-pattern-capacity
+        ├── nanda-pattern-eval
         ├── nanda-llmwave
         ├── nanda-focus
         ├── nanda-proof
@@ -239,6 +240,7 @@ nanda-decode examples/triad-packet.interference-search-route-trap.json --input-f
 nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 --steps 3
 nanda-decode-eval --suite examples/decode-corpus.json
 nanda-pattern-capacity
+nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --train
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
@@ -358,10 +360,12 @@ minimum completed recurrent steps before trusting LLMWave changes.
 `nanda-feedback` can also read `nanda-decode` output. In that mode it emits
 `continuation_memory`: accepted decoded patterns are reinforced during future
 decode ranking, rejected decoded patterns are suppressed locally, and WATCH
-patterns remain review evidence. v35-v40 compact this into a 32-byte pattern
+patterns remain review evidence. v35-v41 compact this into a 32-byte pattern
 store, replay it during decode, estimate capacity, expose shortcut-specific
 negative continuation lanes, run an `nanda-llmwave` mini-loop, and report the
-NANDA-6M pattern runtime contract.
+NANDA-6M pattern runtime contract. `nanda-pattern-eval` measures the actual
+learning effect: baseline decode -> feedback memory -> trained decode, with
+checks for top-pattern movement or score reinforcement.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact
@@ -503,7 +507,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v4.0-llmwave-runtime
+core_version: sparse-triad-v4.1-learning-eval
 wave_dim: 1024
 ```
 

@@ -114,6 +114,7 @@ scripts/nanda-decode .nanda/index.json --input-format json --query-file query.js
 scripts/nanda-decode-eval --suite examples/decode-corpus.json
 scripts/nanda-pattern-store .nanda/index.json --input-format json
 scripts/nanda-pattern-capacity
+scripts/nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --train
 scripts/nanda-hgate task.json --input-format json --by linked-group
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
@@ -265,12 +266,15 @@ rejected a decoded structural continuation. The feedback emits
 reinforce accepted patterns and suppress rejected local forms before recurrent
 selection.
 Inspect `compact_pattern_store` in decode output or run `nanda-pattern-store`
-when continuation memory exists. It is the v35-v40 bridge: 32-byte packed
+when continuation memory exists. It is the v35-v41 bridge: 32-byte packed
 patterns, replay during decode, capacity estimates, shortcut-specific negative
 continuation lanes, and a NANDA-6M pattern runtime contract. Use
 `nanda-pattern-capacity` before claiming large learned-pattern capacity, and
-use `nanda-llmwave` for the mini-loop: raw text -> encode -> decode ->
-feedback preview.
+use `nanda-pattern-eval` before claiming continuation feedback actually changed
+the decoder field. It compares baseline decode with trained decode and reports
+whether reject moved the top pattern or accept reinforced it. Use
+`nanda-llmwave` for the mini-loop: raw text -> encode -> decode -> feedback
+preview.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each

@@ -1,0 +1,27 @@
+{
+  "name": "nanda-v41-pattern-learning",
+  "cases": [
+    {
+      "id": "reject-top-continuation-changes-ranking",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "decision": "reject",
+      "note": "reject top continuation",
+      "expected_baseline_top": "declaration -> requires -> protocols",
+      "expected_trained_top": "certification payment -> pays_for -> declaration",
+      "expected_action": "suppress",
+      "min_abs_delta": 0.1,
+      "top_k": 3
+    },
+    {
+      "id": "accept-top-continuation-reinforces-score",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "decision": "accept",
+      "note": "accept top continuation",
+      "expected_baseline_top": "declaration -> requires -> protocols",
+      "expected_trained_top": "declaration -> requires -> protocols",
+      "expected_action": "reinforce",
+      "min_abs_delta": 0.05,
+      "top_k": 3
+    }
+  ]
+}
