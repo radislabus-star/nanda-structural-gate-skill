@@ -2418,6 +2418,11 @@ pub(crate) enum LlmwaveLensKind {
     Convex,
     Concave,
     Prism,
+    Role,
+    Temporal,
+    Evidence,
+    Energy,
+    Anti,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

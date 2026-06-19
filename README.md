@@ -265,6 +265,11 @@ nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens convex
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens concave
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens prism
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens role
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens temporal
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens evidence
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens energy
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens anti
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -433,7 +438,12 @@ inspect the active lens. v76-v80 add the first LLMWave optics core:
 weak signals into a route basin, Concave Lens for splitting contested peaks,
 and Prism Lens for explaining route/relation/role/polarity contributions. Use
 `--lens convex`, `--lens concave`, or `--lens prism` when the question is not
-"what is the top answer?" but "how did the field form this peak?" Treat
+"what is the top answer?" but "how did the field form this peak?" v81-v85 add
+semantic optics: Role Lens for actor/action/target binding, Temporal Lens for
+recurrent order and route jumps, Evidence Lens for support binding, Energy Lens
+for basin stability, and Anti Lens for destructive-interference reports. Use
+`--lens role`, `--lens temporal`, `--lens evidence`, `--lens energy`, or
+`--lens anti` when the field needs meaning-axis inspection. Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.

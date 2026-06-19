@@ -1323,6 +1323,11 @@ fn llmwave_contract_report(
     let convex = llmwave_convex_lens(decode, &field_snapshot);
     let concave = llmwave_concave_lens(decode);
     let prism = llmwave_prism_lens(decode, &convex, anti_wave);
+    let role = llmwave_role_lens(decode);
+    let temporal = llmwave_temporal_lens(decode);
+    let evidence = llmwave_evidence_lens(packet, decode);
+    let energy = llmwave_energy_lens(attractor, &field_snapshot, &concave);
+    let anti = llmwave_anti_lens(anti_wave, decode, &field_snapshot);
     let selected_name = llmwave_lens_name(selected);
     let selected_lens = match selected {
         LlmwaveLensKind::Pattern => pattern.clone(),
@@ -1332,6 +1337,11 @@ fn llmwave_contract_report(
         LlmwaveLensKind::Convex => convex.clone(),
         LlmwaveLensKind::Concave => concave.clone(),
         LlmwaveLensKind::Prism => prism.clone(),
+        LlmwaveLensKind::Role => role.clone(),
+        LlmwaveLensKind::Temporal => temporal.clone(),
+        LlmwaveLensKind::Evidence => evidence.clone(),
+        LlmwaveLensKind::Energy => energy.clone(),
+        LlmwaveLensKind::Anti => anti.clone(),
     };
     let selected_ready = selected_lens["ready"].as_bool().unwrap_or(false);
     let hot_budget = llmwave_hot_budget_report(packet, capacity, hot_cycle);
@@ -1360,7 +1370,12 @@ fn llmwave_contract_report(
             "token": token,
             "convex": convex,
             "concave": concave,
-            "prism": prism
+            "prism": prism,
+            "role": role,
+            "temporal": temporal,
+            "evidence": evidence,
+            "energy": energy,
+            "anti": anti
         },
         "lens_taxonomy": llmwave_lens_taxonomy(),
         "baseline_compare": baseline,
@@ -1381,17 +1396,27 @@ fn llmwave_lens_name(kind: &LlmwaveLensKind) -> &'static str {
         LlmwaveLensKind::Convex => "convex",
         LlmwaveLensKind::Concave => "concave",
         LlmwaveLensKind::Prism => "prism",
+        LlmwaveLensKind::Role => "role",
+        LlmwaveLensKind::Temporal => "temporal",
+        LlmwaveLensKind::Evidence => "evidence",
+        LlmwaveLensKind::Energy => "energy",
+        LlmwaveLensKind::Anti => "anti",
     }
 }
 
 fn llmwave_lens_taxonomy() -> Value {
     json!({
         "version": "v76-lens-taxonomy",
-        "active": ["pattern", "polarity", "cleanup", "token", "convex", "concave", "prism"],
-        "planned": ["role", "temporal", "energy", "anti", "microscope", "telescope"],
+        "active": ["pattern", "polarity", "cleanup", "token", "convex", "concave", "prism", "role", "temporal", "evidence", "energy", "anti"],
+        "planned": ["microscope", "telescope"],
         "convex": "gather weak aligned signals into a stable peak",
         "concave": "separate a mixed or contested peak into rival branches",
-        "prism": "explain a peak by route, relation, role path, and polarity contribution"
+        "prism": "explain a peak by route, relation, role path, and polarity contribution",
+        "role": "read actor/action/target role binding and role-swap risk",
+        "temporal": "read event order and sequence gaps",
+        "evidence": "read whether the peak is backed by evidence or only resembles a fact",
+        "energy": "read basin stability, margin, attractor trace, and perturbation risk",
+        "anti": "explain destructive interference and what changed after suppression"
     })
 }
 
@@ -1828,6 +1853,252 @@ fn aggregate_prism_pairs(pairs: Vec<(String, f64)>) -> Vec<Value> {
     });
     rows.truncate(5);
     rows
+}
+
+fn llmwave_role_lens(decode: &Value) -> Value {
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let role_paths = patterns
+        .iter()
+        .take(8)
+        .map(|item| {
+            let subject_role = item["subject_role"].as_str().unwrap_or("");
+            let object_role = item["object_role"].as_str().unwrap_or("");
+            let relation = item["relation"].as_str().unwrap_or("");
+            let path = format!(
+                "{}->{}->{}",
+                role_family(subject_role),
+                relation_family(relation),
+                role_family(object_role)
+            );
+            let polarity = item["polarity"].as_str().unwrap_or("");
+            let risk = if polarity.contains("REVERSED") {
+                "ROLE_SWAP_RISK"
+            } else if role_family(subject_role) == role_family(object_role) {
+                "ROLE_COLLAPSE_REVIEW"
+            } else {
+                "ROLE_ALIGNED"
+            };
+            json!({
+                "actor": item["subject"],
+                "action": item["relation"],
+                "target": item["object"],
+                "subject_role": subject_role,
+                "object_role": object_role,
+                "role_path": path,
+                "polarity": polarity,
+                "risk": risk,
+                "score": item["score"]
+            })
+        })
+        .collect::<Vec<_>>();
+    let top_risk = role_paths
+        .first()
+        .and_then(|item| item["risk"].as_str())
+        .unwrap_or("");
+    let swap_risks = role_paths
+        .iter()
+        .filter(|item| item["risk"].as_str() == Some("ROLE_SWAP_RISK"))
+        .count();
+    let state = if role_paths.is_empty() {
+        "ROLE_LENS_EMPTY"
+    } else if top_risk == "ROLE_SWAP_RISK" {
+        "ROLE_LENS_SWAP_RISK"
+    } else if swap_risks > 0 {
+        "ROLE_LENS_REVIEW"
+    } else {
+        "ROLE_LENS_READY"
+    };
+    json!({
+        "kind": "role",
+        "version": "v81-role-binding-lens",
+        "state": state,
+        "ready": state == "ROLE_LENS_READY",
+        "top_role_path": role_paths.first().map(|item| item["role_path"].clone()).unwrap_or(Value::Null),
+        "role_swap_risks": swap_risks,
+        "bindings": role_paths,
+        "read_as": "Role Lens reads actor/action/target binding and keeps role swaps visible."
+    })
+}
+
+fn llmwave_temporal_lens(decode: &Value) -> Value {
+    let steps = decode["recurrent"]["steps"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let mut route_jumps = 0usize;
+    let mut last_route = String::new();
+    let mut rows = vec![];
+    for step in &steps {
+        let route = step["source_search"]["top_peak"].as_str().unwrap_or("");
+        if !last_route.is_empty() && !route.is_empty() && route != last_route {
+            route_jumps += 1;
+        }
+        if !route.is_empty() {
+            last_route = route.to_string();
+        }
+        rows.push(json!({
+            "step": step["step"],
+            "route": route,
+            "top_pattern": step["top_pattern"],
+            "decoder_state": step["decoder_state"],
+            "field_state": step["source_search"]["field_state"]
+        }));
+    }
+    let repeated_pattern = rows
+        .windows(2)
+        .any(|window| window[0]["top_pattern"] == window[1]["top_pattern"]);
+    let state = if rows.is_empty() {
+        "TEMPORAL_LENS_EMPTY"
+    } else if route_jumps > 0 {
+        "TEMPORAL_LENS_ROUTE_JUMP"
+    } else if repeated_pattern {
+        "TEMPORAL_LENS_STANDING"
+    } else {
+        "TEMPORAL_LENS_ORDERED"
+    };
+    json!({
+        "kind": "temporal",
+        "version": "v82-temporal-order-lens",
+        "state": state,
+        "ready": matches!(state, "TEMPORAL_LENS_ORDERED" | "TEMPORAL_LENS_STANDING"),
+        "steps": rows,
+        "route_jumps": route_jumps,
+        "standing_pattern": repeated_pattern,
+        "read_as": "Temporal Lens reads recurrent decode as event/order flow and flags route jumps."
+    })
+}
+
+fn llmwave_evidence_lens(packet: &Packet, decode: &Value) -> Value {
+    let evidence_by_triad = packet
+        .triads
+        .iter()
+        .map(|triad| (triad.id.clone(), triad.evidence.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let rows = patterns
+        .iter()
+        .take(8)
+        .map(|item| {
+            let triad_id = item["triad"].as_str().unwrap_or("");
+            let evidence = evidence_by_triad.get(triad_id).cloned().unwrap_or_default();
+            let has_evidence = !evidence.trim().is_empty();
+            json!({
+                "triad": triad_id,
+                "pattern": pattern_label_value(item),
+                "route": item["route"],
+                "score": item["score"],
+                "evidence": evidence,
+                "has_evidence": has_evidence,
+                "evidence_state": if has_evidence { "EVIDENCE_BOUND" } else { "EVIDENCE_MISSING" }
+            })
+        })
+        .collect::<Vec<_>>();
+    let missing = rows
+        .iter()
+        .filter(|row| !row["has_evidence"].as_bool().unwrap_or(false))
+        .count();
+    let conflicts = evidence_conflicts(&packet.triads);
+    let top_bound = rows
+        .first()
+        .and_then(|row| row["has_evidence"].as_bool())
+        .unwrap_or(false);
+    let state = if rows.is_empty() {
+        "EVIDENCE_LENS_EMPTY"
+    } else if !conflicts.is_empty() {
+        "EVIDENCE_LENS_CONFLICT"
+    } else if !top_bound {
+        "EVIDENCE_LENS_TOP_MISSING"
+    } else if missing > 0 {
+        "EVIDENCE_LENS_PARTIAL"
+    } else {
+        "EVIDENCE_LENS_READY"
+    };
+    json!({
+        "kind": "evidence",
+        "version": "v83-evidence-binding-lens",
+        "state": state,
+        "ready": matches!(state, "EVIDENCE_LENS_READY" | "EVIDENCE_LENS_PARTIAL"),
+        "top_evidence_bound": top_bound,
+        "missing": missing,
+        "conflicts": conflicts,
+        "bindings": rows,
+        "read_as": "Evidence Lens separates an evidence-backed peak from a plausible but unsupported peak."
+    })
+}
+
+fn llmwave_energy_lens(attractor: &Value, snapshot: &Value, concave: &Value) -> Value {
+    let steps = attractor["steps"].as_array().cloned().unwrap_or_default();
+    let final_energy = steps
+        .last()
+        .and_then(|step| step["energy"].as_f64())
+        .unwrap_or_else(|| snapshot["energy"].as_f64().unwrap_or(0.0));
+    let dropping = steps
+        .iter()
+        .any(|step| step["trend"].as_str() == Some("DROPPING"));
+    let route_jumps = attractor["route_jumps"].as_u64().unwrap_or(0);
+    let margin = snapshot["margin"].as_f64().unwrap_or(0.0);
+    let contested = concave["state"].as_str() == Some("CONCAVE_LENS_SPLIT");
+    let state = if steps.is_empty() {
+        "ENERGY_LENS_SNAPSHOT_ONLY"
+    } else if route_jumps > 0 || dropping {
+        "ENERGY_LENS_UNSTABLE"
+    } else if contested && margin < 0.08 {
+        "ENERGY_LENS_CONTESTED"
+    } else {
+        "ENERGY_LENS_STABLE"
+    };
+    json!({
+        "kind": "energy",
+        "version": "v84-energy-stability-lens",
+        "state": state,
+        "ready": matches!(state, "ENERGY_LENS_STABLE" | "ENERGY_LENS_CONTESTED"),
+        "final_energy": round4(final_energy),
+        "margin": round4(margin),
+        "route_jumps": route_jumps,
+        "dropping": dropping,
+        "attractor_state": attractor["state"],
+        "contested": contested,
+        "snapshot_energy": snapshot["energy"],
+        "read_as": "Energy Lens reads basin stability: margin, attractor trend, route jumps, and contested split risk."
+    })
+}
+
+fn llmwave_anti_lens(anti_wave: &Value, decode: &Value, snapshot: &Value) -> Value {
+    let applications = anti_wave["applications"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let suppressions = applications
+        .iter()
+        .filter(|item| item["action"].as_str() == Some("suppress"))
+        .cloned()
+        .collect::<Vec<_>>();
+    let reinforcements = applications
+        .iter()
+        .filter(|item| item["action"].as_str() == Some("reinforce"))
+        .count();
+    let top_after = decode["top_pattern"].as_str().unwrap_or("");
+    let changed_field = !suppressions.is_empty() && !top_after.is_empty();
+    let state = if !suppressions.is_empty() {
+        "ANTI_LENS_SUPPRESSED_SHORTCUT"
+    } else if anti_wave["negative_records"].as_u64().unwrap_or(0) > 0 {
+        "ANTI_LENS_AVAILABLE_NOT_TRIGGERED"
+    } else {
+        "ANTI_LENS_NO_MEMORY"
+    };
+    json!({
+        "kind": "anti",
+        "version": "v85-anti-lens-destructive-report",
+        "state": state,
+        "ready": !suppressions.is_empty(),
+        "negative_records": anti_wave["negative_records"],
+        "suppressions": suppressions,
+        "reinforcements": reinforcements,
+        "top_after": top_after,
+        "changed_field": changed_field,
+        "snapshot_id": snapshot["snapshot_id"],
+        "read_as": "Anti Lens explains destructive interference: which shortcut was suppressed, what stayed visible, and whether the field survived."
+    })
 }
 
 #[derive(Clone, Debug)]

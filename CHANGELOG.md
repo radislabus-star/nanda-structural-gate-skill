@@ -16,6 +16,10 @@
   snapshots, Convex Lens for gathering aligned weak signals into a route
   basin, Concave Lens for splitting contested peaks, and Prism Lens for
   explaining route/relation/role/polarity contributions.
+- v81-v85 add semantic optics: Role Lens for actor/action/target binding,
+  Temporal Lens for recurrent order and route jumps, Evidence Lens for support
+  binding, Energy Lens for basin stability, and Anti Lens for destructive
+  interference reports.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

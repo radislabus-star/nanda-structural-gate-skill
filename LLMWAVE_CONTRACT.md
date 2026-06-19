@@ -231,13 +231,98 @@ Trust:
 - `PRISM_LENS_READY` means the peak has an explanation surface;
 - it does not prove truth; it shows why the field made the peak visible.
 
+### Role Lens
+
+Purpose: read actor/action/target binding from the field.
+
+Output:
+
+```text
+actor, action, target, role path, polarity, role-swap risk
+```
+
+Trust:
+
+- `ROLE_LENS_READY` means the top binding is not reversed and no swap risk is
+  visible in the inspected candidates;
+- `ROLE_LENS_SWAP_RISK` is a stop signal for role-sensitive answers;
+- this lens is the first semantic readout for "who does what to whom?"
+
+### Temporal Lens
+
+Purpose: read recurrent decode as order/sequence flow.
+
+Output:
+
+```text
+steps, top pattern per step, route jumps, standing pattern flag
+```
+
+Trust:
+
+- `TEMPORAL_LENS_ORDERED` means the recurrent route stayed ordered;
+- `TEMPORAL_LENS_ROUTE_JUMP` means the sequence crossed routes and needs
+  review;
+- `TEMPORAL_LENS_STANDING` means a repeated pattern formed a standing wave.
+
+### Evidence Lens
+
+Purpose: separate evidence-backed peaks from plausible but unsupported peaks.
+
+Output:
+
+```text
+triad evidence binding, missing count, conflict list
+```
+
+Trust:
+
+- `EVIDENCE_LENS_READY` means inspected peaks are evidence-bound and conflict
+  free;
+- `EVIDENCE_LENS_PARTIAL` can support review, not final proof;
+- `EVIDENCE_LENS_CONFLICT` and `EVIDENCE_LENS_TOP_MISSING` are unresolved.
+
+### Energy Lens
+
+Purpose: read basin stability and perturbation risk.
+
+Output:
+
+```text
+final energy, margin, route jumps, dropping trend, contested state
+```
+
+Trust:
+
+- `ENERGY_LENS_STABLE` means the attractor and margin support the peak;
+- `ENERGY_LENS_CONTESTED` means the field is alive but close alternatives
+  remain;
+- `ENERGY_LENS_UNSTABLE` means route jumps or dropping energy occurred.
+
+### Anti Lens
+
+Purpose: explain destructive interference.
+
+Output:
+
+```text
+negative records, suppressions, reinforcements, top-after, changed-field flag
+```
+
+Trust:
+
+- `ANTI_LENS_SUPPRESSED_SHORTCUT` means a shortcut-specific reject lane fired
+  and the field still produced a visible continuation;
+- `ANTI_LENS_AVAILABLE_NOT_TRIGGERED` means negative memory exists but did not
+  match the current shape;
+- anti-lens evidence never grants truth by itself; it explains what was
+  suppressed.
+
 ### Future Lenses
 
-- Role Lens: subject/object/action/attribute readout.
-- Position Lens: ordering and distance readout.
-- Energy Lens: basin stability and route jumps.
-- Anti Lens: shortcut-specific suppression readout.
 - Spectral Lens: mode/frequency contribution readout.
+- Microscope Lens: one local triad/branch proof.
+- Telescope Lens: far weak-corpus discovery.
 
 ## Hot Budget
 
@@ -294,6 +379,11 @@ Minimum lenses:
 - Convex Lens;
 - Concave Lens;
 - Prism Lens.
+- Role Lens;
+- Temporal Lens;
+- Evidence Lens;
+- Energy Lens;
+- Anti Lens.
 
 Minimum baselines:
 
@@ -323,6 +413,17 @@ v80 is done when:
 - `--lens concave` reports `v79-concave-separation-lens`;
 - `--lens prism` reports `v80-prism-explanation-lens`;
 - local tests verify the three optics lenses on the route-trap fixture.
+
+## v85 Semantic Optics
+
+v85 is done when:
+
+- `--lens role` reports `v81-role-binding-lens`;
+- `--lens temporal` reports `v82-temporal-order-lens`;
+- `--lens evidence` reports `v83-evidence-binding-lens`;
+- `--lens energy` reports `v84-energy-stability-lens`;
+- `--lens anti` reports `v85-anti-lens-destructive-report`;
+- local tests verify all five lenses on route-trap and reject-memory fixtures.
 
 ## Research Anchors
 

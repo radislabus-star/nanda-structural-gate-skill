@@ -128,6 +128,11 @@ scripts/nanda-llmwave .nanda/index.json --input-format json --text "customs decl
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens convex
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens concave
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens prism
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens role
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens temporal
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens evidence
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens energy
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens anti
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -323,9 +328,12 @@ contract: the shared field is read through `--lens pattern`, `--lens polarity`,
 `--lens cleanup`, or `--lens token`. Token Lens is the v68-v75 next-token path:
 token-pattern records, position-phase prefix waves, next-token resonance, token
 cleanup, shortcut-specific token anti-wave, token eval corpus, and compact
-`nanda-serve` `llmwave_token` responses. Treat `LLMWAVE_LENS_READY` as a usable
-structural readout; treat `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as
-unresolved.
+`nanda-serve` `llmwave_token` responses. v76-v80 add field optics:
+`field_snapshot`, `--lens convex`, `--lens concave`, and `--lens prism`.
+v81-v85 add semantic optics: `--lens role`, `--lens temporal`,
+`--lens evidence`, `--lens energy`, and `--lens anti`. Treat
+`LLMWAVE_LENS_READY` as a usable structural readout; treat
+`LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.
 Use `nanda-demo` when a human or another agent needs the short weak-spot view:
 state, input, top pattern, proof state, compact signals, weak spots, safe
 claim, and boundary. If you do not yet have a packet but you have relation
