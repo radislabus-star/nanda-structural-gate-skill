@@ -2402,6 +2402,13 @@ pub(crate) enum FeedbackDecision {
     Watch,
 }
 
+#[derive(Clone, ValueEnum)]
+pub(crate) enum PatternBankMode {
+    Build,
+    Inspect,
+    Apply,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Triad {
     #[serde(default)]

@@ -111,10 +111,12 @@ scripts/nanda-search .nanda/index.json --input-format json --query "lower operat
 scripts/nanda-encode --text "declaration requires protocols" --as-query-packet
 scripts/nanda-decode .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-decode .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 3 --steps 3
+scripts/nanda-decode .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 3 --steps 3 --beam-width 3 --adaptive-scoring
 scripts/nanda-decode-eval --suite examples/decode-corpus.json
 scripts/nanda-pattern-store .nanda/index.json --input-format json
 scripts/nanda-pattern-capacity
 scripts/nanda-pattern-eval --suite examples/pattern-learning-corpus.json
+scripts/nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --train
 scripts/nanda-hgate task.json --input-format json --by linked-group
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
@@ -256,7 +258,10 @@ retrieval. It runs the same interference field and emits ranked
 roles, polarity, continuity, and support score. Treat it as the first LLMWave
 bridge, not as natural-language generation. Use `--steps N` for recurrent
 decode: each selected pattern is fed back as query context and the field is
-run again. Treat `PATTERN_SATURATED` as an honest stop, not a failure.
+run again. Use `--beam-width N` when the task needs multiple possible
+structural continuations kept in superposition; inspect `beam_decode`.
+Use `--adaptive-scoring` to inspect v45 field-state-aware pattern scoring.
+Treat `PATTERN_SATURATED` as an honest stop, not a failure.
 Use `nanda-decode-eval` after changing decoder, scoring, recurrent selection,
 or pattern extraction. It checks expected top pattern, decoder state, recurrent
 final state, and minimum completed recurrent steps.
@@ -266,15 +271,16 @@ rejected a decoded structural continuation. The feedback emits
 reinforce accepted patterns and suppress rejected local forms before recurrent
 selection.
 Inspect `compact_pattern_store` in decode output or run `nanda-pattern-store`
-when continuation memory exists. It is the v35-v41 bridge: 32-byte packed
+when continuation memory exists. It is the v35-v46 bridge: 32-byte packed
 patterns, replay during decode, capacity estimates, shortcut-specific negative
 continuation lanes, and a NANDA-6M pattern runtime contract. Use
 `nanda-pattern-capacity` before claiming large learned-pattern capacity, and
 use `nanda-pattern-eval` before claiming continuation feedback actually changed
 the decoder field. It compares baseline decode with trained decode and reports
 whether reject moved the top pattern or accept reinforced it. Use
-`nanda-llmwave` for the mini-loop: raw text -> encode -> decode -> feedback
-preview.
+`nanda-pattern-bank` to build or inspect the standalone learned continuation
+bank. Use `nanda-llmwave` for the mini-loop: raw text -> encode -> decode ->
+feedback preview.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each

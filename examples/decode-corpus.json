@@ -19,6 +19,21 @@
       "min_completed_steps": 3,
       "steps": 3,
       "top_k": 3
+    },
+    {
+      "id": "route-trap-beam-trajectory",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "expected_decoder_state": "PATTERN_READY",
+      "expected_top_pattern": "declaration -> requires -> protocols",
+      "expected_final_decoder_state": "PATTERN_SATURATED",
+      "expected_beam_route": "certification",
+      "min_beam_length": 2,
+      "expected_beam_saturated": true,
+      "forbidden_beam_pattern": "customs declaration -> requires -> customs clearance",
+      "min_completed_steps": 3,
+      "steps": 3,
+      "top_k": 3,
+      "beam_width": 3
     }
   ]
 }

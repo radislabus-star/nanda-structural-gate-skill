@@ -97,7 +97,12 @@
 - v40 reports the NANDA-6M pattern runtime contract in budget/pack outputs.
 - v41 adds `nanda-pattern-eval` and `examples/pattern-learning-corpus.json`
   to measure baseline vs trained decode learning effects.
-- Core version is now `sparse-triad-v4.1-learning-eval`.
+- v42 adds beam decode: `--beam-width N` keeps ranked structural trajectories.
+- v43 extends `nanda-decode-eval` with beam trajectory checks.
+- v44 exposes pre-ranking pattern replay under `early_pattern_replay`.
+- v45 adds opt-in field-state-aware decode scoring with `--adaptive-scoring`.
+- v46 adds `nanda-pattern-bank` for standalone learned continuation banks.
+- Core version is now `sparse-triad-v4.6-pattern-bank`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

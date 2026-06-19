@@ -146,6 +146,8 @@ fn run_pattern_eval_case(
         query_format: args.input_format.clone(),
         top_k: case.top_k.unwrap_or(args.top_k),
         steps: case.steps.unwrap_or(args.steps).clamp(1, 16),
+        beam_width: 1,
+        adaptive_scoring: false,
         search_top_k: args.search_top_k,
         route_cap: args.route_cap,
         route_triad_cap: args.route_triad_cap,

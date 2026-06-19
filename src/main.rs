@@ -22,6 +22,7 @@ mod map_gate;
 mod model;
 mod nanda_6m;
 mod pack6m;
+mod pattern_bank;
 mod pattern_eval;
 mod pattern_store;
 mod proof;
@@ -37,14 +38,15 @@ pub(crate) use feedback::*;
 pub(crate) use io::*;
 pub(crate) use map_gate::*;
 pub(crate) use model::*;
+pub(crate) use pattern_bank::*;
 pub(crate) use pattern_eval::*;
 pub(crate) use pattern_store::*;
 pub(crate) use report::*;
 pub(crate) use search::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v4.1-learning-eval";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v4.1-rust";
+const CORE_VERSION: &str = "sparse-triad-v4.6-pattern-bank";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v4.6-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -80,6 +82,7 @@ enum Command {
     PatternStore(PatternStoreArgs),
     PatternCapacity(PatternCapacityArgs),
     PatternEval(PatternEvalArgs),
+    PatternBank(PatternBankArgs),
     Llmwave(LlmwaveArgs),
     Focus(FocusArgs),
     Proof(ProofArgs),
@@ -344,6 +347,10 @@ struct DecodeArgs {
     top_k: usize,
     #[arg(long, default_value_t = 1)]
     steps: usize,
+    #[arg(long, default_value_t = 1)]
+    beam_width: usize,
+    #[arg(long)]
+    adaptive_scoring: bool,
     #[arg(long, default_value_t = 8)]
     search_top_k: usize,
     #[arg(long, default_value_t = 256)]
@@ -368,6 +375,10 @@ struct DecodeEvalArgs {
     top_k: usize,
     #[arg(long, default_value_t = 1)]
     steps: usize,
+    #[arg(long, default_value_t = 1)]
+    beam_width: usize,
+    #[arg(long)]
+    adaptive_scoring: bool,
     #[arg(long, default_value_t = 8)]
     search_top_k: usize,
     #[arg(long, default_value_t = 256)]
@@ -429,6 +440,29 @@ struct PatternEvalArgs {
     route_triad_cap: usize,
     #[arg(long, value_enum, default_value = "route")]
     group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct PatternBankArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, value_enum, default_value = "build")]
+    mode: PatternBankMode,
+    #[arg(long, default_value = "pattern-bank")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long, default_value_t = 8)]
+    sample: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]
@@ -813,6 +847,7 @@ fn run() -> Result<u8> {
         Command::PatternStore(args) => pattern_store_cmd(args),
         Command::PatternCapacity(args) => pattern_capacity_cmd(args),
         Command::PatternEval(args) => pattern_eval_cmd(args),
+        Command::PatternBank(args) => pattern_bank_cmd(args),
         Command::Llmwave(args) => llmwave_cmd(args),
         Command::Focus(args) => focus::focus_cmd(args),
         Command::Proof(args) => proof::proof_cmd(args),

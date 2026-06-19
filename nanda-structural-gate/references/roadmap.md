@@ -122,5 +122,15 @@ Status: started.
 - v41 learning eval: `nanda-pattern-eval` measures baseline decode against
   trained decode and proves whether continuation feedback moved or reinforced
   the next-pattern field.
+- v42 beam decode: `--beam-width N` keeps multiple structural continuations in
+  superposition and ranks trajectory chains.
+- v43 trajectory eval: `nanda-decode-eval` checks beam route, length,
+  saturation, and forbidden trajectory patterns.
+- v44 early replay report: decode exposes pre-ranking pattern replay under
+  `early_pattern_replay`.
+- v45 adaptive pattern scoring: `--adaptive-scoring` reports field-state-aware
+  decode weights while preserving static scoring by default.
+- v46 pattern bank: `nanda-pattern-bank` builds and inspects the learned
+  continuation-memory bank as standalone 32-byte pattern records.
 - Next milestone is making pattern replay participate earlier in the packed
   hot cycle, not only in cold decode ranking.

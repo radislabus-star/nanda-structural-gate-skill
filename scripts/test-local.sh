@@ -23,6 +23,7 @@ decode_eval="$root/nanda-structural-gate/scripts/nanda-decode-eval"
 pattern_store="$root/nanda-structural-gate/scripts/nanda-pattern-store"
 pattern_capacity="$root/nanda-structural-gate/scripts/nanda-pattern-capacity"
 pattern_eval="$root/nanda-structural-gate/scripts/nanda-pattern-eval"
+pattern_bank="$root/nanda-structural-gate/scripts/nanda-pattern-bank"
 llmwave="$root/nanda-structural-gate/scripts/nanda-llmwave"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
 proof="$root/nanda-structural-gate/scripts/nanda-proof"
@@ -171,7 +172,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v4.1-learning-eval"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v4.6-pattern-bank"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -478,8 +479,12 @@ jq -e '.recurrent.completed_steps >= 2' <<<"$decode_steps_json" >/dev/null
 jq -e '.recurrent.steps[0].selected_pattern.decode_as == "next_structural_pattern"' <<<"$decode_steps_json" >/dev/null
 jq -e '.recurrent.steps[-1].decoder_state == "PATTERN_READY" or .recurrent.steps[-1].decoder_state == "PATTERN_SATURATED"' <<<"$decode_steps_json" >/dev/null
 decode_eval_json="$("$decode_eval" --suite "$root/examples/decode-corpus.json")"
-jq -e '.mode == "decode-eval-suite" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$decode_eval_json" >/dev/null
+jq -e '.mode == "decode-eval-suite" and .passed == 3 and .total == 3 and .accuracy == 1' <<<"$decode_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "route-trap-recurrent-saturates" and .actual_final_decoder_state == "PATTERN_SATURATED")' <<<"$decode_eval_json" >/dev/null
+jq -e '.cases[] | select(.id == "route-trap-beam-trajectory" and .actual_beam_route == "certification" and .actual_beam_length >= 2 and .forbidden_seen == false)' <<<"$decode_eval_json" >/dev/null
+beam_decode_json="$("$decode" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3 --steps 3 --beam-width 3 --adaptive-scoring)"
+jq -e '.decoder_version == "v42-beam-wave-decoder" and .beam_decode.enabled == true and .beam_decode.trajectories[0].route_center == "certification"' <<<"$beam_decode_json" >/dev/null
+jq -e '.recurrent.steps[0].adaptive_pattern_scoring.version == "v45-adaptive-pattern-scoring" and .recurrent.steps[0].adaptive_pattern_scoring.enabled == true' <<<"$beam_decode_json" >/dev/null
 tmp_decode_feedback="$(mktemp)"
 tmp_decode_training_feedback="$(mktemp)"
 tmp_decode_index="$(mktemp)"
@@ -494,8 +499,13 @@ trained_decode_json="$("$decode" "$tmp_decode_index" --input-format json --query
 jq -e '.continuation_training.applied == true' <<<"$trained_decode_json" >/dev/null
 jq -e '.patterns[0].continuation_memory_delta > 0' <<<"$trained_decode_json" >/dev/null
 jq -e '.compact_pattern_store.version == "v35-compact-pattern-store" and .continuation_training.version == "v36-pattern-replay"' <<<"$trained_decode_json" >/dev/null
+jq -e '.recurrent.steps[0].early_pattern_replay.version == "v44-pre-ranking-pattern-replay"' <<<"$trained_decode_json" >/dev/null
 pattern_store_json="$("$pattern_store" "$tmp_decode_index" --input-format json)"
 jq -e '.mode == "compact-pattern-store" and .packed_pattern_bytes == 32 and .records == 1 and .fits_pattern_arena == true' <<<"$pattern_store_json" >/dev/null
+pattern_bank_json="$("$pattern_bank" "$tmp_decode_index" --input-format json --mode inspect)"
+jq -e '.mode == "pattern-bank" and .version == "v46-pattern-bank" and .records == 1 and .fits_pattern_arena == true' <<<"$pattern_bank_json" >/dev/null
+pattern_bank_apply_json="$("$pattern_bank" "$tmp_decode_index" --input-format json --mode apply)"
+jq -e '.apply_state == "PATTERN_BANK_READY_FOR_DECODE"' <<<"$pattern_bank_apply_json" >/dev/null
 pattern_capacity_json="$("$pattern_capacity")"
 jq -e '.mode == "llmwave-pattern-capacity" and .pattern_store_capacity == 16384' <<<"$pattern_capacity_json" >/dev/null
 jq -e '.rows[] | select(.patterns == 65536 and .fits_pattern_arena == false)' <<<"$pattern_capacity_json" >/dev/null

@@ -135,6 +135,7 @@ evidence-conflict tasks do.
         ├── nanda-pattern-store
         ├── nanda-pattern-capacity
         ├── nanda-pattern-eval
+        ├── nanda-pattern-bank
         ├── nanda-llmwave
         ├── nanda-focus
         ├── nanda-proof
@@ -238,9 +239,11 @@ nanda-search examples/triad-packet.interference-search-route-trap.json --input-f
 nanda-encode --text "declaration requires protocols" --as-query-packet
 nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 5
 nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 --steps 3
+nanda-decode examples/triad-packet.interference-search-route-trap.json --input-format json --top-k 3 --steps 3 --beam-width 3 --adaptive-scoring
 nanda-decode-eval --suite examples/decode-corpus.json
 nanda-pattern-capacity
 nanda-pattern-eval --suite examples/pattern-learning-corpus.json
+nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --train
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
@@ -355,17 +358,22 @@ feeds the selected pattern back into the query context and re-runs the field.
 `PATTERN_SATURATED` means the current field has no new structural continuation
 under the selected window.
 `nanda-decode-eval` is the regression surface for the decoder. It checks
-expected decoder state, top structural pattern, recurrent final state, and
-minimum completed recurrent steps before trusting LLMWave changes.
+expected decoder state, top structural pattern, recurrent final state, minimum
+completed recurrent steps, and optional v42 beam trajectory checks before
+trusting LLMWave changes. With `--beam-width N`, `nanda-decode` keeps multiple
+structural continuations in superposition and reports ranked trajectories. With
+`--adaptive-scoring`, v45 field-state-aware weights are reported under
+`adaptive_pattern_scoring`.
 `nanda-feedback` can also read `nanda-decode` output. In that mode it emits
 `continuation_memory`: accepted decoded patterns are reinforced during future
 decode ranking, rejected decoded patterns are suppressed locally, and WATCH
-patterns remain review evidence. v35-v41 compact this into a 32-byte pattern
+patterns remain review evidence. v35-v46 compact this into a 32-byte pattern
 store, replay it during decode, estimate capacity, expose shortcut-specific
 negative continuation lanes, run an `nanda-llmwave` mini-loop, and report the
 NANDA-6M pattern runtime contract. `nanda-pattern-eval` measures the actual
 learning effect: baseline decode -> feedback memory -> trained decode, with
-checks for top-pattern movement or score reinforcement.
+checks for top-pattern movement or score reinforcement. `nanda-pattern-bank`
+builds or inspects that learned continuation layer as a standalone compact bank.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact
@@ -507,7 +515,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v4.1-learning-eval
+core_version: sparse-triad-v4.6-pattern-bank
 wave_dim: 1024
 ```
 
