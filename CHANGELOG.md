@@ -4,6 +4,10 @@
 
 ### Changed
 
+- v62 adds `nanda-demo --from-text`, a raw relation-note adapter for demo
+  runs. Explicit `subject -> relation -> object [route=x group=y]` lines are
+  converted into a temporary packet; free-text fallback is marked review-only
+  so the demo does not pretend weak extraction is proof.
 - NANDA-6M lane preview/application now calls the packed hot-core
   `nanda_6m` lane compiler and applier instead of using JSON-derived lane
   deltas as the source of truth.

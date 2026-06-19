@@ -271,7 +271,7 @@ pub(crate) fn demo_cmd(args: DemoArgs) -> Result<u8> {
         let out = json!({
             "core_version": CORE_VERSION,
             "mode": "llmwave-demo-suite",
-            "version": "v61-demo-weak-spot-surface",
+            "version": "v62-demo-raw-text-adapter",
             "suite": if suite.name.is_empty() { suite_path.display().to_string() } else { suite.name },
             "passed": passed,
             "total": total,
@@ -291,24 +291,13 @@ pub(crate) fn demo_cmd(args: DemoArgs) -> Result<u8> {
         });
     }
 
-    let input = args
-        .input
-        .as_ref()
-        .ok_or_else(|| anyhow!("nanda demo requires an input packet or --suite"))?;
     let text = demo_text(&args)?;
-    let mut packet = load_packet_auto(
-        input,
-        &args.input_format,
-        "demo",
-        "general",
-        &text,
-        args.normalize_paths,
-    )?;
+    let (input, mut packet, text, raw_adapter) = load_demo_packet(&args, &text)?;
     let eval_args = demo_eval_args(&args);
     if args.train {
         let case = LlmwaveEvalCase {
             id: "demo-feedback".to_string(),
-            path: input.clone(),
+            path: input.to_path_buf(),
             text: text.clone(),
             feedback_decision: feedback_decision_label(&args.decision).to_string(),
             note: "demo feedback preview".to_string(),
@@ -324,7 +313,10 @@ pub(crate) fn demo_cmd(args: DemoArgs) -> Result<u8> {
         packet = inject_llmwave_feedback(packet, &text, &case, &eval_args)?;
     }
     let report = llmwave_report_from_packet(&packet, input, &text, &eval_args);
-    let demo = demo_surface_report("single", input, &text, &report);
+    let mut demo = demo_surface_report("single", input, &text, &report);
+    if let Some(adapter) = raw_adapter {
+        apply_raw_adapter_metadata(&mut demo, adapter);
+    }
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&demo)?),
         OutputFormat::Text => print_demo_text(&demo),
@@ -541,6 +533,183 @@ fn llmwave_report_from_packet(
         "public_demo": public_demo,
         "decode": decode
     })
+}
+
+fn load_demo_packet<'a>(
+    args: &'a DemoArgs,
+    text: &str,
+) -> Result<(&'a Path, Packet, String, Option<Value>)> {
+    if let Some(raw_path) = args.from_text.as_deref() {
+        let raw =
+            fs::read_to_string(raw_path).with_context(|| format!("read {}", raw_path.display()))?;
+        let query = if text.trim().is_empty() {
+            raw.clone()
+        } else {
+            text.to_string()
+        };
+        let (packet, adapter) =
+            packet_from_demo_text(&raw, &args.task_id, &args.domain, &query, raw_path);
+        return Ok((raw_path, packet, query, Some(adapter)));
+    }
+    let input = args
+        .input
+        .as_deref()
+        .ok_or_else(|| anyhow!("nanda demo requires an input packet, --from-text, or --suite"))?;
+    let packet = load_packet_auto(
+        input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        text,
+        args.normalize_paths,
+    )?;
+    Ok((input, packet, text.to_string(), None))
+}
+
+fn packet_from_demo_text(
+    raw: &str,
+    task_id: &str,
+    domain: &str,
+    query: &str,
+    source: &Path,
+) -> (Packet, Value) {
+    let mut triads = parse_arrow_triads(raw, task_id, domain);
+    let extraction_method = if triads.is_empty() {
+        let tokens = tokenize_pattern(raw);
+        triads = tokens_to_query_triads(&tokens, task_id, domain);
+        "token-window-fallback"
+    } else {
+        "arrow-triads"
+    };
+    let quality = if extraction_method == "arrow-triads" {
+        "RAW_ADAPTER_READY"
+    } else {
+        "RAW_ADAPTER_REVIEW"
+    };
+    let triad_count = triads.len();
+    let packet = Packet {
+        task_id: task_id.to_string(),
+        domain: domain.to_string(),
+        query: query.to_string(),
+        triads,
+        candidate_triads: vec![],
+        candidate_answer: String::new(),
+        aliases: vec![],
+        canonicalization: CanonicalizationReport::default(),
+        negative_shortcuts: vec![],
+        positive_shortcuts: vec![],
+        resonance_memory: vec![],
+        continuation_memory: vec![],
+    };
+    (
+        packet,
+        json!({
+            "input_mode": "raw-text",
+            "source": source.display().to_string(),
+            "extraction_method": extraction_method,
+            "quality": quality,
+            "triads": triad_count,
+            "read_as": "Raw demo adapter accepts explicit `subject -> relation -> object [route=x group=y]` lines. Free text fallback is review-only."
+        }),
+    )
+}
+
+fn parse_arrow_triads(raw: &str, task_id: &str, domain: &str) -> Vec<Triad> {
+    let mut triads = vec![];
+    let mut section = "triads".to_string();
+    for (line_idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            let lower = trimmed.trim_start_matches('#').trim().to_lowercase();
+            if lower.contains("candidate") {
+                section = "candidate_triads".to_string();
+            } else if lower.contains("triad") {
+                section = "triads".to_string();
+            }
+            continue;
+        }
+        let cleaned = trimmed
+            .trim_start_matches('-')
+            .trim_start_matches('*')
+            .trim_start()
+            .trim();
+        if !cleaned.contains("->") {
+            continue;
+        }
+        let (body, route, group) = split_arrow_metadata(cleaned, task_id, domain);
+        let parts = body
+            .split("->")
+            .map(str::trim)
+            .filter(|part| !part.is_empty())
+            .collect::<Vec<_>>();
+        if parts.len() != 3 {
+            continue;
+        }
+        triads.push(Triad {
+            id: format!("raw{}", triads.len() + 1),
+            subject: parts[0].to_string(),
+            relation: parts[1].to_string(),
+            object: parts[2].to_string(),
+            evidence: format!("{}:{}", section, line_idx + 1),
+            confidence: 0.82,
+            subject_role: "subject".to_string(),
+            object_role: "object".to_string(),
+            route,
+            group,
+        });
+    }
+    normalize_ids(triads, "raw")
+}
+
+fn split_arrow_metadata(line: &str, task_id: &str, domain: &str) -> (String, String, String) {
+    let default_route = if domain.trim().is_empty() {
+        task_id.to_string()
+    } else {
+        domain.to_string()
+    };
+    let default_group = format!("{task_id}:raw");
+    let Some(start) = line.rfind('[') else {
+        return (line.to_string(), default_route, default_group);
+    };
+    let Some(end_rel) = line[start..].find(']') else {
+        return (line.to_string(), default_route, default_group);
+    };
+    let end = start + end_rel;
+    let mut route = default_route;
+    let mut group = default_group;
+    let meta = &line[start + 1..end];
+    for item in meta.split_whitespace() {
+        if let Some(value) = item.strip_prefix("route=") {
+            route = value.trim_matches('"').trim_matches('\'').to_string();
+        } else if let Some(value) = item.strip_prefix("group=") {
+            group = value.trim_matches('"').trim_matches('\'').to_string();
+        }
+    }
+    (line[..start].trim().to_string(), route, group)
+}
+
+fn apply_raw_adapter_metadata(demo: &mut Value, adapter: Value) {
+    if let Some(obj) = demo.as_object_mut() {
+        obj.insert("input_mode".to_string(), adapter["input_mode"].clone());
+        obj.insert("raw_adapter".to_string(), adapter.clone());
+    }
+    if adapter["quality"].as_str() == Some("RAW_ADAPTER_REVIEW") {
+        if let Some(items) = demo["weak_spots"].as_array_mut() {
+            items.push(json!({
+                "signal": "raw_adapter",
+                "state": adapter["quality"],
+                "expected": ["RAW_ADAPTER_READY"],
+                "reason": "Raw input had no explicit arrow triads, so the token-window fallback is review-only."
+            }));
+        }
+        if let Some(obj) = demo.as_object_mut() {
+            obj.insert("state".to_string(), json!("PUBLIC_DEMO_REVIEW"));
+            obj.insert(
+                "safe_claim".to_string(),
+                json!("LLMWave produced a reviewable structural continuation from weak raw-text extraction; write explicit arrow triads before relying on it."),
+            );
+        }
+    }
 }
 
 fn inject_llmwave_feedback(
@@ -1183,7 +1352,7 @@ fn demo_surface_report(id: &str, path: &Path, text: &str, report: &Value) -> Val
     json!({
         "core_version": CORE_VERSION,
         "mode": "llmwave-demo",
-        "version": "v61-demo-weak-spot-surface",
+        "version": "v62-demo-raw-text-adapter",
         "id": id,
         "input_packet": path.display().to_string(),
         "text": text,
@@ -1679,6 +1848,17 @@ fn print_demo_text(out: &Value) {
     println!("NANDA LLMWave Demo");
     println!();
     println!("state: {}", out["state"].as_str().unwrap_or(""));
+    if out.get("input_mode").is_some() {
+        println!("input_mode: {}", out["input_mode"].as_str().unwrap_or(""));
+    }
+    if let Some(adapter) = out.get("raw_adapter") {
+        println!(
+            "raw_adapter: {} triads={} quality={}",
+            adapter["extraction_method"].as_str().unwrap_or(""),
+            adapter["triads"].as_u64().unwrap_or(0),
+            adapter["quality"].as_str().unwrap_or("")
+        );
+    }
     println!("input: {}", out["text"].as_str().unwrap_or(""));
     println!("top_pattern: {}", out["top_pattern"].as_str().unwrap_or(""));
     println!("proof: {}", out["proof_state"].as_str().unwrap_or(""));
@@ -1711,6 +1891,20 @@ fn print_demo_text(out: &Value) {
 fn print_demo_md(out: &Value) {
     println!("# NANDA LLMWave Demo\n");
     println!("- state: `{}`", out["state"].as_str().unwrap_or(""));
+    if out.get("input_mode").is_some() {
+        println!(
+            "- input_mode: `{}`",
+            out["input_mode"].as_str().unwrap_or("")
+        );
+    }
+    if let Some(adapter) = out.get("raw_adapter") {
+        println!(
+            "- raw_adapter: `{}` triads=`{}` quality=`{}`",
+            adapter["extraction_method"].as_str().unwrap_or(""),
+            adapter["triads"].as_u64().unwrap_or(0),
+            adapter["quality"].as_str().unwrap_or("")
+        );
+    }
     println!("- input: `{}`", out["text"].as_str().unwrap_or(""));
     println!(
         "- top_pattern: `{}`",

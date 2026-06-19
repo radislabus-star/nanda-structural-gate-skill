@@ -255,6 +255,7 @@ nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --train
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
+nanda-demo --from-text examples/demo-task.raw.txt --task-id demo-raw --domain certification --text "declaration requires protocols"
 nanda-demo --suite examples/demo-corpus.json --format json
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
@@ -390,8 +391,11 @@ v49 attractor energy, v50 capacity, v51 anti-wave audit, v54 packed HRR,
 v55 cleanup thresholds, v56 anti-wave locality, v57 capacity baseline,
 v58 hot-cycle readiness, v59 proof summary, and the v60 public demo packet.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.
-`nanda-demo` is the v61 weak-spot surface: it compresses the v60 JSON into a
+`nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
+It can also start from raw relation notes via `--from-text`: explicit
+`subject -> relation -> object [route=x group=y]` lines become a temporary demo
+packet, while free-text fallback is marked review-only.
 `examples/demo-corpus.json` keeps three demo modes honest: proof-ready,
 anti-wave-visible, and review-only.
 
@@ -399,7 +403,7 @@ Recommended agent rule:
 
 ```text
 relation-heavy task
-  -> extract/build triad packet
+  -> extract/build triad packet, or use nanda-demo --from-text for raw relation notes
   -> nanda-check / nanda-search / nanda-proof as needed
   -> if using an LLMWave peak as support, run nanda-demo
   -> answer only when state=PUBLIC_DEMO_READY and weak_spots=[]

@@ -537,6 +537,12 @@ struct DemoArgs {
     input: Option<PathBuf>,
     #[arg(long)]
     suite: Option<PathBuf>,
+    #[arg(long)]
+    from_text: Option<PathBuf>,
+    #[arg(long, default_value = "demo")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
     #[arg(long, value_enum, default_value = "auto")]
     input_format: InputFormat,
     #[arg(long, default_value = "")]

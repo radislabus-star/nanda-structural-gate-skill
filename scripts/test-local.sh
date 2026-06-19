@@ -540,9 +540,11 @@ llmwave_eval_json="$("$llmwave_eval" --suite "$root/examples/llmwave-corpus.json
 jq -e '.mode == "llmwave-eval-suite" and .version == "v53-llmwave-proof-suite" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$llmwave_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "route-trap-reject-applies-anti-wave" and .states.anti_wave == "ANTI_WAVE_APPLIED")' <<<"$llmwave_eval_json" >/dev/null
 demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"
-jq -e '.mode == "llmwave-demo" and .version == "v61-demo-weak-spot-surface" and .state == "PUBLIC_DEMO_READY" and (.weak_spots | length) == 0' <<<"$demo_json" >/dev/null
+jq -e '.mode == "llmwave-demo" and .version == "v62-demo-raw-text-adapter" and .state == "PUBLIC_DEMO_READY" and (.weak_spots | length) == 0' <<<"$demo_json" >/dev/null
 demo_review_json="$("$demo" "$root/examples/triad-packet.demo-review-empty.json" --input-format json --text "unsupported relation" --format json || true)"
 jq -e '.state == "PUBLIC_DEMO_REVIEW" and (.weak_spots | length) >= 1' <<<"$demo_review_json" >/dev/null
+demo_raw_json="$("$demo" --from-text "$root/examples/demo-task.raw.txt" --task-id demo-raw --domain certification --text "declaration requires protocols" --format json)"
+jq -e '.input_mode == "raw-text" and .raw_adapter.extraction_method == "arrow-triads" and .raw_adapter.triads == 4 and .state == "PUBLIC_DEMO_READY" and .top_pattern == "declaration -> requires -> protocols" and (.weak_spots | length) == 0' <<<"$demo_raw_json" >/dev/null
 demo_suite_json="$("$demo" --suite "$root/examples/demo-corpus.json" --format json)"
 jq -e '.mode == "llmwave-demo-suite" and .passed == 3 and .total == 3 and .accuracy == 1' <<<"$demo_suite_json" >/dev/null
 jq -e '.cases[] | select(.id == "demo-review-empty-memory" and .state == "PUBLIC_DEMO_REVIEW" and (.weak_spots | length) >= 1)' <<<"$demo_suite_json" >/dev/null

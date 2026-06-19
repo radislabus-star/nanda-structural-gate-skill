@@ -1,0 +1,6 @@
+# Demo task raw relation notes
+
+declaration -> requires -> protocols [route=certification group=certification-route]
+protocols -> support -> certification [route=certification group=certification-route]
+certification payment -> pays_for -> declaration [route=certification group=certification-route]
+Monster -> follows -> certification [route=certification group=certification-route]

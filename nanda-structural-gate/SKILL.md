@@ -120,6 +120,7 @@ scripts/nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --train
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
+scripts/nanda-demo --from-text examples/demo-task.raw.txt --task-id demo-raw --domain certification --text "declaration requires protocols"
 scripts/nanda-demo --suite examples/demo-corpus.json --format json
 scripts/nanda-hgate task.json --input-format json --by linked-group
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
@@ -290,9 +291,12 @@ proof summary -> public demo packet. Use `nanda-llmwave-eval --suite
 examples/llmwave-corpus.json` before claiming LLMWave proof behavior.
 Use `nanda-demo` when a human or another agent needs the short weak-spot view:
 state, input, top pattern, proof state, compact signals, weak spots, safe
-claim, and boundary. Use `nanda-demo --suite examples/demo-corpus.json` after
-changing demo/proof behavior; it must keep ready, anti-wave, and review cases
-legible.
+claim, and boundary. If you do not yet have a packet but you have relation
+notes, use `nanda-demo --from-text notes.raw.txt`; explicit
+`subject -> relation -> object [route=x group=y]` lines become a temporary
+demo packet, while free-text fallback is review-only. Use
+`nanda-demo --suite examples/demo-corpus.json` after changing demo/proof
+behavior; it must keep ready, anti-wave, and review cases legible.
 Agent rule: if you intend to use an LLMWave peak as support for a relation-heavy
 answer, run or inspect `nanda-demo` first. Treat `PUBLIC_DEMO_READY` with empty
 `weak_spots` as usable structural support. Treat `PUBLIC_DEMO_REVIEW` or any
