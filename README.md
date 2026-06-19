@@ -22,7 +22,7 @@ current dynamic reference engine.
 For the research line behind LLMWave, see
 [`RESEARCH_DIRECTION.md`](RESEARCH_DIRECTION.md). It maps HRR, VSA,
 Sparse Distributed Memory, Hopfield-style associative memory, superposition,
-and Fourier/grokking work into concrete NANDA mechanisms and v47-v52
+and Fourier/grokking work into concrete NANDA mechanisms and v47-v60
 milestones.
 
 ## Why
@@ -143,6 +143,7 @@ evidence-conflict tasks do.
         ├── nanda-pattern-eval
         ├── nanda-pattern-bank
         ├── nanda-llmwave
+        ├── nanda-llmwave-eval
         ├── nanda-focus
         ├── nanda-proof
         ├── nanda-probe
@@ -251,6 +252,7 @@ nanda-pattern-capacity
 nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --train
+nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
@@ -373,16 +375,18 @@ structural continuations in superposition and reports ranked trajectories. With
 `nanda-feedback` can also read `nanda-decode` output. In that mode it emits
 `continuation_memory`: accepted decoded patterns are reinforced during future
 decode ranking, rejected decoded patterns are suppressed locally, and WATCH
-patterns remain review evidence. v35-v52 compact this into a 32-byte pattern
+patterns remain review evidence. v35-v60 compact this into a 32-byte pattern
 store, replay it during decode, estimate capacity, expose shortcut-specific
-negative continuation lanes, run an `nanda-llmwave` read/write/retrieve loop,
+negative continuation lanes, run an `nanda-llmwave` read/write/retrieve proof loop,
 and report the NANDA-6M pattern runtime contract. `nanda-pattern-eval` measures
 the actual learning effect: baseline decode -> feedback memory -> trained
 decode, with checks for top-pattern movement or score reinforcement.
 `nanda-pattern-bank` now builds or inspects that learned continuation layer as
 a cleanup-memory bank. `nanda-llmwave` reports v47 HRR binding, v48 cleanup,
-v49 attractor energy, v50 capacity, v51 anti-wave audit, and the v52 loop
-contract in one packet.
+v49 attractor energy, v50 capacity, v51 anti-wave audit, v54 packed HRR,
+v55 cleanup thresholds, v56 anti-wave locality, v57 capacity baseline,
+v58 hot-cycle readiness, v59 proof summary, and the v60 public demo packet.
+`nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact
@@ -524,7 +528,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v5.2-llmwave-loop
+core_version: sparse-triad-v6.0-llmwave-proof
 wave_dim: 1024
 ```
 

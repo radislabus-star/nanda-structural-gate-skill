@@ -1,6 +1,6 @@
 # NANDA / LLMWave Research Direction
 
-Status: working research compass after `sparse-triad-v5.2-llmwave-loop`.
+Status: working research compass after `sparse-triad-v6.0-llmwave-proof`.
 Updated: 2026-06-19.
 
 This file records the outside research line that should guide the next NANDA
@@ -219,10 +219,10 @@ The next LLMWave line should preserve these laws:
 
 ## Study-To-Code Roadmap
 
-Status: first baseline implemented in `sparse-triad-v5.2-llmwave-loop`. The
-v47-v52 reports are now exposed by `nanda-llmwave`, `nanda-decode`, and
-`nanda-pattern-bank`. The next research job is to deepen these reports into the
-packed hot-cycle rather than only the cold LLMWave report layer.
+Status: first proof baseline implemented in `sparse-triad-v6.0-llmwave-proof`.
+The v47-v60 reports are now exposed by `nanda-llmwave`, `nanda-decode`,
+`nanda-pattern-bank`, and `nanda-llmwave-eval`. The next research job is to
+move more of these proof signals into the NANDA-6M hot loop.
 
 ### v47: HRR Binding Sandbox
 
@@ -308,7 +308,7 @@ Success criterion:
 
 ### v52: LLMWave Read/Write/Retrieve Demo
 
-Implemented baseline: `nanda-llmwave` now produces a single v52 packet:
+Implemented baseline: `nanda-llmwave` now produces a single v60 packet:
 
 ```text
 write facts -> encode field -> query partial structure -> decode candidates ->

@@ -45,8 +45,8 @@ pub(crate) use report::*;
 pub(crate) use search::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v5.2-llmwave-loop";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v5.2-rust";
+const CORE_VERSION: &str = "sparse-triad-v6.0-llmwave-proof";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v6.0-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -84,6 +84,7 @@ enum Command {
     PatternEval(PatternEvalArgs),
     PatternBank(PatternBankArgs),
     Llmwave(LlmwaveArgs),
+    LlmwaveEval(LlmwaveEvalArgs),
     Focus(FocusArgs),
     Proof(ProofArgs),
     Probe(ProbeArgs),
@@ -507,6 +508,30 @@ struct LlmwaveArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveEvalArgs {
+    #[arg(long)]
+    suite: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, default_value_t = 3)]
+    steps: usize,
+    #[arg(long, default_value_t = 8)]
+    search_top_k: usize,
+    #[arg(long, default_value_t = 256)]
+    route_cap: usize,
+    #[arg(long, default_value_t = 32)]
+    route_triad_cap: usize,
+    #[arg(long, value_enum, default_value = "route")]
+    group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
 struct FocusArgs {
     input: PathBuf,
     #[arg(long, value_enum, default_value = "auto")]
@@ -849,6 +874,7 @@ fn run() -> Result<u8> {
         Command::PatternEval(args) => pattern_eval_cmd(args),
         Command::PatternBank(args) => pattern_bank_cmd(args),
         Command::Llmwave(args) => llmwave_cmd(args),
+        Command::LlmwaveEval(args) => llmwave_eval_cmd(args),
         Command::Focus(args) => focus::focus_cmd(args),
         Command::Proof(args) => proof::proof_cmd(args),
         Command::Probe(args) => probe_cmd(args),

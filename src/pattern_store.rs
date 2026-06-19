@@ -1,4 +1,5 @@
 use crate::*;
+use serde::Deserialize;
 use sha2::Digest;
 
 pub(crate) const PACKED_PATTERN_BYTES: usize = 32;
@@ -144,6 +145,26 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
     let attractor_trace = llmwave_attractor_report(&decode);
     let superposition_capacity = superposition_capacity_report(&packet);
     let anti_wave_audit = shortcut_anti_wave_audit(&decode, &packet);
+    let packed_hrr_runtime = packed_hrr_runtime_report(&hrr_binding, &packet);
+    let cleanup_dictionary = cleanup_dictionary_report(&cleanup_memory, &packet);
+    let anti_wave_locality = anti_wave_locality_report(&anti_wave_audit, &decode);
+    let capacity_curve = capacity_curve_report(&superposition_capacity, &packet);
+    let packed_hot_cycle = llmwave_hot_cycle_report(
+        &packed_hrr_runtime,
+        &cleanup_dictionary,
+        &capacity_curve,
+        &anti_wave_locality,
+    );
+    let proof_summary = llmwave_proof_summary(
+        &hrr_binding,
+        &cleanup_memory,
+        &attractor_trace,
+        &superposition_capacity,
+        &anti_wave_audit,
+        &packed_hot_cycle,
+        &decode,
+    );
+    let public_demo = llmwave_public_demo_report(&proof_summary, &decode, &text);
     let feedback_preview = if args.train {
         decode_feedback_preview(&decode, &args.decision, &args.note)
     } else {
@@ -155,7 +176,7 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
     let out = json!({
         "core_version": CORE_VERSION,
         "mode": "llmwave-mini-loop",
-        "version": "v52-read-write-retrieve-loop",
+        "version": "v60-public-demo-packet",
         "text": text,
         "tokens": tokens,
         "encoded_query_triads": query.iter().map(triad_json).collect::<Vec<_>>(),
@@ -164,10 +185,17 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
         "attractor_trace": attractor_trace,
         "superposition_capacity": superposition_capacity,
         "anti_wave_audit": anti_wave_audit,
+        "packed_hrr_runtime": packed_hrr_runtime,
+        "cleanup_dictionary": cleanup_dictionary,
+        "anti_wave_locality": anti_wave_locality,
+        "capacity_curve": capacity_curve,
+        "packed_hot_cycle": packed_hot_cycle,
+        "proof_summary": proof_summary,
+        "public_demo": public_demo,
         "pattern_store": compact_pattern_store_report(&packet, 3),
         "decode": decode,
         "feedback_preview": feedback_preview,
-        "read_as": "LLMWave v52 loop: raw text -> wave write/query -> HRR-style binding probe -> structural decode -> cleanup/energy/capacity/anti-wave audit -> optional feedback replay."
+        "read_as": "LLMWave v60 loop: raw text -> wave write/query -> HRR binding -> structural decode -> cleanup/energy/capacity/anti-wave audit -> packed readiness -> proof summary -> demo card."
     });
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
@@ -175,6 +203,214 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
         OutputFormat::Md => print_llmwave_md(&out),
     }
     Ok(EXIT_PASS)
+}
+
+pub(crate) fn llmwave_eval_cmd(args: LlmwaveEvalArgs) -> Result<u8> {
+    let text = fs::read_to_string(&args.suite)
+        .with_context(|| format!("read {}", args.suite.display()))?;
+    let suite: LlmwaveEvalSuite =
+        serde_json::from_str(&text).with_context(|| format!("parse {}", args.suite.display()))?;
+    if suite.cases.is_empty() {
+        return Err(anyhow!("nanda llmwave-eval requires at least one case"));
+    }
+    let base = args.suite.parent().unwrap_or_else(|| Path::new("."));
+    let mut rows = vec![];
+    let mut passed = 0usize;
+    for case in suite.cases {
+        let row = run_llmwave_eval_case(&args, base, case)?;
+        if row["ok"].as_bool().unwrap_or(false) {
+            passed += 1;
+        }
+        rows.push(row);
+    }
+    let total = rows.len();
+    let out = json!({
+        "core_version": CORE_VERSION,
+        "wave_dim": WAVE_DIM,
+        "mode": "llmwave-eval-suite",
+        "version": "v53-llmwave-proof-suite",
+        "suite": if suite.name.is_empty() { args.suite.display().to_string() } else { suite.name },
+        "passed": passed,
+        "total": total,
+        "accuracy": round4(passed as f64 / total.max(1) as f64),
+        "cases": rows,
+        "read_as": "LLMWave eval verifies the full v60 read/write/retrieve proof packet, not only the top decoded pattern."
+    });
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_llmwave_eval_text(&out),
+        OutputFormat::Md => print_llmwave_eval_md(&out),
+    }
+    Ok(if passed == total {
+        EXIT_PASS
+    } else {
+        EXIT_VETO
+    })
+}
+
+fn run_llmwave_eval_case(
+    args: &LlmwaveEvalArgs,
+    base: &Path,
+    case: LlmwaveEvalCase,
+) -> Result<Value> {
+    let path = resolve_llmwave_suite_path(base, &case.path);
+    let mut packet = load_packet_auto(
+        &path,
+        &args.input_format,
+        "llmwave-eval",
+        "general",
+        &case.text,
+        args.normalize_paths,
+    )?;
+    let text = if case.text.trim().is_empty() {
+        packet.query.clone()
+    } else {
+        case.text.clone()
+    };
+    if !case.feedback_decision.trim().is_empty() {
+        packet = inject_llmwave_feedback(packet, &text, &case, args)?;
+    }
+    let report = llmwave_report_from_packet(&packet, &path, &text, args);
+    let checks = json!({
+        "top_pattern": case.expected_top_pattern.is_empty() || report["decode"]["top_pattern"].as_str() == Some(case.expected_top_pattern.as_str()),
+        "hrr": case.expected_hrr_state.is_empty() || report["hrr_binding"]["state"].as_str() == Some(case.expected_hrr_state.as_str()),
+        "cleanup": case.expected_cleanup_state.is_empty() || report["cleanup_memory"]["state"].as_str() == Some(case.expected_cleanup_state.as_str()),
+        "attractor": case.expected_attractor_state.is_empty() || report["attractor_trace"]["state"].as_str() == Some(case.expected_attractor_state.as_str()),
+        "capacity": case.expected_capacity_state.is_empty() || report["superposition_capacity"]["state"].as_str() == Some(case.expected_capacity_state.as_str()),
+        "anti_wave": case.expected_anti_wave_state.is_empty() || report["anti_wave_audit"]["state"].as_str() == Some(case.expected_anti_wave_state.as_str()),
+        "proof": case.expected_proof_state.is_empty() || report["proof_summary"]["state"].as_str() == Some(case.expected_proof_state.as_str()),
+        "demo": case.expected_demo_state.is_empty() || report["public_demo"]["state"].as_str() == Some(case.expected_demo_state.as_str())
+    });
+    let ok = checks
+        .as_object()
+        .is_some_and(|items| items.values().all(|value| value.as_bool().unwrap_or(false)));
+    Ok(json!({
+        "id": if case.id.is_empty() { path.display().to_string() } else { case.id },
+        "case": path.display().to_string(),
+        "text": text,
+        "feedback_decision": case.feedback_decision,
+        "expected_top_pattern": case.expected_top_pattern,
+        "actual_top_pattern": report["decode"]["top_pattern"],
+        "states": {
+            "hrr": report["hrr_binding"]["state"],
+            "cleanup": report["cleanup_memory"]["state"],
+            "attractor": report["attractor_trace"]["state"],
+            "capacity": report["superposition_capacity"]["state"],
+            "anti_wave": report["anti_wave_audit"]["state"],
+            "packed_hrr": report["packed_hrr_runtime"]["state"],
+            "cleanup_dictionary": report["cleanup_dictionary"]["state"],
+            "anti_wave_locality": report["anti_wave_locality"]["state"],
+            "capacity_curve": report["capacity_curve"]["state"],
+            "hot_cycle": report["packed_hot_cycle"]["state"],
+            "proof": report["proof_summary"]["state"],
+            "demo": report["public_demo"]["state"]
+        },
+        "checks": checks,
+        "ok": ok
+    }))
+}
+
+fn llmwave_report_from_packet(
+    packet: &Packet,
+    input: &Path,
+    text: &str,
+    args: &LlmwaveEvalArgs,
+) -> Value {
+    let mut packet = packet.clone();
+    let tokens = tokenize_pattern(text);
+    let query = tokens_to_query_triads(&tokens, "llmwave-eval", "general");
+    packet.query = text.to_string();
+    let memory = normalize_ids(packet.triads.clone(), "m");
+    let decode_args = DecodeArgs {
+        input: input.to_path_buf(),
+        input_format: args.input_format.clone(),
+        task_id: "llmwave-eval".to_string(),
+        domain: "general".to_string(),
+        query: text.to_string(),
+        query_file: None,
+        query_format: args.input_format.clone(),
+        top_k: args.top_k,
+        steps: args.steps.clamp(1, 16),
+        beam_width: 1,
+        adaptive_scoring: false,
+        search_top_k: args.search_top_k,
+        route_cap: args.route_cap,
+        route_triad_cap: args.route_triad_cap,
+        group_by: args.group_by.clone(),
+        format: OutputFormat::Json,
+        normalize_paths: args.normalize_paths,
+    };
+    let decode = recurrent_decode_report(
+        &packet,
+        &memory,
+        &query,
+        "llmwave-eval-query",
+        &decode_args,
+        decode_args.steps,
+    );
+    let hrr_binding = hrr_binding_report(&packet, &query, args.top_k);
+    let cleanup_memory = cleanup_memory_report(&decode, &packet);
+    let attractor_trace = llmwave_attractor_report(&decode);
+    let superposition_capacity = superposition_capacity_report(&packet);
+    let anti_wave_audit = shortcut_anti_wave_audit(&decode, &packet);
+    let packed_hrr_runtime = packed_hrr_runtime_report(&hrr_binding, &packet);
+    let cleanup_dictionary = cleanup_dictionary_report(&cleanup_memory, &packet);
+    let anti_wave_locality = anti_wave_locality_report(&anti_wave_audit, &decode);
+    let capacity_curve = capacity_curve_report(&superposition_capacity, &packet);
+    let packed_hot_cycle = llmwave_hot_cycle_report(
+        &packed_hrr_runtime,
+        &cleanup_dictionary,
+        &capacity_curve,
+        &anti_wave_locality,
+    );
+    let proof_summary = llmwave_proof_summary(
+        &hrr_binding,
+        &cleanup_memory,
+        &attractor_trace,
+        &superposition_capacity,
+        &anti_wave_audit,
+        &packed_hot_cycle,
+        &decode,
+    );
+    let public_demo = llmwave_public_demo_report(&proof_summary, &decode, text);
+    json!({
+        "core_version": CORE_VERSION,
+        "mode": "llmwave-eval-case-report",
+        "version": "v60-public-demo-packet",
+        "hrr_binding": hrr_binding,
+        "cleanup_memory": cleanup_memory,
+        "attractor_trace": attractor_trace,
+        "superposition_capacity": superposition_capacity,
+        "anti_wave_audit": anti_wave_audit,
+        "packed_hrr_runtime": packed_hrr_runtime,
+        "cleanup_dictionary": cleanup_dictionary,
+        "anti_wave_locality": anti_wave_locality,
+        "capacity_curve": capacity_curve,
+        "packed_hot_cycle": packed_hot_cycle,
+        "proof_summary": proof_summary,
+        "public_demo": public_demo,
+        "decode": decode
+    })
+}
+
+fn inject_llmwave_feedback(
+    mut packet: Packet,
+    text: &str,
+    case: &LlmwaveEvalCase,
+    args: &LlmwaveEvalArgs,
+) -> Result<Packet> {
+    let report = llmwave_report_from_packet(&packet, &case.path, text, args);
+    let decision = normalize_llmwave_feedback_decision(&case.feedback_decision)?;
+    let note = if case.note.trim().is_empty() {
+        format!("llmwave eval {decision}")
+    } else {
+        case.note.clone()
+    };
+    let mut memories =
+        continuation_memory_from_decode(&report["decode"], &decision, &note, "llmwave-eval".into());
+    packet.continuation_memory.append(&mut memories);
+    packet.continuation_memory = merge_continuation_memory(packet.continuation_memory);
+    Ok(packet)
 }
 
 fn hrr_binding_report(packet: &Packet, query: &[Triad], top_k: usize) -> Value {
@@ -465,6 +701,259 @@ fn pattern_label_value(pattern: &Value) -> String {
         pattern["relation"].as_str().unwrap_or(""),
         pattern["object"].as_str().unwrap_or("")
     )
+}
+
+fn packed_hrr_runtime_report(hrr: &Value, packet: &Packet) -> Value {
+    let records = hrr["sample"].as_array().map_or(0, Vec::len);
+    let bytes_per_lane = 64usize;
+    let bytes = records * bytes_per_lane;
+    let recovered = hrr["recovered_in_sample"].as_u64().unwrap_or(0);
+    json!({
+        "version": "v54-packed-hrr-lanes",
+        "state": if recovered > 0 { "PACKED_HRR_READY" } else { "PACKED_HRR_REVIEW" },
+        "records": records,
+        "source_triads": packet.triads.len(),
+        "bytes_per_lane": bytes_per_lane,
+        "bytes": bytes,
+        "fits_pattern_arena": bytes <= PATTERN_STORE_ARENA_BYTES,
+        "contract": "role/filler binding probes are representable as fixed 64-byte hot lanes",
+        "read_as": "v54 moves HRR binding from a visual report toward a packed-lane runtime contract."
+    })
+}
+
+fn cleanup_dictionary_report(cleanup: &Value, packet: &Packet) -> Value {
+    let items = cleanup["items"].as_array().cloned().unwrap_or_default();
+    let exact = items
+        .iter()
+        .filter(|item| item["state"].as_str() == Some("CLEANUP_EXACT"))
+        .count();
+    let near = items
+        .iter()
+        .filter(|item| item["state"].as_str() == Some("CLEANUP_NEAR"))
+        .count();
+    let ambiguous = items
+        .iter()
+        .filter(|item| item["state"].as_str() == Some("CLEANUP_AMBIGUOUS"))
+        .count();
+    let state = if ambiguous > 0 {
+        "CLEANUP_DICTIONARY_WATCH"
+    } else if exact + near > 0 {
+        "CLEANUP_DICTIONARY_READY"
+    } else {
+        "CLEANUP_DICTIONARY_EMPTY"
+    };
+    json!({
+        "version": "v55-cleanup-dictionary-thresholds",
+        "state": state,
+        "memory_triads": packet.triads.len(),
+        "exact": exact,
+        "near": near,
+        "ambiguous": ambiguous,
+        "exact_threshold": 0.92,
+        "near_threshold": 0.45,
+        "read_as": "v55 makes cleanup explicit: exact and near matches can support proof; ambiguous cleanup keeps the result under WATCH."
+    })
+}
+
+fn anti_wave_locality_report(anti_wave: &Value, decode: &Value) -> Value {
+    let applications = anti_wave["applications"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let suppressions = applications
+        .iter()
+        .filter(|item| item["action"].as_str() == Some("suppress"))
+        .count();
+    let reinforcements = applications
+        .iter()
+        .filter(|item| item["action"].as_str() == Some("reinforce"))
+        .count();
+    let top_after = decode["top_pattern"].as_str().unwrap_or("");
+    let state = if suppressions > 0 && !top_after.is_empty() {
+        "ANTI_WAVE_LOCAL"
+    } else if anti_wave["negative_records"].as_u64().unwrap_or(0) > 0 {
+        "ANTI_WAVE_NOT_TRIGGERED"
+    } else {
+        "ANTI_WAVE_NO_MEMORY"
+    };
+    json!({
+        "version": "v56-anti-wave-locality-fixture",
+        "state": state,
+        "suppressions": suppressions,
+        "reinforcements": reinforcements,
+        "top_after": top_after,
+        "kept_decode_alive": !top_after.is_empty(),
+        "read_as": "v56 checks that anti-wave suppresses a shortcut-shaped continuation without destroying the whole decode surface."
+    })
+}
+
+fn capacity_curve_report(capacity: &Value, packet: &Packet) -> Value {
+    let active = capacity["active_patterns"].as_u64().unwrap_or(0) as usize;
+    let direct_table_bytes = active * 96;
+    let packed_wave_bytes = active * PACKED_PATTERN_BYTES;
+    let compression_ratio = if packed_wave_bytes == 0 {
+        0.0
+    } else {
+        direct_table_bytes as f64 / packed_wave_bytes as f64
+    };
+    json!({
+        "version": "v57-superposition-capacity-baseline",
+        "state": capacity["state"],
+        "active_patterns": active,
+        "routes": capacity["routes"],
+        "direct_table_bytes_estimate": direct_table_bytes,
+        "packed_wave_bytes_estimate": packed_wave_bytes,
+        "compression_ratio_vs_direct_table": round4(compression_ratio),
+        "continuation_records": packet.continuation_memory.len(),
+        "read_as": "v57 compares the packed wave representation with a simple direct-table estimate before making capacity claims."
+    })
+}
+
+fn llmwave_hot_cycle_report(
+    packed_hrr: &Value,
+    cleanup_dictionary: &Value,
+    capacity_curve: &Value,
+    anti_wave_locality: &Value,
+) -> Value {
+    let ready = packed_hrr["state"].as_str() == Some("PACKED_HRR_READY")
+        && matches!(
+            cleanup_dictionary["state"].as_str().unwrap_or(""),
+            "CLEANUP_DICTIONARY_READY" | "CLEANUP_DICTIONARY_EMPTY"
+        )
+        && capacity_curve["state"].as_str() != Some("FOCUS_REQUIRED")
+        && anti_wave_locality["kept_decode_alive"]
+            .as_bool()
+            .unwrap_or(true);
+    json!({
+        "version": "v58-packed-hot-cycle-bridge",
+        "state": if ready { "LLMWAVE_HOT_READY" } else { "LLMWAVE_HOT_WATCH" },
+        "packed_hrr_state": packed_hrr["state"],
+        "cleanup_dictionary_state": cleanup_dictionary["state"],
+        "capacity_state": capacity_curve["state"],
+        "anti_wave_locality_state": anti_wave_locality["state"],
+        "read_as": "v58 is the cold-to-hot bridge: v52 reports are collapsed into a single packed runtime readiness state."
+    })
+}
+
+fn llmwave_proof_summary(
+    hrr: &Value,
+    cleanup: &Value,
+    attractor: &Value,
+    capacity: &Value,
+    anti_wave: &Value,
+    hot_cycle: &Value,
+    decode: &Value,
+) -> Value {
+    let mut blockers = vec![];
+    if hrr["state"].as_str() != Some("HRR_BINDING_VISIBLE") {
+        blockers.push("hrr_binding");
+    }
+    if cleanup["state"].as_str() == Some("CLEANUP_WATCH") {
+        blockers.push("cleanup_memory");
+    }
+    if !matches!(
+        attractor["state"].as_str().unwrap_or(""),
+        "ATTRACTOR_STABLE" | "NO_ATTRACTOR_TRACE"
+    ) {
+        blockers.push("attractor_trace");
+    }
+    if capacity["state"].as_str() == Some("FOCUS_REQUIRED") {
+        blockers.push("capacity");
+    }
+    if hot_cycle["state"].as_str() != Some("LLMWAVE_HOT_READY") {
+        blockers.push("hot_cycle");
+    }
+    let top_pattern = decode["top_pattern"].as_str().unwrap_or("");
+    if top_pattern.is_empty() {
+        blockers.push("decode");
+    }
+    let state = if blockers.is_empty() {
+        "LLMWAVE_PROOF_READY"
+    } else {
+        "LLMWAVE_PROOF_WATCH"
+    };
+    json!({
+        "version": "v59-llmwave-proof-command-contract",
+        "state": state,
+        "answer_ready": state == "LLMWAVE_PROOF_READY",
+        "top_pattern": top_pattern,
+        "anti_wave_state": anti_wave["state"],
+        "blockers": blockers,
+        "read_as": "v59 is the proof contract: a decoded pattern is useful only when binding, cleanup, attractor, capacity, and hot readiness agree."
+    })
+}
+
+fn llmwave_public_demo_report(proof: &Value, decode: &Value, text: &str) -> Value {
+    let top = decode["top_pattern"].as_str().unwrap_or("");
+    let state = if proof["state"].as_str() == Some("LLMWAVE_PROOF_READY") {
+        "PUBLIC_DEMO_READY"
+    } else {
+        "PUBLIC_DEMO_REVIEW"
+    };
+    json!({
+        "version": "v60-public-demo-packet",
+        "state": state,
+        "input": text,
+        "demo_claim": if state == "PUBLIC_DEMO_READY" { "LLMWave found a stable structural continuation and exposed its proof signals." } else { "LLMWave produced a reviewable structural continuation, but proof blockers remain." },
+        "top_pattern": top,
+        "safe_claim": "This is structural wave retrieval/proof, not standalone natural-language understanding.",
+        "read_as": "v60 is the public demo surface: one compact packet that can be shown without hiding proof state."
+    })
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct LlmwaveEvalSuite {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    cases: Vec<LlmwaveEvalCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct LlmwaveEvalCase {
+    #[serde(default)]
+    id: String,
+    path: PathBuf,
+    #[serde(default)]
+    text: String,
+    #[serde(default)]
+    feedback_decision: String,
+    #[serde(default)]
+    note: String,
+    #[serde(default)]
+    expected_top_pattern: String,
+    #[serde(default)]
+    expected_hrr_state: String,
+    #[serde(default)]
+    expected_cleanup_state: String,
+    #[serde(default)]
+    expected_attractor_state: String,
+    #[serde(default)]
+    expected_capacity_state: String,
+    #[serde(default)]
+    expected_anti_wave_state: String,
+    #[serde(default)]
+    expected_proof_state: String,
+    #[serde(default)]
+    expected_demo_state: String,
+}
+
+fn resolve_llmwave_suite_path(base: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        base.join(path)
+    }
+}
+
+fn normalize_llmwave_feedback_decision(decision: &str) -> Result<String> {
+    match norm(decision).as_str() {
+        "" => Ok(String::new()),
+        "accept" | "accepted" => Ok("accept".to_string()),
+        "reject" | "rejected" => Ok("reject".to_string()),
+        "watch" => Ok("watch".to_string()),
+        other => Err(anyhow!("unsupported llmwave feedback decision: {other}")),
+    }
 }
 
 pub(crate) fn compact_pattern_store_report(packet: &Packet, sample: usize) -> Value {
@@ -820,4 +1309,51 @@ fn print_llmwave_md(out: &Value) {
         "- decoder_state: `{}`",
         out["decode"]["decoder_state"].as_str().unwrap_or("")
     );
+}
+
+fn print_llmwave_eval_text(out: &Value) {
+    println!("mode: {}", out["mode"].as_str().unwrap_or(""));
+    println!(
+        "passed: {}/{}",
+        out["passed"].as_u64().unwrap_or(0),
+        out["total"].as_u64().unwrap_or(0)
+    );
+    if let Some(cases) = out["cases"].as_array() {
+        for case in cases {
+            println!(
+                "- {}: {} top={}",
+                case["id"].as_str().unwrap_or(""),
+                if case["ok"].as_bool().unwrap_or(false) {
+                    "ok"
+                } else {
+                    "fail"
+                },
+                case["actual_top_pattern"].as_str().unwrap_or("")
+            );
+        }
+    }
+}
+
+fn print_llmwave_eval_md(out: &Value) {
+    println!("# NANDA LLMWave Eval\n");
+    println!("- mode: `{}`", out["mode"].as_str().unwrap_or(""));
+    println!(
+        "- passed: `{}/{}`",
+        out["passed"].as_u64().unwrap_or(0),
+        out["total"].as_u64().unwrap_or(0)
+    );
+    if let Some(cases) = out["cases"].as_array() {
+        for case in cases {
+            println!(
+                "- `{}`: `{}` top=`{}`",
+                case["id"].as_str().unwrap_or(""),
+                if case["ok"].as_bool().unwrap_or(false) {
+                    "ok"
+                } else {
+                    "fail"
+                },
+                case["actual_top_pattern"].as_str().unwrap_or("")
+            );
+        }
+    }
 }

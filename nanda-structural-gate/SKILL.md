@@ -118,6 +118,7 @@ scripts/nanda-pattern-capacity
 scripts/nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 scripts/nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --train
+scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-hgate task.json --input-format json --by linked-group
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
@@ -271,7 +272,7 @@ rejected a decoded structural continuation. The feedback emits
 reinforce accepted patterns and suppress rejected local forms before recurrent
 selection.
 Inspect `compact_pattern_store` in decode output or run `nanda-pattern-store`
-when continuation memory exists. It is the v35-v52 bridge: 32-byte packed
+when continuation memory exists. It is the v35-v60 bridge: 32-byte packed
 patterns, replay during decode, capacity estimates, shortcut-specific negative
 continuation lanes, cleanup memory, HRR binding probes, attractor energy traces,
 superposition capacity checks, anti-wave audits, and a NANDA-6M pattern runtime
@@ -281,8 +282,10 @@ use `nanda-pattern-eval` before claiming continuation feedback actually changed
 the decoder field. It compares baseline decode with trained decode and reports
 whether reject moved the top pattern or accept reinforced it. Use
 `nanda-pattern-bank` to build or inspect the learned cleanup-memory bank. Use
-`nanda-llmwave` for the v52 loop: raw text -> encode -> HRR binding probe ->
-decode -> cleanup -> energy/capacity/anti-wave audit -> feedback preview.
+`nanda-llmwave` for the v60 loop: raw text -> encode -> HRR binding probe ->
+decode -> cleanup -> energy/capacity/anti-wave audit -> packed readiness ->
+proof summary -> public demo packet. Use `nanda-llmwave-eval --suite
+examples/llmwave-corpus.json` before claiming LLMWave proof behavior.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each

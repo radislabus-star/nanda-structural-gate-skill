@@ -145,5 +145,17 @@ Status: started.
 - v52 read/write/retrieve loop: `nanda-llmwave` now combines raw text encoding,
   HRR binding probe, structural decode, cleanup, energy trace, capacity,
   anti-wave audit, and feedback preview.
-- Next milestone is making these v52 reports participate earlier in the packed
-  hot cycle, not only in cold decode ranking.
+- v53 proof suite: `nanda-llmwave-eval` checks full LLMWave proof packets.
+- v54 packed HRR lanes: HRR binding probes expose fixed hot-lane estimates.
+- v55 cleanup dictionary thresholds: cleanup reports exact/near/ambiguous
+  states explicitly.
+- v56 anti-wave locality: reject lanes must suppress a shortcut while keeping
+  decode alive.
+- v57 capacity baseline: packed-wave estimates are compared to direct-table
+  storage.
+- v58 packed hot-cycle bridge: report states collapse into
+  `LLMWAVE_HOT_READY` or `LLMWAVE_HOT_WATCH`.
+- v59 proof summary: LLMWave exposes one answer-readiness contract.
+- v60 public demo packet: the demo surface includes safe claims and proof
+  blockers instead of hiding uncertainty.
+- Next milestone is moving v60 proof signals deeper into the NANDA-6M hot loop.

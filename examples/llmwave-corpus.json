@@ -1,0 +1,32 @@
+{
+  "name": "nanda-v60-llmwave-proof",
+  "cases": [
+    {
+      "id": "route-trap-v60-proof-ready",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "text": "declaration requires protocols",
+      "expected_top_pattern": "declaration -> requires -> protocols",
+      "expected_hrr_state": "HRR_BINDING_VISIBLE",
+      "expected_cleanup_state": "CLEANUP_READY",
+      "expected_attractor_state": "ATTRACTOR_STABLE",
+      "expected_capacity_state": "CAPACITY_HEALTHY",
+      "expected_anti_wave_state": "NO_ANTI_WAVE_MEMORY",
+      "expected_proof_state": "LLMWAVE_PROOF_READY",
+      "expected_demo_state": "PUBLIC_DEMO_READY"
+    },
+    {
+      "id": "route-trap-reject-applies-anti-wave",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "text": "declaration requires protocols",
+      "feedback_decision": "reject",
+      "note": "reject false first continuation",
+      "expected_hrr_state": "HRR_BINDING_VISIBLE",
+      "expected_cleanup_state": "CLEANUP_READY",
+      "expected_attractor_state": "ATTRACTOR_STABLE",
+      "expected_capacity_state": "CAPACITY_HEALTHY",
+      "expected_anti_wave_state": "ANTI_WAVE_APPLIED",
+      "expected_proof_state": "LLMWAVE_PROOF_READY",
+      "expected_demo_state": "PUBLIC_DEMO_READY"
+    }
+  ]
+}

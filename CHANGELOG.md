@@ -112,8 +112,17 @@
 - v52 upgrades `nanda-llmwave` to a read/write/retrieve loop that reports HRR
   binding, cleanup, attractor energy, capacity, anti-wave locality, decode, and
   feedback preview in one packet.
-- Core version is now `sparse-triad-v5.2-llmwave-loop`.
-- Cargo package version is now `5.2.0`.
+- v53 adds `nanda-llmwave-eval` and `examples/llmwave-corpus.json` to verify
+  the full LLMWave proof packet.
+- v54 reports packed HRR lanes as a fixed 64-byte hot-lane contract.
+- v55 adds cleanup dictionary thresholds.
+- v56 adds anti-wave locality checks.
+- v57 adds direct-table vs packed-wave capacity baseline estimates.
+- v58 collapses LLMWave reports into a packed hot-cycle readiness state.
+- v59 adds the LLMWave proof-summary contract.
+- v60 exposes a public demo packet with a safe claim and proof state.
+- Core version is now `sparse-triad-v6.0-llmwave-proof`.
+- Cargo package version is now `6.0.0`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior
