@@ -47,7 +47,7 @@ pub(crate) fn pattern_bank_report(packet: &Packet, args: &PatternBankArgs) -> Va
         "core_version": CORE_VERSION,
         "wave_dim": WAVE_DIM,
         "mode": "pattern-bank",
-        "version": "v46-pattern-bank",
+        "version": "v48-cleanup-pattern-bank",
         "operation": mode,
         "records": store["records"],
         "accepted": store["accepted"],
@@ -59,8 +59,16 @@ pub(crate) fn pattern_bank_report(packet: &Packet, args: &PatternBankArgs) -> Va
         "remaining_bytes": store["remaining_bytes"],
         "fits_pattern_arena": store["fits_pattern_arena"],
         "apply_state": apply_state,
+        "cleanup_memory": {
+            "version": "v48-cleanup-memory",
+            "state": if packet.continuation_memory.is_empty() { "NO_CLEANUP_RECORDS" } else { "CLEANUP_DICTIONARY_READY" },
+            "records": packet.continuation_memory.len(),
+            "accepted_records": store["accepted"],
+            "rejected_records": store["rejected"],
+            "contract": "raw decoded pattern -> nearest accepted/rejected continuation record -> cleanup verdict"
+        },
         "records_sample": store["records_sample"],
-        "read_as": "A Pattern Bank is the standalone learned continuation-memory layer: compact 32-byte pattern records that can be inspected, budgeted, and replayed during LLMWave decode."
+        "read_as": "A Pattern Bank is now the cleanup-memory layer: compact 32-byte continuation records that can inspect, budget, replay, and clean up noisy decoded structural patterns."
     })
 }
 

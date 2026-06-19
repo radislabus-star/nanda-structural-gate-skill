@@ -70,6 +70,10 @@ core_version: sparse-triad-v2.5-probe-report
     route/group/support shape and search exposes top-level verdict fields.
 38. Add probe report. Done in `v2.5`: compare plain search against negative-lane
     search before claiming destructive interference improved the result.
+39. Maintain the research compass. Current direction is recorded in
+    `RESEARCH_DIRECTION.md`: HRR/VSA/SDM/Hopfield/superposition/Fourier
+    mechanisms are mapped to NANDA imports, refusals, tests, and v47-v52
+    milestones.
 
 ## Engineering Constraints
 

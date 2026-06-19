@@ -45,8 +45,8 @@ pub(crate) use report::*;
 pub(crate) use search::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v4.6-pattern-bank";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v4.6-rust";
+const CORE_VERSION: &str = "sparse-triad-v5.2-llmwave-loop";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v5.2-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;

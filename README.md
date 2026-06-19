@@ -19,6 +19,12 @@ For the planned cache-resident runtime, see
 as a separate 6 MiB packed hot core, not as another command bolted onto the
 current dynamic reference engine.
 
+For the research line behind LLMWave, see
+[`RESEARCH_DIRECTION.md`](RESEARCH_DIRECTION.md). It maps HRR, VSA,
+Sparse Distributed Memory, Hopfield-style associative memory, superposition,
+and Fourier/grokking work into concrete NANDA mechanisms and v47-v52
+milestones.
+
 ## Why
 
 LLMs can read individual facts correctly and still confuse the relation shape:
@@ -367,13 +373,16 @@ structural continuations in superposition and reports ranked trajectories. With
 `nanda-feedback` can also read `nanda-decode` output. In that mode it emits
 `continuation_memory`: accepted decoded patterns are reinforced during future
 decode ranking, rejected decoded patterns are suppressed locally, and WATCH
-patterns remain review evidence. v35-v46 compact this into a 32-byte pattern
+patterns remain review evidence. v35-v52 compact this into a 32-byte pattern
 store, replay it during decode, estimate capacity, expose shortcut-specific
-negative continuation lanes, run an `nanda-llmwave` mini-loop, and report the
-NANDA-6M pattern runtime contract. `nanda-pattern-eval` measures the actual
-learning effect: baseline decode -> feedback memory -> trained decode, with
-checks for top-pattern movement or score reinforcement. `nanda-pattern-bank`
-builds or inspects that learned continuation layer as a standalone compact bank.
+negative continuation lanes, run an `nanda-llmwave` read/write/retrieve loop,
+and report the NANDA-6M pattern runtime contract. `nanda-pattern-eval` measures
+the actual learning effect: baseline decode -> feedback memory -> trained
+decode, with checks for top-pattern movement or score reinforcement.
+`nanda-pattern-bank` now builds or inspects that learned continuation layer as
+a cleanup-memory bank. `nanda-llmwave` reports v47 HRR binding, v48 cleanup,
+v49 attractor energy, v50 capacity, v51 anti-wave audit, and the v52 loop
+contract in one packet.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact
@@ -515,7 +524,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v4.6-pattern-bank
+core_version: sparse-triad-v5.2-llmwave-loop
 wave_dim: 1024
 ```
 

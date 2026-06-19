@@ -271,16 +271,18 @@ rejected a decoded structural continuation. The feedback emits
 reinforce accepted patterns and suppress rejected local forms before recurrent
 selection.
 Inspect `compact_pattern_store` in decode output or run `nanda-pattern-store`
-when continuation memory exists. It is the v35-v46 bridge: 32-byte packed
+when continuation memory exists. It is the v35-v52 bridge: 32-byte packed
 patterns, replay during decode, capacity estimates, shortcut-specific negative
-continuation lanes, and a NANDA-6M pattern runtime contract. Use
+continuation lanes, cleanup memory, HRR binding probes, attractor energy traces,
+superposition capacity checks, anti-wave audits, and a NANDA-6M pattern runtime
+contract. Use
 `nanda-pattern-capacity` before claiming large learned-pattern capacity, and
 use `nanda-pattern-eval` before claiming continuation feedback actually changed
 the decoder field. It compares baseline decode with trained decode and reports
 whether reject moved the top pattern or accept reinforced it. Use
-`nanda-pattern-bank` to build or inspect the standalone learned continuation
-bank. Use `nanda-llmwave` for the mini-loop: raw text -> encode -> decode ->
-feedback preview.
+`nanda-pattern-bank` to build or inspect the learned cleanup-memory bank. Use
+`nanda-llmwave` for the v52 loop: raw text -> encode -> HRR binding probe ->
+decode -> cleanup -> energy/capacity/anti-wave audit -> feedback preview.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each

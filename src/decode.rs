@@ -282,6 +282,7 @@ pub(crate) fn recurrent_decode_report(
         .last()
         .cloned()
         .unwrap_or_else(|| first.clone());
+    let energy_trace = decode_energy_trace(&step_reports);
     let beam_decode = beam_decode_report(packet, memory, query, query_source, args, steps);
     json!({
         "core_version": CORE_VERSION,
@@ -299,6 +300,7 @@ pub(crate) fn recurrent_decode_report(
         "top_pattern": first["top_pattern"],
         "patterns": first["patterns"],
         "beam_decode": beam_decode,
+        "energy_trace": energy_trace,
         "recurrent": {
             "enabled": steps > 1,
             "requested_steps": steps,
@@ -306,6 +308,7 @@ pub(crate) fn recurrent_decode_report(
             "final_decoder_state": final_step["decoder_state"],
             "final_top_pattern": final_step["top_pattern"],
             "final_context": current_query.iter().map(triad_json).collect::<Vec<_>>(),
+            "energy_trace": energy_trace,
             "steps": step_reports,
             "read_as": "Each recurrent step decodes a next structural pattern, feeds it back as query context, and re-runs the field."
         },
@@ -316,6 +319,72 @@ pub(crate) fn recurrent_decode_report(
         } else {
             "This is the first LLMWave bridge: it decodes the interference field into ranked next structural patterns, not natural-language text."
         }
+    })
+}
+
+fn decode_energy_trace(step_reports: &[Value]) -> Value {
+    let mut rows = vec![];
+    let mut last_energy = None::<f64>;
+    let mut last_route = String::new();
+    let mut route_jumps = 0usize;
+    for step in step_reports {
+        let route = step["source_search"]["top_peak"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        if !last_route.is_empty() && !route.is_empty() && last_route != route {
+            route_jumps += 1;
+        }
+        if !route.is_empty() {
+            last_route = route.clone();
+        }
+        let top_score = step["patterns"]
+            .as_array()
+            .and_then(|items| items.first())
+            .and_then(|item| item["score"].as_f64())
+            .unwrap_or(0.0);
+        let peak_margin = step["source_search"]["peak_margin"].as_f64().unwrap_or(0.0);
+        let safe_bonus = if step["safe_to_generate"].as_bool().unwrap_or(false) {
+            0.04
+        } else {
+            0.0
+        };
+        let energy = round4((top_score + peak_margin + safe_bonus).clamp(-1.0, 2.0));
+        let trend = match last_energy {
+            None => "START",
+            Some(prev) if energy > prev + 0.005 => "IMPROVING",
+            Some(prev) if energy < prev - 0.005 => "DROPPING",
+            Some(_) => "SATURATING",
+        };
+        last_energy = Some(energy);
+        rows.push(json!({
+            "step": step["step"],
+            "route_basin": route,
+            "top_pattern": step["top_pattern"],
+            "energy": energy,
+            "trend": trend,
+            "decoder_state": step["decoder_state"]
+        }));
+    }
+    let state = if rows.is_empty() {
+        "NO_ENERGY_TRACE"
+    } else if route_jumps == 0
+        && rows
+            .iter()
+            .all(|row| row["trend"].as_str().is_some_and(|x| x != "DROPPING"))
+    {
+        "ATTRACTOR_STABLE"
+    } else if route_jumps > 0 {
+        "ATTRACTOR_ROUTE_JUMP"
+    } else {
+        "ATTRACTOR_REVIEW"
+    };
+    json!({
+        "version": "v49-attractor-energy-trace",
+        "route_jumps": route_jumps,
+        "state": state,
+        "steps": rows,
+        "read_as": "Decode now exposes an attractor-style energy trace: stable recurrent routes should improve or saturate instead of jumping basins."
     })
 }
 

@@ -139,6 +139,11 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
         &decode_args,
         decode_args.steps,
     );
+    let hrr_binding = hrr_binding_report(&packet, &query, args.top_k);
+    let cleanup_memory = cleanup_memory_report(&decode, &packet);
+    let attractor_trace = llmwave_attractor_report(&decode);
+    let superposition_capacity = superposition_capacity_report(&packet);
+    let anti_wave_audit = shortcut_anti_wave_audit(&decode, &packet);
     let feedback_preview = if args.train {
         decode_feedback_preview(&decode, &args.decision, &args.note)
     } else {
@@ -150,14 +155,19 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
     let out = json!({
         "core_version": CORE_VERSION,
         "mode": "llmwave-mini-loop",
-        "version": "v39-encode-decode-train-loop",
+        "version": "v52-read-write-retrieve-loop",
         "text": text,
         "tokens": tokens,
         "encoded_query_triads": query.iter().map(triad_json).collect::<Vec<_>>(),
+        "hrr_binding": hrr_binding,
+        "cleanup_memory": cleanup_memory,
+        "attractor_trace": attractor_trace,
+        "superposition_capacity": superposition_capacity,
+        "anti_wave_audit": anti_wave_audit,
         "pattern_store": compact_pattern_store_report(&packet, 3),
         "decode": decode,
         "feedback_preview": feedback_preview,
-        "read_as": "Mini-loop: raw text -> token wave query -> structural decode -> optional continuation feedback preview."
+        "read_as": "LLMWave v52 loop: raw text -> wave write/query -> HRR-style binding probe -> structural decode -> cleanup/energy/capacity/anti-wave audit -> optional feedback replay."
     });
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
@@ -165,6 +175,296 @@ pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
         OutputFormat::Md => print_llmwave_md(&out),
     }
     Ok(EXIT_PASS)
+}
+
+fn hrr_binding_report(packet: &Packet, query: &[Triad], top_k: usize) -> Value {
+    let mut rows = packet
+        .triads
+        .iter()
+        .map(|triad| {
+            let subject_bound = bind(
+                &vector(&format!("role:{}", norm(&triad.subject_role))),
+                &vector(&format!("entity:{}", norm(&triad.subject))),
+            );
+            let object_bound = bind(
+                &vector(&format!("role:{}", norm(&triad.object_role))),
+                &vector(&format!("entity:{}", norm(&triad.object))),
+            );
+            let relation = vector(&format!("relation:{}", norm(&triad.relation)));
+            let bound = bind(&bind(&subject_bound, &relation), &object_bound);
+            let query_score = if query.is_empty() {
+                0.0
+            } else {
+                query
+                    .iter()
+                    .map(|q| cosine(&bound, &triad_wave(q)))
+                    .fold(f64::NEG_INFINITY, f64::max)
+                    .max(0.0)
+            };
+            let recovered_subject = bind(
+                &subject_bound,
+                &vector(&format!("role:{}", norm(&triad.subject_role))),
+            );
+            let recovered_object = bind(
+                &object_bound,
+                &vector(&format!("role:{}", norm(&triad.object_role))),
+            );
+            let subject_recovery = cosine(
+                &recovered_subject,
+                &vector(&format!("entity:{}", norm(&triad.subject))),
+            );
+            let object_recovery = cosine(
+                &recovered_object,
+                &vector(&format!("entity:{}", norm(&triad.object))),
+            );
+            json!({
+                "triad": triad.id,
+                "subject": triad.subject,
+                "relation": triad.relation,
+                "object": triad.object,
+                "route": triad.route,
+                "role_filler_binding": true,
+                "query_score": round4(query_score),
+                "subject_unbind_cosine": round4(subject_recovery),
+                "object_unbind_cosine": round4(object_recovery),
+                "state": if subject_recovery > 0.98 && object_recovery > 0.98 { "BINDING_RECOVERED" } else { "BINDING_AMBIGUOUS" }
+            })
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["query_score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["query_score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    rows.truncate(top_k.max(1));
+    let recovered = rows
+        .iter()
+        .filter(|row| row["state"].as_str() == Some("BINDING_RECOVERED"))
+        .count();
+    json!({
+        "version": "v47-hrr-binding-sandbox",
+        "operation": "role_filler_bind_unbind",
+        "records_checked": packet.triads.len(),
+        "sample": rows,
+        "recovered_in_sample": recovered,
+        "state": if recovered > 0 { "HRR_BINDING_VISIBLE" } else { "HRR_BINDING_REVIEW" },
+        "read_as": "Experimental HRR-style binding probe: role * filler lanes are bound and then unbound back to subject/object vectors. This is a sandbox signal, not proof by itself."
+    })
+}
+
+fn cleanup_memory_report(decode: &Value, packet: &Packet) -> Value {
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let mut cleanup_rows = vec![];
+    for pattern in patterns.iter().take(5) {
+        let mut best = None::<(f64, &Triad)>;
+        let p_wave = triad_wave(&Triad {
+            id: String::new(),
+            subject: pattern["subject"].as_str().unwrap_or("").to_string(),
+            relation: pattern["relation"].as_str().unwrap_or("").to_string(),
+            object: pattern["object"].as_str().unwrap_or("").to_string(),
+            evidence: String::new(),
+            confidence: 1.0,
+            subject_role: pattern["subject_role"]
+                .as_str()
+                .unwrap_or("subject")
+                .to_string(),
+            object_role: pattern["object_role"]
+                .as_str()
+                .unwrap_or("object")
+                .to_string(),
+            route: pattern["route"].as_str().unwrap_or("").to_string(),
+            group: pattern["group"].as_str().unwrap_or("").to_string(),
+        });
+        for triad in &packet.triads {
+            let score = cosine(&p_wave, &triad_wave(triad));
+            if best.as_ref().is_none_or(|(old, _)| score > *old) {
+                best = Some((score, triad));
+            }
+        }
+        if let Some((score, triad)) = best {
+            let state = if score >= 0.92 {
+                "CLEANUP_EXACT"
+            } else if score >= 0.45 {
+                "CLEANUP_NEAR"
+            } else {
+                "CLEANUP_AMBIGUOUS"
+            };
+            cleanup_rows.push(json!({
+                "raw_pattern": pattern_label_value(pattern),
+                "nearest_memory_triad": triad.id,
+                "nearest_pattern": format!("{} -> {} -> {}", triad.subject, triad.relation, triad.object),
+                "route": triad.route,
+                "score": round4(score),
+                "state": state
+            }));
+        }
+    }
+    let ambiguous = cleanup_rows
+        .iter()
+        .filter(|row| row["state"].as_str() == Some("CLEANUP_AMBIGUOUS"))
+        .count();
+    json!({
+        "version": "v48-cleanup-memory",
+        "operation": "decoded_pattern_cleanup",
+        "items": cleanup_rows,
+        "state": if ambiguous == 0 { "CLEANUP_READY" } else { "CLEANUP_WATCH" },
+        "read_as": "Cleanup memory maps raw decoded structural patterns back to the nearest known triad and keeps ambiguity visible instead of forcing a clean answer."
+    })
+}
+
+fn llmwave_attractor_report(decode: &Value) -> Value {
+    let steps = decode["recurrent"]["steps"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let mut last_energy = None::<f64>;
+    let mut route_jumps = 0usize;
+    let mut last_route = String::new();
+    let mut rows = vec![];
+    for step in steps {
+        let route = step["source_search"]["top_peak"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        if !last_route.is_empty() && !route.is_empty() && route != last_route {
+            route_jumps += 1;
+        }
+        if !route.is_empty() {
+            last_route = route.clone();
+        }
+        let margin = step["source_search"]["peak_margin"].as_f64().unwrap_or(0.0);
+        let top_score = step["patterns"]
+            .as_array()
+            .and_then(|items| items.first())
+            .and_then(|item| item["score"].as_f64())
+            .unwrap_or(0.0);
+        let anti = step["source_search"]["resonance"]["energy_accounting"]["anti_energy"]
+            .as_f64()
+            .unwrap_or(0.0);
+        let energy = round4((top_score + margin - anti).clamp(-1.0, 2.0));
+        let trend = match last_energy {
+            None => "START",
+            Some(prev) if energy > prev + 0.005 => "IMPROVING",
+            Some(prev) if energy < prev - 0.005 => "DROPPING",
+            Some(_) => "SATURATING",
+        };
+        last_energy = Some(energy);
+        rows.push(json!({
+            "step": step["step"],
+            "route_basin": route,
+            "top_pattern": step["top_pattern"],
+            "energy": energy,
+            "trend": trend,
+            "decoder_state": step["decoder_state"]
+        }));
+    }
+    let final_state = if rows.is_empty() {
+        "NO_ATTRACTOR_TRACE"
+    } else if route_jumps == 0
+        && rows
+            .iter()
+            .all(|row| row["trend"].as_str().is_some_and(|x| x != "DROPPING"))
+    {
+        "ATTRACTOR_STABLE"
+    } else if route_jumps > 0 {
+        "ATTRACTOR_ROUTE_JUMP"
+    } else {
+        "ATTRACTOR_REVIEW"
+    };
+    json!({
+        "version": "v49-attractor-energy-trace",
+        "route_jumps": route_jumps,
+        "steps": rows,
+        "state": final_state,
+        "read_as": "Energy trace treats recurrent decode as an attractor candidate: stable routes should improve or saturate; route jumps and drops stay review-only."
+    })
+}
+
+fn superposition_capacity_report(packet: &Packet) -> Value {
+    let active_patterns = packet.triads.len() + packet.continuation_memory.len();
+    let dimensions = WAVE_DIM;
+    let route_count = packet
+        .triads
+        .iter()
+        .filter_map(|triad| (!triad.route.is_empty()).then_some(norm(&triad.route)))
+        .collect::<BTreeSet<_>>()
+        .len()
+        .max(1);
+    let load = active_patterns as f64 / dimensions as f64;
+    let route_pressure = route_count as f64 / 64.0;
+    let crosstalk = round4((load * load + route_pressure * 0.25).min(1.0));
+    let state = if active_patterns <= 1024 && crosstalk < 0.35 {
+        "CAPACITY_HEALTHY"
+    } else if active_patterns <= PATTERN_STORE_CAPACITY && crosstalk < 0.75 {
+        "CAPACITY_WATCH"
+    } else {
+        "FOCUS_REQUIRED"
+    };
+    json!({
+        "version": "v50-superposition-capacity-curve",
+        "wave_dim": dimensions,
+        "active_patterns": active_patterns,
+        "routes": route_count,
+        "pattern_store_capacity": PATTERN_STORE_CAPACITY,
+        "load_factor": round4(load),
+        "estimated_crosstalk": crosstalk,
+        "state": state,
+        "read_as": "Capacity is treated as a curve, not a slogan: more patterns increase useful compression and harmful crosstalk at the same time."
+    })
+}
+
+fn shortcut_anti_wave_audit(decode: &Value, packet: &Packet) -> Value {
+    let applications = decode["recurrent"]["steps"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|step| {
+            step["continuation_training"]["applications"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>();
+    let suppressions = applications
+        .iter()
+        .filter(|item| item["action"].as_str() == Some("suppress"))
+        .count();
+    let reinforcements = applications
+        .iter()
+        .filter(|item| item["action"].as_str() == Some("reinforce"))
+        .count();
+    let negative_records = packet
+        .continuation_memory
+        .iter()
+        .filter(|item| item.decision == "reject")
+        .count();
+    let state = if suppressions > 0 {
+        "ANTI_WAVE_APPLIED"
+    } else if negative_records > 0 {
+        "ANTI_WAVE_AVAILABLE_NOT_MATCHED"
+    } else {
+        "NO_ANTI_WAVE_MEMORY"
+    };
+    json!({
+        "version": "v51-shortcut-specific-anti-wave-audit",
+        "negative_records": negative_records,
+        "suppressions": suppressions,
+        "reinforcements": reinforcements,
+        "applications": applications,
+        "state": state,
+        "read_as": "Anti-wave is accepted only when it is shortcut-specific: rejected local pattern signatures are suppressed without killing the whole topic."
+    })
+}
+
+fn pattern_label_value(pattern: &Value) -> String {
+    format!(
+        "{} -> {} -> {}",
+        pattern["subject"].as_str().unwrap_or(""),
+        pattern["relation"].as_str().unwrap_or(""),
+        pattern["object"].as_str().unwrap_or("")
+    )
 }
 
 pub(crate) fn compact_pattern_store_report(packet: &Packet, sample: usize) -> Value {

@@ -102,7 +102,18 @@
 - v44 exposes pre-ranking pattern replay under `early_pattern_replay`.
 - v45 adds opt-in field-state-aware decode scoring with `--adaptive-scoring`.
 - v46 adds `nanda-pattern-bank` for standalone learned continuation banks.
-- Core version is now `sparse-triad-v4.6-pattern-bank`.
+- v47 adds an HRR binding sandbox inside `nanda-llmwave`: role/filler lanes are
+  bound and unbound back to subject/object vectors as a measurable probe.
+- v48 turns `nanda-pattern-bank` into a cleanup-memory contract for noisy
+  decoded structural patterns.
+- v49 adds an attractor-style `energy_trace` to recurrent decode.
+- v50 adds a superposition capacity report to the LLMWave loop.
+- v51 adds a shortcut-specific anti-wave audit for rejected continuation lanes.
+- v52 upgrades `nanda-llmwave` to a read/write/retrieve loop that reports HRR
+  binding, cleanup, attractor energy, capacity, anti-wave locality, decode, and
+  feedback preview in one packet.
+- Core version is now `sparse-triad-v5.2-llmwave-loop`.
+- Cargo package version is now `5.2.0`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

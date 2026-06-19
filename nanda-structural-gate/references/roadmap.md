@@ -132,5 +132,18 @@ Status: started.
   decode weights while preserving static scoring by default.
 - v46 pattern bank: `nanda-pattern-bank` builds and inspects the learned
   continuation-memory bank as standalone 32-byte pattern records.
-- Next milestone is making pattern replay participate earlier in the packed
+- v47 HRR binding sandbox: `nanda-llmwave` reports role/filler bind-unbind
+  probes for packet triads.
+- v48 cleanup memory: `nanda-pattern-bank` becomes the cleanup dictionary for
+  noisy decoded structural patterns.
+- v49 attractor trace: recurrent decode reports an energy-style route-basin
+  trace.
+- v50 capacity curve: `nanda-llmwave` reports active pattern load and estimated
+  crosstalk instead of treating superposition as a slogan.
+- v51 anti-wave audit: rejected continuation lanes are reported as
+  shortcut-specific suppressions.
+- v52 read/write/retrieve loop: `nanda-llmwave` now combines raw text encoding,
+  HRR binding probe, structural decode, cleanup, energy trace, capacity,
+  anti-wave audit, and feedback preview.
+- Next milestone is making these v52 reports participate earlier in the packed
   hot cycle, not only in cold decode ranking.

@@ -172,7 +172,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v4.6-pattern-bank"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v5.2-llmwave-loop"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -478,6 +478,7 @@ jq -e '.recurrent.enabled == true and .recurrent.requested_steps == 3' <<<"$deco
 jq -e '.recurrent.completed_steps >= 2' <<<"$decode_steps_json" >/dev/null
 jq -e '.recurrent.steps[0].selected_pattern.decode_as == "next_structural_pattern"' <<<"$decode_steps_json" >/dev/null
 jq -e '.recurrent.steps[-1].decoder_state == "PATTERN_READY" or .recurrent.steps[-1].decoder_state == "PATTERN_SATURATED"' <<<"$decode_steps_json" >/dev/null
+jq -e '.energy_trace.version == "v49-attractor-energy-trace" and .energy_trace.state != "NO_ENERGY_TRACE"' <<<"$decode_steps_json" >/dev/null
 decode_eval_json="$("$decode_eval" --suite "$root/examples/decode-corpus.json")"
 jq -e '.mode == "decode-eval-suite" and .passed == 3 and .total == 3 and .accuracy == 1' <<<"$decode_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "route-trap-recurrent-saturates" and .actual_final_decoder_state == "PATTERN_SATURATED")' <<<"$decode_eval_json" >/dev/null
@@ -503,7 +504,8 @@ jq -e '.recurrent.steps[0].early_pattern_replay.version == "v44-pre-ranking-patt
 pattern_store_json="$("$pattern_store" "$tmp_decode_index" --input-format json)"
 jq -e '.mode == "compact-pattern-store" and .packed_pattern_bytes == 32 and .records == 1 and .fits_pattern_arena == true' <<<"$pattern_store_json" >/dev/null
 pattern_bank_json="$("$pattern_bank" "$tmp_decode_index" --input-format json --mode inspect)"
-jq -e '.mode == "pattern-bank" and .version == "v46-pattern-bank" and .records == 1 and .fits_pattern_arena == true' <<<"$pattern_bank_json" >/dev/null
+jq -e '.mode == "pattern-bank" and .version == "v48-cleanup-pattern-bank" and .records == 1 and .fits_pattern_arena == true' <<<"$pattern_bank_json" >/dev/null
+jq -e '.cleanup_memory.version == "v48-cleanup-memory" and .cleanup_memory.state == "CLEANUP_DICTIONARY_READY"' <<<"$pattern_bank_json" >/dev/null
 pattern_bank_apply_json="$("$pattern_bank" "$tmp_decode_index" --input-format json --mode apply)"
 jq -e '.apply_state == "PATTERN_BANK_READY_FOR_DECODE"' <<<"$pattern_bank_apply_json" >/dev/null
 pattern_capacity_json="$("$pattern_capacity")"
@@ -515,7 +517,12 @@ jq -e '.learning_effect.changed_top == 1 and .learning_effect.reinforced_same_to
 jq -e '.cases[] | select(.id == "reject-top-continuation-changes-ranking" and .learning_changed_top == true and .actual_action == "suppress")' <<<"$pattern_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "accept-top-continuation-reinforces-score" and .training_applied == true and .actual_action == "reinforce")' <<<"$pattern_eval_json" >/dev/null
 llmwave_json="$("$llmwave" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --train)"
-jq -e '.mode == "llmwave-mini-loop" and .version == "v39-encode-decode-train-loop"' <<<"$llmwave_json" >/dev/null
+jq -e '.mode == "llmwave-mini-loop" and .version == "v52-read-write-retrieve-loop"' <<<"$llmwave_json" >/dev/null
+jq -e '.hrr_binding.version == "v47-hrr-binding-sandbox" and .hrr_binding.state == "HRR_BINDING_VISIBLE"' <<<"$llmwave_json" >/dev/null
+jq -e '.cleanup_memory.version == "v48-cleanup-memory" and .cleanup_memory.state != "CLEANUP_WATCH"' <<<"$llmwave_json" >/dev/null
+jq -e '.attractor_trace.version == "v49-attractor-energy-trace" and .attractor_trace.state != "NO_ATTRACTOR_TRACE"' <<<"$llmwave_json" >/dev/null
+jq -e '.superposition_capacity.version == "v50-superposition-capacity-curve" and .superposition_capacity.state != "FOCUS_REQUIRED"' <<<"$llmwave_json" >/dev/null
+jq -e '.anti_wave_audit.version == "v51-shortcut-specific-anti-wave-audit"' <<<"$llmwave_json" >/dev/null
 jq -e '.decode.top_pattern == "declaration -> requires -> protocols" and .feedback_preview.enabled == true' <<<"$llmwave_json" >/dev/null
 trained_budget_json="$("$budget" "$tmp_decode_index" --input-format json)"
 jq -e '.pattern_runtime.version == "v40-6m-pattern-runtime-contract" and .pattern_runtime.active_patterns == 1 and .pattern_runtime.fits_pattern_arena == true' <<<"$trained_budget_json" >/dev/null
