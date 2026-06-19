@@ -21,6 +21,7 @@ pub(crate) fn load_packet(path: Option<&Path>) -> Result<Packet> {
             negative_shortcuts: vec![],
             positive_shortcuts: vec![],
             resonance_memory: vec![],
+            continuation_memory: vec![],
         }),
     }
 }
@@ -81,6 +82,7 @@ pub(crate) fn init_task(args: InitTaskArgs) -> Result<u8> {
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
         resonance_memory: vec![],
+        continuation_memory: vec![],
     };
     let output = serde_json::to_string_pretty(&packet)? + "\n";
     write_or_print(

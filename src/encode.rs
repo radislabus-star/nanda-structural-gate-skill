@@ -47,6 +47,7 @@ pub(crate) fn encode_cmd(args: EncodeArgs) -> Result<u8> {
             negative_shortcuts: vec![],
             positive_shortcuts: vec![],
             resonance_memory: vec![],
+            continuation_memory: vec![],
         });
     }
 

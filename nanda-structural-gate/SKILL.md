@@ -256,6 +256,11 @@ run again. Treat `PATTERN_SATURATED` as an honest stop, not a failure.
 Use `nanda-decode-eval` after changing decoder, scoring, recurrent selection,
 or pattern extraction. It checks expected top pattern, decoder state, recurrent
 final state, and minimum completed recurrent steps.
+Use `nanda-feedback` on `nanda-decode` output when the agent has accepted or
+rejected a decoded structural continuation. The feedback emits
+`continuation_memory`; after `nanda-index`, future `nanda-decode` runs softly
+reinforce accepted patterns and suppress rejected local forms before recurrent
+selection.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each
@@ -287,7 +292,9 @@ the same false shortcut later or constructively reinforce an accepted
 route/group/support shape. All feedback decisions also emit `resonance_memory`:
 peak, route, relation, role mode, WAW status, phase/standing/energy/boundary
 states, and support/anti terms. Index it when you want future search to
-recognize honest or dishonest interference forms.
+recognize honest or dishonest interference forms. Decode feedback emits
+`continuation_memory`, which future decode runs apply as a local pattern-ranking
+training signal.
 Use `nanda-probe` before claiming that destructive interference helped. It
 compares plain search with negative-lane search. Use `nanda probe --suite`
 before changing probe or negative-lane behavior. Treat `IMPROVED` as usable

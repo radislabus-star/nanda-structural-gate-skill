@@ -423,6 +423,7 @@ pub(crate) fn split_packet(args: SplitPacketArgs) -> Result<u8> {
                     negative_shortcuts: packet.negative_shortcuts.clone(),
                     positive_shortcuts: packet.positive_shortcuts.clone(),
                     resonance_memory: packet.resonance_memory.clone(),
+                    continuation_memory: packet.continuation_memory.clone(),
                 };
                 fs::write(&path, serde_json::to_string_pretty(&split_packet)? + "\n")?;
             }
@@ -672,6 +673,7 @@ pub(crate) fn hgate_cmd(args: HgateArgs) -> Result<u8> {
             negative_shortcuts: packet.negative_shortcuts.clone(),
             positive_shortcuts: packet.positive_shortcuts.clone(),
             resonance_memory: packet.resonance_memory.clone(),
+            continuation_memory: packet.continuation_memory.clone(),
         };
         let report = make_report(&branch_packet, &split.triads, &split.candidates)?;
         branches.push(json!({
@@ -1028,6 +1030,7 @@ pub(crate) fn builtin_route_trap_packet(noisy: bool) -> Packet {
         negative_shortcuts: vec![],
         positive_shortcuts: vec![],
         resonance_memory: vec![],
+        continuation_memory: vec![],
     }
 }
 
@@ -1173,6 +1176,7 @@ pub(crate) fn comb_node(
         negative_shortcuts: packet.negative_shortcuts.clone(),
         positive_shortcuts: packet.positive_shortcuts.clone(),
         resonance_memory: packet.resonance_memory.clone(),
+        continuation_memory: packet.continuation_memory.clone(),
     };
     let report = make_report(&local_packet, source, candidates)?;
     let map = structural_map(source, candidates);

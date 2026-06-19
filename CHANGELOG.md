@@ -85,7 +85,10 @@
 - v33 adds `nanda encode` / `nanda-encode`, the deterministic token/pattern
   encoder that turns raw text into a 1024-dimensional wave signature and
   optional query packet.
-- Core version is now `sparse-triad-v3.8-pattern-encoder`.
+- v34 adds continuation training: `nanda-feedback` can now accept decode
+  output, `nanda-index` merges `continuation_memory`, and `nanda-decode`
+  reinforces accepted continuations or suppresses rejected ones.
+- Core version is now `sparse-triad-v3.9-continuation-training`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior

@@ -103,6 +103,7 @@ pub(crate) fn build_focused_packet(
         negative_shortcuts: packet.negative_shortcuts.clone(),
         positive_shortcuts: packet.positive_shortcuts.clone(),
         resonance_memory: packet.resonance_memory.clone(),
+        continuation_memory: packet.continuation_memory.clone(),
     };
     let mut metadata = focus.metadata;
     metadata["mode"] = json!("focused-packet-builder");
@@ -363,6 +364,7 @@ mod tests {
             negative_shortcuts: vec![],
             positive_shortcuts: vec![],
             resonance_memory: vec![],
+            continuation_memory: vec![],
         };
         let query = vec![triad(
             "q1", "a", "links", "b", "query", "subject", "object", "", "query",

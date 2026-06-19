@@ -350,6 +350,11 @@ under the selected window.
 `nanda-decode-eval` is the regression surface for the decoder. It checks
 expected decoder state, top structural pattern, recurrent final state, and
 minimum completed recurrent steps before trusting LLMWave changes.
+`nanda-feedback` can also read `nanda-decode` output. In that mode it emits
+`continuation_memory`: accepted decoded patterns are reinforced during future
+decode ranking, rejected decoded patterns are suppressed locally, and WATCH
+patterns remain review evidence. This is the v34 training loop for structural
+continuation quality.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact
@@ -442,13 +447,16 @@ nanda-bench6m --mode hot-cycle --support-build-iterations 1000 --lane-sweep-widt
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 or `{"command":"search","packet":...}`.
 `nanda-feedback` is the feedback-memory surface. It records whether a search
-peak was accepted, rejected, or kept under WATCH, together with margin, support
-ids, anti ids, and a compact memory patch. Reject feedback emits
+peak or decoded continuation was accepted, rejected, or kept under WATCH,
+together with margin, support ids, anti ids, and a compact memory patch. Reject
+feedback emits
 `negative_shortcuts`; accept feedback emits `positive_shortcuts`; all decisions
 emit `resonance_memory` so the honest or dishonest field form can be recognized
 again. `nanda-index` can carry these into future search, so rejected shortcuts
 are suppressed, accepted routes are constructively reinforced, and matching
 resonance forms are softly replayed without granting automatic safety.
+Decode feedback emits `continuation_memory`; `nanda-index` carries it into
+future decode runs, where it shifts pattern scores before recurrent selection.
 `nanda-probe` compares the same search before and after negative lanes. Use it
 before claiming destructive interference helped. `nanda probe --suite` runs a
 probe regression corpus. `SHIFTED_TO_REVIEW` means the false shortcut moved,
@@ -488,7 +496,7 @@ next_prompt
 Core version fields:
 
 ```text
-core_version: sparse-triad-v3.8-pattern-encoder
+core_version: sparse-triad-v3.9-continuation-training
 wave_dim: 1024
 ```
 

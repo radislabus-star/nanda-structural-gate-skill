@@ -250,6 +250,7 @@ pub(crate) fn recurrent_decode_report(
         "source_search": first["source_search"],
         "decoder_state": first["decoder_state"],
         "safe_to_generate": first["safe_to_generate"],
+        "continuation_training": first["continuation_training"],
         "top_pattern": first["top_pattern"],
         "patterns": first["patterns"],
         "recurrent": {
@@ -271,13 +272,15 @@ pub(crate) fn recurrent_decode_report(
 }
 
 pub(crate) fn decode_step_report(
-    _packet: &Packet,
+    packet: &Packet,
     query: &[Triad],
     search: &Value,
     top_k: usize,
     step: usize,
 ) -> Value {
     let mut candidates = decode_candidates(search, query);
+    let continuation_training =
+        apply_continuation_memory(&mut candidates, query, &packet.continuation_memory);
     candidates.sort_by(|a, b| {
         b["score"]
             .as_f64()
@@ -325,9 +328,147 @@ pub(crate) fn decode_step_report(
         },
         "decoder_state": decoder_state,
         "safe_to_generate": decoder_state == "PATTERN_READY",
+        "continuation_training": continuation_training,
         "top_pattern": top_candidate,
         "patterns": candidates
     })
+}
+
+fn apply_continuation_memory(
+    candidates: &mut [Value],
+    query: &[Triad],
+    memories: &[ContinuationMemory],
+) -> Value {
+    let query_terms = query_term_set(query);
+    let mut applications = vec![];
+    if memories.is_empty() || candidates.is_empty() {
+        return json!({
+            "applied": false,
+            "continuation_memory": memories.len(),
+            "applications": applications
+        });
+    }
+    for memory in memories {
+        let query_ratio = continuation_query_match_ratio(&query_terms, memory);
+        if query_ratio <= 0.0 {
+            continue;
+        }
+        for candidate in candidates.iter_mut() {
+            if !continuation_matches_candidate(memory, candidate) {
+                continue;
+            }
+            let support_ratio = continuation_support_ratio(memory, candidate);
+            let match_ratio = round4(query_ratio * support_ratio);
+            if match_ratio <= 0.0 {
+                continue;
+            }
+            let old_score = candidate["score"].as_f64().unwrap_or(0.0);
+            let decision = memory.decision.as_str();
+            let accepted_count = memory.accepted_count.max(usize::from(decision == "accept"));
+            let rejected_count = memory.rejected_count.max(usize::from(decision == "reject"));
+            let (delta, action) = match decision {
+                "accept" => (
+                    round4(
+                        (memory.boost.max(0.0) + accepted_count.saturating_sub(1) as f64 * 0.025)
+                            .min(0.25)
+                            * match_ratio,
+                    ),
+                    "reinforce",
+                ),
+                "reject" => (
+                    -round4(
+                        (memory.penalty.max(0.0) + rejected_count.saturating_sub(1) as f64 * 0.035)
+                            .min(0.35)
+                            * match_ratio,
+                    ),
+                    "suppress",
+                ),
+                _ => (0.0, "watch"),
+            };
+            if delta == 0.0 {
+                continue;
+            }
+            let new_score = round4((old_score + delta).clamp(-1.0, 1.5));
+            if let Some(object) = candidate.as_object_mut() {
+                object.insert("score".to_string(), json!(new_score));
+                object.insert("raw_decode_score".to_string(), json!(round4(old_score)));
+                object.insert("continuation_memory_delta".to_string(), json!(delta));
+            }
+            applications.push(json!({
+                "memory": memory.id,
+                "action": action,
+                "pattern": format!("{} -> {} -> {}", memory.subject, memory.relation, memory.object),
+                "delta": delta,
+                "match_ratio": match_ratio,
+                "query_match_ratio": round4(query_ratio),
+                "support_match_ratio": round4(support_ratio),
+                "observations": memory.observations,
+                "accepted_count": accepted_count,
+                "rejected_count": rejected_count,
+                "reason": memory.reason
+            }));
+        }
+    }
+    json!({
+        "applied": !applications.is_empty(),
+        "continuation_memory": memories.len(),
+        "applications": applications,
+        "read_as": "Continuation memory softly reinforces accepted decoded patterns and suppresses rejected decoded patterns before recurrent selection."
+    })
+}
+
+fn continuation_matches_candidate(memory: &ContinuationMemory, candidate: &Value) -> bool {
+    if norm(&memory.subject) != norm(candidate["subject"].as_str().unwrap_or("")) {
+        return false;
+    }
+    if norm(&memory.relation) != norm(candidate["relation"].as_str().unwrap_or("")) {
+        return false;
+    }
+    if norm(&memory.object) != norm(candidate["object"].as_str().unwrap_or("")) {
+        return false;
+    }
+    if !memory.route.is_empty()
+        && norm(&memory.route) != norm(candidate["route"].as_str().unwrap_or(""))
+    {
+        return false;
+    }
+    true
+}
+
+fn continuation_query_match_ratio(
+    query_terms: &BTreeSet<String>,
+    memory: &ContinuationMemory,
+) -> f64 {
+    if memory.terms.is_empty() || query_terms.is_empty() {
+        return 1.0;
+    }
+    let terms = normalized_shortcut_terms(&memory.terms);
+    if terms.is_empty() {
+        return 1.0;
+    }
+    terms.intersection(query_terms).count() as f64 / terms.len() as f64
+}
+
+fn continuation_support_ratio(memory: &ContinuationMemory, candidate: &Value) -> f64 {
+    if memory.support_terms.is_empty() {
+        return 1.0;
+    }
+    let candidate_terms = ["subject", "relation", "object", "route", "group", "peak"]
+        .into_iter()
+        .filter_map(|key| candidate[key].as_str())
+        .flat_map(|value| {
+            norm(value)
+                .split(|ch: char| !ch.is_ascii_alphanumeric())
+                .filter(|token| token.len() >= 2)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect::<BTreeSet<_>>();
+    let support_terms = normalized_shortcut_terms(&memory.support_terms);
+    if support_terms.is_empty() || candidate_terms.is_empty() {
+        return 1.0;
+    }
+    support_terms.intersection(&candidate_terms).count() as f64 / support_terms.len() as f64
 }
 
 fn decode_candidates(search: &Value, query: &[Triad]) -> Vec<Value> {

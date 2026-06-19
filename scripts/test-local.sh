@@ -166,7 +166,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v3.8-pattern-encoder"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v3.9-continuation-training"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -475,6 +475,19 @@ jq -e '.recurrent.steps[-1].decoder_state == "PATTERN_READY" or .recurrent.steps
 decode_eval_json="$("$decode_eval" --suite "$root/examples/decode-corpus.json")"
 jq -e '.mode == "decode-eval-suite" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$decode_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "route-trap-recurrent-saturates" and .actual_final_decoder_state == "PATTERN_SATURATED")' <<<"$decode_eval_json" >/dev/null
+tmp_decode_feedback="$(mktemp)"
+tmp_decode_training_feedback="$(mktemp)"
+tmp_decode_index="$(mktemp)"
+printf '%s\n' "$decode_json" >"$tmp_decode_feedback"
+"$feedback" "$tmp_decode_feedback" --decision accept --note "accepted continuation" --out "$tmp_decode_training_feedback" >/dev/null
+jq -e '.source_mode == "wave-pattern-decoder"' "$tmp_decode_training_feedback" >/dev/null
+jq -e '.continuation_memory[0].decision == "accept"' "$tmp_decode_training_feedback" >/dev/null
+jq -e '.continuation_memory[0].subject == "declaration" and .continuation_memory[0].relation == "requires" and .continuation_memory[0].object == "protocols"' "$tmp_decode_training_feedback" >/dev/null
+"$indexer" "$root/examples/triad-packet.interference-search-route-trap.json" "$tmp_decode_training_feedback" --input-format json --out "$tmp_decode_index" >/dev/null
+jq -e '.continuation_memory[0].accepted_count == 1' "$tmp_decode_index" >/dev/null
+trained_decode_json="$("$decode" "$tmp_decode_index" --input-format json --query-file "$root/examples/triad-packet.interference-search-route-trap.json" --query-format json --top-k 3)"
+jq -e '.continuation_training.applied == true' <<<"$trained_decode_json" >/dev/null
+jq -e '.patterns[0].continuation_memory_delta > 0' <<<"$trained_decode_json" >/dev/null
 serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"
 jq -e '.ok == true and .result.mode == "doctor" and .result.healthy == true' <<<"$serve_json" >/dev/null
 tmp_search="$(mktemp)"

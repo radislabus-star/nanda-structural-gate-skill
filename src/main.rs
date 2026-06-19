@@ -39,8 +39,8 @@ pub(crate) use report::*;
 pub(crate) use search::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v3.8-pattern-encoder";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v3.8-rust";
+const CORE_VERSION: &str = "sparse-triad-v3.9-continuation-training";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v3.9-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;

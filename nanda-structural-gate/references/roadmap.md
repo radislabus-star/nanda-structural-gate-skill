@@ -104,6 +104,9 @@ Status: started.
   decoder state, recurrent final state, and minimum completed steps.
 - `nanda-encode` is the first token/pattern encoder: raw text -> deterministic
   token waves -> 1024-dimensional pattern signature -> preview query triads.
-- Next milestone is a training loop for continuation quality: accepted decoder
-  continuations should reinforce future pattern selection, rejected
-  continuations should suppress local false forms.
+- `nanda-feedback` accepts decoder output and emits `continuation_memory`.
+- `nanda-index` merges continuation memory, and `nanda-decode` applies it as a
+  local training signal before recurrent selection.
+- Next milestone is a compact pattern store: continuation memory should become
+  packable into the NANDA-6M hot contract rather than remaining only JSON-side
+  decoder metadata.

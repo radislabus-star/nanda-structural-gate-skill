@@ -4,6 +4,7 @@ type FeedbackLanes = (
     Vec<NegativeShortcut>,
     Vec<PositiveShortcut>,
     Vec<ResonanceMemory>,
+    Vec<ContinuationMemory>,
 );
 
 type ResonanceMemoryKey = (
@@ -301,7 +302,7 @@ pub(crate) fn probe_report(plain: &Value, negative: &Value, negative_lanes: usiz
 pub(crate) fn load_feedback_negative_shortcuts(
     path: &Path,
 ) -> Result<Option<Vec<NegativeShortcut>>> {
-    Ok(load_feedback_lanes(path)?.map(|(negative, _, _)| negative))
+    Ok(load_feedback_lanes(path)?.map(|(negative, _, _, _)| negative))
 }
 
 pub(crate) fn load_feedback_lanes(path: &Path) -> Result<Option<FeedbackLanes>> {
@@ -339,7 +340,14 @@ pub(crate) fn load_feedback_lanes(path: &Path) -> Result<Option<FeedbackLanes>> 
         .into_iter()
         .map(serde_json::from_value)
         .collect::<std::result::Result<Vec<ResonanceMemory>, _>>()?;
-    Ok(Some((negative, positive, resonance)))
+    let continuation = value["continuation_memory"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(serde_json::from_value)
+        .collect::<std::result::Result<Vec<ContinuationMemory>, _>>()?;
+    Ok(Some((negative, positive, resonance, continuation)))
 }
 
 #[allow(clippy::type_complexity)]
@@ -557,11 +565,80 @@ pub(crate) fn merge_resonance_memory(memories: Vec<ResonanceMemory>) -> Vec<Reso
     merged.into_values().collect()
 }
 
+pub(crate) fn merge_continuation_memory(
+    memories: Vec<ContinuationMemory>,
+) -> Vec<ContinuationMemory> {
+    let mut merged: BTreeMap<(String, String, String, String, String, String), ContinuationMemory> =
+        BTreeMap::new();
+    for mut memory in memories {
+        if memory.observations == 0 {
+            memory.observations = 1;
+        }
+        match memory.decision.as_str() {
+            "reject" if memory.rejected_count == 0 => memory.rejected_count = memory.observations,
+            "accept" if memory.accepted_count == 0 => memory.accepted_count = memory.observations,
+            _ => {}
+        }
+        memory.terms = normalized_shortcut_terms(&memory.terms)
+            .into_iter()
+            .collect::<Vec<_>>();
+        memory.support_terms = normalized_shortcut_terms(&memory.support_terms)
+            .into_iter()
+            .collect::<Vec<_>>();
+        let key = (
+            norm(&memory.decision),
+            norm(&memory.subject),
+            norm(&memory.relation),
+            norm(&memory.object),
+            norm(&memory.route),
+            memory.terms.join("|"),
+        );
+        merged
+            .entry(key)
+            .and_modify(|existing| {
+                existing.observations += memory.observations;
+                existing.accepted_count += memory.accepted_count;
+                existing.rejected_count += memory.rejected_count;
+                existing.boost = existing.boost.max(memory.boost);
+                existing.penalty = existing.penalty.max(memory.penalty);
+                if existing.pattern_id.is_empty() {
+                    existing.pattern_id = memory.pattern_id.clone();
+                }
+                if existing.group.is_empty() {
+                    existing.group = memory.group.clone();
+                }
+                if existing.peak.is_empty() {
+                    existing.peak = memory.peak.clone();
+                }
+                if existing.reason.is_empty() {
+                    existing.reason = memory.reason.clone();
+                }
+                if !memory.source_feedback.is_empty() {
+                    if existing.source_feedback.is_empty() {
+                        existing.source_feedback = memory.source_feedback.clone();
+                    } else if !existing
+                        .source_feedback
+                        .split(';')
+                        .any(|item| item == memory.source_feedback)
+                    {
+                        existing.source_feedback.push(';');
+                        existing.source_feedback.push_str(&memory.source_feedback);
+                    }
+                }
+            })
+            .or_insert(memory);
+    }
+    merged.into_values().collect()
+}
+
 pub(crate) fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
     let text = fs::read_to_string(&args.input)
         .with_context(|| format!("read {}", args.input.display()))?;
     let search: Value =
         serde_json::from_str(&text).with_context(|| format!("parse {}", args.input.display()))?;
+    if search["mode"].as_str() == Some("wave-pattern-decoder") {
+        return decode_feedback_cmd(args, search);
+    }
     let top = search["peaks"].as_array().and_then(|peaks| peaks.first());
     let peak_name = top
         .and_then(|peak| peak["peak"].as_str())
@@ -651,12 +728,146 @@ pub(crate) fn feedback_cmd(args: FeedbackArgs) -> Result<u8> {
         "negative_shortcuts": negative_shortcuts,
         "positive_shortcuts": positive_shortcuts,
         "resonance_memory": resonance_memory,
+        "continuation_memory": [],
         "memory_patch": reinforcement,
         "interpretation": "Feedback is a compact trace for later memory tuning. Reject feedback creates a negative shortcut; accept feedback creates a positive shortcut and a resonance-memory form that can later reinforce or suppress the same field shape."
     });
     let output = serde_json::to_string_pretty(&feedback)? + "\n";
     write_or_print(args.out, args.stdout, output)?;
     Ok(EXIT_PASS)
+}
+
+fn decode_feedback_cmd(args: FeedbackArgs, decode: Value) -> Result<u8> {
+    let decision = feedback_decision_label(&args.decision);
+    let continuation_memory = continuation_memory_from_decode(
+        &decode,
+        decision,
+        &args.note,
+        args.input.display().to_string(),
+    );
+    let pattern = continuation_memory
+        .first()
+        .map(|memory| {
+            format!(
+                "{} -> {} -> {}",
+                memory.subject, memory.relation, memory.object
+            )
+        })
+        .unwrap_or_default();
+    let reinforcement = match args.decision {
+        FeedbackDecision::Accept => json!({
+            "reinforce_pattern": pattern,
+            "continuation_memory": continuation_memory
+        }),
+        FeedbackDecision::Reject => json!({
+            "suppress_pattern": pattern,
+            "continuation_memory": continuation_memory
+        }),
+        FeedbackDecision::Watch => json!({
+            "watch_pattern": pattern,
+            "continuation_memory": continuation_memory
+        }),
+    };
+    let feedback = json!({
+        "core_version": CORE_VERSION,
+        "wave_dim": WAVE_DIM,
+        "mode": "feedback-memory",
+        "source_search": args.input.display().to_string(),
+        "source_mode": "wave-pattern-decoder",
+        "decision": decision,
+        "note": args.note,
+        "peak": decode["source_search"]["top_peak"].as_str().unwrap_or(""),
+        "top_pattern": pattern,
+        "peak_score": 0.0,
+        "peak_margin": decode["source_search"]["peak_margin"].clone(),
+        "peak_decision": decode["source_search"]["resonance"].clone(),
+        "lexical_baseline_top": "",
+        "wins_over_lexical_baseline": false,
+        "support_ids": [],
+        "anti_ids": [],
+        "negative_shortcuts": [],
+        "positive_shortcuts": [],
+        "resonance_memory": [],
+        "continuation_memory": continuation_memory,
+        "memory_patch": reinforcement,
+        "interpretation": "Decode feedback trains continuation ranking: accept reinforces the selected structural continuation; reject suppresses the same local pattern shape."
+    });
+    let output = serde_json::to_string_pretty(&feedback)? + "\n";
+    write_or_print(args.out, args.stdout, output)?;
+    Ok(EXIT_PASS)
+}
+
+fn continuation_memory_from_decode(
+    decode: &Value,
+    decision: &str,
+    note: &str,
+    source_feedback: String,
+) -> Vec<ContinuationMemory> {
+    let selected = decode["patterns"]
+        .as_array()
+        .and_then(|patterns| patterns.first())
+        .or_else(|| {
+            decode["recurrent"]["steps"]
+                .as_array()
+                .and_then(|steps| steps.first())
+                .and_then(|step| {
+                    step["selected_pattern"]
+                        .as_object()
+                        .map(|_| &step["selected_pattern"])
+                })
+        });
+    let Some(pattern) = selected else {
+        return vec![];
+    };
+    let subject = pattern["subject"].as_str().unwrap_or("").to_string();
+    let relation = pattern["relation"].as_str().unwrap_or("").to_string();
+    let object = pattern["object"].as_str().unwrap_or("").to_string();
+    if subject.is_empty() || relation.is_empty() || object.is_empty() {
+        return vec![];
+    }
+    let mut terms = vec![];
+    terms.extend(
+        decode["query"]["terms"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|item| item.as_str().map(str::to_string)),
+    );
+    for value in [&subject, &relation, &object] {
+        terms.push(value.clone());
+    }
+    vec![ContinuationMemory {
+        id: format!(
+            "cont-{}",
+            slug(&format!("{decision}-{subject}-{relation}-{object}"))
+        ),
+        decision: decision.to_string(),
+        pattern_id: pattern["pattern_id"].as_str().unwrap_or("").to_string(),
+        subject,
+        relation,
+        object,
+        route: pattern["route"].as_str().unwrap_or("").to_string(),
+        group: pattern["group"].as_str().unwrap_or("").to_string(),
+        peak: pattern["peak"].as_str().unwrap_or("").to_string(),
+        boost: default_positive_boost(),
+        penalty: default_negative_penalty(),
+        terms,
+        support_terms: vec![
+            pattern["subject"].as_str().unwrap_or("").to_string(),
+            pattern["relation"].as_str().unwrap_or("").to_string(),
+            pattern["object"].as_str().unwrap_or("").to_string(),
+            pattern["route"].as_str().unwrap_or("").to_string(),
+        ],
+        reason: if note.trim().is_empty() {
+            "decode continuation feedback".to_string()
+        } else {
+            note.to_string()
+        },
+        source_feedback,
+        observations: 1,
+        accepted_count: usize::from(decision == "accept"),
+        rejected_count: usize::from(decision == "reject"),
+    }]
 }
 
 pub(crate) fn resonance_memory_from_search(
