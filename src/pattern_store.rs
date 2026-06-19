@@ -267,6 +267,7 @@ pub(crate) fn llmwave_eval_cmd(args: LlmwaveEvalArgs) -> Result<u8> {
 pub(crate) fn llmwave_memory_cmd(args: LlmwaveMemoryArgs) -> Result<u8> {
     match args.command {
         LlmwaveMemoryCommand::Write(args) => llmwave_memory_write_cmd(args),
+        LlmwaveMemoryCommand::Inspect(args) => llmwave_memory_inspect_cmd(args),
         LlmwaveMemoryCommand::Vocabulary(args) => llmwave_memory_vocabulary_cmd(args),
         LlmwaveMemoryCommand::Retrieve(args) => llmwave_memory_retrieve_cmd(args),
         LlmwaveMemoryCommand::Feedback(args) => llmwave_memory_feedback_cmd(args),
@@ -278,6 +279,8 @@ pub(crate) fn llmwave_memory_cmd(args: LlmwaveMemoryArgs) -> Result<u8> {
         LlmwaveMemoryCommand::Train(args) => llmwave_memory_train_cmd(args),
         LlmwaveMemoryCommand::Grow(args) => llmwave_memory_grow_cmd(args),
         LlmwaveMemoryCommand::Eval(args) => llmwave_memory_eval_cmd(args),
+        LlmwaveMemoryCommand::Pack(args) => llmwave_memory_pack_cmd(args),
+        LlmwaveMemoryCommand::Unpack(args) => llmwave_memory_unpack_cmd(args),
     }
 }
 
@@ -292,6 +295,13 @@ fn llmwave_memory_write_cmd(args: LlmwaveMemoryWriteArgs) -> Result<u8> {
     )?;
     let memory = llmwave_memory_from_packet(&packet, &args.text);
     llmwave_memory_emit(memory, args.out.as_deref(), &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_inspect_cmd(args: LlmwaveMemoryInspectArgs) -> Result<u8> {
+    let memory = llmwave_memory_load(&args.memory)?;
+    let out = llmwave_memory_model_report(&memory);
+    llmwave_memory_emit(out, None, &args.format)?;
     Ok(EXIT_PASS)
 }
 
@@ -459,17 +469,35 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
     let mut rows = vec![];
     let mut passed = 0usize;
     for case in suite["cases"].as_array().cloned().unwrap_or_default() {
-        let path = base.join(case["path"].as_str().unwrap_or(""));
-        let packet = load_packet_auto(
-            &path,
-            &InputFormat::Auto,
-            "llmwave-memory-eval",
-            "general",
-            "",
-            false,
-        )?;
-        let mut memory =
-            llmwave_memory_from_packet(&packet, case["write_text"].as_str().unwrap_or(""));
+        let mut memory = if let Some(train_path) = case["train_text_path"].as_str() {
+            let text = fs::read_to_string(base.join(train_path))
+                .with_context(|| format!("failed to read {train_path}"))?;
+            llmwave_memory_from_text(&text, "llmwave-memory-eval", "general")
+        } else {
+            let path = base.join(case["path"].as_str().unwrap_or(""));
+            let packet = load_packet_auto(
+                &path,
+                &InputFormat::Auto,
+                "llmwave-memory-eval",
+                "general",
+                "",
+                false,
+            )?;
+            llmwave_memory_from_packet(&packet, case["write_text"].as_str().unwrap_or(""))
+        };
+        if let Some(grow_path) = case["grow_path"].as_str() {
+            let packet = load_packet_auto(
+                &base.join(grow_path),
+                &InputFormat::Auto,
+                "llmwave-memory-eval-grow",
+                "general",
+                "",
+                false,
+            )?;
+            let addition = llmwave_memory_from_packet(&packet, "");
+            llmwave_memory_append(&mut memory, &addition);
+            llmwave_memory_refresh_budget(&mut memory);
+        }
         if let Some(feedback) = case["feedback"].as_array() {
             for item in feedback {
                 let decision = match item["decision"].as_str().unwrap_or("watch") {
@@ -504,10 +532,12 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
             0.0,
             case["language"].as_str().unwrap_or("en"),
         );
+        let inspect = llmwave_memory_model_report(&memory);
         let expected_token = case["expected_top_token"].as_str().unwrap_or("");
         let expected_state = case["expected_state"].as_str().unwrap_or("");
         let expected_generated_contains =
             case["expected_generated_contains"].as_str().unwrap_or("");
+        let expected_version = case["expected_memory_version"].as_str().unwrap_or("");
         let token_ok =
             expected_token.is_empty() || retrieve["top_token"].as_str() == Some(expected_token);
         let state_ok =
@@ -516,7 +546,12 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
             || generate["generated_text"]
                 .as_str()
                 .is_some_and(|value| value.contains(expected_generated_contains));
-        let ok = token_ok && state_ok && generated_ok;
+        let version_ok =
+            expected_version.is_empty() || memory["version"].as_str() == Some(expected_version);
+        let inspect_ok = inspect["version"].as_str() == Some("v105-real-memory-file-format")
+            && inspect["tokenizer_contract"]["version"].as_str() == Some("v106-tokenizer-contract")
+            && inspect["model_config"]["version"].as_str() == Some("v107-model-config");
+        let ok = token_ok && state_ok && generated_ok && version_ok && inspect_ok;
         passed += usize::from(ok);
         rows.push(json!({
             "id": case["id"],
@@ -527,13 +562,15 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
             "expected_state": expected_state,
             "actual_state": retrieve["state"],
             "expected_generated_contains": expected_generated_contains,
-            "generated": generate["generated_text"]
+            "generated": generate["generated_text"],
+            "memory_version": memory["version"],
+            "inspect_state": inspect["version"]
         }));
     }
     let total = rows.len();
     let out = json!({
         "mode": "llmwave-memory-eval",
-        "version": "v104-generator-eval",
+        "version": "v109-generator-quality-eval",
         "passed": passed,
         "total": total,
         "accuracy": if total == 0 { 0.0 } else { round4(passed as f64 / total as f64) },
@@ -545,6 +582,31 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
     } else {
         EXIT_VETO
     })
+}
+
+fn llmwave_memory_pack_cmd(args: LlmwaveMemoryPackArgs) -> Result<u8> {
+    let memory = llmwave_memory_load(&args.memory)?;
+    let packed = llmwave_memory_pack_bytes(&memory);
+    fs::write(&args.out, &packed)
+        .with_context(|| format!("failed to write {}", args.out.display()))?;
+    let out = json!({
+        "mode": "llmwave-memory-pack",
+        "version": "v108-binary-packed-memory-prototype",
+        "out": args.out,
+        "bytes": packed.len(),
+        "records": memory["wave_memory"]["token_patterns"].as_array().map_or(0, Vec::len),
+        "format": "LLMWAVE1"
+    });
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_unpack_cmd(args: LlmwaveMemoryUnpackArgs) -> Result<u8> {
+    let bytes = fs::read(&args.input)
+        .with_context(|| format!("failed to read {}", args.input.display()))?;
+    let out = llmwave_memory_unpack_report(&bytes);
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
 }
 
 fn llmwave_memory_emit(value: Value, out: Option<&Path>, format: &OutputFormat) -> Result<()> {
@@ -565,6 +627,65 @@ fn llmwave_memory_load(path: &Path) -> Result<Value> {
     let text =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     serde_json::from_str(&text).with_context(|| format!("failed to parse {}", path.display()))
+}
+
+fn llmwave_memory_model_report(memory: &Value) -> Value {
+    let schema_source = json!({
+        "version": memory["version"],
+        "sections": ["source", "write_path", "vocabulary", "wave_memory"],
+        "record_shapes": ["pattern", "token_pattern", "phrase_pattern", "feedback_lane"]
+    });
+    let schema_digest = Sha256::digest(schema_source.to_string().as_bytes());
+    json!({
+        "mode": "llmwave-memory-inspect",
+        "version": "v105-real-memory-file-format",
+        "file_format": {
+            "container": "json",
+            "schema_hash": format!("{:x}", schema_digest),
+            "binary_candidate": ".llmw.bin",
+            "required_sections": ["source", "write_path", "vocabulary", "wave_memory"]
+        },
+        "tokenizer_contract": llmwave_tokenizer_contract(),
+        "model_config": llmwave_model_config(memory),
+        "packed_runtime": memory["wave_memory"]["packed_runtime"],
+        "records": {
+            "patterns": memory["wave_memory"]["patterns"].as_array().map_or(0, Vec::len),
+            "token_patterns": memory["wave_memory"]["token_patterns"].as_array().map_or(0, Vec::len),
+            "phrase_patterns": memory["wave_memory"]["phrase_patterns"].as_array().map_or(0, Vec::len)
+        },
+        "read_as": "Inspect reports the model artifact contract before treating LLMWaveMemory as a model."
+    })
+}
+
+fn llmwave_tokenizer_contract() -> Value {
+    json!({
+        "version": "v106-tokenizer-contract",
+        "normalization": "lowercase ascii-domain token normalization",
+        "split": "non-alphanumeric separators",
+        "position_window": 6,
+        "unknown_token": "<unk>",
+        "stop_tokens": [".", "\n"],
+        "preserve_domain_tokens": ["route", "role", "relation", "evidence"]
+    })
+}
+
+fn llmwave_model_config(memory: &Value) -> Value {
+    json!({
+        "version": "v107-model-config",
+        "wave_dim": WAVE_DIM,
+        "hot_budget": nanda_6m::BUDGET_BYTES,
+        "record_bytes": 32,
+        "sampler": {
+            "temperature": 0.0,
+            "top_k": 5,
+            "beam_width": 3
+        },
+        "decay": memory["wave_memory"]["decay"],
+        "feedback": {
+            "positive_lanes": memory["wave_memory"]["positive_lanes"].as_array().map_or(0, Vec::len),
+            "negative_lanes": memory["wave_memory"]["negative_lanes"].as_array().map_or(0, Vec::len)
+        }
+    })
 }
 
 fn llmwave_memory_from_packet(packet: &Packet, text: &str) -> Value {
@@ -1252,6 +1373,76 @@ fn llmwave_memory_append(memory: &mut Value, addition: &Value) {
         }
     }
     memory["vocabulary"] = llmwave_memory_vocabulary_report(memory);
+}
+
+fn llmwave_memory_pack_bytes(memory: &Value) -> Vec<u8> {
+    let records = memory["wave_memory"]["token_patterns"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let mut out = vec![];
+    out.extend_from_slice(b"LLMWAVE1");
+    out.extend_from_slice(&(records.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(32u16).to_le_bytes());
+    out.extend_from_slice(&(WAVE_DIM as u16).to_le_bytes());
+    for record in records {
+        let prefix_hash = hash32(record["prefix"].as_str().unwrap_or(""));
+        let next_hash = hash32(record["next_token"].as_str().unwrap_or(""));
+        let route_hash = hash32(record["route"].as_str().unwrap_or(""));
+        let group_hash = hash32(record["group"].as_str().unwrap_or(""));
+        let strength = (record["strength"].as_f64().unwrap_or(0.0).clamp(0.0, 2.0) * 1000.0) as u16;
+        let accepted = record["accepted"]
+            .as_u64()
+            .unwrap_or(0)
+            .min(u16::MAX as u64) as u16;
+        let rejected = record["rejected"]
+            .as_u64()
+            .unwrap_or(0)
+            .min(u16::MAX as u64) as u16;
+        let flags = if rejected > 0 { 2u16 } else { 1u16 };
+        out.extend_from_slice(&prefix_hash.to_le_bytes());
+        out.extend_from_slice(&next_hash.to_le_bytes());
+        out.extend_from_slice(&route_hash.to_le_bytes());
+        out.extend_from_slice(&group_hash.to_le_bytes());
+        out.extend_from_slice(&strength.to_le_bytes());
+        out.extend_from_slice(&accepted.to_le_bytes());
+        out.extend_from_slice(&rejected.to_le_bytes());
+        out.extend_from_slice(&flags.to_le_bytes());
+        out.extend_from_slice(&0u64.to_le_bytes());
+    }
+    out
+}
+
+fn llmwave_memory_unpack_report(bytes: &[u8]) -> Value {
+    let ok_magic = bytes.len() >= 16 && &bytes[0..8] == b"LLMWAVE1";
+    let records = if ok_magic {
+        u32::from_le_bytes(bytes[8..12].try_into().unwrap_or([0; 4])) as usize
+    } else {
+        0
+    };
+    let record_bytes = if ok_magic {
+        u16::from_le_bytes(bytes[12..14].try_into().unwrap_or([0; 2])) as usize
+    } else {
+        0
+    };
+    let wave_dim = if ok_magic {
+        u16::from_le_bytes(bytes[14..16].try_into().unwrap_or([0; 2])) as usize
+    } else {
+        0
+    };
+    let expected_bytes = 16 + records * record_bytes;
+    json!({
+        "mode": "llmwave-memory-unpack",
+        "version": "v108-binary-packed-memory-prototype",
+        "state": if ok_magic && bytes.len() == expected_bytes { "PACKED_MEMORY_OK" } else { "PACKED_MEMORY_REVIEW" },
+        "magic": ok_magic,
+        "records": records,
+        "record_bytes": record_bytes,
+        "wave_dim": wave_dim,
+        "bytes": bytes.len(),
+        "expected_bytes": expected_bytes,
+        "read_as": "Unpack validates the first binary packed LLMWave memory prototype header."
+    })
 }
 
 fn llmwave_memory_refresh_budget(memory: &mut Value) {

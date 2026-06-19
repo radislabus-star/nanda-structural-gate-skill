@@ -560,6 +560,7 @@ struct LlmwaveMemoryArgs {
 #[derive(Subcommand)]
 enum LlmwaveMemoryCommand {
     Write(LlmwaveMemoryWriteArgs),
+    Inspect(LlmwaveMemoryInspectArgs),
     Vocabulary(LlmwaveMemoryVocabularyArgs),
     Retrieve(LlmwaveMemoryRetrieveArgs),
     Feedback(LlmwaveMemoryFeedbackArgs),
@@ -571,6 +572,8 @@ enum LlmwaveMemoryCommand {
     Train(LlmwaveMemoryTrainArgs),
     Grow(LlmwaveMemoryGrowArgs),
     Eval(LlmwaveMemoryEvalArgs),
+    Pack(LlmwaveMemoryPackArgs),
+    Unpack(LlmwaveMemoryUnpackArgs),
 }
 
 #[derive(Parser)]
@@ -590,6 +593,13 @@ struct LlmwaveMemoryWriteArgs {
     format: OutputFormat,
     #[arg(long)]
     normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryInspectArgs {
+    memory: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
 }
 
 #[derive(Parser)]
@@ -739,6 +749,22 @@ struct LlmwaveMemoryGrowArgs {
 struct LlmwaveMemoryEvalArgs {
     #[arg(long)]
     suite: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryPackArgs {
+    memory: PathBuf,
+    #[arg(long)]
+    out: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryUnpackArgs {
+    input: PathBuf,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }

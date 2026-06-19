@@ -1,0 +1,4 @@
+customs declaration requires payment confirmation.
+payment confirmation supports customs declaration.
+supplier issues invoice.
+buyer pays supplier.

@@ -28,6 +28,36 @@
       ],
       "consolidate": true,
       "steps": 2
+    },
+    {
+      "id": "text-trained-payment-continuation",
+      "train_text_path": "llmwave-tiny-corpus.txt",
+      "prefix": "customs declaration requires",
+      "expected_top_token": "payment",
+      "expected_state": "MEMORY_RETRIEVE_READY",
+      "expected_generated_contains": "payment",
+      "expected_memory_version": "v101-training-from-text",
+      "steps": 2
+    },
+    {
+      "id": "grown-business-memory-supplier-issues",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "grow_path": "triad-packet.token-lens-business.json",
+      "prefix": "supplier issues",
+      "expected_top_token": "invoice",
+      "expected_state": "MEMORY_RETRIEVE_READY",
+      "expected_generated_contains": "invoice",
+      "steps": 2
+    },
+    {
+      "id": "decay-keeps-strong-payment-route",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "prefix": "customs declaration requires",
+      "expected_top_token": "payment",
+      "expected_state": "MEMORY_RETRIEVE_READY",
+      "expected_generated_contains": "payment",
+      "decay_factor": 0.99,
+      "steps": 2
     }
   ]
 }

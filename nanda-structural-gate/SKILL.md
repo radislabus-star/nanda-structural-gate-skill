@@ -134,7 +134,10 @@ scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration 
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens energy
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens anti
 scripts/nanda-llmwave-memory write .nanda/index.json --input-format json --text "customs declaration requires payment" --out .nanda/llmwave-memory.json
+scripts/nanda-llmwave-memory inspect .nanda/llmwave-memory.json
 scripts/nanda-llmwave-memory vocabulary .nanda/llmwave-memory.json
+scripts/nanda-llmwave-memory pack .nanda/llmwave-memory.json --out .nanda/llmwave-memory.llmw.bin
+scripts/nanda-llmwave-memory unpack .nanda/llmwave-memory.llmw.bin
 scripts/nanda-llmwave-memory retrieve .nanda/llmwave-memory.json --prefix "customs declaration requires"
 scripts/nanda-llmwave-memory feedback .nanda/llmwave-memory.json --decision reject --token protocols --out .nanda/llmwave-memory-feedback.json
 scripts/nanda-llmwave-memory correct .nanda/llmwave-memory.json --reject-token protocols --accept-token payment --out .nanda/llmwave-memory-corrected.json
@@ -349,7 +352,9 @@ read next-token candidates through resonance, `feedback` for accept/reject/WATCH
 learning, `consolidate` to merge duplicate continuations, `decay` to forget weak
 records, `generate` for recurrent retrieval, and `eval` for the memory corpus.
 v96-v104 add `vocabulary`, beam/sampler metadata, semantic decoder text,
-`chat`, `train`, `grow`, and `correct`.
+`chat`, `train`, `grow`, and `correct`. v105-v109 add `inspect`, tokenizer and
+model-config contracts, binary `.llmw.bin` `pack`/`unpack`, and larger generator
+quality eval.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

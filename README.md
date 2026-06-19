@@ -271,7 +271,10 @@ nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens energy
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens anti
 nanda-llmwave-memory write examples/triad-packet.interference-search-route-trap.json --input-format json --text "customs declaration requires payment" --out .nanda/llmwave-memory.json
+nanda-llmwave-memory inspect .nanda/llmwave-memory.json
 nanda-llmwave-memory vocabulary .nanda/llmwave-memory.json
+nanda-llmwave-memory pack .nanda/llmwave-memory.json --out .nanda/llmwave-memory.llmw.bin
+nanda-llmwave-memory unpack .nanda/llmwave-memory.llmw.bin
 nanda-llmwave-memory retrieve .nanda/llmwave-memory.json --prefix "customs declaration requires"
 nanda-llmwave-memory feedback .nanda/llmwave-memory.json --decision reject --token protocols --out .nanda/llmwave-memory-feedback.json
 nanda-llmwave-memory correct .nanda/llmwave-memory.json --reject-token protocols --accept-token payment --out .nanda/llmwave-memory-corrected.json
@@ -464,7 +467,11 @@ records, `generate` runs recurrent retrieval, and `eval` checks memory behavior
 against `examples/llmwave-memory-corpus.json`. v96-v104 add the first generator
 surface: `vocabulary`, deterministic/temperature sampler metadata, beam
 candidates, semantic decoder text, `chat`, text training, memory growth, and
-self-correction through `correct`. Treat
+self-correction through `correct`. v105-v109 add model-core checks: `inspect`
+reports memory file format, schema hash, tokenizer contract, and model config;
+`pack`/`unpack` write and validate the first binary `.llmw.bin` prototype; the
+quality eval now covers direct retrieve, feedback shift, text training, memory
+growth, and decay. Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.

@@ -30,6 +30,10 @@
   deterministic/temperature sampler metadata, beam candidates, semantic text
   decoder, `chat`, training from text, memory growth, self-correction, and
   generator eval checks.
+- v105-v109 add the first model-core contract: memory inspect/schema hash,
+  tokenizer contract, model config, binary packed `.llmw.bin` prototype
+  pack/unpack, and a larger generator quality eval covering direct retrieve,
+  feedback shift, text training, memory growth, and decay.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

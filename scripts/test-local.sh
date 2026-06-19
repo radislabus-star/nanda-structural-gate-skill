@@ -85,6 +85,7 @@ jq empty "$root/examples/pattern-learning-corpus.json"
 jq empty "$root/examples/llmwave-corpus.json"
 jq empty "$root/examples/token-lens-corpus.json"
 jq empty "$root/examples/llmwave-memory-corpus.json"
+jq -e 'length > 0' <<<"$(jq -Rs . "$root/examples/llmwave-tiny-corpus.txt")" >/dev/null
 jq empty "$root/examples/triad-packet.token-lens-business.json"
 jq empty "$root/examples/demo-corpus.json"
 
@@ -596,6 +597,12 @@ tmp_memory="$(mktemp -d)"
 jq -e '.version == "v86-wave-memory-schema" and .write_path.version == "v87-memory-write-path" and .wave_memory.phrase_memory.version == "v92-phrase-memory" and .wave_memory.packed_runtime.version == "v93-packed-6m-memory"' "$tmp_memory/memory.json" >/dev/null
 memory_vocab_json="$("$llmwave_memory" vocabulary "$tmp_memory/memory.json")"
 jq -e '.mode == "llmwave-memory-vocabulary" and .version == "v96-vocabulary-token-space" and .tokens > 0' <<<"$memory_vocab_json" >/dev/null
+memory_inspect_json="$("$llmwave_memory" inspect "$tmp_memory/memory.json")"
+jq -e '.mode == "llmwave-memory-inspect" and .version == "v105-real-memory-file-format" and .tokenizer_contract.version == "v106-tokenizer-contract" and .model_config.version == "v107-model-config"' <<<"$memory_inspect_json" >/dev/null
+memory_pack_json="$("$llmwave_memory" pack "$tmp_memory/memory.json" --out "$tmp_memory/memory.llmw.bin")"
+jq -e '.mode == "llmwave-memory-pack" and .version == "v108-binary-packed-memory-prototype" and .bytes > 16' <<<"$memory_pack_json" >/dev/null
+memory_unpack_json="$("$llmwave_memory" unpack "$tmp_memory/memory.llmw.bin")"
+jq -e '.mode == "llmwave-memory-unpack" and .version == "v108-binary-packed-memory-prototype" and .state == "PACKED_MEMORY_OK"' <<<"$memory_unpack_json" >/dev/null
 memory_retrieve_json="$("$llmwave_memory" retrieve "$tmp_memory/memory.json" --prefix "customs declaration requires")"
 jq -e '.mode == "llmwave-memory-retrieve" and .version == "v88-memory-retrieve-path" and .state == "MEMORY_RETRIEVE_READY" and .top_token == "payment" and .packed_runtime.fits_6m == true' <<<"$memory_retrieve_json" >/dev/null
 memory_feedback_json="$("$llmwave_memory" feedback "$tmp_memory/memory.json" --decision reject --token protocols)"
@@ -618,7 +625,7 @@ jq -e '.version == "v101-training-from-text" and .write_path.state == "TEXT_MEMO
 memory_grow_json="$("$llmwave_memory" grow "$tmp_memory/memory.json" "$root/examples/triad-packet.token-lens-business.json" --input-format json)"
 jq -e '.mode == "llmwave-memory-grow" and .version == "v102-memory-growth" and .after_records > .before_records' <<<"$memory_grow_json" >/dev/null
 memory_eval_json="$("$llmwave_memory" eval --suite "$root/examples/llmwave-memory-corpus.json")"
-jq -e '.mode == "llmwave-memory-eval" and .version == "v104-generator-eval" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$memory_eval_json" >/dev/null
+jq -e '.mode == "llmwave-memory-eval" and .version == "v109-generator-quality-eval" and .passed == 5 and .total == 5 and .accuracy == 1' <<<"$memory_eval_json" >/dev/null
 serve_token_json="$(printf '{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n' "$root" "$root" | "$serve")"
 jq -e 'length == 2 and .[0].ok == true and .[0].result.mode == "llmwave-token-compact" and .[0].result.top_token == "payment" and .[0].result.serve_cache.state == "SERVE_TOKEN_WARMED" and .[1].result.serve_cache.state == "SERVE_TOKEN_HIT"' <<<"$(jq -s . <<<"$serve_token_json")" >/dev/null
 demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"

@@ -1,6 +1,6 @@
 # LLMWave Field + Lens Contract
 
-Status: v104 implementation contract.
+Status: v109 implementation contract.
 Updated: 2026-06-19.
 
 LLMWave is not a prose generator yet. It is the next layer above the NANDA
@@ -99,7 +99,12 @@ Memory versions:
 - v101: training from text;
 - v102: memory growth;
 - v103: self-correction;
-- v104: generator eval.
+- v104: generator eval;
+- v105: real memory file format;
+- v106: tokenizer contract;
+- v107: model config;
+- v108: binary packed memory prototype;
+- v109: generator quality eval.
 
 The current memory core is still a cold JSON implementation with explicit 6M
 budget reporting. It is not yet the final hot packed runtime, but it gives
@@ -123,6 +128,9 @@ memory
 Commands:
 
 - `nanda-llmwave-memory vocabulary`;
+- `nanda-llmwave-memory inspect`;
+- `nanda-llmwave-memory pack memory.json --out memory.llmw.bin`;
+- `nanda-llmwave-memory unpack memory.llmw.bin`;
 - `nanda-llmwave-memory generate --beam-width N --temperature T`;
 - `nanda-llmwave-memory chat --prompt ...`;
 - `nanda-llmwave-memory train corpus.txt`;
@@ -535,6 +543,18 @@ v104 is done when:
 - `grow` emits `v102-memory-growth`;
 - `correct` emits `v103-self-correction`;
 - memory eval emits `v104-generator-eval` and passes.
+
+## v109 Model Core
+
+v109 is done when:
+
+- `inspect` emits `v105-real-memory-file-format` with a schema hash;
+- `inspect.tokenizer_contract.version == "v106-tokenizer-contract"`;
+- `inspect.model_config.version == "v107-model-config"`;
+- `pack` writes a binary `.llmw.bin` prototype with `LLMWAVE1` header;
+- `unpack` validates the binary prototype as `PACKED_MEMORY_OK`;
+- memory eval emits `v109-generator-quality-eval` and covers direct retrieve,
+  feedback shift, text training, memory growth, and decay.
 
 ## Research Anchors
 
