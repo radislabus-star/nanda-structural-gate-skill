@@ -121,6 +121,9 @@
 - v58 collapses LLMWave reports into a packed hot-cycle readiness state.
 - v59 adds the LLMWave proof-summary contract.
 - v60 exposes a public demo packet with a safe claim and proof state.
+- v61 adds `nanda-demo`, a human/agent-facing weak-spot surface over the v60
+  proof packet, plus `examples/demo-corpus.json` with ready, anti-wave, and
+  review cases.
 - Core version is now `sparse-triad-v6.0-llmwave-proof`.
 - Cargo package version is now `6.0.0`.
 - Added an explicit heavy 16k finance fixture generator and

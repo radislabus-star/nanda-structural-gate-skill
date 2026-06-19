@@ -1,0 +1,31 @@
+{
+  "name": "nanda-v61-demo-weak-spots",
+  "cases": [
+    {
+      "id": "demo-proof-ready",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "text": "declaration requires protocols",
+      "expected_state": "PUBLIC_DEMO_READY",
+      "expected_weak_spots": 0,
+      "expected_anti_wave_state": "NO_ANTI_WAVE_MEMORY"
+    },
+    {
+      "id": "demo-anti-wave-visible",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "text": "declaration requires protocols",
+      "feedback_decision": "reject",
+      "note": "demo reject false first continuation",
+      "expected_state": "PUBLIC_DEMO_READY",
+      "expected_weak_spots": 0,
+      "expected_anti_wave_state": "ANTI_WAVE_APPLIED"
+    },
+    {
+      "id": "demo-review-empty-memory",
+      "path": "triad-packet.demo-review-empty.json",
+      "text": "unsupported relation",
+      "expected_state": "PUBLIC_DEMO_REVIEW",
+      "expected_weak_spots": 4,
+      "expected_anti_wave_state": "NO_ANTI_WAVE_MEMORY"
+    }
+  ]
+}

@@ -144,6 +144,7 @@ evidence-conflict tasks do.
         ├── nanda-pattern-bank
         ├── nanda-llmwave
         ├── nanda-llmwave-eval
+        ├── nanda-demo
         ├── nanda-focus
         ├── nanda-proof
         ├── nanda-probe
@@ -253,6 +254,8 @@ nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --train
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
+nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
+nanda-demo --suite examples/demo-corpus.json --format json
 nanda-search examples/triad-packet.source-weighting.json --input-format json --top-k 3
 nanda-search examples/triad-packet.auto-query-memory.json --input-format json --query "lower operator debt route" --top-k 3
 nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
@@ -387,6 +390,10 @@ v49 attractor energy, v50 capacity, v51 anti-wave audit, v54 packed HRR,
 v55 cleanup thresholds, v56 anti-wave locality, v57 capacity baseline,
 v58 hot-cycle readiness, v59 proof summary, and the v60 public demo packet.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.
+`nanda-demo` is the v61 weak-spot surface: it compresses the v60 JSON into a
+short state/top-pattern/proof/signals/weak-spots report for humans and agents.
+`examples/demo-corpus.json` keeps three demo modes honest: proof-ready,
+anti-wave-visible, and review-only.
 `nanda-feedback` also records v29 `resonance_memory`: the accepted, rejected,
 or watched shape of the field itself. It stores the peak, route, relation,
 role mode, WAW status, phase/standing-wave/energy/boundary states, and compact

@@ -158,4 +158,8 @@ Status: started.
 - v59 proof summary: LLMWave exposes one answer-readiness contract.
 - v60 public demo packet: the demo surface includes safe claims and proof
   blockers instead of hiding uncertainty.
-- Next milestone is moving v60 proof signals deeper into the NANDA-6M hot loop.
+- v61 demo weak-spot surface: `nanda-demo` compresses v60 proof JSON into a
+  short human/agent dashboard and `examples/demo-corpus.json` checks ready,
+  anti-wave, and review cases.
+- Next milestone is moving v60/v61 proof signals deeper into the NANDA-6M hot
+  loop.

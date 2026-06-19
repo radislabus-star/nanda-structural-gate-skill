@@ -119,6 +119,8 @@ scripts/nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 scripts/nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --train
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
+scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
+scripts/nanda-demo --suite examples/demo-corpus.json --format json
 scripts/nanda-hgate task.json --input-format json --by linked-group
 scripts/nanda-search examples/triad-packet.route-balanced-focus.json --input-format json --query "lower operator debt route" --route-cap 3 --route-triad-cap 1 --top-k 3
 scripts/nanda-search examples/triad-packet.polarization-role-swap.json --input-format json --top-k 3
@@ -286,6 +288,11 @@ whether reject moved the top pattern or accept reinforced it. Use
 decode -> cleanup -> energy/capacity/anti-wave audit -> packed readiness ->
 proof summary -> public demo packet. Use `nanda-llmwave-eval --suite
 examples/llmwave-corpus.json` before claiming LLMWave proof behavior.
+Use `nanda-demo` when a human or another agent needs the short weak-spot view:
+state, input, top pattern, proof state, compact signals, weak spots, safe
+claim, and boundary. Use `nanda-demo --suite examples/demo-corpus.json` after
+changing demo/proof behavior; it must keep ready, anti-wave, and review cases
+legible.
 If no `candidate_triads` exist, `nanda-search` converts `--query` or packet
 `query` into lightweight `auto_query_triads`; inspect `query.source` in output.
 When source quality matters, inspect `source_weighting` and each

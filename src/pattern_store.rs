@@ -248,6 +248,156 @@ pub(crate) fn llmwave_eval_cmd(args: LlmwaveEvalArgs) -> Result<u8> {
     })
 }
 
+pub(crate) fn demo_cmd(args: DemoArgs) -> Result<u8> {
+    if let Some(suite_path) = &args.suite {
+        let text = fs::read_to_string(suite_path)
+            .with_context(|| format!("read {}", suite_path.display()))?;
+        let suite: DemoSuite = serde_json::from_str(&text)
+            .with_context(|| format!("parse {}", suite_path.display()))?;
+        if suite.cases.is_empty() {
+            return Err(anyhow!("nanda demo --suite requires at least one case"));
+        }
+        let base = suite_path.parent().unwrap_or_else(|| Path::new("."));
+        let mut rows = vec![];
+        let mut passed = 0usize;
+        for case in suite.cases {
+            let row = run_demo_case(&args, base, case)?;
+            if row["ok"].as_bool().unwrap_or(false) {
+                passed += 1;
+            }
+            rows.push(row);
+        }
+        let total = rows.len();
+        let out = json!({
+            "core_version": CORE_VERSION,
+            "mode": "llmwave-demo-suite",
+            "version": "v61-demo-weak-spot-surface",
+            "suite": if suite.name.is_empty() { suite_path.display().to_string() } else { suite.name },
+            "passed": passed,
+            "total": total,
+            "accuracy": round4(passed as f64 / total.max(1) as f64),
+            "cases": rows,
+            "read_as": "Demo suite checks the human/agent-facing LLMWave surface: ready, anti-wave, and review cases must all be legible."
+        });
+        match args.format {
+            OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+            OutputFormat::Text => print_demo_suite_text(&out),
+            OutputFormat::Md => print_demo_suite_md(&out),
+        }
+        return Ok(if passed == total {
+            EXIT_PASS
+        } else {
+            EXIT_VETO
+        });
+    }
+
+    let input = args
+        .input
+        .as_ref()
+        .ok_or_else(|| anyhow!("nanda demo requires an input packet or --suite"))?;
+    let text = demo_text(&args)?;
+    let mut packet = load_packet_auto(
+        input,
+        &args.input_format,
+        "demo",
+        "general",
+        &text,
+        args.normalize_paths,
+    )?;
+    let eval_args = demo_eval_args(&args);
+    if args.train {
+        let case = LlmwaveEvalCase {
+            id: "demo-feedback".to_string(),
+            path: input.clone(),
+            text: text.clone(),
+            feedback_decision: feedback_decision_label(&args.decision).to_string(),
+            note: "demo feedback preview".to_string(),
+            expected_top_pattern: String::new(),
+            expected_hrr_state: String::new(),
+            expected_cleanup_state: String::new(),
+            expected_attractor_state: String::new(),
+            expected_capacity_state: String::new(),
+            expected_anti_wave_state: String::new(),
+            expected_proof_state: String::new(),
+            expected_demo_state: String::new(),
+        };
+        packet = inject_llmwave_feedback(packet, &text, &case, &eval_args)?;
+    }
+    let report = llmwave_report_from_packet(&packet, input, &text, &eval_args);
+    let demo = demo_surface_report("single", input, &text, &report);
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&demo)?),
+        OutputFormat::Text => print_demo_text(&demo),
+        OutputFormat::Md => print_demo_md(&demo),
+    }
+    Ok(if demo["state"].as_str() == Some("PUBLIC_DEMO_READY") {
+        EXIT_PASS
+    } else {
+        EXIT_WATCH
+    })
+}
+
+fn run_demo_case(args: &DemoArgs, base: &Path, case: DemoCase) -> Result<Value> {
+    let path = resolve_llmwave_suite_path(base, &case.path);
+    let text = if case.text.trim().is_empty() {
+        args.text.clone()
+    } else {
+        case.text.clone()
+    };
+    let mut packet = load_packet_auto(
+        &path,
+        &args.input_format,
+        "demo-suite",
+        "general",
+        &text,
+        args.normalize_paths,
+    )?;
+    let eval_args = demo_eval_args(args);
+    if !case.feedback_decision.trim().is_empty() {
+        let eval_case = LlmwaveEvalCase {
+            id: case.id.clone(),
+            path: path.clone(),
+            text: text.clone(),
+            feedback_decision: case.feedback_decision.clone(),
+            note: case.note.clone(),
+            expected_top_pattern: String::new(),
+            expected_hrr_state: String::new(),
+            expected_cleanup_state: String::new(),
+            expected_attractor_state: String::new(),
+            expected_capacity_state: String::new(),
+            expected_anti_wave_state: String::new(),
+            expected_proof_state: String::new(),
+            expected_demo_state: String::new(),
+        };
+        packet = inject_llmwave_feedback(packet, &text, &eval_case, &eval_args)?;
+    }
+    let report = llmwave_report_from_packet(&packet, &path, &text, &eval_args);
+    let demo = demo_surface_report(&case.id, &path, &text, &report);
+    let expected_state_ok = case.expected_state.is_empty()
+        || demo["state"].as_str() == Some(case.expected_state.as_str());
+    let expected_weak_ok = case
+        .expected_weak_spots
+        .is_none_or(|expected| demo["weak_spots"].as_array().map_or(0, Vec::len) == expected);
+    let expected_anti_ok = case.expected_anti_wave_state.is_empty()
+        || demo["signals"]["anti_wave"].as_str() == Some(case.expected_anti_wave_state.as_str());
+    let ok = expected_state_ok && expected_weak_ok && expected_anti_ok;
+    Ok(json!({
+        "id": if case.id.is_empty() { path.display().to_string() } else { case.id },
+        "case": path.display().to_string(),
+        "state": demo["state"],
+        "top_pattern": demo["top_pattern"],
+        "weak_spots": demo["weak_spots"],
+        "signals": demo["signals"],
+        "expected_state": case.expected_state,
+        "checks": {
+            "state": expected_state_ok,
+            "weak_spots": expected_weak_ok,
+            "anti_wave": expected_anti_ok
+        },
+        "ok": ok
+    }))
+}
+
 fn run_llmwave_eval_case(
     args: &LlmwaveEvalArgs,
     base: &Path,
@@ -956,6 +1106,173 @@ fn normalize_llmwave_feedback_decision(decision: &str) -> Result<String> {
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
+struct DemoSuite {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    cases: Vec<DemoCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct DemoCase {
+    #[serde(default)]
+    id: String,
+    path: PathBuf,
+    #[serde(default)]
+    text: String,
+    #[serde(default)]
+    feedback_decision: String,
+    #[serde(default)]
+    note: String,
+    #[serde(default)]
+    expected_state: String,
+    #[serde(default)]
+    expected_weak_spots: Option<usize>,
+    #[serde(default)]
+    expected_anti_wave_state: String,
+}
+
+fn demo_text(args: &DemoArgs) -> Result<String> {
+    if let Some(path) = &args.text_file {
+        fs::read_to_string(path).with_context(|| format!("read {}", path.display()))
+    } else {
+        Ok(args.text.clone())
+    }
+}
+
+fn demo_eval_args(args: &DemoArgs) -> LlmwaveEvalArgs {
+    LlmwaveEvalArgs {
+        suite: PathBuf::new(),
+        input_format: args.input_format.clone(),
+        top_k: args.top_k,
+        steps: args.steps,
+        search_top_k: args.search_top_k,
+        route_cap: args.route_cap,
+        route_triad_cap: args.route_triad_cap,
+        group_by: args.group_by.clone(),
+        format: OutputFormat::Json,
+        normalize_paths: args.normalize_paths,
+    }
+}
+
+fn demo_surface_report(id: &str, path: &Path, text: &str, report: &Value) -> Value {
+    let proof_state = report["proof_summary"]["state"].as_str().unwrap_or("");
+    let demo_state = report["public_demo"]["state"].as_str().unwrap_or("");
+    let top_pattern = report["decode"]["top_pattern"].as_str().unwrap_or("");
+    let signals = json!({
+        "hrr": report["hrr_binding"]["state"],
+        "cleanup": report["cleanup_memory"]["state"],
+        "attractor": report["attractor_trace"]["state"],
+        "capacity": report["superposition_capacity"]["state"],
+        "anti_wave": report["anti_wave_audit"]["state"],
+        "packed_hrr": report["packed_hrr_runtime"]["state"],
+        "cleanup_dictionary": report["cleanup_dictionary"]["state"],
+        "anti_wave_locality": report["anti_wave_locality"]["state"],
+        "capacity_curve": report["capacity_curve"]["state"],
+        "hot_cycle": report["packed_hot_cycle"]["state"],
+        "proof": proof_state,
+        "demo": demo_state
+    });
+    let weak_spots = demo_weak_spots(report);
+    let state = if demo_state == "PUBLIC_DEMO_READY" && weak_spots.is_empty() {
+        "PUBLIC_DEMO_READY"
+    } else {
+        "PUBLIC_DEMO_REVIEW"
+    };
+    json!({
+        "core_version": CORE_VERSION,
+        "mode": "llmwave-demo",
+        "version": "v61-demo-weak-spot-surface",
+        "id": id,
+        "input_packet": path.display().to_string(),
+        "text": text,
+        "state": state,
+        "top_pattern": top_pattern,
+        "proof_state": proof_state,
+        "signals": signals,
+        "weak_spots": weak_spots,
+        "safe_claim": if state == "PUBLIC_DEMO_READY" {
+            "LLMWave found a stable structural continuation and exposed its proof signals."
+        } else {
+            "LLMWave produced a reviewable structural continuation, but weak spots remain."
+        },
+        "boundary": "This is structural wave retrieval/proof, not standalone natural-language understanding.",
+        "raw_public_demo": report["public_demo"],
+        "read_as": "Demo mode is the weak-spot surface: it compresses v60 JSON into a human/agent readable proof dashboard."
+    })
+}
+
+fn demo_weak_spots(report: &Value) -> Vec<Value> {
+    let mut weak = vec![];
+    push_weak(
+        &mut weak,
+        "hrr",
+        report["hrr_binding"]["state"].as_str().unwrap_or(""),
+        &["HRR_BINDING_VISIBLE"],
+        "HRR binding did not visibly recover role/filler lanes.",
+    );
+    push_weak(
+        &mut weak,
+        "cleanup",
+        report["cleanup_memory"]["state"].as_str().unwrap_or(""),
+        &["CLEANUP_READY"],
+        "Cleanup memory is ambiguous or empty for decoded patterns.",
+    );
+    push_weak(
+        &mut weak,
+        "attractor",
+        report["attractor_trace"]["state"].as_str().unwrap_or(""),
+        &["ATTRACTOR_STABLE", "NO_ATTRACTOR_TRACE"],
+        "Decode trajectory jumps route or loses energy.",
+    );
+    push_weak(
+        &mut weak,
+        "capacity",
+        report["superposition_capacity"]["state"]
+            .as_str()
+            .unwrap_or(""),
+        &["CAPACITY_HEALTHY", "CAPACITY_WATCH"],
+        "Superposition pressure requires focus or split.",
+    );
+    push_weak(
+        &mut weak,
+        "hot_cycle",
+        report["packed_hot_cycle"]["state"].as_str().unwrap_or(""),
+        &["LLMWAVE_HOT_READY"],
+        "Packed hot-cycle readiness is not proven.",
+    );
+    push_weak(
+        &mut weak,
+        "proof",
+        report["proof_summary"]["state"].as_str().unwrap_or(""),
+        &["LLMWAVE_PROOF_READY"],
+        "Proof summary is not answer-ready.",
+    );
+    if report["decode"]["top_pattern"]
+        .as_str()
+        .unwrap_or("")
+        .is_empty()
+    {
+        weak.push(json!({
+            "signal": "decode",
+            "state": "NO_PATTERN",
+            "reason": "No structural continuation was decoded."
+        }));
+    }
+    weak
+}
+
+fn push_weak(weak: &mut Vec<Value>, signal: &str, state: &str, allowed: &[&str], reason: &str) {
+    if !allowed.contains(&state) {
+        weak.push(json!({
+            "signal": signal,
+            "state": state,
+            "reason": reason
+        }));
+    }
+}
+
 pub(crate) fn compact_pattern_store_report(packet: &Packet, sample: usize) -> Value {
     let records = packet
         .continuation_memory
@@ -1353,6 +1670,121 @@ fn print_llmwave_eval_md(out: &Value) {
                     "fail"
                 },
                 case["actual_top_pattern"].as_str().unwrap_or("")
+            );
+        }
+    }
+}
+
+fn print_demo_text(out: &Value) {
+    println!("NANDA LLMWave Demo");
+    println!();
+    println!("state: {}", out["state"].as_str().unwrap_or(""));
+    println!("input: {}", out["text"].as_str().unwrap_or(""));
+    println!("top_pattern: {}", out["top_pattern"].as_str().unwrap_or(""));
+    println!("proof: {}", out["proof_state"].as_str().unwrap_or(""));
+    println!();
+    println!("signals:");
+    if let Some(signals) = out["signals"].as_object() {
+        for (key, value) in signals {
+            println!("  {key}: {}", value.as_str().unwrap_or(""));
+        }
+    }
+    println!();
+    println!("weak_spots:");
+    if out["weak_spots"].as_array().is_none_or(Vec::is_empty) {
+        println!("  none");
+    } else if let Some(items) = out["weak_spots"].as_array() {
+        for item in items {
+            println!(
+                "  - {} [{}]: {}",
+                item["signal"].as_str().unwrap_or(""),
+                item["state"].as_str().unwrap_or(""),
+                item["reason"].as_str().unwrap_or("")
+            );
+        }
+    }
+    println!();
+    println!("safe_claim: {}", out["safe_claim"].as_str().unwrap_or(""));
+    println!("boundary: {}", out["boundary"].as_str().unwrap_or(""));
+}
+
+fn print_demo_md(out: &Value) {
+    println!("# NANDA LLMWave Demo\n");
+    println!("- state: `{}`", out["state"].as_str().unwrap_or(""));
+    println!("- input: `{}`", out["text"].as_str().unwrap_or(""));
+    println!(
+        "- top_pattern: `{}`",
+        out["top_pattern"].as_str().unwrap_or("")
+    );
+    println!("- proof: `{}`", out["proof_state"].as_str().unwrap_or(""));
+    println!("\n## Signals\n");
+    if let Some(signals) = out["signals"].as_object() {
+        for (key, value) in signals {
+            println!("- `{key}`: `{}`", value.as_str().unwrap_or(""));
+        }
+    }
+    println!("\n## Weak Spots\n");
+    if out["weak_spots"].as_array().is_none_or(Vec::is_empty) {
+        println!("- none");
+    } else if let Some(items) = out["weak_spots"].as_array() {
+        for item in items {
+            println!(
+                "- `{}` / `{}`: {}",
+                item["signal"].as_str().unwrap_or(""),
+                item["state"].as_str().unwrap_or(""),
+                item["reason"].as_str().unwrap_or("")
+            );
+        }
+    }
+    println!("\n## Claim\n");
+    println!("{}", out["safe_claim"].as_str().unwrap_or(""));
+    println!();
+    println!("{}", out["boundary"].as_str().unwrap_or(""));
+}
+
+fn print_demo_suite_text(out: &Value) {
+    println!("NANDA LLMWave Demo Suite");
+    println!(
+        "passed: {}/{}",
+        out["passed"].as_u64().unwrap_or(0),
+        out["total"].as_u64().unwrap_or(0)
+    );
+    if let Some(cases) = out["cases"].as_array() {
+        for case in cases {
+            println!(
+                "- {}: {} state={} weak_spots={}",
+                case["id"].as_str().unwrap_or(""),
+                if case["ok"].as_bool().unwrap_or(false) {
+                    "ok"
+                } else {
+                    "fail"
+                },
+                case["state"].as_str().unwrap_or(""),
+                case["weak_spots"].as_array().map_or(0, Vec::len)
+            );
+        }
+    }
+}
+
+fn print_demo_suite_md(out: &Value) {
+    println!("# NANDA LLMWave Demo Suite\n");
+    println!(
+        "- passed: `{}/{}`",
+        out["passed"].as_u64().unwrap_or(0),
+        out["total"].as_u64().unwrap_or(0)
+    );
+    if let Some(cases) = out["cases"].as_array() {
+        for case in cases {
+            println!(
+                "- `{}`: `{}` state=`{}` weak_spots=`{}`",
+                case["id"].as_str().unwrap_or(""),
+                if case["ok"].as_bool().unwrap_or(false) {
+                    "ok"
+                } else {
+                    "fail"
+                },
+                case["state"].as_str().unwrap_or(""),
+                case["weak_spots"].as_array().map_or(0, Vec::len)
             );
         }
     }

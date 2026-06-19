@@ -221,8 +221,9 @@ The next LLMWave line should preserve these laws:
 
 Status: first proof baseline implemented in `sparse-triad-v6.0-llmwave-proof`.
 The v47-v60 reports are now exposed by `nanda-llmwave`, `nanda-decode`,
-`nanda-pattern-bank`, and `nanda-llmwave-eval`. The next research job is to
-move more of these proof signals into the NANDA-6M hot loop.
+`nanda-pattern-bank`, `nanda-llmwave-eval`, and the v61 `nanda-demo` weak-spot
+surface. The next research job is to move more of these proof signals into the
+NANDA-6M hot loop.
 
 ### v47: HRR Binding Sandbox
 

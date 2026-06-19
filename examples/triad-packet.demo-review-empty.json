@@ -1,0 +1,7 @@
+{
+  "task_id": "demo-review-empty",
+  "domain": "demo",
+  "query": "unsupported relation should stay review-only",
+  "triads": [],
+  "candidate_triads": []
+}

@@ -85,6 +85,7 @@ enum Command {
     PatternBank(PatternBankArgs),
     Llmwave(LlmwaveArgs),
     LlmwaveEval(LlmwaveEvalArgs),
+    Demo(DemoArgs),
     Focus(FocusArgs),
     Proof(ProofArgs),
     Probe(ProbeArgs),
@@ -532,6 +533,39 @@ struct LlmwaveEvalArgs {
 }
 
 #[derive(Parser)]
+struct DemoArgs {
+    input: Option<PathBuf>,
+    #[arg(long)]
+    suite: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "")]
+    text: String,
+    #[arg(long)]
+    text_file: Option<PathBuf>,
+    #[arg(long)]
+    train: bool,
+    #[arg(long, value_enum, default_value = "accept")]
+    decision: FeedbackDecision,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, default_value_t = 3)]
+    steps: usize,
+    #[arg(long, default_value_t = 8)]
+    search_top_k: usize,
+    #[arg(long, default_value_t = 256)]
+    route_cap: usize,
+    #[arg(long, default_value_t = 32)]
+    route_triad_cap: usize,
+    #[arg(long, value_enum, default_value = "route")]
+    group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "text")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
 struct FocusArgs {
     input: PathBuf,
     #[arg(long, value_enum, default_value = "auto")]
@@ -875,6 +909,7 @@ fn run() -> Result<u8> {
         Command::PatternBank(args) => pattern_bank_cmd(args),
         Command::Llmwave(args) => llmwave_cmd(args),
         Command::LlmwaveEval(args) => llmwave_eval_cmd(args),
+        Command::Demo(args) => demo_cmd(args),
         Command::Focus(args) => focus::focus_cmd(args),
         Command::Proof(args) => proof::proof_cmd(args),
         Command::Probe(args) => probe_cmd(args),

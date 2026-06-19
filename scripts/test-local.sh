@@ -26,6 +26,7 @@ pattern_eval="$root/nanda-structural-gate/scripts/nanda-pattern-eval"
 pattern_bank="$root/nanda-structural-gate/scripts/nanda-pattern-bank"
 llmwave="$root/nanda-structural-gate/scripts/nanda-llmwave"
 llmwave_eval="$root/nanda-structural-gate/scripts/nanda-llmwave-eval"
+demo="$root/nanda-structural-gate/scripts/nanda-demo"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
 proof="$root/nanda-structural-gate/scripts/nanda-proof"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
@@ -66,6 +67,7 @@ jq empty "$root/examples/triad-packet.polarization-role-swap.json"
 jq empty "$root/examples/triad-packet.polarization-reversed-stop.json"
 jq empty "$root/examples/triad-packet.route-balanced-focus.json"
 jq empty "$root/examples/triad-packet.hgate-size-only.json"
+jq empty "$root/examples/triad-packet.demo-review-empty.json"
 jq empty "$root/examples/triad-packet.canonical-alias-pass.json"
 jq empty "$root/examples/triad-packet.canonical-alias-veto.json"
 jq empty "$root/examples/triad-packet.canonical-alias-conflict.json"
@@ -75,6 +77,7 @@ jq empty "$root/examples/waw-corpus.json"
 jq empty "$root/examples/decode-corpus.json"
 jq empty "$root/examples/pattern-learning-corpus.json"
 jq empty "$root/examples/llmwave-corpus.json"
+jq empty "$root/examples/demo-corpus.json"
 
 pass_json="$("$checker" --triads "$root/examples/triad-packet.example.json" --format json)"
 if ! grep -q '"verdict": "PASS"' <<<"$pass_json"; then
@@ -536,6 +539,13 @@ jq -e '.decode.top_pattern == "declaration -> requires -> protocols" and .feedba
 llmwave_eval_json="$("$llmwave_eval" --suite "$root/examples/llmwave-corpus.json")"
 jq -e '.mode == "llmwave-eval-suite" and .version == "v53-llmwave-proof-suite" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$llmwave_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "route-trap-reject-applies-anti-wave" and .states.anti_wave == "ANTI_WAVE_APPLIED")' <<<"$llmwave_eval_json" >/dev/null
+demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"
+jq -e '.mode == "llmwave-demo" and .version == "v61-demo-weak-spot-surface" and .state == "PUBLIC_DEMO_READY" and (.weak_spots | length) == 0' <<<"$demo_json" >/dev/null
+demo_review_json="$("$demo" "$root/examples/triad-packet.demo-review-empty.json" --input-format json --text "unsupported relation" --format json || true)"
+jq -e '.state == "PUBLIC_DEMO_REVIEW" and (.weak_spots | length) >= 1' <<<"$demo_review_json" >/dev/null
+demo_suite_json="$("$demo" --suite "$root/examples/demo-corpus.json" --format json)"
+jq -e '.mode == "llmwave-demo-suite" and .passed == 3 and .total == 3 and .accuracy == 1' <<<"$demo_suite_json" >/dev/null
+jq -e '.cases[] | select(.id == "demo-review-empty-memory" and .state == "PUBLIC_DEMO_REVIEW" and (.weak_spots | length) >= 1)' <<<"$demo_suite_json" >/dev/null
 trained_budget_json="$("$budget" "$tmp_decode_index" --input-format json)"
 jq -e '.pattern_runtime.version == "v40-6m-pattern-runtime-contract" and .pattern_runtime.active_patterns == 1 and .pattern_runtime.fits_pattern_arena == true' <<<"$trained_budget_json" >/dev/null
 serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"
