@@ -58,6 +58,16 @@
       "expected_generated_contains": "payment",
       "decay_factor": 0.99,
       "steps": 2
+    },
+    {
+      "id": "prompt-adapter-question-to-prefix",
+      "train_text_path": "llmwave-tiny-corpus.txt",
+      "prompt": "what does customs declaration require?",
+      "expected_top_token": "payment",
+      "expected_state": "MEMORY_RETRIEVE_READY",
+      "expected_generated_contains": "payment",
+      "expected_memory_version": "v101-training-from-text",
+      "steps": 2
     }
   ]
 }

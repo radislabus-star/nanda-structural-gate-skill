@@ -572,6 +572,7 @@ enum LlmwaveMemoryCommand {
     Train(LlmwaveMemoryTrainArgs),
     Grow(LlmwaveMemoryGrowArgs),
     Eval(LlmwaveMemoryEvalArgs),
+    Demo(LlmwaveMemoryDemoArgs),
     Pack(LlmwaveMemoryPackArgs),
     Unpack(LlmwaveMemoryUnpackArgs),
 }
@@ -749,6 +750,22 @@ struct LlmwaveMemoryGrowArgs {
 struct LlmwaveMemoryEvalArgs {
     #[arg(long)]
     suite: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryDemoArgs {
+    #[arg(long)]
+    corpus: PathBuf,
+    #[arg(long, default_value = "what does customs declaration require?")]
+    prompt: String,
+    #[arg(long, default_value = "protocols")]
+    reject_token: String,
+    #[arg(long, default_value = "payment")]
+    accept_token: String,
+    #[arg(long, default_value_t = 3)]
+    steps: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }

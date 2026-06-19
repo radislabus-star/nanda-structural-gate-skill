@@ -279,6 +279,7 @@ pub(crate) fn llmwave_memory_cmd(args: LlmwaveMemoryArgs) -> Result<u8> {
         LlmwaveMemoryCommand::Train(args) => llmwave_memory_train_cmd(args),
         LlmwaveMemoryCommand::Grow(args) => llmwave_memory_grow_cmd(args),
         LlmwaveMemoryCommand::Eval(args) => llmwave_memory_eval_cmd(args),
+        LlmwaveMemoryCommand::Demo(args) => llmwave_memory_demo_cmd(args),
         LlmwaveMemoryCommand::Pack(args) => llmwave_memory_pack_cmd(args),
         LlmwaveMemoryCommand::Unpack(args) => llmwave_memory_unpack_cmd(args),
     }
@@ -397,7 +398,7 @@ fn llmwave_memory_generate_cmd(args: LlmwaveMemoryGenerateArgs) -> Result<u8> {
 
 fn llmwave_memory_chat_cmd(args: LlmwaveMemoryChatArgs) -> Result<u8> {
     let memory = llmwave_memory_load(&args.memory)?;
-    let generation = llmwave_memory_generate_report(
+    let out = llmwave_memory_chat_report(
         &memory,
         &args.prompt,
         args.steps,
@@ -406,15 +407,6 @@ fn llmwave_memory_chat_cmd(args: LlmwaveMemoryChatArgs) -> Result<u8> {
         args.temperature,
         &args.language,
     );
-    let out = json!({
-        "mode": "llmwave-memory-chat",
-        "version": "v100-chat-loop",
-        "prompt": args.prompt,
-        "answer": generation["decoded_text"],
-        "state": generation["state"],
-        "generation": generation,
-        "read_as": "Chat is a tiny LLMWave loop: memory -> beam -> sampler -> semantic decoder -> text."
-    });
     llmwave_memory_emit(out, None, &args.format)?;
     Ok(EXIT_PASS)
 }
@@ -521,17 +513,36 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
         if let Some(factor) = case["decay_factor"].as_f64() {
             memory = llmwave_memory_decay(&mut memory, factor, 0.05)["memory"].clone();
         }
+        let prompt = case["prompt"].as_str();
         let prefix = case["prefix"].as_str().unwrap_or("");
-        let retrieve = llmwave_memory_retrieve_report(&memory, prefix, 5);
-        let generate = llmwave_memory_generate_report(
-            &memory,
-            prefix,
-            case["steps"].as_u64().unwrap_or(2) as usize,
-            3,
-            3,
-            0.0,
-            case["language"].as_str().unwrap_or("en"),
-        );
+        let adapter = prompt.map(|value| llmwave_prompt_adapter(&memory, value));
+        let active_prefix = adapter
+            .as_ref()
+            .and_then(|value| value["selected_prefix"].as_str())
+            .unwrap_or(prefix);
+        let retrieve = llmwave_memory_retrieve_report(&memory, active_prefix, 5);
+        let generate = if let Some(prompt) = prompt {
+            llmwave_memory_chat_report(
+                &memory,
+                prompt,
+                case["steps"].as_u64().unwrap_or(2) as usize,
+                3,
+                3,
+                0.0,
+                case["language"].as_str().unwrap_or("en"),
+            )["generation"]
+                .clone()
+        } else {
+            llmwave_memory_generate_report(
+                &memory,
+                active_prefix,
+                case["steps"].as_u64().unwrap_or(2) as usize,
+                3,
+                3,
+                0.0,
+                case["language"].as_str().unwrap_or("en"),
+            )
+        };
         let inspect = llmwave_memory_model_report(&memory);
         let expected_token = case["expected_top_token"].as_str().unwrap_or("");
         let expected_state = case["expected_state"].as_str().unwrap_or("");
@@ -557,6 +568,8 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
             "id": case["id"],
             "ok": ok,
             "prefix": prefix,
+            "prompt": prompt.unwrap_or(""),
+            "selected_prefix": active_prefix,
             "expected_top_token": expected_token,
             "actual_top_token": retrieve["top_token"],
             "expected_state": expected_state,
@@ -582,6 +595,44 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
     } else {
         EXIT_VETO
     })
+}
+
+fn llmwave_memory_demo_cmd(args: LlmwaveMemoryDemoArgs) -> Result<u8> {
+    let text = fs::read_to_string(&args.corpus)
+        .with_context(|| format!("failed to read {}", args.corpus.display()))?;
+    let mut memory = llmwave_memory_from_text(&text, "llmwave-memory-demo", "general");
+    let before = llmwave_memory_chat_report(&memory, &args.prompt, args.steps, 3, 3, 0.0, "en");
+    let correction = llmwave_memory_apply_feedback(
+        &mut memory,
+        &FeedbackDecision::Reject,
+        "",
+        &args.reject_token,
+        "demo reject lane",
+    );
+    memory = correction["memory"].clone();
+    let correction_accept = llmwave_memory_apply_feedback(
+        &mut memory,
+        &FeedbackDecision::Accept,
+        "",
+        &args.accept_token,
+        "demo accept lane",
+    );
+    memory = correction_accept["memory"].clone();
+    let after = llmwave_memory_chat_report(&memory, &args.prompt, args.steps, 3, 3, 0.0, "en");
+    let packed = llmwave_memory_unpack_report(&llmwave_memory_pack_bytes(&memory));
+    let out = json!({
+        "mode": "llmwave-memory-demo",
+        "version": "v114-public-demo-script",
+        "state": "LLMWAVE_MEMORY_DEMO_READY",
+        "prompt": args.prompt,
+        "before": before,
+        "corrections": [correction["lane"].clone(), correction_accept["lane"].clone()],
+        "after": after,
+        "packed": packed,
+        "read_as": "Public demo trains a tiny corpus, adapts the prompt into a wave prefix, generates through semantic guard/coherence, applies feedback lanes, and validates packed memory."
+    });
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
 }
 
 fn llmwave_memory_pack_cmd(args: LlmwaveMemoryPackArgs) -> Result<u8> {
@@ -623,7 +674,7 @@ fn llmwave_memory_emit(value: Value, out: Option<&Path>, format: &OutputFormat) 
     Ok(())
 }
 
-fn llmwave_memory_load(path: &Path) -> Result<Value> {
+pub(crate) fn llmwave_memory_load(path: &Path) -> Result<Value> {
     let text =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     serde_json::from_str(&text).with_context(|| format!("failed to parse {}", path.display()))
@@ -1236,6 +1287,144 @@ fn llmwave_memory_decay(memory: &mut Value, factor: f64, min_strength: f64) -> V
     })
 }
 
+pub(crate) fn llmwave_memory_chat_report(
+    memory: &Value,
+    prompt: &str,
+    steps: usize,
+    top_k: usize,
+    beam_width: usize,
+    temperature: f64,
+    language: &str,
+) -> Value {
+    let prompt_adapter = llmwave_prompt_adapter(memory, prompt);
+    let selected_prefix = prompt_adapter["selected_prefix"].as_str().unwrap_or(prompt);
+    let generation = llmwave_memory_generate_report(
+        memory,
+        selected_prefix,
+        steps,
+        top_k,
+        beam_width,
+        temperature,
+        language,
+    );
+    json!({
+        "mode": "llmwave-memory-chat",
+        "version": "v100-chat-loop",
+        "prompt": prompt,
+        "answer": generation["decoded_text"],
+        "state": generation["state"],
+        "prompt_adapter": prompt_adapter,
+        "generation": generation,
+        "read_as": "Chat is a tiny LLMWave loop: prompt adapter -> memory -> semantic guard -> coherent beam -> semantic decoder -> text."
+    })
+}
+
+fn llmwave_prompt_adapter(memory: &Value, prompt: &str) -> Value {
+    let prompt_tokens = tokenize_pattern(prompt);
+    let prompt_terms = prompt_tokens
+        .iter()
+        .map(|token| norm(token))
+        .filter(|token| !llmwave_prompt_stopword(token))
+        .collect::<BTreeSet<_>>();
+    let wants_require = prompt_terms.iter().any(|token| {
+        matches!(
+            token.as_str(),
+            "require" | "requires" | "required" | "need" | "needs" | "нужно" | "требует"
+        )
+    });
+    let mut candidates = BTreeMap::<String, f64>::new();
+    for record in memory["wave_memory"]["token_patterns"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        let prefix = record["prefix"].as_str().unwrap_or("").trim();
+        if prefix.is_empty() {
+            continue;
+        }
+        let prefix_terms = tokenize_pattern(prefix)
+            .into_iter()
+            .map(|token| norm(&token))
+            .collect::<BTreeSet<_>>();
+        let overlap = prompt_terms.intersection(&prefix_terms).count() as f64
+            / prompt_terms.len().max(1) as f64;
+        let route = llmwave_memory_route_match(&prompt_terms, record);
+        let require_bonus = if wants_require
+            && prefix_terms
+                .iter()
+                .any(|token| token == "require" || token == "requires")
+        {
+            0.2
+        } else {
+            0.0
+        };
+        let score = round4((0.70 * overlap) + (0.20 * route) + require_bonus);
+        candidates
+            .entry(prefix.to_string())
+            .and_modify(|value| *value = value.max(score))
+            .or_insert(score);
+    }
+    let mut rows = candidates
+        .into_iter()
+        .map(|(prefix, score)| {
+            json!({
+                "prefix": prefix,
+                "score": score
+            })
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                a["prefix"]
+                    .as_str()
+                    .unwrap_or("")
+                    .len()
+                    .cmp(&b["prefix"].as_str().unwrap_or("").len())
+            })
+    });
+    rows.truncate(5);
+    let selected = rows
+        .first()
+        .and_then(|row| row["prefix"].as_str())
+        .unwrap_or(prompt);
+    json!({
+        "version": "v110-prompt-adapter",
+        "state": if rows.is_empty() { "PROMPT_ADAPTER_FALLBACK" } else { "PROMPT_ADAPTER_READY" },
+        "prompt": prompt,
+        "selected_prefix": selected,
+        "candidates": rows,
+        "read_as": "Prompt adapter turns a natural question into the closest internal LLMWave prefix before generation."
+    })
+}
+
+fn llmwave_prompt_stopword(token: &str) -> bool {
+    matches!(
+        token,
+        "what"
+            | "does"
+            | "do"
+            | "is"
+            | "are"
+            | "the"
+            | "a"
+            | "an"
+            | "to"
+            | "for"
+            | "of"
+            | "and"
+            | "что"
+            | "как"
+            | "для"
+            | "это"
+            | "нужно"
+    )
+}
+
 fn llmwave_memory_generate_report(
     memory: &Value,
     prefix: &str,
@@ -1247,44 +1436,119 @@ fn llmwave_memory_generate_report(
 ) -> Value {
     let mut current = prefix.to_string();
     let mut rows = vec![];
+    let mut selected_tokens = BTreeSet::<String>::new();
+    let mut previous_route = String::new();
+    let mut stop_reason = "MAX_STEPS".to_string();
+    let mut route_consistent = true;
     for step in 0..steps.max(1) {
         let retrieve = llmwave_memory_retrieve_report(memory, &current, top_k);
-        let beams = llmwave_memory_beams(&retrieve, beam_width, temperature);
-        let token = beams
-            .first()
+        let mut beams = llmwave_memory_beams(&retrieve, beam_width, temperature);
+        llmwave_memory_guard_beams(&mut beams, &retrieve, &selected_tokens, &previous_route);
+        let selected = beams
+            .iter()
+            .find(|beam| beam["semantic_guard"]["state"].as_str() == Some("BEAM_SAFE"))
+            .or_else(|| beams.first());
+        let token = selected
             .and_then(|beam| beam["next_token"].as_str())
             .unwrap_or("")
             .to_string();
+        let route = selected
+            .and_then(|beam| beam["route"].as_str())
+            .unwrap_or("")
+            .to_string();
+        let guard_state = selected
+            .map(|beam| beam["semantic_guard"]["state"].clone())
+            .unwrap_or_else(|| json!("BEAM_EMPTY"));
+        if !previous_route.is_empty() && !route.is_empty() && previous_route != route {
+            route_consistent = false;
+        }
         rows.push(json!({
             "step": step + 1,
             "prefix": current,
             "top_token": token,
             "state": retrieve["state"],
             "margin": retrieve["margin"],
+            "selected_guard_state": guard_state,
             "sampler": llmwave_memory_sampler_report(temperature, top_k, beam_width),
             "beams": beams,
             "top_k": retrieve["top_k"]
         }));
         if token.is_empty() {
+            stop_reason = "EMPTY_TOKEN".to_string();
+            break;
+        }
+        if selected_tokens.contains(&norm(&token)) {
+            stop_reason = "REPEATED_TOKEN_STOP".to_string();
+            break;
+        }
+        if retrieve["state"].as_str() != Some("MEMORY_RETRIEVE_READY") {
+            stop_reason = "LOW_MARGIN_OR_REVIEW".to_string();
             break;
         }
         if !current.is_empty() {
             current.push(' ');
         }
         current.push_str(&token);
+        selected_tokens.insert(norm(&token));
+        previous_route = route;
     }
     let decoded = llmwave_memory_semantic_decode(&current, language);
+    let all_ready = rows.iter().all(|row| {
+        row["state"].as_str() == Some("MEMORY_RETRIEVE_READY")
+            && row["selected_guard_state"].as_str() == Some("BEAM_SAFE")
+    });
     json!({
         "mode": "llmwave-memory-generate",
         "version": "v94-recurrent-generation",
-        "state": if rows.iter().all(|row| row["state"].as_str() == Some("MEMORY_RETRIEVE_READY")) { "MEMORY_GENERATION_READY" } else { "MEMORY_GENERATION_REVIEW" },
+        "coherence_version": "v112-multi-step-coherence",
+        "state": if all_ready { "MEMORY_GENERATION_READY" } else { "MEMORY_GENERATION_REVIEW" },
         "initial_prefix": prefix,
         "generated_text": current,
         "decoded_text": decoded["text"],
         "semantic_decoder": decoded,
+        "coherence": {
+            "version": "v112-multi-step-coherence",
+            "stop_reason": stop_reason,
+            "selected_tokens": selected_tokens.iter().cloned().collect::<Vec<_>>(),
+            "route_consistent": route_consistent
+        },
         "steps": rows,
-        "read_as": "Recurrent generation repeatedly retrieves the next resonant token from LLMWaveMemory, ranks beams, and decodes the selected path to text."
+        "read_as": "Recurrent generation retrieves resonant tokens, vetoes unsafe beams, stops on incoherent loops, and decodes the selected path to text."
     })
+}
+
+fn llmwave_memory_guard_beams(
+    beams: &mut [Value],
+    retrieve: &Value,
+    selected_tokens: &BTreeSet<String>,
+    previous_route: &str,
+) {
+    let margin = retrieve["margin"].as_f64().unwrap_or(0.0);
+    for beam in beams {
+        let token = beam["next_token"].as_str().unwrap_or("");
+        let rejected = beam["rejected"].as_u64().unwrap_or(0);
+        let safe = beam["safe"].as_bool().unwrap_or(false);
+        let route = beam["route"].as_str().unwrap_or("");
+        let mut reasons = vec![];
+        if rejected > 0 || !safe {
+            reasons.push("REJECTED_TOKEN");
+        }
+        if selected_tokens.contains(&norm(token)) {
+            reasons.push("REPEATED_TOKEN");
+        }
+        if margin < 0.015 && retrieve["top_k"].as_array().map_or(0, Vec::len) > 1 {
+            reasons.push("LOW_MARGIN");
+        }
+        if !previous_route.is_empty() && !route.is_empty() && route != previous_route {
+            reasons.push("ROUTE_SHIFT");
+        }
+        beam["semantic_guard"] = json!({
+            "version": "v111-semantic-guard",
+            "state": if reasons.is_empty() { "BEAM_SAFE" } else { "BEAM_VETO" },
+            "safe_to_emit": reasons.is_empty(),
+            "reasons": reasons
+        });
+    }
 }
 
 fn llmwave_memory_sampler_report(temperature: f64, top_k: usize, beam_width: usize) -> Value {

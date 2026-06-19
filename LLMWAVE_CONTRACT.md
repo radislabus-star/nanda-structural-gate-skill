@@ -136,11 +136,23 @@ Commands:
 - `nanda-llmwave-memory train corpus.txt`;
 - `nanda-llmwave-memory grow memory.json packet.json`;
 - `nanda-llmwave-memory correct --reject-token ... --accept-token ...`;
+- `nanda-llmwave-memory demo --corpus corpus.txt --prompt ...`;
 - `nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json`.
 
 This is a tiny LLMWave generator, not a full large language model. It can
 continue from its own wave memory, rank beams, apply correction feedback, grow
 from new packets/text, and decode a selected path into text.
+
+v110-v114 define the first chat-safe path:
+
+- `v110-prompt-adapter` maps a natural question to an internal memory prefix;
+- `v111-semantic-guard` vetoes rejected, repeated, low-margin, or route-shifted
+  beams before emission;
+- `v112-multi-step-coherence` reports why generation stopped and whether the
+  route stayed consistent;
+- `nanda-serve` supports cached `llmwave_chat` requests;
+- `v114-public-demo-script` trains a tiny corpus, runs chat, applies feedback
+  lanes, and validates packed memory.
 
 ## Lenses
 

@@ -34,6 +34,9 @@
   tokenizer contract, model config, binary packed `.llmw.bin` prototype
   pack/unpack, and a larger generator quality eval covering direct retrieve,
   feedback shift, text training, memory growth, and decay.
+- v110-v114 add the first chat-safe LLMWave memory loop: prompt adapter,
+  semantic guard, multi-step coherence, cached `nanda-serve` `llmwave_chat`,
+  and a public tiny-corpus memory demo.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

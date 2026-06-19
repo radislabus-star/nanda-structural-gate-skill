@@ -144,10 +144,11 @@ scripts/nanda-llmwave-memory correct .nanda/llmwave-memory.json --reject-token p
 scripts/nanda-llmwave-memory consolidate .nanda/llmwave-memory-feedback.json --out .nanda/llmwave-memory-consolidated.json
 scripts/nanda-llmwave-memory decay .nanda/llmwave-memory-consolidated.json --factor 0.99 --out .nanda/llmwave-memory-decayed.json
 scripts/nanda-llmwave-memory generate .nanda/llmwave-memory.json --prefix "customs declaration requires" --steps 2 --beam-width 2 --temperature 0
-scripts/nanda-llmwave-memory chat .nanda/llmwave-memory.json --prompt "customs declaration requires" --steps 2
+scripts/nanda-llmwave-memory chat .nanda/llmwave-memory.json --prompt "what does customs declaration require?" --steps 2
 scripts/nanda-llmwave-memory train corpus.txt --out .nanda/llmwave-text-memory.json
 scripts/nanda-llmwave-memory grow .nanda/llmwave-memory.json .nanda/index.json --input-format json --out .nanda/llmwave-grown.json
 scripts/nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
+scripts/nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -171,6 +172,7 @@ printf '{"command":"doctor"}\n' | scripts/nanda-serve
 printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json"}\n' | scripts/nanda-serve
 printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json","response":"compact"}\n' | scripts/nanda-serve
 printf '{"command":"llmwave_token","input":"examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n' | scripts/nanda-serve
+printf '{"command":"llmwave_chat","memory":".nanda/llmwave-memory.json","prompt":"what does customs declaration require?","steps":2}\n' | scripts/nanda-serve
 scripts/nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
 scripts/nanda-doctor
 scripts/nanda-dogfood .
@@ -354,7 +356,9 @@ records, `generate` for recurrent retrieval, and `eval` for the memory corpus.
 v96-v104 add `vocabulary`, beam/sampler metadata, semantic decoder text,
 `chat`, `train`, `grow`, and `correct`. v105-v109 add `inspect`, tokenizer and
 model-config contracts, binary `.llmw.bin` `pack`/`unpack`, and larger generator
-quality eval.
+quality eval. v110-v114 add a prompt adapter for natural questions, semantic
+guard for unsafe/rejected beams, multi-step coherence stops, `nanda-serve`
+`llmwave_chat` cache, and `nanda-llmwave-memory demo`.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

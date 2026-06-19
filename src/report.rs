@@ -259,6 +259,7 @@ pub(crate) struct ServeState {
     focus_cache: HashMap<PathBuf, (focus::FocusBuild, Value)>,
     proof_cache: HashMap<ServeProofKey, Value>,
     token_cache: HashMap<ServeTokenKey, Value>,
+    chat_cache: HashMap<ServeChatKey, Value>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -274,6 +275,17 @@ struct ServeTokenKey {
     source: String,
     text: String,
     top_k: usize,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ServeChatKey {
+    source: String,
+    prompt: String,
+    steps: usize,
+    top_k: usize,
+    beam_width: usize,
+    temperature_milli: i64,
+    language: String,
 }
 
 pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result<Value> {
@@ -443,6 +455,64 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
             out["serve_cache"] = json!({
                 "enabled": true,
                 "state": "SERVE_TOKEN_WARMED"
+            });
+            Ok(out)
+        }
+        "llmwave_chat" | "llmwave-chat" => {
+            let prompt = request["prompt"].as_str().unwrap_or("");
+            let steps = request["steps"].as_u64().unwrap_or(3) as usize;
+            let top_k = request["top_k"].as_u64().unwrap_or(3) as usize;
+            let beam_width = request["beam_width"].as_u64().unwrap_or(3) as usize;
+            let temperature = request["temperature"].as_f64().unwrap_or(0.0);
+            let language = request["language"].as_str().unwrap_or("en");
+            let (memory, source) = if let Some(memory_value) = request.get("memory_packet") {
+                (memory_value.clone(), serve_packet_hash(memory_value)?)
+            } else if let Some(memory_value) =
+                request.get("memory").filter(|value| value.is_object())
+            {
+                (memory_value.clone(), serve_packet_hash(memory_value)?)
+            } else {
+                let input = request["memory"]
+                    .as_str()
+                    .or_else(|| request["input"].as_str())
+                    .ok_or_else(|| {
+                        anyhow!("llmwave_chat request requires memory, memory_packet, or input")
+                    })?;
+                (
+                    llmwave_memory_load(Path::new(input))?,
+                    serve_manifest_key(Path::new(input))?.display().to_string(),
+                )
+            };
+            let key = ServeChatKey {
+                source,
+                prompt: prompt.to_string(),
+                steps,
+                top_k,
+                beam_width,
+                temperature_milli: (temperature * 1000.0).round() as i64,
+                language: language.to_string(),
+            };
+            if let Some(cached) = state.chat_cache.get(&key) {
+                let mut out = cached.clone();
+                out["serve_cache"] = json!({
+                    "enabled": true,
+                    "state": "SERVE_CHAT_HIT"
+                });
+                return Ok(out);
+            }
+            let mut out = llmwave_memory_chat_report(
+                &memory,
+                prompt,
+                steps,
+                top_k,
+                beam_width,
+                temperature,
+                language,
+            );
+            state.chat_cache.insert(key, out.clone());
+            out["serve_cache"] = json!({
+                "enabled": true,
+                "state": "SERVE_CHAT_WARMED"
             });
             Ok(out)
         }

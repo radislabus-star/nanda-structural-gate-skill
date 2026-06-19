@@ -616,18 +616,22 @@ jq '.memory' <<<"$memory_consolidate_json" >"$tmp_memory/memory-consolidated.jso
 memory_decay_json="$("$llmwave_memory" decay "$tmp_memory/memory-consolidated.json" --factor 0.99)"
 jq -e '.mode == "llmwave-memory-decay" and .version == "v91-decay-forgetting" and .memory.wave_memory.decay.state == "DECAY_APPLIED"' <<<"$memory_decay_json" >/dev/null
 memory_generate_json="$("$llmwave_memory" generate "$tmp_memory/memory.json" --prefix "customs declaration requires" --steps 2 --beam-width 2 --temperature 0)"
-jq -e '.mode == "llmwave-memory-generate" and .version == "v94-recurrent-generation" and (.generated_text | contains("payment")) and .steps[0].sampler.version == "v97-sampler" and .steps[0].beams[0].version == "v98-beam-generator" and .semantic_decoder.version == "v99-semantic-decoder"' <<<"$memory_generate_json" >/dev/null
-memory_chat_json="$("$llmwave_memory" chat "$tmp_memory/memory.json" --prompt "customs declaration requires" --steps 2)"
-jq -e '.mode == "llmwave-memory-chat" and .version == "v100-chat-loop" and (.answer | contains("payment"))' <<<"$memory_chat_json" >/dev/null
+jq -e '.mode == "llmwave-memory-generate" and .version == "v94-recurrent-generation" and .coherence.version == "v112-multi-step-coherence" and (.generated_text | contains("payment")) and .steps[0].sampler.version == "v97-sampler" and .steps[0].beams[0].version == "v98-beam-generator" and .steps[0].beams[0].semantic_guard.version == "v111-semantic-guard" and .semantic_decoder.version == "v99-semantic-decoder"' <<<"$memory_generate_json" >/dev/null
+memory_chat_json="$("$llmwave_memory" chat "$tmp_memory/memory.json" --prompt "what does customs declaration require?" --steps 2)"
+jq -e '.mode == "llmwave-memory-chat" and .version == "v100-chat-loop" and .prompt_adapter.version == "v110-prompt-adapter" and .prompt_adapter.selected_prefix == "customs declaration requires" and (.answer | contains("payment"))' <<<"$memory_chat_json" >/dev/null
 printf 'customs declaration requires payment confirmation. payment confirmation supports customs declaration.\n' >"$tmp_memory/train.txt"
 "$llmwave_memory" train "$tmp_memory/train.txt" --out "$tmp_memory/train-memory.json"
 jq -e '.version == "v101-training-from-text" and .write_path.state == "TEXT_MEMORY_WRITTEN" and .vocabulary.version == "v96-vocabulary-token-space"' "$tmp_memory/train-memory.json" >/dev/null
 memory_grow_json="$("$llmwave_memory" grow "$tmp_memory/memory.json" "$root/examples/triad-packet.token-lens-business.json" --input-format json)"
 jq -e '.mode == "llmwave-memory-grow" and .version == "v102-memory-growth" and .after_records > .before_records' <<<"$memory_grow_json" >/dev/null
 memory_eval_json="$("$llmwave_memory" eval --suite "$root/examples/llmwave-memory-corpus.json")"
-jq -e '.mode == "llmwave-memory-eval" and .version == "v109-generator-quality-eval" and .passed == 5 and .total == 5 and .accuracy == 1' <<<"$memory_eval_json" >/dev/null
+jq -e '.mode == "llmwave-memory-eval" and .version == "v109-generator-quality-eval" and .passed == 6 and .total == 6 and .accuracy == 1' <<<"$memory_eval_json" >/dev/null
 serve_token_json="$(printf '{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n' "$root" "$root" | "$serve")"
 jq -e 'length == 2 and .[0].ok == true and .[0].result.mode == "llmwave-token-compact" and .[0].result.top_token == "payment" and .[0].result.serve_cache.state == "SERVE_TOKEN_WARMED" and .[1].result.serve_cache.state == "SERVE_TOKEN_HIT"' <<<"$(jq -s . <<<"$serve_token_json")" >/dev/null
+serve_chat_json="$(printf '{"command":"llmwave_chat","memory":"%s","prompt":"what does customs declaration require?","steps":2}\n{"command":"llmwave_chat","memory":"%s","prompt":"what does customs declaration require?","steps":2}\n' "$tmp_memory/memory.json" "$tmp_memory/memory.json" | "$serve")"
+jq -e 'length == 2 and .[0].ok == true and .[0].result.mode == "llmwave-memory-chat" and .[0].result.prompt_adapter.version == "v110-prompt-adapter" and .[0].result.serve_cache.state == "SERVE_CHAT_WARMED" and .[1].result.serve_cache.state == "SERVE_CHAT_HIT"' <<<"$(jq -s . <<<"$serve_chat_json")" >/dev/null
+memory_demo_json="$("$llmwave_memory" demo --corpus "$root/examples/llmwave-tiny-corpus.txt" --prompt "what does customs declaration require?")"
+jq -e '.mode == "llmwave-memory-demo" and .version == "v114-public-demo-script" and .state == "LLMWAVE_MEMORY_DEMO_READY" and .after.prompt_adapter.version == "v110-prompt-adapter" and .after.generation.coherence.version == "v112-multi-step-coherence" and .packed.state == "PACKED_MEMORY_OK"' <<<"$memory_demo_json" >/dev/null
 demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"
 jq -e '.mode == "llmwave-demo" and .version == "v62-demo-raw-text-adapter" and .state == "PUBLIC_DEMO_READY" and (.weak_spots | length) == 0' <<<"$demo_json" >/dev/null
 demo_review_json="$("$demo" "$root/examples/triad-packet.demo-review-empty.json" --input-format json --text "unsupported relation" --format json || true)"
