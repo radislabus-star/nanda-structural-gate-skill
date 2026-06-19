@@ -267,11 +267,16 @@ pub(crate) fn llmwave_eval_cmd(args: LlmwaveEvalArgs) -> Result<u8> {
 pub(crate) fn llmwave_memory_cmd(args: LlmwaveMemoryArgs) -> Result<u8> {
     match args.command {
         LlmwaveMemoryCommand::Write(args) => llmwave_memory_write_cmd(args),
+        LlmwaveMemoryCommand::Vocabulary(args) => llmwave_memory_vocabulary_cmd(args),
         LlmwaveMemoryCommand::Retrieve(args) => llmwave_memory_retrieve_cmd(args),
         LlmwaveMemoryCommand::Feedback(args) => llmwave_memory_feedback_cmd(args),
+        LlmwaveMemoryCommand::Correct(args) => llmwave_memory_correct_cmd(args),
         LlmwaveMemoryCommand::Consolidate(args) => llmwave_memory_consolidate_cmd(args),
         LlmwaveMemoryCommand::Decay(args) => llmwave_memory_decay_cmd(args),
         LlmwaveMemoryCommand::Generate(args) => llmwave_memory_generate_cmd(args),
+        LlmwaveMemoryCommand::Chat(args) => llmwave_memory_chat_cmd(args),
+        LlmwaveMemoryCommand::Train(args) => llmwave_memory_train_cmd(args),
+        LlmwaveMemoryCommand::Grow(args) => llmwave_memory_grow_cmd(args),
         LlmwaveMemoryCommand::Eval(args) => llmwave_memory_eval_cmd(args),
     }
 }
@@ -290,10 +295,51 @@ fn llmwave_memory_write_cmd(args: LlmwaveMemoryWriteArgs) -> Result<u8> {
     Ok(EXIT_PASS)
 }
 
+fn llmwave_memory_vocabulary_cmd(args: LlmwaveMemoryVocabularyArgs) -> Result<u8> {
+    let memory = llmwave_memory_load(&args.memory)?;
+    let out = llmwave_memory_vocabulary_report(&memory);
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
+}
+
 fn llmwave_memory_retrieve_cmd(args: LlmwaveMemoryRetrieveArgs) -> Result<u8> {
     let memory = llmwave_memory_load(&args.memory)?;
     let out = llmwave_memory_retrieve_report(&memory, &args.prefix, args.top_k);
     llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_correct_cmd(args: LlmwaveMemoryCorrectArgs) -> Result<u8> {
+    let mut memory = llmwave_memory_load(&args.memory)?;
+    let mut actions = vec![];
+    if !args.reject_token.trim().is_empty() {
+        let reject = llmwave_memory_apply_feedback(
+            &mut memory,
+            &FeedbackDecision::Reject,
+            "",
+            &args.reject_token,
+            &args.note,
+        );
+        actions.push(reject["lane"].clone());
+    }
+    if !args.accept_token.trim().is_empty() {
+        let accept = llmwave_memory_apply_feedback(
+            &mut memory,
+            &FeedbackDecision::Accept,
+            "",
+            &args.accept_token,
+            &args.note,
+        );
+        actions.push(accept["lane"].clone());
+    }
+    let out = json!({
+        "mode": "llmwave-memory-correct",
+        "version": "v103-self-correction",
+        "state": if actions.is_empty() { "MEMORY_CORRECTION_EMPTY" } else { "MEMORY_CORRECTION_APPLIED" },
+        "actions": actions,
+        "memory": memory
+    });
+    llmwave_memory_emit(out, args.out.as_deref(), &args.format)?;
     Ok(EXIT_PASS)
 }
 
@@ -326,8 +372,81 @@ fn llmwave_memory_decay_cmd(args: LlmwaveMemoryDecayArgs) -> Result<u8> {
 
 fn llmwave_memory_generate_cmd(args: LlmwaveMemoryGenerateArgs) -> Result<u8> {
     let memory = llmwave_memory_load(&args.memory)?;
-    let out = llmwave_memory_generate_report(&memory, &args.prefix, args.steps, args.top_k);
+    let out = llmwave_memory_generate_report(
+        &memory,
+        &args.prefix,
+        args.steps,
+        args.top_k,
+        args.beam_width,
+        args.temperature,
+        &args.language,
+    );
     llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_chat_cmd(args: LlmwaveMemoryChatArgs) -> Result<u8> {
+    let memory = llmwave_memory_load(&args.memory)?;
+    let generation = llmwave_memory_generate_report(
+        &memory,
+        &args.prompt,
+        args.steps,
+        args.top_k,
+        args.beam_width,
+        args.temperature,
+        &args.language,
+    );
+    let out = json!({
+        "mode": "llmwave-memory-chat",
+        "version": "v100-chat-loop",
+        "prompt": args.prompt,
+        "answer": generation["decoded_text"],
+        "state": generation["state"],
+        "generation": generation,
+        "read_as": "Chat is a tiny LLMWave loop: memory -> beam -> sampler -> semantic decoder -> text."
+    });
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_train_cmd(args: LlmwaveMemoryTrainArgs) -> Result<u8> {
+    let text = fs::read_to_string(&args.input)
+        .with_context(|| format!("failed to read {}", args.input.display()))?;
+    let memory = llmwave_memory_from_text(&text, &args.task_id, &args.domain);
+    llmwave_memory_emit(memory, args.out.as_deref(), &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_grow_cmd(args: LlmwaveMemoryGrowArgs) -> Result<u8> {
+    let mut memory = llmwave_memory_load(&args.memory)?;
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.text,
+        args.normalize_paths,
+    )?;
+    let addition = llmwave_memory_from_packet(&packet, &args.text);
+    let before = memory_record_count(&memory);
+    llmwave_memory_append(&mut memory, &addition);
+    let after = memory_record_count(&memory);
+    llmwave_memory_refresh_budget(&mut memory);
+    memory["growth"] = json!({
+        "version": "v102-memory-growth",
+        "state": "MEMORY_GROWN",
+        "before_records": before,
+        "after_records": after,
+        "added_records": after.saturating_sub(before)
+    });
+    let out = json!({
+        "mode": "llmwave-memory-grow",
+        "version": "v102-memory-growth",
+        "before_records": before,
+        "after_records": after,
+        "memory": memory
+    });
+    llmwave_memory_emit(out, args.out.as_deref(), &args.format)?;
     Ok(EXIT_PASS)
 }
 
@@ -381,14 +500,23 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
             prefix,
             case["steps"].as_u64().unwrap_or(2) as usize,
             3,
+            3,
+            0.0,
+            case["language"].as_str().unwrap_or("en"),
         );
         let expected_token = case["expected_top_token"].as_str().unwrap_or("");
         let expected_state = case["expected_state"].as_str().unwrap_or("");
+        let expected_generated_contains =
+            case["expected_generated_contains"].as_str().unwrap_or("");
         let token_ok =
             expected_token.is_empty() || retrieve["top_token"].as_str() == Some(expected_token);
         let state_ok =
             expected_state.is_empty() || retrieve["state"].as_str() == Some(expected_state);
-        let ok = token_ok && state_ok;
+        let generated_ok = expected_generated_contains.is_empty()
+            || generate["generated_text"]
+                .as_str()
+                .is_some_and(|value| value.contains(expected_generated_contains));
+        let ok = token_ok && state_ok && generated_ok;
         passed += usize::from(ok);
         rows.push(json!({
             "id": case["id"],
@@ -398,13 +526,14 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
             "actual_top_token": retrieve["top_token"],
             "expected_state": expected_state,
             "actual_state": retrieve["state"],
+            "expected_generated_contains": expected_generated_contains,
             "generated": generate["generated_text"]
         }));
     }
     let total = rows.len();
     let out = json!({
         "mode": "llmwave-memory-eval",
-        "version": "v95-memory-eval",
+        "version": "v104-generator-eval",
         "passed": passed,
         "total": total,
         "accuracy": if total == 0 { 0.0 } else { round4(passed as f64 / total as f64) },
@@ -517,6 +646,7 @@ fn llmwave_memory_from_packet(packet: &Packet, text: &str) -> Value {
             "token_records": token_patterns.len(),
             "phrase_records": phrase_patterns.len()
         },
+        "vocabulary": llmwave_memory_vocabulary_from_records(&token_patterns, &phrase_patterns),
         "wave_memory": {
             "patterns": patterns,
             "token_patterns": token_patterns,
@@ -546,6 +676,158 @@ fn llmwave_memory_from_packet(packet: &Packet, text: &str) -> Value {
             }
         },
         "read_as": "v86 writes triads, token continuations, and phrase continuations into one LLMWave memory object."
+    })
+}
+
+fn llmwave_memory_from_text(text: &str, task_id: &str, domain: &str) -> Value {
+    let tokens = tokenize_pattern(text);
+    let mut token_patterns = vec![];
+    for index in 1..tokens.len() {
+        let start = index.saturating_sub(6);
+        let prefix_tokens = tokens[start..index].to_vec();
+        token_patterns.push(json!({
+            "id": format!("txt-tok-{index:04}"),
+            "prefix": prefix_tokens.join(" "),
+            "next_token": tokens[index],
+            "next_phrase": tokens[index..tokens.len().min(index + 3)].join(" "),
+            "pattern": format!("{} -> continues -> {}", prefix_tokens.join(" "), tokens[index]),
+            "route": "text",
+            "group": "text-memory",
+            "polarity": "text->continues->token",
+            "strength": 0.5,
+            "accepted": 0,
+            "rejected": 0,
+            "observations": 1
+        }));
+    }
+    let phrase_patterns = text
+        .split(['.', '\n', ';'])
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .enumerate()
+        .map(|(idx, line)| {
+            let line_tokens = tokenize_pattern(line);
+            let prefix = line_tokens
+                .iter()
+                .take(3)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ");
+            json!({
+                "id": format!("txt-phrase-{idx:04}"),
+                "prefix": prefix,
+                "phrase": line,
+                "pattern": format!("{prefix} -> phrase -> {line}"),
+                "route": "text",
+                "strength": 0.5
+            })
+        })
+        .collect::<Vec<_>>();
+    let packed_bytes = (token_patterns.len() + phrase_patterns.len()) * 32;
+    json!({
+        "mode": "llmwave-memory",
+        "version": "v101-training-from-text",
+        "source": {
+            "text": text,
+            "triads": 0,
+            "task_id": task_id,
+            "domain": domain
+        },
+        "write_path": {
+            "version": "v101-training-from-text",
+            "state": "TEXT_MEMORY_WRITTEN",
+            "source_tokens": tokens.len(),
+            "token_records": token_patterns.len(),
+            "phrase_records": phrase_patterns.len()
+        },
+        "vocabulary": llmwave_memory_vocabulary_from_records(&token_patterns, &phrase_patterns),
+        "wave_memory": {
+            "patterns": [],
+            "token_patterns": token_patterns,
+            "phrase_patterns": phrase_patterns,
+            "phrase_memory": {
+                "version": "v92-phrase-memory",
+                "state": "PHRASE_MEMORY_READY",
+                "records": text.split(['.', '\n', ';']).filter(|line| !line.trim().is_empty()).count()
+            },
+            "positive_lanes": [],
+            "negative_lanes": [],
+            "resonance_traces": [],
+            "consolidation": {
+                "version": "v90-consolidation",
+                "state": "NOT_CONSOLIDATED"
+            },
+            "decay": {
+                "version": "v91-decay-forgetting",
+                "state": "NOT_APPLIED"
+            },
+            "packed_runtime": {
+                "version": "v93-packed-6m-memory",
+                "record_bytes": 32,
+                "estimated_packed_bytes": packed_bytes,
+                "hot_budget_bytes": nanda_6m::BUDGET_BYTES,
+                "fits_6m": packed_bytes <= nanda_6m::BUDGET_BYTES
+            }
+        },
+        "read_as": "v101 trains a small LLMWave memory directly from text token windows."
+    })
+}
+
+fn llmwave_memory_vocabulary_report(memory: &Value) -> Value {
+    let token_patterns = memory["wave_memory"]["token_patterns"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let phrase_patterns = memory["wave_memory"]["phrase_patterns"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    llmwave_memory_vocabulary_from_records(&token_patterns, &phrase_patterns)
+}
+
+fn llmwave_memory_vocabulary_from_records(
+    token_patterns: &[Value],
+    phrase_patterns: &[Value],
+) -> Value {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for record in token_patterns {
+        for token in tokenize_pattern(record["prefix"].as_str().unwrap_or("")) {
+            *counts.entry(token).or_insert(0) += 1;
+        }
+        if let Some(token) = record["next_token"].as_str() {
+            *counts.entry(norm(token)).or_insert(0) += 1;
+        }
+    }
+    for record in phrase_patterns {
+        for token in tokenize_pattern(record["phrase"].as_str().unwrap_or("")) {
+            *counts.entry(token).or_insert(0) += 1;
+        }
+    }
+    let mut top_tokens = counts
+        .iter()
+        .map(|(token, count)| json!({"token": token, "count": count}))
+        .collect::<Vec<_>>();
+    top_tokens.sort_by(|a, b| {
+        b["count"]
+            .as_u64()
+            .unwrap_or(0)
+            .cmp(&a["count"].as_u64().unwrap_or(0))
+            .then_with(|| {
+                a["token"]
+                    .as_str()
+                    .unwrap_or("")
+                    .cmp(b["token"].as_str().unwrap_or(""))
+            })
+    });
+    top_tokens.truncate(16);
+    json!({
+        "mode": "llmwave-memory-vocabulary",
+        "version": "v96-vocabulary-token-space",
+        "tokens": counts.len(),
+        "token_records": token_patterns.len(),
+        "phrase_records": phrase_patterns.len(),
+        "top_tokens": top_tokens,
+        "read_as": "Vocabulary is the explicit token/phrase space used by LLMWaveMemory generation."
     })
 }
 
@@ -838,18 +1120,28 @@ fn llmwave_memory_generate_report(
     prefix: &str,
     steps: usize,
     top_k: usize,
+    beam_width: usize,
+    temperature: f64,
+    language: &str,
 ) -> Value {
     let mut current = prefix.to_string();
     let mut rows = vec![];
     for step in 0..steps.max(1) {
         let retrieve = llmwave_memory_retrieve_report(memory, &current, top_k);
-        let token = retrieve["top_token"].as_str().unwrap_or("").to_string();
+        let beams = llmwave_memory_beams(&retrieve, beam_width, temperature);
+        let token = beams
+            .first()
+            .and_then(|beam| beam["next_token"].as_str())
+            .unwrap_or("")
+            .to_string();
         rows.push(json!({
             "step": step + 1,
             "prefix": current,
             "top_token": token,
             "state": retrieve["state"],
             "margin": retrieve["margin"],
+            "sampler": llmwave_memory_sampler_report(temperature, top_k, beam_width),
+            "beams": beams,
             "top_k": retrieve["top_k"]
         }));
         if token.is_empty() {
@@ -860,15 +1152,106 @@ fn llmwave_memory_generate_report(
         }
         current.push_str(&token);
     }
+    let decoded = llmwave_memory_semantic_decode(&current, language);
     json!({
         "mode": "llmwave-memory-generate",
         "version": "v94-recurrent-generation",
         "state": if rows.iter().all(|row| row["state"].as_str() == Some("MEMORY_RETRIEVE_READY")) { "MEMORY_GENERATION_READY" } else { "MEMORY_GENERATION_REVIEW" },
         "initial_prefix": prefix,
         "generated_text": current,
+        "decoded_text": decoded["text"],
+        "semantic_decoder": decoded,
         "steps": rows,
-        "read_as": "Recurrent generation repeatedly retrieves the next resonant token from LLMWaveMemory."
+        "read_as": "Recurrent generation repeatedly retrieves the next resonant token from LLMWaveMemory, ranks beams, and decodes the selected path to text."
     })
+}
+
+fn llmwave_memory_sampler_report(temperature: f64, top_k: usize, beam_width: usize) -> Value {
+    json!({
+        "version": "v97-sampler",
+        "temperature": round4(temperature.max(0.0)),
+        "top_k": top_k,
+        "beam_width": beam_width,
+        "strategy": if temperature <= 0.0 { "deterministic-top" } else { "temperature-rescore" }
+    })
+}
+
+fn llmwave_memory_beams(retrieve: &Value, beam_width: usize, temperature: f64) -> Vec<Value> {
+    let mut beams = retrieve["top_k"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|row| {
+            let score = row["score"].as_f64().unwrap_or(0.0).max(0.0);
+            let sampled_score = if temperature <= 0.0 {
+                score
+            } else {
+                round4(score.powf(1.0 / temperature.max(0.05)))
+            };
+            json!({
+                "version": "v98-beam-generator",
+                "next_token": row["next_token"],
+                "next_phrase": row["next_phrase"],
+                "pattern": row["pattern"],
+                "route": row["route"],
+                "score": round4(score),
+                "sampled_score": sampled_score,
+                "safe": row["rejected"].as_u64().unwrap_or(0) == 0,
+                "accepted": row["accepted"],
+                "rejected": row["rejected"]
+            })
+        })
+        .collect::<Vec<_>>();
+    beams.sort_by(|a, b| {
+        b["sampled_score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["sampled_score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    beams.truncate(beam_width.max(1));
+    beams
+}
+
+fn llmwave_memory_semantic_decode(text: &str, language: &str) -> Value {
+    let clean = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let decoded = if language == "ru" {
+        format!("LLMWave продолжение: {clean}.")
+    } else {
+        format!("LLMWave continuation: {clean}.")
+    };
+    json!({
+        "version": "v99-semantic-decoder",
+        "language": language,
+        "text": decoded,
+        "source_text": clean
+    })
+}
+
+fn memory_record_count(memory: &Value) -> usize {
+    memory["wave_memory"]["patterns"]
+        .as_array()
+        .map_or(0, Vec::len)
+        + memory["wave_memory"]["token_patterns"]
+            .as_array()
+            .map_or(0, Vec::len)
+        + memory["wave_memory"]["phrase_patterns"]
+            .as_array()
+            .map_or(0, Vec::len)
+}
+
+fn llmwave_memory_append(memory: &mut Value, addition: &Value) {
+    for key in ["patterns", "token_patterns", "phrase_patterns"] {
+        let additions = addition["wave_memory"][key]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        if let Some(target) = memory["wave_memory"][key].as_array_mut() {
+            target.extend(additions);
+        }
+    }
+    memory["vocabulary"] = llmwave_memory_vocabulary_report(memory);
 }
 
 fn llmwave_memory_refresh_budget(memory: &mut Value) {

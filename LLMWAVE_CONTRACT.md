@@ -1,6 +1,6 @@
 # LLMWave Field + Lens Contract
 
-Status: v95 implementation contract.
+Status: v104 implementation contract.
 Updated: 2026-06-19.
 
 LLMWave is not a prose generator yet. It is the next layer above the NANDA
@@ -90,12 +90,49 @@ Memory versions:
 - v92: phrase memory;
 - v93: packed 6M memory budget;
 - v94: recurrent generation;
-- v95: memory eval corpus.
+- v95: memory eval corpus;
+- v96: vocabulary/token space;
+- v97: sampler;
+- v98: beam generator;
+- v99: semantic decoder;
+- v100: chat loop;
+- v101: training from text;
+- v102: memory growth;
+- v103: self-correction;
+- v104: generator eval.
 
 The current memory core is still a cold JSON implementation with explicit 6M
 budget reporting. It is not yet the final hot packed runtime, but it gives
 LLMWave a concrete memory object that can grow, be corrected, be compacted, and
 be tested.
+
+## Generator Surface
+
+The first generator surface is:
+
+```text
+memory
+  -> vocabulary
+  -> retrieve(prefix)
+  -> sampler
+  -> beams
+  -> semantic decoder
+  -> chat text
+```
+
+Commands:
+
+- `nanda-llmwave-memory vocabulary`;
+- `nanda-llmwave-memory generate --beam-width N --temperature T`;
+- `nanda-llmwave-memory chat --prompt ...`;
+- `nanda-llmwave-memory train corpus.txt`;
+- `nanda-llmwave-memory grow memory.json packet.json`;
+- `nanda-llmwave-memory correct --reject-token ... --accept-token ...`;
+- `nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json`.
+
+This is a tiny LLMWave generator, not a full large language model. It can
+continue from its own wave memory, rank beams, apply correction feedback, grow
+from new packets/text, and decode a selected path into text.
 
 ## Lenses
 
@@ -485,6 +522,19 @@ v95 is done when:
 - `generate` emits `v94-recurrent-generation`;
 - `eval --suite examples/llmwave-memory-corpus.json` emits
   `v95-memory-eval` and passes.
+
+## v104 Generator Core
+
+v104 is done when:
+
+- memory objects emit `v96-vocabulary-token-space`;
+- `generate` reports `v97-sampler`, `v98-beam-generator`, and
+  `v99-semantic-decoder`;
+- `chat` emits `v100-chat-loop`;
+- `train` emits `v101-training-from-text`;
+- `grow` emits `v102-memory-growth`;
+- `correct` emits `v103-self-correction`;
+- memory eval emits `v104-generator-eval` and passes.
 
 ## Research Anchors
 

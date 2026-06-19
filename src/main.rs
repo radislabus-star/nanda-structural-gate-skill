@@ -560,11 +560,16 @@ struct LlmwaveMemoryArgs {
 #[derive(Subcommand)]
 enum LlmwaveMemoryCommand {
     Write(LlmwaveMemoryWriteArgs),
+    Vocabulary(LlmwaveMemoryVocabularyArgs),
     Retrieve(LlmwaveMemoryRetrieveArgs),
     Feedback(LlmwaveMemoryFeedbackArgs),
+    Correct(LlmwaveMemoryCorrectArgs),
     Consolidate(LlmwaveMemoryConsolidateArgs),
     Decay(LlmwaveMemoryDecayArgs),
     Generate(LlmwaveMemoryGenerateArgs),
+    Chat(LlmwaveMemoryChatArgs),
+    Train(LlmwaveMemoryTrainArgs),
+    Grow(LlmwaveMemoryGrowArgs),
     Eval(LlmwaveMemoryEvalArgs),
 }
 
@@ -599,6 +604,13 @@ struct LlmwaveMemoryRetrieveArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveMemoryVocabularyArgs {
+    memory: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveMemoryFeedbackArgs {
     memory: PathBuf,
     #[arg(long, value_enum)]
@@ -607,6 +619,21 @@ struct LlmwaveMemoryFeedbackArgs {
     pattern: String,
     #[arg(long, default_value = "")]
     token: String,
+    #[arg(long, default_value = "")]
+    note: String,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryCorrectArgs {
+    memory: PathBuf,
+    #[arg(long, default_value = "")]
+    reject_token: String,
+    #[arg(long, default_value = "")]
+    accept_token: String,
     #[arg(long, default_value = "")]
     note: String,
     #[arg(long)]
@@ -646,8 +673,66 @@ struct LlmwaveMemoryGenerateArgs {
     steps: usize,
     #[arg(long, default_value_t = 3)]
     top_k: usize,
+    #[arg(long, default_value_t = 3)]
+    beam_width: usize,
+    #[arg(long, default_value_t = 0.0)]
+    temperature: f64,
+    #[arg(long, default_value = "en")]
+    language: String,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryChatArgs {
+    memory: PathBuf,
+    #[arg(long, default_value = "")]
+    prompt: String,
+    #[arg(long, default_value_t = 3)]
+    steps: usize,
+    #[arg(long, default_value_t = 3)]
+    top_k: usize,
+    #[arg(long, default_value_t = 3)]
+    beam_width: usize,
+    #[arg(long, default_value_t = 0.0)]
+    temperature: f64,
+    #[arg(long, default_value = "en")]
+    language: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryTrainArgs {
+    input: PathBuf,
+    #[arg(long, default_value = "llmwave-text-train")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryGrowArgs {
+    memory: PathBuf,
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "llmwave-memory-grow")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    text: String,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
 }
 
 #[derive(Parser)]

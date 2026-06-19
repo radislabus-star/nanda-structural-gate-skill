@@ -271,11 +271,16 @@ nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens energy
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens anti
 nanda-llmwave-memory write examples/triad-packet.interference-search-route-trap.json --input-format json --text "customs declaration requires payment" --out .nanda/llmwave-memory.json
+nanda-llmwave-memory vocabulary .nanda/llmwave-memory.json
 nanda-llmwave-memory retrieve .nanda/llmwave-memory.json --prefix "customs declaration requires"
 nanda-llmwave-memory feedback .nanda/llmwave-memory.json --decision reject --token protocols --out .nanda/llmwave-memory-feedback.json
+nanda-llmwave-memory correct .nanda/llmwave-memory.json --reject-token protocols --accept-token payment --out .nanda/llmwave-memory-corrected.json
 nanda-llmwave-memory consolidate .nanda/llmwave-memory-feedback.json --out .nanda/llmwave-memory-consolidated.json
 nanda-llmwave-memory decay .nanda/llmwave-memory-consolidated.json --factor 0.99 --out .nanda/llmwave-memory-decayed.json
-nanda-llmwave-memory generate .nanda/llmwave-memory.json --prefix "customs declaration requires" --steps 2
+nanda-llmwave-memory generate .nanda/llmwave-memory.json --prefix "customs declaration requires" --steps 2 --beam-width 2 --temperature 0
+nanda-llmwave-memory chat .nanda/llmwave-memory.json --prompt "customs declaration requires" --steps 2
+nanda-llmwave-memory train corpus.txt --out .nanda/llmwave-text-memory.json
+nanda-llmwave-memory grow .nanda/llmwave-memory.json examples/triad-packet.token-lens-business.json --input-format json --out .nanda/llmwave-grown.json
 nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
@@ -456,7 +461,10 @@ wave-memory object from triads/token/phrase continuations, `retrieve` reads
 next-token candidates through resonance, `feedback` applies accept/reject/WATCH
 learning, `consolidate` merges duplicate continuations, `decay` forgets weak
 records, `generate` runs recurrent retrieval, and `eval` checks memory behavior
-against `examples/llmwave-memory-corpus.json`. Treat
+against `examples/llmwave-memory-corpus.json`. v96-v104 add the first generator
+surface: `vocabulary`, deterministic/temperature sampler metadata, beam
+candidates, semantic decoder text, `chat`, text training, memory growth, and
+self-correction through `correct`. Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.

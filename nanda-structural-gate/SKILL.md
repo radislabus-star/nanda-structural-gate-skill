@@ -134,11 +134,16 @@ scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration 
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens energy
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens anti
 scripts/nanda-llmwave-memory write .nanda/index.json --input-format json --text "customs declaration requires payment" --out .nanda/llmwave-memory.json
+scripts/nanda-llmwave-memory vocabulary .nanda/llmwave-memory.json
 scripts/nanda-llmwave-memory retrieve .nanda/llmwave-memory.json --prefix "customs declaration requires"
 scripts/nanda-llmwave-memory feedback .nanda/llmwave-memory.json --decision reject --token protocols --out .nanda/llmwave-memory-feedback.json
+scripts/nanda-llmwave-memory correct .nanda/llmwave-memory.json --reject-token protocols --accept-token payment --out .nanda/llmwave-memory-corrected.json
 scripts/nanda-llmwave-memory consolidate .nanda/llmwave-memory-feedback.json --out .nanda/llmwave-memory-consolidated.json
 scripts/nanda-llmwave-memory decay .nanda/llmwave-memory-consolidated.json --factor 0.99 --out .nanda/llmwave-memory-decayed.json
-scripts/nanda-llmwave-memory generate .nanda/llmwave-memory.json --prefix "customs declaration requires" --steps 2
+scripts/nanda-llmwave-memory generate .nanda/llmwave-memory.json --prefix "customs declaration requires" --steps 2 --beam-width 2 --temperature 0
+scripts/nanda-llmwave-memory chat .nanda/llmwave-memory.json --prompt "customs declaration requires" --steps 2
+scripts/nanda-llmwave-memory train corpus.txt --out .nanda/llmwave-text-memory.json
+scripts/nanda-llmwave-memory grow .nanda/llmwave-memory.json .nanda/index.json --input-format json --out .nanda/llmwave-grown.json
 scripts/nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
@@ -343,6 +348,8 @@ v81-v85 add semantic optics: `--lens role`, `--lens temporal`,
 read next-token candidates through resonance, `feedback` for accept/reject/WATCH
 learning, `consolidate` to merge duplicate continuations, `decay` to forget weak
 records, `generate` for recurrent retrieval, and `eval` for the memory corpus.
+v96-v104 add `vocabulary`, beam/sampler metadata, semantic decoder text,
+`chat`, `train`, `grow`, and `correct`.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

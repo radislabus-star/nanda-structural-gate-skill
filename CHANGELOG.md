@@ -26,6 +26,10 @@
   feedback, consolidates duplicate continuations, decays weak memory, reports
   6M packed-memory budget, runs recurrent generation, and verifies behavior
   through `examples/llmwave-memory-corpus.json`.
+- v96-v104 turn memory into a tiny generator surface: explicit vocabulary,
+  deterministic/temperature sampler metadata, beam candidates, semantic text
+  decoder, `chat`, training from text, memory growth, self-correction, and
+  generator eval checks.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

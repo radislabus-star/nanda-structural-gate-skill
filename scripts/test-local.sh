@@ -594,20 +594,31 @@ jq -e '.cases[] | select(.id == "reject-protocols-shifts-token" and .actual_next
 tmp_memory="$(mktemp -d)"
 "$llmwave_memory" write "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "customs declaration requires payment" --out "$tmp_memory/memory.json"
 jq -e '.version == "v86-wave-memory-schema" and .write_path.version == "v87-memory-write-path" and .wave_memory.phrase_memory.version == "v92-phrase-memory" and .wave_memory.packed_runtime.version == "v93-packed-6m-memory"' "$tmp_memory/memory.json" >/dev/null
+memory_vocab_json="$("$llmwave_memory" vocabulary "$tmp_memory/memory.json")"
+jq -e '.mode == "llmwave-memory-vocabulary" and .version == "v96-vocabulary-token-space" and .tokens > 0' <<<"$memory_vocab_json" >/dev/null
 memory_retrieve_json="$("$llmwave_memory" retrieve "$tmp_memory/memory.json" --prefix "customs declaration requires")"
 jq -e '.mode == "llmwave-memory-retrieve" and .version == "v88-memory-retrieve-path" and .state == "MEMORY_RETRIEVE_READY" and .top_token == "payment" and .packed_runtime.fits_6m == true' <<<"$memory_retrieve_json" >/dev/null
 memory_feedback_json="$("$llmwave_memory" feedback "$tmp_memory/memory.json" --decision reject --token protocols)"
 jq -e '.mode == "llmwave-memory-feedback" and .version == "v89-feedback-learning" and .state == "MEMORY_FEEDBACK_APPLIED" and .touched >= 1' <<<"$memory_feedback_json" >/dev/null
+memory_correct_json="$("$llmwave_memory" correct "$tmp_memory/memory.json" --reject-token protocols --accept-token payment)"
+jq -e '.mode == "llmwave-memory-correct" and .version == "v103-self-correction" and .state == "MEMORY_CORRECTION_APPLIED" and (.actions | length) == 2' <<<"$memory_correct_json" >/dev/null
 jq '.memory' <<<"$memory_feedback_json" >"$tmp_memory/memory-feedback.json"
 memory_consolidate_json="$("$llmwave_memory" consolidate "$tmp_memory/memory-feedback.json")"
 jq -e '.mode == "llmwave-memory-consolidate" and .version == "v90-consolidation" and .memory.wave_memory.consolidation.state == "CONSOLIDATED"' <<<"$memory_consolidate_json" >/dev/null
 jq '.memory' <<<"$memory_consolidate_json" >"$tmp_memory/memory-consolidated.json"
 memory_decay_json="$("$llmwave_memory" decay "$tmp_memory/memory-consolidated.json" --factor 0.99)"
 jq -e '.mode == "llmwave-memory-decay" and .version == "v91-decay-forgetting" and .memory.wave_memory.decay.state == "DECAY_APPLIED"' <<<"$memory_decay_json" >/dev/null
-memory_generate_json="$("$llmwave_memory" generate "$tmp_memory/memory.json" --prefix "customs declaration requires" --steps 2)"
-jq -e '.mode == "llmwave-memory-generate" and .version == "v94-recurrent-generation" and (.generated_text | contains("payment"))' <<<"$memory_generate_json" >/dev/null
+memory_generate_json="$("$llmwave_memory" generate "$tmp_memory/memory.json" --prefix "customs declaration requires" --steps 2 --beam-width 2 --temperature 0)"
+jq -e '.mode == "llmwave-memory-generate" and .version == "v94-recurrent-generation" and (.generated_text | contains("payment")) and .steps[0].sampler.version == "v97-sampler" and .steps[0].beams[0].version == "v98-beam-generator" and .semantic_decoder.version == "v99-semantic-decoder"' <<<"$memory_generate_json" >/dev/null
+memory_chat_json="$("$llmwave_memory" chat "$tmp_memory/memory.json" --prompt "customs declaration requires" --steps 2)"
+jq -e '.mode == "llmwave-memory-chat" and .version == "v100-chat-loop" and (.answer | contains("payment"))' <<<"$memory_chat_json" >/dev/null
+printf 'customs declaration requires payment confirmation. payment confirmation supports customs declaration.\n' >"$tmp_memory/train.txt"
+"$llmwave_memory" train "$tmp_memory/train.txt" --out "$tmp_memory/train-memory.json"
+jq -e '.version == "v101-training-from-text" and .write_path.state == "TEXT_MEMORY_WRITTEN" and .vocabulary.version == "v96-vocabulary-token-space"' "$tmp_memory/train-memory.json" >/dev/null
+memory_grow_json="$("$llmwave_memory" grow "$tmp_memory/memory.json" "$root/examples/triad-packet.token-lens-business.json" --input-format json)"
+jq -e '.mode == "llmwave-memory-grow" and .version == "v102-memory-growth" and .after_records > .before_records' <<<"$memory_grow_json" >/dev/null
 memory_eval_json="$("$llmwave_memory" eval --suite "$root/examples/llmwave-memory-corpus.json")"
-jq -e '.mode == "llmwave-memory-eval" and .version == "v95-memory-eval" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$memory_eval_json" >/dev/null
+jq -e '.mode == "llmwave-memory-eval" and .version == "v104-generator-eval" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$memory_eval_json" >/dev/null
 serve_token_json="$(printf '{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n' "$root" "$root" | "$serve")"
 jq -e 'length == 2 and .[0].ok == true and .[0].result.mode == "llmwave-token-compact" and .[0].result.top_token == "payment" and .[0].result.serve_cache.state == "SERVE_TOKEN_WARMED" and .[1].result.serve_cache.state == "SERVE_TOKEN_HIT"' <<<"$(jq -s . <<<"$serve_token_json")" >/dev/null
 demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"
