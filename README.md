@@ -240,6 +240,7 @@ nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000 --lane-i
 nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
 nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
 nanda-cache list .nanda/cache
+nanda --version
 nanda-focus .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --out .nanda/focus.json
 nanda-proof .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
 nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast
@@ -576,6 +577,7 @@ next_prompt
 Core version fields:
 
 ```text
+nanda --version
 core_version: sparse-triad-v6.0-llmwave-proof
 wave_dim: 1024
 ```

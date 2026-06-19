@@ -55,7 +55,18 @@ const EXIT_ERROR: u8 = 2;
 const EXIT_WATCH: u8 = 3;
 
 #[derive(Parser)]
-#[command(name = "nanda", about = "NANDA structural gate CLI")]
+#[command(
+    name = "nanda",
+    about = "NANDA structural gate CLI",
+    version,
+    long_version = concat!(
+        env!("CARGO_PKG_VERSION"),
+        "\ncore_version: sparse-triad-v6.0-llmwave-proof",
+        "\nengine: nanda-check sparse-triad-v6.0-rust",
+        "\nnanda_6m: nanda-6m-v40-llmwave-pattern-runtime",
+        "\nwave_dim: 1024"
+    )
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,

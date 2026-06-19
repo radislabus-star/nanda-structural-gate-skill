@@ -47,6 +47,10 @@ code_mapper="$root/nanda-structural-gate/scripts/nanda-map-code"
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
 cargo test --manifest-path "$root/Cargo.toml" >/dev/null
+version_text="$("$root/target/debug/nanda" --version)"
+grep -q '^nanda ' <<<"$version_text"
+grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
+grep -q 'nanda_6m:' <<<"$version_text"
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"

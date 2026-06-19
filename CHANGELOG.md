@@ -4,6 +4,8 @@
 
 ### Changed
 
+- `nanda --version` now reports package version plus core version, engine id,
+  NANDA-6M runtime version, and wave dimension.
 - v65 adds cache-only proof: `nanda-cache list` shows available focused
   packets, and `nanda-proof --cache-only <manifest-or-single-manifest-dir>`
   runs focused search and packed proof without loading the original large
