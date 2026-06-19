@@ -270,6 +270,13 @@ nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens evidence
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens energy
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens anti
+nanda-llmwave-memory write examples/triad-packet.interference-search-route-trap.json --input-format json --text "customs declaration requires payment" --out .nanda/llmwave-memory.json
+nanda-llmwave-memory retrieve .nanda/llmwave-memory.json --prefix "customs declaration requires"
+nanda-llmwave-memory feedback .nanda/llmwave-memory.json --decision reject --token protocols --out .nanda/llmwave-memory-feedback.json
+nanda-llmwave-memory consolidate .nanda/llmwave-memory-feedback.json --out .nanda/llmwave-memory-consolidated.json
+nanda-llmwave-memory decay .nanda/llmwave-memory-consolidated.json --factor 0.99 --out .nanda/llmwave-memory-decayed.json
+nanda-llmwave-memory generate .nanda/llmwave-memory.json --prefix "customs declaration requires" --steps 2
+nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -443,7 +450,13 @@ semantic optics: Role Lens for actor/action/target binding, Temporal Lens for
 recurrent order and route jumps, Evidence Lens for support binding, Energy Lens
 for basin stability, and Anti Lens for destructive-interference reports. Use
 `--lens role`, `--lens temporal`, `--lens evidence`, `--lens energy`, or
-`--lens anti` when the field needs meaning-axis inspection. Treat
+`--lens anti` when the field needs meaning-axis inspection. v86-v95 add
+LLMWave Memory Core through `nanda-llmwave-memory`: `write` creates one
+wave-memory object from triads/token/phrase continuations, `retrieve` reads
+next-token candidates through resonance, `feedback` applies accept/reject/WATCH
+learning, `consolidate` merges duplicate continuations, `decay` forgets weak
+records, `generate` runs recurrent retrieval, and `eval` checks memory behavior
+against `examples/llmwave-memory-corpus.json`. Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.

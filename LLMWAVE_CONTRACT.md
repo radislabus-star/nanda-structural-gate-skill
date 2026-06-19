@@ -1,6 +1,6 @@
 # LLMWave Field + Lens Contract
 
-Status: v80 implementation contract.
+Status: v95 implementation contract.
 Updated: 2026-06-19.
 
 LLMWave is not a prose generator yet. It is the next layer above the NANDA
@@ -23,6 +23,8 @@ LLMWave is:
 
 - a field over encoded text and structural patterns;
 - a packed pattern memory with cleanup and replay;
+- a wave-memory object with write/retrieve/feedback/consolidate/decay/generate
+  operations;
 - a lens readout layer over the same field;
 - a proof contract that says whether the readout is usable.
 
@@ -49,6 +51,51 @@ The field owns the shared state:
 
 The field may contain many possible continuations in superposition. It does
 not decide by itself which view is being read.
+
+## Memory Core
+
+`nanda-llmwave-memory` is the first explicit LLMWave memory surface.
+
+```text
+triads/text
+  -> write
+  -> wave_memory
+  -> retrieve(prefix)
+  -> feedback(accept/reject/watch)
+  -> consolidate
+  -> decay
+  -> generate recurrently
+```
+
+The memory object contains:
+
+- `patterns`: structural triad continuations;
+- `token_patterns`: prefix -> next token/phrase records;
+- `phrase_patterns`: prefix -> phrase records;
+- `positive_lanes`: accepted continuation traces;
+- `negative_lanes`: rejected shortcut traces;
+- `resonance_traces`: WATCH observations;
+- `consolidation`: duplicate merge state;
+- `decay`: forgetting state;
+- `packed_runtime`: v93 6M budget estimate.
+
+Memory versions:
+
+- v86: wave-memory schema;
+- v87: write path from packet/text into memory records;
+- v88: retrieve path through token/phrase resonance;
+- v89: feedback learning;
+- v90: consolidation;
+- v91: decay/forgetting;
+- v92: phrase memory;
+- v93: packed 6M memory budget;
+- v94: recurrent generation;
+- v95: memory eval corpus.
+
+The current memory core is still a cold JSON implementation with explicit 6M
+budget reporting. It is not yet the final hot packed runtime, but it gives
+LLMWave a concrete memory object that can grow, be corrected, be compacted, and
+be tested.
 
 ## Lenses
 
@@ -424,6 +471,20 @@ v85 is done when:
 - `--lens energy` reports `v84-energy-stability-lens`;
 - `--lens anti` reports `v85-anti-lens-destructive-report`;
 - local tests verify all five lenses on route-trap and reject-memory fixtures.
+
+## v95 Memory Core
+
+v95 is done when:
+
+- `nanda-llmwave-memory write` emits `v86-wave-memory-schema`;
+- `retrieve` emits `v88-memory-retrieve-path`;
+- `feedback` emits `v89-feedback-learning`;
+- `consolidate` emits `v90-consolidation`;
+- `decay` emits `v91-decay-forgetting`;
+- memory records include phrase continuations and `v93-packed-6m-memory`;
+- `generate` emits `v94-recurrent-generation`;
+- `eval --suite examples/llmwave-memory-corpus.json` emits
+  `v95-memory-eval` and passes.
 
 ## Research Anchors
 

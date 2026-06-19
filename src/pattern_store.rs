@@ -264,6 +264,633 @@ pub(crate) fn llmwave_eval_cmd(args: LlmwaveEvalArgs) -> Result<u8> {
     })
 }
 
+pub(crate) fn llmwave_memory_cmd(args: LlmwaveMemoryArgs) -> Result<u8> {
+    match args.command {
+        LlmwaveMemoryCommand::Write(args) => llmwave_memory_write_cmd(args),
+        LlmwaveMemoryCommand::Retrieve(args) => llmwave_memory_retrieve_cmd(args),
+        LlmwaveMemoryCommand::Feedback(args) => llmwave_memory_feedback_cmd(args),
+        LlmwaveMemoryCommand::Consolidate(args) => llmwave_memory_consolidate_cmd(args),
+        LlmwaveMemoryCommand::Decay(args) => llmwave_memory_decay_cmd(args),
+        LlmwaveMemoryCommand::Generate(args) => llmwave_memory_generate_cmd(args),
+        LlmwaveMemoryCommand::Eval(args) => llmwave_memory_eval_cmd(args),
+    }
+}
+
+fn llmwave_memory_write_cmd(args: LlmwaveMemoryWriteArgs) -> Result<u8> {
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.text,
+        args.normalize_paths,
+    )?;
+    let memory = llmwave_memory_from_packet(&packet, &args.text);
+    llmwave_memory_emit(memory, args.out.as_deref(), &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_retrieve_cmd(args: LlmwaveMemoryRetrieveArgs) -> Result<u8> {
+    let memory = llmwave_memory_load(&args.memory)?;
+    let out = llmwave_memory_retrieve_report(&memory, &args.prefix, args.top_k);
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_feedback_cmd(args: LlmwaveMemoryFeedbackArgs) -> Result<u8> {
+    let mut memory = llmwave_memory_load(&args.memory)?;
+    let out = llmwave_memory_apply_feedback(
+        &mut memory,
+        &args.decision,
+        &args.pattern,
+        &args.token,
+        &args.note,
+    );
+    llmwave_memory_emit(out, args.out.as_deref(), &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_consolidate_cmd(args: LlmwaveMemoryConsolidateArgs) -> Result<u8> {
+    let mut memory = llmwave_memory_load(&args.memory)?;
+    let out = llmwave_memory_consolidate(&mut memory);
+    llmwave_memory_emit(out, args.out.as_deref(), &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_decay_cmd(args: LlmwaveMemoryDecayArgs) -> Result<u8> {
+    let mut memory = llmwave_memory_load(&args.memory)?;
+    let out = llmwave_memory_decay(&mut memory, args.factor, args.min_strength);
+    llmwave_memory_emit(out, args.out.as_deref(), &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_generate_cmd(args: LlmwaveMemoryGenerateArgs) -> Result<u8> {
+    let memory = llmwave_memory_load(&args.memory)?;
+    let out = llmwave_memory_generate_report(&memory, &args.prefix, args.steps, args.top_k);
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
+    let suite_text = fs::read_to_string(&args.suite)
+        .with_context(|| format!("failed to read {}", args.suite.display()))?;
+    let suite: Value = serde_json::from_str(&suite_text)
+        .with_context(|| format!("failed to parse {}", args.suite.display()))?;
+    let base = args.suite.parent().unwrap_or_else(|| Path::new("."));
+    let mut rows = vec![];
+    let mut passed = 0usize;
+    for case in suite["cases"].as_array().cloned().unwrap_or_default() {
+        let path = base.join(case["path"].as_str().unwrap_or(""));
+        let packet = load_packet_auto(
+            &path,
+            &InputFormat::Auto,
+            "llmwave-memory-eval",
+            "general",
+            "",
+            false,
+        )?;
+        let mut memory =
+            llmwave_memory_from_packet(&packet, case["write_text"].as_str().unwrap_or(""));
+        if let Some(feedback) = case["feedback"].as_array() {
+            for item in feedback {
+                let decision = match item["decision"].as_str().unwrap_or("watch") {
+                    "accept" => FeedbackDecision::Accept,
+                    "reject" => FeedbackDecision::Reject,
+                    _ => FeedbackDecision::Watch,
+                };
+                memory = llmwave_memory_apply_feedback(
+                    &mut memory,
+                    &decision,
+                    item["pattern"].as_str().unwrap_or(""),
+                    item["token"].as_str().unwrap_or(""),
+                    item["note"].as_str().unwrap_or(""),
+                )["memory"]
+                    .clone();
+            }
+        }
+        if case["consolidate"].as_bool().unwrap_or(false) {
+            memory = llmwave_memory_consolidate(&mut memory)["memory"].clone();
+        }
+        if let Some(factor) = case["decay_factor"].as_f64() {
+            memory = llmwave_memory_decay(&mut memory, factor, 0.05)["memory"].clone();
+        }
+        let prefix = case["prefix"].as_str().unwrap_or("");
+        let retrieve = llmwave_memory_retrieve_report(&memory, prefix, 5);
+        let generate = llmwave_memory_generate_report(
+            &memory,
+            prefix,
+            case["steps"].as_u64().unwrap_or(2) as usize,
+            3,
+        );
+        let expected_token = case["expected_top_token"].as_str().unwrap_or("");
+        let expected_state = case["expected_state"].as_str().unwrap_or("");
+        let token_ok =
+            expected_token.is_empty() || retrieve["top_token"].as_str() == Some(expected_token);
+        let state_ok =
+            expected_state.is_empty() || retrieve["state"].as_str() == Some(expected_state);
+        let ok = token_ok && state_ok;
+        passed += usize::from(ok);
+        rows.push(json!({
+            "id": case["id"],
+            "ok": ok,
+            "prefix": prefix,
+            "expected_top_token": expected_token,
+            "actual_top_token": retrieve["top_token"],
+            "expected_state": expected_state,
+            "actual_state": retrieve["state"],
+            "generated": generate["generated_text"]
+        }));
+    }
+    let total = rows.len();
+    let out = json!({
+        "mode": "llmwave-memory-eval",
+        "version": "v95-memory-eval",
+        "passed": passed,
+        "total": total,
+        "accuracy": if total == 0 { 0.0 } else { round4(passed as f64 / total as f64) },
+        "cases": rows
+    });
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(if passed == total {
+        EXIT_PASS
+    } else {
+        EXIT_VETO
+    })
+}
+
+fn llmwave_memory_emit(value: Value, out: Option<&Path>, format: &OutputFormat) -> Result<()> {
+    if let Some(path) = out {
+        fs::write(path, serde_json::to_string_pretty(&value)? + "\n")
+            .with_context(|| format!("failed to write {}", path.display()))?;
+        return Ok(());
+    }
+    match format {
+        OutputFormat::Json | OutputFormat::Text | OutputFormat::Md => {
+            println!("{}", serde_json::to_string_pretty(&value)?)
+        }
+    }
+    Ok(())
+}
+
+fn llmwave_memory_load(path: &Path) -> Result<Value> {
+    let text =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    serde_json::from_str(&text).with_context(|| format!("failed to parse {}", path.display()))
+}
+
+fn llmwave_memory_from_packet(packet: &Packet, text: &str) -> Value {
+    let token_records = token_pattern_records(packet);
+    let patterns = packet
+        .triads
+        .iter()
+        .map(|triad| {
+            let pattern = format!(
+                "{} -> {} -> {}",
+                triad.subject, triad.relation, triad.object
+            );
+            json!({
+                "id": if triad.id.is_empty() { slug(&pattern) } else { triad.id.clone() },
+                "pattern": pattern,
+                "subject": triad.subject,
+                "relation": triad.relation,
+                "object": triad.object,
+                "route": triad.route,
+                "group": triad.group,
+                "subject_role": triad.subject_role,
+                "object_role": triad.object_role,
+                "evidence": triad.evidence,
+                "confidence": triad.confidence,
+                "strength": round4(triad.confidence.max(0.05)),
+                "accepted": 0,
+                "rejected": 0,
+                "observations": 1
+            })
+        })
+        .collect::<Vec<_>>();
+    let token_patterns = token_records
+        .iter()
+        .enumerate()
+        .map(|(idx, record)| {
+            json!({
+                "id": format!("tok-{idx:04}"),
+                "prefix": record.prefix_tokens.join(" "),
+                "next_token": record.next_token,
+                "next_phrase": record.next_phrase,
+                "pattern": record.pattern,
+                "route": record.route,
+                "group": record.group,
+                "polarity": record.polarity,
+                "strength": round4(record.confidence.max(0.05)),
+                "accepted": 0,
+                "rejected": 0,
+                "observations": 1
+            })
+        })
+        .collect::<Vec<_>>();
+    let phrase_patterns = packet
+        .triads
+        .iter()
+        .map(|triad| {
+            json!({
+                "prefix": format!("{} {}", triad.subject, triad.relation),
+                "phrase": triad.object,
+                "pattern": format!("{} -> {} -> {}", triad.subject, triad.relation, triad.object),
+                "route": triad.route,
+                "strength": round4(triad.confidence.max(0.05))
+            })
+        })
+        .collect::<Vec<_>>();
+    let packed_bytes = (patterns.len() + token_patterns.len() + phrase_patterns.len()) * 32;
+    json!({
+        "mode": "llmwave-memory",
+        "version": "v86-wave-memory-schema",
+        "source": {
+            "text": text,
+            "triads": packet.triads.len(),
+            "task_id": packet.task_id,
+            "domain": packet.domain
+        },
+        "write_path": {
+            "version": "v87-memory-write-path",
+            "state": "MEMORY_WRITTEN",
+            "source_triads": packet.triads.len(),
+            "token_records": token_patterns.len(),
+            "phrase_records": phrase_patterns.len()
+        },
+        "wave_memory": {
+            "patterns": patterns,
+            "token_patterns": token_patterns,
+            "phrase_patterns": phrase_patterns,
+            "phrase_memory": {
+                "version": "v92-phrase-memory",
+                "state": "PHRASE_MEMORY_READY",
+                "records": packet.triads.len()
+            },
+            "positive_lanes": [],
+            "negative_lanes": [],
+            "resonance_traces": [],
+            "consolidation": {
+                "version": "v90-consolidation",
+                "state": "NOT_CONSOLIDATED"
+            },
+            "decay": {
+                "version": "v91-decay-forgetting",
+                "state": "NOT_APPLIED"
+            },
+            "packed_runtime": {
+                "version": "v93-packed-6m-memory",
+                "record_bytes": 32,
+                "estimated_packed_bytes": packed_bytes,
+                "hot_budget_bytes": nanda_6m::BUDGET_BYTES,
+                "fits_6m": packed_bytes <= nanda_6m::BUDGET_BYTES
+            }
+        },
+        "read_as": "v86 writes triads, token continuations, and phrase continuations into one LLMWave memory object."
+    })
+}
+
+fn llmwave_memory_retrieve_report(memory: &Value, prefix: &str, top_k: usize) -> Value {
+    let rows = llmwave_memory_score_tokens(memory, prefix, top_k.max(1));
+    let top_token = rows
+        .first()
+        .and_then(|row| row["next_token"].as_str())
+        .unwrap_or("");
+    let top_score = rows
+        .first()
+        .and_then(|row| row["score"].as_f64())
+        .unwrap_or(0.0);
+    let second_score = rows
+        .get(1)
+        .and_then(|row| row["score"].as_f64())
+        .unwrap_or(0.0);
+    let margin = round4((top_score - second_score).max(0.0));
+    let state = if top_token.is_empty() {
+        "MEMORY_RETRIEVE_EMPTY"
+    } else if margin < 0.015 && rows.len() > 1 {
+        "MEMORY_RETRIEVE_CONTESTED"
+    } else {
+        "MEMORY_RETRIEVE_READY"
+    };
+    json!({
+        "mode": "llmwave-memory-retrieve",
+        "version": "v88-memory-retrieve-path",
+        "state": state,
+        "prefix": prefix,
+        "top_token": top_token,
+        "top_phrase": rows.first().map(|row| row["next_phrase"].clone()).unwrap_or(Value::Null),
+        "margin": margin,
+        "top_k": rows,
+        "packed_runtime": memory["wave_memory"]["packed_runtime"],
+        "read_as": "Retrieve reads LLMWaveMemory through token/phrase resonance, not a prose generator."
+    })
+}
+
+fn llmwave_memory_score_tokens(memory: &Value, prefix: &str, top_k: usize) -> Vec<Value> {
+    let tokens = tokenize_pattern(prefix);
+    let query_wave = token_prefix_wave(&tokens);
+    let query_terms = tokens
+        .iter()
+        .map(|token| norm(token))
+        .collect::<BTreeSet<_>>();
+    let mut rows = memory["wave_memory"]["token_patterns"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|record| {
+            let record_prefix = tokenize_pattern(record["prefix"].as_str().unwrap_or(""));
+            let wave = token_prefix_wave(&record_prefix);
+            let wave_score = ((cosine(&query_wave, &wave) + 1.0) / 2.0).clamp(0.0, 1.0);
+            let suffix = token_suffix_match(&tokens, &record_prefix);
+            let route_score = llmwave_memory_route_match(&query_terms, record);
+            let strength = record["strength"].as_f64().unwrap_or(0.5).max(0.0);
+            let accepted = record["accepted"].as_u64().unwrap_or(0) as f64;
+            let rejected = record["rejected"].as_u64().unwrap_or(0) as f64;
+            let feedback = (accepted * 0.08) - (rejected * 0.12);
+            let score = round4(
+                ((0.38 * wave_score)
+                    + (0.30 * suffix)
+                    + (0.16 * route_score)
+                    + (0.16 * strength)
+                    + feedback)
+                    .max(0.0),
+            );
+            json!({
+                "next_token": record["next_token"],
+                "next_phrase": record["next_phrase"],
+                "pattern": record["pattern"],
+                "prefix": record["prefix"],
+                "route": record["route"],
+                "group": record["group"],
+                "score": score,
+                "wave_score": round4(wave_score),
+                "suffix_score": round4(suffix),
+                "route_score": round4(route_score),
+                "strength": round4(strength),
+                "accepted": accepted as u64,
+                "rejected": rejected as u64
+            })
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    rows.truncate(top_k);
+    rows
+}
+
+fn llmwave_memory_route_match(query_terms: &BTreeSet<String>, record: &Value) -> f64 {
+    let mut route_terms = BTreeSet::new();
+    for value in [record["route"].as_str(), record["group"].as_str()]
+        .into_iter()
+        .flatten()
+    {
+        for term in norm(value)
+            .split(|ch: char| !ch.is_ascii_alphanumeric())
+            .filter(|term| term.len() >= 2)
+        {
+            route_terms.insert(term.to_string());
+        }
+    }
+    if route_terms.is_empty() {
+        return 0.0;
+    }
+    query_terms.intersection(&route_terms).count() as f64 / route_terms.len() as f64
+}
+
+fn llmwave_memory_apply_feedback(
+    memory: &mut Value,
+    decision: &FeedbackDecision,
+    pattern: &str,
+    token: &str,
+    note: &str,
+) -> Value {
+    let decision_label = match decision {
+        FeedbackDecision::Accept => "accept",
+        FeedbackDecision::Reject => "reject",
+        FeedbackDecision::Watch => "watch",
+    };
+    let mut touched = 0usize;
+    if let Some(records) = memory["wave_memory"]["token_patterns"].as_array_mut() {
+        for record in records {
+            let token_match = token.is_empty() || record["next_token"].as_str() == Some(token);
+            let pattern_match = pattern.is_empty()
+                || record["pattern"]
+                    .as_str()
+                    .is_some_and(|value| norm(value).contains(&norm(pattern)));
+            if token_match && pattern_match {
+                touched += 1;
+                let strength = record["strength"].as_f64().unwrap_or(0.5);
+                match decision {
+                    FeedbackDecision::Accept => {
+                        record["accepted"] = json!(record["accepted"].as_u64().unwrap_or(0) + 1);
+                        record["strength"] = json!(round4((strength + 0.08).min(1.5)));
+                    }
+                    FeedbackDecision::Reject => {
+                        record["rejected"] = json!(record["rejected"].as_u64().unwrap_or(0) + 1);
+                        record["strength"] = json!(round4((strength - 0.12).max(0.0)));
+                    }
+                    FeedbackDecision::Watch => {
+                        record["observations"] =
+                            json!(record["observations"].as_u64().unwrap_or(1) + 1);
+                    }
+                }
+            }
+        }
+    }
+    let lane = json!({
+        "decision": decision_label,
+        "pattern": pattern,
+        "token": token,
+        "note": note,
+        "touched": touched
+    });
+    match decision {
+        FeedbackDecision::Accept => {
+            if let Some(lanes) = memory["wave_memory"]["positive_lanes"].as_array_mut() {
+                lanes.push(lane.clone());
+            }
+        }
+        FeedbackDecision::Reject => {
+            if let Some(lanes) = memory["wave_memory"]["negative_lanes"].as_array_mut() {
+                lanes.push(lane.clone());
+            }
+        }
+        FeedbackDecision::Watch => {
+            if let Some(lanes) = memory["wave_memory"]["resonance_traces"].as_array_mut() {
+                lanes.push(lane.clone());
+            }
+        }
+    }
+    json!({
+        "mode": "llmwave-memory-feedback",
+        "version": "v89-feedback-learning",
+        "state": if touched > 0 { "MEMORY_FEEDBACK_APPLIED" } else { "MEMORY_FEEDBACK_NO_MATCH" },
+        "decision": decision_label,
+        "touched": touched,
+        "lane": lane,
+        "memory": memory
+    })
+}
+
+fn llmwave_memory_consolidate(memory: &mut Value) -> Value {
+    let before = memory["wave_memory"]["token_patterns"]
+        .as_array()
+        .map_or(0, Vec::len);
+    let mut merged: BTreeMap<(String, String), Value> = BTreeMap::new();
+    for record in memory["wave_memory"]["token_patterns"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+    {
+        let key = (
+            norm(record["prefix"].as_str().unwrap_or("")),
+            norm(record["next_token"].as_str().unwrap_or("")),
+        );
+        merged
+            .entry(key)
+            .and_modify(|existing| {
+                existing["strength"] = json!(round4(
+                    existing["strength"].as_f64().unwrap_or(0.0)
+                        + record["strength"].as_f64().unwrap_or(0.0)
+                ));
+                existing["observations"] = json!(
+                    existing["observations"].as_u64().unwrap_or(0)
+                        + record["observations"].as_u64().unwrap_or(1)
+                );
+                existing["accepted"] = json!(
+                    existing["accepted"].as_u64().unwrap_or(0)
+                        + record["accepted"].as_u64().unwrap_or(0)
+                );
+                existing["rejected"] = json!(
+                    existing["rejected"].as_u64().unwrap_or(0)
+                        + record["rejected"].as_u64().unwrap_or(0)
+                );
+            })
+            .or_insert(record);
+    }
+    let mut records = merged.into_values().collect::<Vec<_>>();
+    records.sort_by(|a, b| {
+        b["strength"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["strength"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let after = records.len();
+    memory["wave_memory"]["token_patterns"] = Value::Array(records);
+    memory["wave_memory"]["consolidation"] = json!({
+        "version": "v90-consolidation",
+        "state": "CONSOLIDATED",
+        "before": before,
+        "after": after,
+        "merged": before.saturating_sub(after)
+    });
+    llmwave_memory_refresh_budget(memory);
+    json!({
+        "mode": "llmwave-memory-consolidate",
+        "version": "v90-consolidation",
+        "before": before,
+        "after": after,
+        "memory": memory
+    })
+}
+
+fn llmwave_memory_decay(memory: &mut Value, factor: f64, min_strength: f64) -> Value {
+    let factor = factor.clamp(0.0, 1.0);
+    let mut kept = vec![];
+    let mut dropped = 0usize;
+    for mut record in memory["wave_memory"]["token_patterns"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+    {
+        let strength = round4(record["strength"].as_f64().unwrap_or(0.0) * factor);
+        if strength >= min_strength {
+            record["strength"] = json!(strength);
+            kept.push(record);
+        } else {
+            dropped += 1;
+        }
+    }
+    memory["wave_memory"]["token_patterns"] = Value::Array(kept);
+    memory["wave_memory"]["decay"] = json!({
+        "version": "v91-decay-forgetting",
+        "state": "DECAY_APPLIED",
+        "factor": factor,
+        "min_strength": min_strength,
+        "dropped": dropped
+    });
+    llmwave_memory_refresh_budget(memory);
+    json!({
+        "mode": "llmwave-memory-decay",
+        "version": "v91-decay-forgetting",
+        "dropped": dropped,
+        "memory": memory
+    })
+}
+
+fn llmwave_memory_generate_report(
+    memory: &Value,
+    prefix: &str,
+    steps: usize,
+    top_k: usize,
+) -> Value {
+    let mut current = prefix.to_string();
+    let mut rows = vec![];
+    for step in 0..steps.max(1) {
+        let retrieve = llmwave_memory_retrieve_report(memory, &current, top_k);
+        let token = retrieve["top_token"].as_str().unwrap_or("").to_string();
+        rows.push(json!({
+            "step": step + 1,
+            "prefix": current,
+            "top_token": token,
+            "state": retrieve["state"],
+            "margin": retrieve["margin"],
+            "top_k": retrieve["top_k"]
+        }));
+        if token.is_empty() {
+            break;
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(&token);
+    }
+    json!({
+        "mode": "llmwave-memory-generate",
+        "version": "v94-recurrent-generation",
+        "state": if rows.iter().all(|row| row["state"].as_str() == Some("MEMORY_RETRIEVE_READY")) { "MEMORY_GENERATION_READY" } else { "MEMORY_GENERATION_REVIEW" },
+        "initial_prefix": prefix,
+        "generated_text": current,
+        "steps": rows,
+        "read_as": "Recurrent generation repeatedly retrieves the next resonant token from LLMWaveMemory."
+    })
+}
+
+fn llmwave_memory_refresh_budget(memory: &mut Value) {
+    let records = memory["wave_memory"]["patterns"]
+        .as_array()
+        .map_or(0, Vec::len)
+        + memory["wave_memory"]["token_patterns"]
+            .as_array()
+            .map_or(0, Vec::len)
+        + memory["wave_memory"]["phrase_patterns"]
+            .as_array()
+            .map_or(0, Vec::len);
+    let bytes = records * 32;
+    memory["wave_memory"]["packed_runtime"] = json!({
+        "version": "v93-packed-6m-memory",
+        "record_bytes": 32,
+        "estimated_packed_bytes": bytes,
+        "hot_budget_bytes": nanda_6m::BUDGET_BYTES,
+        "fits_6m": bytes <= nanda_6m::BUDGET_BYTES
+    });
+}
+
 pub(crate) fn llmwave_token_compact_report(packet: &Packet, text: &str, top_k: usize) -> Value {
     let args = LlmwaveEvalArgs {
         suite: PathBuf::from("<serve>"),

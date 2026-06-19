@@ -97,6 +97,7 @@ enum Command {
     PatternBank(PatternBankArgs),
     Llmwave(LlmwaveArgs),
     LlmwaveEval(LlmwaveEvalArgs),
+    LlmwaveMemory(LlmwaveMemoryArgs),
     Demo(DemoArgs),
     Cache {
         #[command(subcommand)]
@@ -551,6 +552,113 @@ struct LlmwaveEvalArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveMemoryArgs {
+    #[command(subcommand)]
+    command: LlmwaveMemoryCommand,
+}
+
+#[derive(Subcommand)]
+enum LlmwaveMemoryCommand {
+    Write(LlmwaveMemoryWriteArgs),
+    Retrieve(LlmwaveMemoryRetrieveArgs),
+    Feedback(LlmwaveMemoryFeedbackArgs),
+    Consolidate(LlmwaveMemoryConsolidateArgs),
+    Decay(LlmwaveMemoryDecayArgs),
+    Generate(LlmwaveMemoryGenerateArgs),
+    Eval(LlmwaveMemoryEvalArgs),
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryWriteArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "llmwave-memory")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    text: String,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryRetrieveArgs {
+    memory: PathBuf,
+    #[arg(long, default_value = "")]
+    prefix: String,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryFeedbackArgs {
+    memory: PathBuf,
+    #[arg(long, value_enum)]
+    decision: FeedbackDecision,
+    #[arg(long, default_value = "")]
+    pattern: String,
+    #[arg(long, default_value = "")]
+    token: String,
+    #[arg(long, default_value = "")]
+    note: String,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryConsolidateArgs {
+    memory: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryDecayArgs {
+    memory: PathBuf,
+    #[arg(long, default_value_t = 0.92)]
+    factor: f64,
+    #[arg(long, default_value_t = 0.05)]
+    min_strength: f64,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryGenerateArgs {
+    memory: PathBuf,
+    #[arg(long, default_value = "")]
+    prefix: String,
+    #[arg(long, default_value_t = 3)]
+    steps: usize,
+    #[arg(long, default_value_t = 3)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryEvalArgs {
+    #[arg(long)]
+    suite: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct DemoArgs {
     input: Option<PathBuf>,
     #[arg(long)]
@@ -984,6 +1092,7 @@ fn run() -> Result<u8> {
         Command::PatternBank(args) => pattern_bank_cmd(args),
         Command::Llmwave(args) => llmwave_cmd(args),
         Command::LlmwaveEval(args) => llmwave_eval_cmd(args),
+        Command::LlmwaveMemory(args) => llmwave_memory_cmd(args),
         Command::Demo(args) => demo_cmd(args),
         Command::Cache { command } => focus_cache::cache_cmd(command),
         Command::Focus(args) => focus::focus_cmd(args),

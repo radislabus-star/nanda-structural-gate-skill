@@ -1,0 +1,31 @@
+{
+  "name": "llmwave-memory-corpus",
+  "cases": [
+    {
+      "id": "retrieve-payment-from-customs-prefix",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "write_text": "customs declaration requires payment",
+      "prefix": "customs declaration requires",
+      "expected_top_token": "payment",
+      "expected_state": "MEMORY_RETRIEVE_READY",
+      "steps": 2
+    },
+    {
+      "id": "feedback-reject-protocols-keeps-payment",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "write_text": "declaration requires protocols",
+      "prefix": "declaration requires",
+      "expected_top_token": "payment",
+      "expected_state": "MEMORY_RETRIEVE_READY",
+      "feedback": [
+        {
+          "decision": "reject",
+          "token": "protocols",
+          "note": "false shortcut"
+        }
+      ],
+      "consolidate": true,
+      "steps": 2
+    }
+  ]
+}

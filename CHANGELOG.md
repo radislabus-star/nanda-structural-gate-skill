@@ -20,6 +20,12 @@
   Temporal Lens for recurrent order and route jumps, Evidence Lens for support
   binding, Energy Lens for basin stability, and Anti Lens for destructive
   interference reports.
+- v86-v95 add the first LLMWave Memory Core: `nanda-llmwave-memory` writes
+  triads/token/phrase continuations into one wave-memory object, retrieves
+  next-token candidates through resonance, applies accept/reject/WATCH
+  feedback, consolidates duplicate continuations, decays weak memory, reports
+  6M packed-memory budget, runs recurrent generation, and verifies behavior
+  through `examples/llmwave-memory-corpus.json`.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

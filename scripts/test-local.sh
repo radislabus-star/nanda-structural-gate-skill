@@ -26,6 +26,7 @@ pattern_eval="$root/nanda-structural-gate/scripts/nanda-pattern-eval"
 pattern_bank="$root/nanda-structural-gate/scripts/nanda-pattern-bank"
 llmwave="$root/nanda-structural-gate/scripts/nanda-llmwave"
 llmwave_eval="$root/nanda-structural-gate/scripts/nanda-llmwave-eval"
+llmwave_memory="$root/nanda-structural-gate/scripts/nanda-llmwave-memory"
 demo="$root/nanda-structural-gate/scripts/nanda-demo"
 cache="$root/nanda-structural-gate/scripts/nanda-cache"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
@@ -83,6 +84,7 @@ jq empty "$root/examples/decode-corpus.json"
 jq empty "$root/examples/pattern-learning-corpus.json"
 jq empty "$root/examples/llmwave-corpus.json"
 jq empty "$root/examples/token-lens-corpus.json"
+jq empty "$root/examples/llmwave-memory-corpus.json"
 jq empty "$root/examples/triad-packet.token-lens-business.json"
 jq empty "$root/examples/demo-corpus.json"
 
@@ -589,6 +591,23 @@ jq -e '.cases[] | select(.id == "route-trap-reject-applies-anti-wave" and .state
 token_lens_eval_json="$("$llmwave_eval" --suite "$root/examples/token-lens-corpus.json")"
 jq -e '.mode == "llmwave-eval-suite" and .passed == 5 and .total == 5 and .accuracy == 1' <<<"$token_lens_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "reject-protocols-shifts-token" and .actual_next_token == "payment" and .states.anti_wave == "ANTI_WAVE_APPLIED")' <<<"$token_lens_eval_json" >/dev/null
+tmp_memory="$(mktemp -d)"
+"$llmwave_memory" write "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "customs declaration requires payment" --out "$tmp_memory/memory.json"
+jq -e '.version == "v86-wave-memory-schema" and .write_path.version == "v87-memory-write-path" and .wave_memory.phrase_memory.version == "v92-phrase-memory" and .wave_memory.packed_runtime.version == "v93-packed-6m-memory"' "$tmp_memory/memory.json" >/dev/null
+memory_retrieve_json="$("$llmwave_memory" retrieve "$tmp_memory/memory.json" --prefix "customs declaration requires")"
+jq -e '.mode == "llmwave-memory-retrieve" and .version == "v88-memory-retrieve-path" and .state == "MEMORY_RETRIEVE_READY" and .top_token == "payment" and .packed_runtime.fits_6m == true' <<<"$memory_retrieve_json" >/dev/null
+memory_feedback_json="$("$llmwave_memory" feedback "$tmp_memory/memory.json" --decision reject --token protocols)"
+jq -e '.mode == "llmwave-memory-feedback" and .version == "v89-feedback-learning" and .state == "MEMORY_FEEDBACK_APPLIED" and .touched >= 1' <<<"$memory_feedback_json" >/dev/null
+jq '.memory' <<<"$memory_feedback_json" >"$tmp_memory/memory-feedback.json"
+memory_consolidate_json="$("$llmwave_memory" consolidate "$tmp_memory/memory-feedback.json")"
+jq -e '.mode == "llmwave-memory-consolidate" and .version == "v90-consolidation" and .memory.wave_memory.consolidation.state == "CONSOLIDATED"' <<<"$memory_consolidate_json" >/dev/null
+jq '.memory' <<<"$memory_consolidate_json" >"$tmp_memory/memory-consolidated.json"
+memory_decay_json="$("$llmwave_memory" decay "$tmp_memory/memory-consolidated.json" --factor 0.99)"
+jq -e '.mode == "llmwave-memory-decay" and .version == "v91-decay-forgetting" and .memory.wave_memory.decay.state == "DECAY_APPLIED"' <<<"$memory_decay_json" >/dev/null
+memory_generate_json="$("$llmwave_memory" generate "$tmp_memory/memory.json" --prefix "customs declaration requires" --steps 2)"
+jq -e '.mode == "llmwave-memory-generate" and .version == "v94-recurrent-generation" and (.generated_text | contains("payment"))' <<<"$memory_generate_json" >/dev/null
+memory_eval_json="$("$llmwave_memory" eval --suite "$root/examples/llmwave-memory-corpus.json")"
+jq -e '.mode == "llmwave-memory-eval" and .version == "v95-memory-eval" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$memory_eval_json" >/dev/null
 serve_token_json="$(printf '{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n' "$root" "$root" | "$serve")"
 jq -e 'length == 2 and .[0].ok == true and .[0].result.mode == "llmwave-token-compact" and .[0].result.top_token == "payment" and .[0].result.serve_cache.state == "SERVE_TOKEN_WARMED" and .[1].result.serve_cache.state == "SERVE_TOKEN_HIT"' <<<"$(jq -s . <<<"$serve_token_json")" >/dev/null
 demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"
