@@ -97,6 +97,14 @@
       "expected_answer_contains": "buyer pays supplier",
       "expected_memory_version": "v101-training-from-text",
       "facts": 3
+    },
+    {
+      "id": "qa-reversed-invoice-issue-veto",
+      "train_text_path": "llmwave-tiny-corpus.txt",
+      "prompt": "what does invoice issue?",
+      "expected_answer_state": "ANSWER_EMPTY",
+      "expected_memory_version": "v101-training-from-text",
+      "facts": 3
     }
   ]
 }

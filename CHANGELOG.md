@@ -40,6 +40,9 @@
 - v115-v119 add LLMWave Answer Core: `answer` CLI, grounded multi-fact
   evidence, explicit answer review states, cached `nanda-serve`
   `llmwave_answer`, and QA eval cases for natural questions.
+- v120-v126 strengthen the answer field core with relation phase channels,
+  subject/object polarity, bidirectional recall, field decomposition,
+  phase-collision detection, and reversed-polarity core eval.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

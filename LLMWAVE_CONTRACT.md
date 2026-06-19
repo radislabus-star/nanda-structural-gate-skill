@@ -168,6 +168,19 @@ grounded response assembled from memory records. Answer output must expose:
 
 The QA eval corpus checks answer behavior directly, not only continuation text.
 
+v120-v126 move precision into the field core:
+
+- relation phase channels: `requires`, `supports`, `issues`, `pays`;
+- subject/object polarity: `subject -> relation -> object` is not reversible;
+- bidirectional recall: object-to-subject and subject-to-object questions use
+  different target energy;
+- field decomposition: subject, relation, object, phrase, polarity,
+  bidirectional, and anti energy are reported per fact;
+- phase collision detection: `FIELD_SINGLE_PEAK`, `FIELD_MULTI_PEAK`,
+  `FIELD_PHASE_MISMATCH`, or `FIELD_EMPTY`;
+- core eval includes a reversed-polarity trap such as
+  `what does invoice issue?`.
+
 ## Lenses
 
 A lens is a readout/projection over the field. The same field can be read

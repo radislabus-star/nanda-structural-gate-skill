@@ -146,6 +146,7 @@ scripts/nanda-llmwave-memory decay .nanda/llmwave-memory-consolidated.json --fac
 scripts/nanda-llmwave-memory generate .nanda/llmwave-memory.json --prefix "customs declaration requires" --steps 2 --beam-width 2 --temperature 0
 scripts/nanda-llmwave-memory chat .nanda/llmwave-memory.json --prompt "what does customs declaration require?" --steps 2
 scripts/nanda-llmwave-memory answer .nanda/llmwave-memory.json --prompt "what does customs declaration require?" --facts 3
+scripts/nanda-llmwave-memory answer .nanda/llmwave-memory.json --prompt "what does invoice issue?" --facts 3
 scripts/nanda-llmwave-memory train corpus.txt --out .nanda/llmwave-text-memory.json
 scripts/nanda-llmwave-memory grow .nanda/llmwave-memory.json .nanda/index.json --input-format json --out .nanda/llmwave-grown.json
 scripts/nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
@@ -363,6 +364,9 @@ guard for unsafe/rejected beams, multi-step coherence stops, `nanda-serve`
 `llmwave_chat` cache, and `nanda-llmwave-memory demo`. v115-v119 add
 `nanda-llmwave-memory answer`: a grounded answer contract with multi-fact
 evidence, review states, `llmwave_answer` serve cache, and QA eval cases.
+v120-v126 strengthen the answer field core with relation phase channels,
+subject/object polarity, bidirectional recall, field decomposition,
+phase-collision detection, and reversed-polarity QA.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

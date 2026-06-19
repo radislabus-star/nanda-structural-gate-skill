@@ -628,8 +628,8 @@ fn llmwave_memory_eval_cmd(args: LlmwaveMemoryEvalArgs) -> Result<u8> {
     let total = rows.len();
     let out = json!({
         "mode": "llmwave-memory-eval",
-        "version": "v119-qa-answer-eval",
-        "legacy_version": "v109-generator-quality-eval",
+        "version": "v126-core-field-eval",
+        "legacy_version": "v119-qa-answer-eval",
         "passed": passed,
         "total": total,
         "accuracy": if total == 0 { 0.0 } else { round4(passed as f64 / total as f64) },
@@ -842,6 +842,10 @@ fn llmwave_memory_from_packet(packet: &Packet, text: &str) -> Value {
                 "prefix": format!("{} {}", triad.subject, triad.relation),
                 "phrase": triad.object,
                 "pattern": format!("{} -> {} -> {}", triad.subject, triad.relation, triad.object),
+                "subject": triad.subject,
+                "relation": llmwave_canonical_relation(&triad.relation),
+                "object": triad.object,
+                "polarity": "subject->relation->object",
                 "route": triad.route,
                 "strength": round4(triad.confidence.max(0.05))
             })
@@ -940,11 +944,16 @@ fn llmwave_memory_from_text(text: &str, task_id: &str, domain: &str) -> Value {
                 .cloned()
                 .collect::<Vec<_>>()
                 .join(" ");
+            let fact = llmwave_parse_fact(line);
             json!({
                 "id": format!("txt-phrase-{idx:04}"),
                 "prefix": prefix,
                 "phrase": line,
                 "pattern": format!("{prefix} -> phrase -> {line}"),
+                "subject": fact.subject,
+                "relation": fact.relation,
+                "object": fact.object,
+                "polarity": "subject->relation->object",
                 "route": "text",
                 "strength": 0.5
             })
@@ -1383,10 +1392,12 @@ pub(crate) fn llmwave_memory_answer_report(
 ) -> Value {
     let prompt_adapter = llmwave_prompt_adapter(memory, prompt);
     let selected_prefix = prompt_adapter["selected_prefix"].as_str().unwrap_or(prompt);
+    let intent = llmwave_query_intent(prompt);
     let retrieve = llmwave_memory_retrieve_report(memory, selected_prefix, top_k.max(3));
     let mut beams = llmwave_memory_beams(&retrieve, top_k.max(3), 0.0);
     llmwave_memory_guard_beams(&mut beams, &retrieve, &BTreeSet::new(), "");
-    let evidence = llmwave_answer_evidence(memory, selected_prefix, prompt, facts.max(1));
+    let (mut evidence, mut suppressed_facts, field_core) =
+        llmwave_answer_evidence(memory, selected_prefix, prompt, &intent, facts.max(1));
     let suppressed = beams
         .iter()
         .filter(|beam| beam["semantic_guard"]["state"].as_str() != Some("BEAM_SAFE"))
@@ -1398,13 +1409,19 @@ pub(crate) fn llmwave_memory_answer_report(
         .cloned()
         .collect::<Vec<_>>();
     let contested = retrieve["state"].as_str() == Some("MEMORY_RETRIEVE_CONTESTED");
-    let answer_state = if evidence.is_empty() && safe_beams.is_empty() {
-        "ANSWER_EMPTY"
-    } else if contested || safe_beams.is_empty() {
-        "ANSWER_CONTESTED"
-    } else {
-        "ANSWER_READY"
-    };
+    let field_state = field_core["state"].as_str().unwrap_or("FIELD_EMPTY");
+    if field_state == "FIELD_PHASE_MISMATCH" {
+        suppressed_facts.extend(evidence.clone());
+        evidence.clear();
+    }
+    let answer_state =
+        if matches!(field_state, "FIELD_EMPTY" | "FIELD_PHASE_MISMATCH") || evidence.is_empty() {
+            "ANSWER_EMPTY"
+        } else if field_state == "FIELD_MULTI_PEAK" {
+            "ANSWER_CONTESTED"
+        } else {
+            "ANSWER_READY"
+        };
     let answer_text = llmwave_memory_answer_text(prompt, &evidence, language, answer_state);
     json!({
         "mode": "llmwave-memory-answer",
@@ -1414,6 +1431,14 @@ pub(crate) fn llmwave_memory_answer_report(
             "grounding": "v116-grounded-answer",
             "multi_fact": "v117-multi-fact-answer",
             "review_state": "v118-answer-review-state"
+        },
+        "core_versions": {
+            "relation_phase": "v120-relation-phase-channels",
+            "polarity": "v121-subject-object-polarity",
+            "bidirectional_recall": "v122-bidirectional-recall",
+            "field_decomposition": "v123-field-decomposition",
+            "ambiguity_detector": "v124-phase-collision-detector",
+            "core_eval": "v126-core-field-eval"
         },
         "state": answer_state,
         "safe_to_answer": answer_state == "ANSWER_READY",
@@ -1425,20 +1450,43 @@ pub(crate) fn llmwave_memory_answer_report(
             "version": "v116-grounded-answer",
             "selected_prefix": selected_prefix,
             "facts": evidence,
+            "suppressed_facts": suppressed_facts,
             "safe_beams": safe_beams,
             "suppressed_beams": suppressed,
             "memory_records_used": evidence.len()
         },
+        "field_core": field_core,
         "review": {
             "version": "v118-answer-review-state",
             "state": answer_state,
-            "reasons": llmwave_answer_reasons(answer_state, &beams, &evidence, contested)
+            "reasons": llmwave_answer_reasons(answer_state, &beams, &evidence, contested || field_state == "FIELD_MULTI_PEAK" || field_state == "FIELD_PHASE_MISMATCH")
         },
-        "read_as": "Answer is grounded in memory records and guarded beams. Use ANSWER_READY as usable; treat EMPTY/CONTESTED as review-only."
+        "read_as": "Answer readiness is decided by the LLMWave field core. Retrieve/beams are diagnostics, not the final judge."
     })
 }
 
-fn llmwave_answer_evidence(memory: &Value, prefix: &str, prompt: &str, limit: usize) -> Vec<Value> {
+#[derive(Clone, Debug)]
+struct LlmwaveFact {
+    subject: String,
+    relation: String,
+    object: String,
+}
+
+#[derive(Clone, Debug)]
+struct LlmwaveQueryIntent {
+    relation: String,
+    direction: String,
+    target: String,
+    target_terms: BTreeSet<String>,
+}
+
+fn llmwave_answer_evidence(
+    memory: &Value,
+    prefix: &str,
+    prompt: &str,
+    intent: &LlmwaveQueryIntent,
+    limit: usize,
+) -> (Vec<Value>, Vec<Value>, Value) {
     let mut rows = vec![];
     let query_terms = tokenize_pattern(&format!("{prefix} {prompt}"))
         .into_iter()
@@ -1452,12 +1500,18 @@ fn llmwave_answer_evidence(memory: &Value, prefix: &str, prompt: &str, limit: us
     {
         let phrase = record["phrase"].as_str().unwrap_or("");
         let record_prefix = record["prefix"].as_str().unwrap_or("");
+        let fact = llmwave_fact_from_record(record, phrase);
         let terms = tokenize_pattern(&format!("{record_prefix} {phrase}"))
             .into_iter()
             .map(|token| norm(&token))
             .collect::<BTreeSet<_>>();
         let overlap =
             query_terms.intersection(&terms).count() as f64 / query_terms.len().max(1) as f64;
+        let relation_phase = llmwave_relation_phase_score(intent, &fact);
+        let polarity = llmwave_polarity_score(intent, &fact);
+        let bidirectional = llmwave_bidirectional_score(intent, &fact);
+        let phrase_energy = overlap;
+        let anti_energy = if polarity < 0.0 { polarity.abs() } else { 0.0 };
         let prefix_bonus = if norm(record_prefix) == norm(prefix)
             || norm(phrase).contains(&norm(prefix))
             || norm(prefix).contains(&norm(record_prefix))
@@ -1466,8 +1520,16 @@ fn llmwave_answer_evidence(memory: &Value, prefix: &str, prompt: &str, limit: us
         } else {
             0.0
         };
+        let strength_energy = record["strength"].as_f64().unwrap_or(0.0) * 0.20;
         let score = round4(
-            (overlap + prefix_bonus + record["strength"].as_f64().unwrap_or(0.0) * 0.25).min(1.5),
+            ((0.22 * phrase_energy)
+                + (0.30 * relation_phase)
+                + (0.28 * bidirectional)
+                + (0.20 * polarity.max(0.0))
+                + prefix_bonus
+                + strength_energy
+                - (0.75 * anti_energy))
+                .clamp(0.0, 1.5),
         );
         if score > 0.0 {
             rows.push(json!({
@@ -1475,8 +1537,38 @@ fn llmwave_answer_evidence(memory: &Value, prefix: &str, prompt: &str, limit: us
                 "prefix": record_prefix,
                 "fact": phrase,
                 "pattern": record["pattern"],
+                "subject": fact.subject,
+                "relation": fact.relation,
+                "object": fact.object,
                 "route": record["route"],
-                "score": score
+                "score": score,
+                "field_decomposition": {
+                    "version": "v123-field-decomposition",
+                    "subject_energy": round4(llmwave_term_match(&intent.target_terms, &fact.subject)),
+                    "relation_energy": round4(relation_phase),
+                    "object_energy": round4(llmwave_term_match(&intent.target_terms, &fact.object)),
+                    "phrase_energy": round4(phrase_energy),
+                    "polarity_energy": round4(polarity),
+                    "bidirectional_energy": round4(bidirectional),
+                    "anti_energy": round4(anti_energy)
+                },
+                "phase": {
+                    "version": "v120-relation-phase-channels",
+                    "intent_relation": intent.relation,
+                    "record_relation": fact.relation,
+                    "relation_phase_score": round4(relation_phase)
+                },
+                "polarity": {
+                    "version": "v121-subject-object-polarity",
+                    "direction": intent.direction,
+                    "score": round4(polarity),
+                    "state": if polarity < 0.0 { "REVERSED" } else if polarity > 0.0 { "ALIGNED" } else { "NEUTRAL" }
+                },
+                "bidirectional_recall": {
+                    "version": "v122-bidirectional-recall",
+                    "target": intent.target,
+                    "score": round4(bidirectional)
+                }
             }));
         }
     }
@@ -1517,10 +1609,223 @@ fn llmwave_answer_evidence(memory: &Value, prefix: &str, prompt: &str, limit: us
         .and_then(|row| row["score"].as_f64())
         .unwrap_or(0.0);
     let keep_threshold = (top_score * 0.35).max(0.25);
+    let mut suppressed = rows
+        .iter()
+        .filter(|row| row["score"].as_f64().unwrap_or(0.0) < keep_threshold)
+        .cloned()
+        .collect::<Vec<_>>();
     rows.retain(|row| row["score"].as_f64().unwrap_or(0.0) >= keep_threshold);
     rows.dedup_by(|a, b| a["fact"].as_str() == b["fact"].as_str());
+    suppressed.dedup_by(|a, b| a["fact"].as_str() == b["fact"].as_str());
+    let field_core = llmwave_answer_field_core(&rows, &suppressed, intent);
     rows.truncate(limit);
-    rows
+    (rows, suppressed, field_core)
+}
+
+fn llmwave_answer_field_core(
+    rows: &[Value],
+    suppressed: &[Value],
+    intent: &LlmwaveQueryIntent,
+) -> Value {
+    let top_score = rows
+        .first()
+        .and_then(|row| row["score"].as_f64())
+        .unwrap_or(0.0);
+    let second_score = rows
+        .get(1)
+        .and_then(|row| row["score"].as_f64())
+        .unwrap_or(0.0);
+    let margin = round4((top_score - second_score).max(0.0));
+    let relation_energy = rows
+        .first()
+        .and_then(|row| row["field_decomposition"]["relation_energy"].as_f64())
+        .unwrap_or(0.0);
+    let anti_energy = suppressed
+        .iter()
+        .filter_map(|row| row["field_decomposition"]["anti_energy"].as_f64())
+        .sum::<f64>();
+    let state = if rows.is_empty() {
+        "FIELD_EMPTY"
+    } else if intent.relation != "related" && relation_energy < 0.5 {
+        "FIELD_PHASE_MISMATCH"
+    } else if rows.len() > 1 && margin < 0.18 {
+        "FIELD_MULTI_PEAK"
+    } else {
+        "FIELD_SINGLE_PEAK"
+    };
+    json!({
+        "version": "v124-phase-collision-detector",
+        "state": state,
+        "intent": {
+            "relation": intent.relation,
+            "direction": intent.direction,
+            "target": intent.target
+        },
+        "top_score": round4(top_score),
+        "second_score": round4(second_score),
+        "margin": margin,
+        "relation_energy": round4(relation_energy),
+        "anti_energy": round4(anti_energy),
+        "suppressed_count": suppressed.len(),
+        "read_as": "Core field state is computed from relation phase, subject/object polarity, bidirectional target match, and anti-energy."
+    })
+}
+
+fn llmwave_query_intent(prompt: &str) -> LlmwaveQueryIntent {
+    let tokens = tokenize_pattern(prompt);
+    let relation = tokens
+        .iter()
+        .find_map(|token| {
+            let canonical = llmwave_canonical_relation(token);
+            if canonical.is_empty() {
+                None
+            } else {
+                Some(canonical)
+            }
+        })
+        .unwrap_or_else(|| "related".to_string());
+    let question = tokens.first().map(|token| norm(token)).unwrap_or_default();
+    let has_does = tokens.iter().any(|token| norm(token) == "does");
+    let direction = if question == "who" {
+        "backward-subject"
+    } else if question == "what" && has_does {
+        "forward-object"
+    } else if question == "what" {
+        "backward-subject"
+    } else {
+        "bidirectional"
+    }
+    .to_string();
+    let target_tokens = tokens
+        .iter()
+        .map(|token| norm(token))
+        .filter(|token| {
+            !llmwave_prompt_stopword(token)
+                && llmwave_canonical_relation(token).is_empty()
+                && token != "who"
+                && token != "what"
+                && token != "does"
+        })
+        .collect::<Vec<_>>();
+    let target = target_tokens.join(" ");
+    let target_terms = target_tokens.into_iter().collect::<BTreeSet<_>>();
+    LlmwaveQueryIntent {
+        relation,
+        direction,
+        target,
+        target_terms,
+    }
+}
+
+fn llmwave_fact_from_record(record: &Value, fallback_phrase: &str) -> LlmwaveFact {
+    let subject = record["subject"].as_str().unwrap_or("");
+    let relation = record["relation"].as_str().unwrap_or("");
+    let object = record["object"].as_str().unwrap_or("");
+    if !subject.is_empty() || !relation.is_empty() || !object.is_empty() {
+        return LlmwaveFact {
+            subject: subject.to_string(),
+            relation: llmwave_canonical_relation(relation),
+            object: object.to_string(),
+        };
+    }
+    llmwave_parse_fact(fallback_phrase)
+}
+
+fn llmwave_parse_fact(text: &str) -> LlmwaveFact {
+    let tokens = tokenize_pattern(text);
+    let relation_index = tokens
+        .iter()
+        .position(|token| !llmwave_canonical_relation(token).is_empty());
+    if let Some(index) = relation_index {
+        let subject = tokens[..index].join(" ");
+        let relation = llmwave_canonical_relation(&tokens[index]);
+        let object = tokens[index + 1..].join(" ");
+        return LlmwaveFact {
+            subject,
+            relation,
+            object,
+        };
+    }
+    LlmwaveFact {
+        subject: tokens.first().cloned().unwrap_or_default(),
+        relation: "related".to_string(),
+        object: tokens.iter().skip(1).cloned().collect::<Vec<_>>().join(" "),
+    }
+}
+
+fn llmwave_canonical_relation(value: &str) -> String {
+    match norm(value).as_str() {
+        "require" | "requires" | "required" | "need" | "needs" => "requires".to_string(),
+        "support" | "supports" | "supported" => "supports".to_string(),
+        "issue" | "issues" | "issued" => "issues".to_string(),
+        "pay" | "pays" | "paid" => "pays".to_string(),
+        _ => String::new(),
+    }
+}
+
+fn llmwave_relation_phase_score(intent: &LlmwaveQueryIntent, fact: &LlmwaveFact) -> f64 {
+    if intent.relation == "related" || fact.relation.is_empty() {
+        0.35
+    } else if intent.relation == fact.relation {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+fn llmwave_polarity_score(intent: &LlmwaveQueryIntent, fact: &LlmwaveFact) -> f64 {
+    let subject_match = llmwave_term_match(&intent.target_terms, &fact.subject);
+    let object_match = llmwave_term_match(&intent.target_terms, &fact.object);
+    match intent.direction.as_str() {
+        "forward-object" => {
+            if subject_match > 0.0 {
+                subject_match
+            } else if object_match > 0.0 {
+                -object_match
+            } else {
+                0.0
+            }
+        }
+        "backward-subject" => {
+            if object_match > 0.0 {
+                object_match
+            } else if subject_match > 0.0 {
+                if intent.relation == fact.relation {
+                    0.25
+                } else {
+                    -subject_match
+                }
+            } else {
+                0.0
+            }
+        }
+        _ => subject_match.max(object_match),
+    }
+}
+
+fn llmwave_bidirectional_score(intent: &LlmwaveQueryIntent, fact: &LlmwaveFact) -> f64 {
+    let subject_match = llmwave_term_match(&intent.target_terms, &fact.subject);
+    let object_match = llmwave_term_match(&intent.target_terms, &fact.object);
+    match intent.direction.as_str() {
+        "forward-object" => subject_match,
+        "backward-subject" => object_match.max(if intent.relation == fact.relation {
+            subject_match * 0.25
+        } else {
+            0.0
+        }),
+        _ => subject_match.max(object_match),
+    }
+}
+
+fn llmwave_term_match(query_terms: &BTreeSet<String>, text: &str) -> f64 {
+    if query_terms.is_empty() {
+        return 0.0;
+    }
+    let terms = tokenize_pattern(text)
+        .into_iter()
+        .map(|token| norm(&token))
+        .collect::<BTreeSet<_>>();
+    query_terms.intersection(&terms).count() as f64 / query_terms.len().max(1) as f64
 }
 
 fn llmwave_memory_answer_text(

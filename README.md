@@ -283,6 +283,7 @@ nanda-llmwave-memory decay .nanda/llmwave-memory-consolidated.json --factor 0.99
 nanda-llmwave-memory generate .nanda/llmwave-memory.json --prefix "customs declaration requires" --steps 2 --beam-width 2 --temperature 0
 nanda-llmwave-memory chat .nanda/llmwave-memory.json --prompt "what does customs declaration require?" --steps 2
 nanda-llmwave-memory answer .nanda/llmwave-memory.json --prompt "what does customs declaration require?" --facts 3
+nanda-llmwave-memory answer .nanda/llmwave-memory.json --prompt "what does invoice issue?" --facts 3
 nanda-llmwave-memory train corpus.txt --out .nanda/llmwave-text-memory.json
 nanda-llmwave-memory grow .nanda/llmwave-memory.json examples/triad-packet.token-lens-business.json --input-format json --out .nanda/llmwave-grown.json
 nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
