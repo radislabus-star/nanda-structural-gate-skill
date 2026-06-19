@@ -4,6 +4,10 @@
 
 ### Changed
 
+- v65 adds cache-only proof: `nanda-cache list` shows available focused
+  packets, and `nanda-proof --cache-only <manifest-or-single-manifest-dir>`
+  runs focused search and packed proof without loading the original large
+  corpus, marking `corpus.state=CORPUS_NOT_LOADED`.
 - v64 adds a reusable focused-packet cache: `nanda-cache build` writes a
   query/corpus/cap keyed focus packet, and `nanda-proof --cache-dir` reports
   `CACHE_HIT`, `CACHE_MISS`, or `CACHE_WRITTEN` while keeping proof semantics

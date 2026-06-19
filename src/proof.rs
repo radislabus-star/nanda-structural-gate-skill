@@ -50,6 +50,15 @@ pub(crate) fn proof_cmd(args: ProofArgs) -> Result<u8> {
 }
 
 fn proof_report_from_args(args: &ProofArgs) -> Result<Value> {
+    if let Some(cache_path) = &args.cache_only {
+        return run_cache_only_proof(
+            cache_path,
+            args.top_k,
+            &args.group_by,
+            args.sample,
+            args.include_focused_packet || args.focus_out.is_some(),
+        );
+    }
     let input = args
         .input
         .as_ref()
@@ -171,6 +180,8 @@ fn run_proof_once(
     Ok(proof_report(
         &packet,
         &focus_build.packet,
+        packet.triads.len(),
+        if fast { "fast-focused" } else { "full-compare" },
         corpus,
         focus_build.metadata,
         budget,
@@ -178,9 +189,66 @@ fn run_proof_once(
         raw_search,
         search,
         include_focused_packet,
-        fast,
         cache_report,
     ))
+}
+
+fn run_cache_only_proof(
+    cache_path: &Path,
+    top_k: usize,
+    group_by: &PeakGroupBy,
+    sample: usize,
+    include_focused_packet: bool,
+) -> Result<Value> {
+    let (focus_build, cache_report) = focus_cache::load_focus_cache_manifest(cache_path)?;
+    let focused_source = normalize_ids(focus_build.packet.triads.clone(), "m");
+    let focused_query = normalize_ids(focus_build.packet.candidate_triads.clone(), "q");
+    let query_source = focus_build.metadata["query_source"]
+        .as_str()
+        .unwrap_or("cache_query_triads");
+    let original_memory_size = focus_build.metadata["original_memory_size"]
+        .as_u64()
+        .unwrap_or(focus_build.packet.triads.len() as u64) as usize;
+    let corpus = cache_only_corpus_summary(&focus_build.metadata);
+    let budget = pack6m::budget_report(&focus_build.packet, &focused_source, &focused_query);
+    let pack = pack6m::pack_report(&focus_build.packet, &focused_source, &focused_query, sample);
+    let search = interference_search(
+        &focus_build.packet,
+        &focused_source,
+        &focused_query,
+        top_k,
+        group_by,
+        query_source,
+        focus_build.metadata.clone(),
+    );
+    let raw_search = skipped_raw_search_summary(original_memory_size, &search);
+    Ok(proof_report(
+        &focus_build.packet,
+        &focus_build.packet,
+        original_memory_size,
+        "cache-only-focused",
+        corpus,
+        focus_build.metadata,
+        budget,
+        pack,
+        raw_search,
+        search,
+        include_focused_packet,
+        cache_report,
+    ))
+}
+
+fn cache_only_corpus_summary(focus_metadata: &Value) -> Value {
+    json!({
+        "mode": "corpus-diagnostics",
+        "state": "CORPUS_NOT_LOADED",
+        "verdict": "SKIPPED",
+        "triad_count": Value::Null,
+        "original_memory_size": focus_metadata["original_memory_size"],
+        "original_routes": focus_metadata["original_routes"],
+        "reason": "cache-only proof uses a prebuilt focused packet and does not load the full corpus.",
+        "read_as": "The cache manifest proves which focused window is being reused, but this run does not re-run full corpus diagnostics."
+    })
 }
 
 pub(crate) fn proof_suite_cmd(args: &ProofArgs, suite_path: &Path) -> Result<u8> {
@@ -386,6 +454,8 @@ fn load_or_build_focus(
 fn proof_report(
     packet: &Packet,
     focused_packet: &Packet,
+    input_memory_size: usize,
+    proof_mode: &str,
     corpus: Value,
     focus: Value,
     budget: Value,
@@ -393,7 +463,6 @@ fn proof_report(
     raw_search: Value,
     search: Value,
     include_focused_packet: bool,
-    fast: bool,
     cache_report: Value,
 ) -> Value {
     let runtime_ready = focus["runtime_contract"]["ready"]
@@ -440,7 +509,7 @@ fn proof_report(
         "nanda_6m_version": nanda_6m::VERSION,
         "mode": "proof-from-focus",
         "proof_version": "v27-proof-reason-suite",
-        "proof_mode": if fast { "fast-focused" } else { "full-compare" },
+        "proof_mode": proof_mode,
         "proof_state": proof_state,
         "reason_codes": reason_codes,
         "proof_confidence": confidence,
@@ -451,7 +520,7 @@ fn proof_report(
         "task_id": packet.task_id,
         "domain": packet.domain,
         "query": packet.query,
-        "input_memory_size": packet.triads.len(),
+        "input_memory_size": input_memory_size,
         "focused_memory_size": focused_packet.triads.len(),
         "focused_query_size": focused_packet.candidate_triads.len(),
         "top_peak": search["top_peak"],
@@ -550,6 +619,9 @@ fn proof_reason_codes(
     }
     if corpus["verdict"].as_str() == Some("WATCH") {
         codes.push("CORPUS_WATCH".to_string());
+    }
+    if corpus["state"].as_str() == Some("CORPUS_NOT_LOADED") {
+        codes.push("CORPUS_NOT_LOADED".to_string());
     }
     if !focus["runtime_contract"]["ready"]
         .as_bool()

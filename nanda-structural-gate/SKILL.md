@@ -102,10 +102,12 @@ scripts/nanda-budget .nanda/index.json --input-format json
 scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
 scripts/nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
+scripts/nanda-cache list .nanda/cache
 scripts/nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
 scripts/nanda-proof .nanda/index.json --input-format json --query-file query.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
 scripts/nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast
 scripts/nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast --cache-dir .nanda/cache
+scripts/nanda-proof --cache-only .nanda/cache/<key>.manifest.json
 scripts/nanda-proof --suite examples/proof-corpus.json --input-format json
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
@@ -185,6 +187,10 @@ focused packet keyed by corpus content, query text/source, and focus caps.
 Then run `nanda-proof --fast --cache-dir .nanda/cache`; inspect
 `focus_cache.state`. Treat `CACHE_HIT` as reused focus, `CACHE_MISS` as rebuilt
 focus, and `CACHE_WRITTEN` as an explicit `--write-cache` update.
+Use `nanda-cache list .nanda/cache` to inspect available focused packets. Use
+`nanda-proof --cache-only <manifest-or-single-manifest-dir>` only when avoiding
+the original large corpus is intentional; it sets
+`proof_mode=cache-only-focused` and `corpus.state=CORPUS_NOT_LOADED`.
 Use `nanda-proof` when the agent needs the whole chain in one report:
 dataset doctor, focused packet, NANDA-6M runtime contract, interference search,
 packed peak, and repair instructions. Treat `ANSWER_READY` as usable, `WATCH`

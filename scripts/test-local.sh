@@ -292,8 +292,13 @@ rm -f "$tmp_proof_report" "$tmp_proof_focus"
 tmp_cache="$(mktemp -d)"
 cache_build_json="$("$cache" build "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --query "lower operator debt route" --out-dir "$tmp_cache")"
 jq -e '.mode == "focus-cache-build" and .version == "v64-focus-cache" and .focused_memory_size > 0' <<<"$cache_build_json" >/dev/null
+cache_list_json="$("$cache" list "$tmp_cache")"
+jq -e '.mode == "focus-cache-list" and .version == "v65-cache-only-proof" and .count == 1' <<<"$cache_list_json" >/dev/null
 cache_proof_json="$("$proof" "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --query "lower operator debt route" --fast --cache-dir "$tmp_cache")"
 jq -e '.proof_mode == "fast-focused" and .focus_cache.state == "CACHE_HIT" and (.reason_codes | index("RAW_SEARCH_SKIPPED"))' <<<"$cache_proof_json" >/dev/null
+cache_manifest="$(find "$tmp_cache" -type f -name '*.manifest.json' | head -n 1)"
+cache_only_json="$("$proof" --cache-only "$cache_manifest")"
+jq -e '.proof_mode == "cache-only-focused" and .focus_cache.state == "CACHE_ONLY_HIT" and .corpus.state == "CORPUS_NOT_LOADED" and (.reason_codes | index("CORPUS_NOT_LOADED"))' <<<"$cache_only_json" >/dev/null
 rm -rf "$tmp_cache"
 proof_suite_json="$("$proof" --suite "$root/examples/proof-corpus.json" --input-format json)"
 jq -e '.mode == "proof-suite"' <<<"$proof_suite_json" >/dev/null

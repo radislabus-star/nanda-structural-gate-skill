@@ -239,10 +239,12 @@ nanda-pack6m .nanda/index.json --input-format json
 nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000 --lane-iterations 1000000 --lane-sweep-iterations 100000
 nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
 nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
+nanda-cache list .nanda/cache
 nanda-focus .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --out .nanda/focus.json
 nanda-proof .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
 nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast
 nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast --cache-dir .nanda/cache
+nanda-proof --cache-only .nanda/cache/<key>.manifest.json
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
 nanda-search .nanda/focus.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
@@ -348,6 +350,7 @@ proof cap, and writes a smaller JSON packet that can be passed to
 `nanda-cache build` is the v64 reusable focus-cache builder. It stores a
 focused packet under a key derived from corpus content, query text/source, and
 focus caps. Use it before repeated large-corpus `nanda-proof --fast` queries.
+Use `nanda-cache list .nanda/cache` to inspect available focused packets.
 `nanda-proof` is the v27 one-shot proof pipeline. It runs corpus diagnostics,
 builds the focused packet, checks the NANDA-6M runtime contract, runs
 interference search, runs the packed bridge, and returns `ANSWER_READY`,
@@ -366,6 +369,10 @@ Use `nanda-proof --cache-dir .nanda/cache` to reuse a focused packet created by
 `nanda-cache build`; inspect `focus_cache.state`. `CACHE_HIT` means the focus
 window was reused, `CACHE_MISS` means it was rebuilt in memory, and
 `CACHE_WRITTEN` appears only when `--write-cache` is passed.
+Use `nanda-proof --cache-only <manifest-or-single-manifest-dir>` when the agent
+must avoid loading the original large corpus. It runs focused search and packed
+proof from the cached focused packet, sets `proof_mode=cache-only-focused`, and
+marks `corpus.state=CORPUS_NOT_LOADED`.
 `nanda-search` now emits `resonant_field`, the v28 physical field layer. It
 checks phase lock, standing-wave reflection, route-boundary leakage,
 destructive locality, multiscale agreement, energy conservation,

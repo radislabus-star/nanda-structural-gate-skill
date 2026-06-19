@@ -612,6 +612,8 @@ struct ProofArgs {
     input: Option<PathBuf>,
     #[arg(long)]
     suite: Option<PathBuf>,
+    #[arg(long)]
+    cache_only: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "auto")]
     input_format: InputFormat,
     #[arg(long, default_value = "proof")]
@@ -657,6 +659,7 @@ struct ProofArgs {
 #[derive(Subcommand)]
 enum CacheCommand {
     Build(CacheBuildArgs),
+    List(CacheListArgs),
 }
 
 #[derive(Parser)]
@@ -686,6 +689,14 @@ struct CacheBuildArgs {
     format: OutputFormat,
     #[arg(long)]
     normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct CacheListArgs {
+    #[arg(default_value = ".nanda/cache")]
+    dir: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
 }
 
 #[derive(Parser)]
