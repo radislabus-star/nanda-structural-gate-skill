@@ -82,6 +82,8 @@ jq empty "$root/examples/waw-corpus.json"
 jq empty "$root/examples/decode-corpus.json"
 jq empty "$root/examples/pattern-learning-corpus.json"
 jq empty "$root/examples/llmwave-corpus.json"
+jq empty "$root/examples/token-lens-corpus.json"
+jq empty "$root/examples/triad-packet.token-lens-business.json"
 jq empty "$root/examples/demo-corpus.json"
 
 pass_json="$("$checker" --triads "$root/examples/triad-packet.example.json" --format json)"
@@ -560,10 +562,17 @@ jq -e '.llmwave_contract.version == "v67-field-lens-contract" and .llmwave_contr
 jq -e '.decode.top_pattern == "declaration -> requires -> protocols" and .feedback_preview.enabled == true' <<<"$llmwave_json" >/dev/null
 llmwave_polarity_json="$("$llmwave" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --lens polarity)"
 jq -e '.llmwave_contract.selected == "polarity" and .llmwave_contract.selected_lens.state == "POLARITY_LENS_DIRECTIONAL" and .llmwave_contract.state == "LLMWAVE_LENS_READY"' <<<"$llmwave_polarity_json" >/dev/null
+llmwave_token_json="$("$llmwave" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "customs declaration requires" --lens token)"
+jq -e '.llmwave_contract.selected == "token" and .llmwave_contract.selected_lens.version == "v75-token-lens-next-token-resonance" and .llmwave_contract.selected_lens.top_token == "payment" and .llmwave_contract.selected_lens.token_cleanup.state == "TOKEN_CLEANUP_EXACT"' <<<"$llmwave_token_json" >/dev/null
 llmwave_eval_json="$("$llmwave_eval" --suite "$root/examples/llmwave-corpus.json")"
 jq -e '.mode == "llmwave-eval-suite" and .version == "v53-llmwave-proof-suite" and .passed == 2 and .total == 2 and .accuracy == 1' <<<"$llmwave_eval_json" >/dev/null
 jq -e '.cases[].states.llmwave_contract == "LLMWAVE_LENS_READY"' <<<"$llmwave_eval_json" >/dev/null
 jq -e '.cases[] | select(.id == "route-trap-reject-applies-anti-wave" and .states.anti_wave == "ANTI_WAVE_APPLIED")' <<<"$llmwave_eval_json" >/dev/null
+token_lens_eval_json="$("$llmwave_eval" --suite "$root/examples/token-lens-corpus.json")"
+jq -e '.mode == "llmwave-eval-suite" and .passed == 5 and .total == 5 and .accuracy == 1' <<<"$token_lens_eval_json" >/dev/null
+jq -e '.cases[] | select(.id == "reject-protocols-shifts-token" and .actual_next_token == "payment" and .states.anti_wave == "ANTI_WAVE_APPLIED")' <<<"$token_lens_eval_json" >/dev/null
+serve_token_json="$(printf '{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n{"command":"llmwave_token","input":"%s/examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n' "$root" "$root" | "$serve")"
+jq -e 'length == 2 and .[0].ok == true and .[0].result.mode == "llmwave-token-compact" and .[0].result.top_token == "payment" and .[0].result.serve_cache.state == "SERVE_TOKEN_WARMED" and .[1].result.serve_cache.state == "SERVE_TOKEN_HIT"' <<<"$(jq -s . <<<"$serve_token_json")" >/dev/null
 demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"
 jq -e '.mode == "llmwave-demo" and .version == "v62-demo-raw-text-adapter" and .state == "PUBLIC_DEMO_READY" and (.weak_spots | length) == 0' <<<"$demo_json" >/dev/null
 demo_review_json="$("$demo" "$root/examples/triad-packet.demo-review-empty.json" --input-format json --text "unsupported relation" --format json || true)"

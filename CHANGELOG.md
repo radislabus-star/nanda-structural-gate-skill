@@ -8,6 +8,10 @@
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active
   readout.
+- v68-v75 add the first Token Lens path: token-pattern records, deterministic
+  prefix waves with position phase, next-token resonance, token cleanup,
+  shortcut-specific token anti-wave, token eval corpus, and a compact
+  `nanda-serve` `llmwave_token` request.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

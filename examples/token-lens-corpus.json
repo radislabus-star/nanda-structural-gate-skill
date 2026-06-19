@@ -1,0 +1,44 @@
+{
+  "name": "nanda-v75-token-lens",
+  "cases": [
+    {
+      "id": "certification-prefix-protocols",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "text": "declaration requires",
+      "expected_next_token": "protocols",
+      "expected_proof_state": "LLMWAVE_PROOF_READY",
+      "expected_demo_state": "PUBLIC_DEMO_READY"
+    },
+    {
+      "id": "customs-prefix-payment",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "text": "customs declaration requires",
+      "expected_next_token": "payment",
+      "expected_proof_state": "LLMWAVE_PROOF_READY",
+      "expected_demo_state": "PUBLIC_DEMO_READY"
+    },
+    {
+      "id": "reject-protocols-shifts-token",
+      "path": "triad-packet.interference-search-route-trap.json",
+      "text": "declaration requires",
+      "feedback_decision": "reject",
+      "note": "reject false protocols continuation for token lens",
+      "expected_next_token": "payment",
+      "expected_anti_wave_state": "ANTI_WAVE_APPLIED"
+    },
+    {
+      "id": "supplier-prefix-invoice",
+      "path": "triad-packet.token-lens-business.json",
+      "text": "supplier issues",
+      "expected_next_token": "invoice",
+      "expected_proof_state": "LLMWAVE_PROOF_READY",
+      "expected_demo_state": "PUBLIC_DEMO_READY"
+    },
+    {
+      "id": "buyer-prefix-supplier",
+      "path": "triad-packet.token-lens-business.json",
+      "text": "buyer pays",
+      "expected_next_token": "supplier"
+    }
+  ]
+}

@@ -264,6 +264,41 @@ pub(crate) fn llmwave_eval_cmd(args: LlmwaveEvalArgs) -> Result<u8> {
     })
 }
 
+pub(crate) fn llmwave_token_compact_report(packet: &Packet, text: &str, top_k: usize) -> Value {
+    let args = LlmwaveEvalArgs {
+        suite: PathBuf::from("<serve>"),
+        input_format: InputFormat::Json,
+        top_k,
+        steps: 1,
+        search_top_k: 8,
+        route_cap: 256,
+        route_triad_cap: 32,
+        group_by: PeakGroupBy::Route,
+        format: OutputFormat::Json,
+        normalize_paths: false,
+    };
+    let report = llmwave_report_from_packet(packet, Path::new("<serve>"), text, &args);
+    let token = &report["llmwave_contract"]["lenses"]["token"];
+    json!({
+        "mode": "llmwave-token-compact",
+        "version": "v75-serve-compact-token-lens",
+        "contract_state": report["llmwave_contract"]["state"],
+        "proof_state": report["proof_summary"]["state"],
+        "token_state": token["state"],
+        "ready": token["ready"],
+        "prefix": token["prefix"],
+        "top_token": token["top_token"],
+        "top_phrase": token["top_phrase"],
+        "margin": token["margin"],
+        "top_k": token["top_k"],
+        "baseline_compare": token["baseline_compare"],
+        "token_cleanup": token["token_cleanup"],
+        "anti_wave": token["anti_wave"],
+        "token_memory": token["token_memory"],
+        "read_as": "Compact Token Lens response for agent next-token/phrase resonance."
+    })
+}
+
 pub(crate) fn demo_cmd(args: DemoArgs) -> Result<u8> {
     if let Some(suite_path) = &args.suite {
         let text = fs::read_to_string(suite_path)
@@ -325,6 +360,7 @@ pub(crate) fn demo_cmd(args: DemoArgs) -> Result<u8> {
             expected_anti_wave_state: String::new(),
             expected_proof_state: String::new(),
             expected_demo_state: String::new(),
+            expected_next_token: String::new(),
         };
         packet = inject_llmwave_feedback(packet, &text, &case, &eval_args)?;
     }
@@ -376,6 +412,7 @@ fn run_demo_case(args: &DemoArgs, base: &Path, case: DemoCase) -> Result<Value> 
             expected_anti_wave_state: String::new(),
             expected_proof_state: String::new(),
             expected_demo_state: String::new(),
+            expected_next_token: String::new(),
         };
         packet = inject_llmwave_feedback(packet, &text, &eval_case, &eval_args)?;
     }
@@ -438,7 +475,12 @@ fn run_llmwave_eval_case(
         "anti_wave": case.expected_anti_wave_state.is_empty() || report["anti_wave_audit"]["state"].as_str() == Some(case.expected_anti_wave_state.as_str()),
         "proof": case.expected_proof_state.is_empty() || report["proof_summary"]["state"].as_str() == Some(case.expected_proof_state.as_str()),
         "demo": case.expected_demo_state.is_empty() || report["public_demo"]["state"].as_str() == Some(case.expected_demo_state.as_str()),
-        "llmwave_contract": report["llmwave_contract"]["state"].as_str() == Some("LLMWAVE_LENS_READY")
+        "llmwave_contract": if case.expected_next_token.is_empty() {
+            report["llmwave_contract"]["state"].as_str() == Some("LLMWAVE_LENS_READY")
+        } else {
+            report["llmwave_contract"]["lenses"]["token"]["top_token"].as_str() == Some(case.expected_next_token.as_str())
+        },
+        "next_token": case.expected_next_token.is_empty() || report["llmwave_contract"]["lenses"]["token"]["top_token"].as_str() == Some(case.expected_next_token.as_str())
     });
     let ok = checks
         .as_object()
@@ -463,8 +505,10 @@ fn run_llmwave_eval_case(
             "hot_cycle": report["packed_hot_cycle"]["state"],
             "proof": report["proof_summary"]["state"],
             "llmwave_contract": report["llmwave_contract"]["state"],
+            "token_lens": report["llmwave_contract"]["lenses"]["token"]["state"],
             "demo": report["public_demo"]["state"]
         },
+        "actual_next_token": report["llmwave_contract"]["lenses"]["token"]["top_token"],
         "checks": checks,
         "ok": ok
     }))
@@ -1273,11 +1317,13 @@ fn llmwave_contract_report(
     let pattern = llmwave_pattern_lens(decode, proof, cleanup_dictionary);
     let polarity = llmwave_polarity_lens(decode);
     let cleanup_lens = llmwave_cleanup_lens(cleanup, cleanup_dictionary);
+    let token = llmwave_token_lens(packet, tokens, proof, cleanup_dictionary);
     let selected_name = llmwave_lens_name(selected);
     let selected_lens = match selected {
         LlmwaveLensKind::Pattern => pattern.clone(),
         LlmwaveLensKind::Polarity => polarity.clone(),
         LlmwaveLensKind::Cleanup => cleanup_lens.clone(),
+        LlmwaveLensKind::Token => token.clone(),
     };
     let selected_ready = selected_lens["ready"].as_bool().unwrap_or(false);
     let field = llmwave_field_report(packet, text, tokens, decode, hrr, attractor, capacity);
@@ -1302,7 +1348,8 @@ fn llmwave_contract_report(
         "lenses": {
             "pattern": pattern,
             "polarity": polarity,
-            "cleanup": cleanup_lens
+            "cleanup": cleanup_lens,
+            "token": token
         },
         "baseline_compare": baseline,
         "hot_budget": hot_budget,
@@ -1318,6 +1365,7 @@ fn llmwave_lens_name(kind: &LlmwaveLensKind) -> &'static str {
         LlmwaveLensKind::Pattern => "pattern",
         LlmwaveLensKind::Polarity => "polarity",
         LlmwaveLensKind::Cleanup => "cleanup",
+        LlmwaveLensKind::Token => "token",
     }
 }
 
@@ -1460,6 +1508,412 @@ fn llmwave_cleanup_lens(cleanup: &Value, cleanup_dictionary: &Value) -> Value {
     })
 }
 
+#[derive(Clone, Debug)]
+struct TokenPatternRecord {
+    prefix_tokens: Vec<String>,
+    next_token: String,
+    next_phrase: String,
+    pattern: String,
+    triad_id: String,
+    route: String,
+    group: String,
+    polarity: String,
+    confidence: f64,
+}
+
+fn llmwave_token_lens(
+    packet: &Packet,
+    tokens: &[String],
+    proof: &Value,
+    cleanup_dictionary: &Value,
+) -> Value {
+    let records = token_pattern_records(packet);
+    let anti = token_anti_wave_report(packet, tokens);
+    let mut candidates = token_resonance_candidates(tokens, &records, &anti);
+    candidates.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    candidates.truncate(5);
+    let top_token = candidates
+        .first()
+        .and_then(|candidate| candidate["token"].as_str())
+        .unwrap_or("");
+    let top_score = candidates
+        .first()
+        .and_then(|candidate| candidate["score"].as_f64())
+        .unwrap_or(0.0);
+    let second_score = candidates
+        .get(1)
+        .and_then(|candidate| candidate["score"].as_f64())
+        .unwrap_or(0.0);
+    let margin = round4((top_score - second_score).max(0.0));
+    let cleanup = token_cleanup_report(top_token, &candidates, &records, margin);
+    let mut baseline = token_lens_baseline(tokens, &records);
+    let baseline_score = baseline["top_score"].as_f64().unwrap_or(0.0);
+    baseline["field_top_score"] = json!(round4(top_score));
+    baseline["field_beats_baseline"] = json!(top_score > baseline_score + 0.03);
+    let cleanup_ready = matches!(
+        cleanup["state"].as_str().unwrap_or(""),
+        "TOKEN_CLEANUP_EXACT" | "TOKEN_CLEANUP_NEAR"
+    );
+    let proof_ready = proof["state"].as_str() == Some("LLMWAVE_PROOF_READY");
+    let ready = !top_token.is_empty() && cleanup_ready && proof_ready && margin >= 0.015;
+    let state = if ready {
+        "TOKEN_LENS_READY"
+    } else if top_token.is_empty() {
+        "TOKEN_LENS_EMPTY"
+    } else if cleanup["state"].as_str() == Some("TOKEN_CLEANUP_AMBIGUOUS") || margin < 0.015 {
+        "TOKEN_LENS_CONTESTED"
+    } else if baseline["top_token"].as_str() == Some(top_token)
+        && !baseline["field_beats_baseline"].as_bool().unwrap_or(false)
+    {
+        "TOKEN_LENS_BASELINE_TIE"
+    } else {
+        "TOKEN_LENS_REVIEW"
+    };
+    json!({
+        "kind": "token",
+        "version": "v75-token-lens-next-token-resonance",
+        "state": state,
+        "ready": ready,
+        "prefix": tokens.join(" "),
+        "top_token": top_token,
+        "top_phrase": candidates.first().map(|candidate| candidate["phrase"].clone()).unwrap_or(Value::Null),
+        "top_k": candidates,
+        "margin": margin,
+        "token_cleanup": cleanup,
+        "structural_cleanup_state": cleanup_dictionary["state"],
+        "anti_wave": anti,
+        "baseline_compare": baseline,
+        "token_memory": {
+            "version": "v69-token-pattern-records",
+            "records": records.len(),
+            "packed_record_bytes": 32,
+            "estimated_packed_bytes": records.len() * 32,
+            "fits_pattern_arena": records.len() * 32 <= PATTERN_STORE_ARENA_BYTES
+        },
+        "encoder": {
+            "version": "v70-token-position-phase",
+            "position_weights": [1.0, 0.70, 0.45, 0.25, 0.15, 0.10],
+            "read_as": "Prefix tokens are encoded with deterministic token waves plus relative position phase."
+        },
+        "read_as": "Token Lens reads the LLMWave field as next-token/phrase candidates, with cleanup, anti-wave, and cheap baselines visible."
+    })
+}
+
+fn token_pattern_records(packet: &Packet) -> Vec<TokenPatternRecord> {
+    let mut records = vec![];
+    for triad in &packet.triads {
+        let sequence = tokenize_pattern(&format!(
+            "{} {} {}",
+            triad.subject, triad.relation, triad.object
+        ));
+        if sequence.len() < 2 {
+            continue;
+        }
+        for index in 1..sequence.len() {
+            let start = index.saturating_sub(6);
+            let prefix_tokens = sequence[start..index].to_vec();
+            let next_token = sequence[index].clone();
+            let next_phrase = sequence[index..].join(" ");
+            records.push(TokenPatternRecord {
+                prefix_tokens,
+                next_token,
+                next_phrase,
+                pattern: format!(
+                    "{} -> {} -> {}",
+                    triad.subject, triad.relation, triad.object
+                ),
+                triad_id: triad.id.clone(),
+                route: triad.route.clone(),
+                group: triad.group.clone(),
+                polarity: triad_polarity(triad),
+                confidence: triad.confidence,
+            });
+        }
+    }
+    records
+}
+
+fn token_resonance_candidates(
+    tokens: &[String],
+    records: &[TokenPatternRecord],
+    anti: &Value,
+) -> Vec<Value> {
+    let prefix_wave = token_prefix_wave(tokens);
+    let query_terms = tokens
+        .iter()
+        .map(|token| norm(token))
+        .collect::<BTreeSet<_>>();
+    let mut by_token: BTreeMap<String, Value> = BTreeMap::new();
+    for record in records {
+        let wave_score = ((cosine(&prefix_wave, &token_prefix_wave(&record.prefix_tokens)) + 1.0)
+            / 2.0)
+            .clamp(0.0, 1.0);
+        let suffix = token_suffix_match(tokens, &record.prefix_tokens);
+        let length_fit = token_prefix_length_fit(tokens, &record.prefix_tokens);
+        let route = token_route_match(&query_terms, record);
+        let anti_penalty = token_anti_penalty(anti, record);
+        let score = round4(
+            (0.40 * wave_score)
+                + (0.30 * suffix)
+                + (0.10 * length_fit)
+                + (0.12 * route)
+                + (0.08 * record.confidence.min(1.0))
+                - anti_penalty,
+        )
+        .max(0.0);
+        let candidate = json!({
+            "token": record.next_token,
+            "phrase": record.next_phrase,
+            "score": score,
+            "wave_score": round4(wave_score),
+            "suffix_score": round4(suffix),
+            "length_fit": round4(length_fit),
+            "route_score": round4(route),
+            "anti_penalty": round4(anti_penalty),
+            "pattern": record.pattern,
+            "triad": record.triad_id,
+            "route": record.route,
+            "group": record.group,
+            "polarity": record.polarity,
+            "support": [{
+                "triad": record.triad_id,
+                "pattern": record.pattern,
+                "prefix": record.prefix_tokens.join(" "),
+                "next": record.next_token,
+                "route": record.route,
+                "score": score
+            }]
+        });
+        by_token
+            .entry(record.next_token.clone())
+            .and_modify(|existing| {
+                if score > existing["score"].as_f64().unwrap_or(0.0) {
+                    *existing = candidate.clone();
+                } else if let Some(support) = existing["support"].as_array_mut() {
+                    support.push(candidate["support"][0].clone());
+                }
+            })
+            .or_insert(candidate);
+    }
+    by_token.into_values().collect()
+}
+
+fn token_prefix_wave(tokens: &[String]) -> Vec<i32> {
+    let mut out = vec![0i32; WAVE_DIM];
+    let weights = [100, 70, 45, 25, 15, 10];
+    for (offset, token) in tokens.iter().rev().take(weights.len()).enumerate() {
+        let phase = vector(&format!("token:{}:pos:-{}", norm(token), offset + 1));
+        let base = vector(&format!("token:{}", norm(token)));
+        for idx in 0..WAVE_DIM {
+            out[idx] += ((phase[idx] + base[idx]) * weights[offset]) / 100;
+        }
+    }
+    out
+}
+
+fn token_suffix_match(query: &[String], prefix: &[String]) -> f64 {
+    if query.is_empty() || prefix.is_empty() {
+        return 0.0;
+    }
+    let max = query.len().min(prefix.len()).min(6);
+    let mut weighted_hit = 0.0;
+    let mut total = 0.0;
+    for offset in 0..max {
+        let weight = match offset {
+            0 => 1.0,
+            1 => 0.70,
+            2 => 0.45,
+            3 => 0.25,
+            4 => 0.15,
+            _ => 0.10,
+        };
+        total += weight;
+        let q = query[query.len() - 1 - offset].as_str();
+        let p = prefix[prefix.len() - 1 - offset].as_str();
+        if norm(q) == norm(p) {
+            weighted_hit += weight;
+        }
+    }
+    if total == 0.0 {
+        0.0
+    } else {
+        weighted_hit / total
+    }
+}
+
+fn token_prefix_length_fit(query: &[String], prefix: &[String]) -> f64 {
+    if query.is_empty() || prefix.is_empty() {
+        return 0.0;
+    }
+    let delta = query.len().abs_diff(prefix.len()) as f64;
+    (1.0 - (delta * 0.18)).clamp(0.0, 1.0)
+}
+
+fn token_route_match(query_terms: &BTreeSet<String>, record: &TokenPatternRecord) -> f64 {
+    if query_terms.is_empty() {
+        return 0.0;
+    }
+    let mut route_terms = BTreeSet::new();
+    for value in [&record.route, &record.group] {
+        for term in norm(value)
+            .split(|ch: char| !ch.is_ascii_alphanumeric())
+            .filter(|term| term.len() >= 2)
+        {
+            route_terms.insert(term.to_string());
+        }
+    }
+    if route_terms.is_empty() {
+        0.0
+    } else {
+        query_terms.intersection(&route_terms).count() as f64 / route_terms.len() as f64
+    }
+}
+
+fn token_cleanup_report(
+    top_token: &str,
+    candidates: &[Value],
+    records: &[TokenPatternRecord],
+    margin: f64,
+) -> Value {
+    if top_token.is_empty() {
+        return json!({
+            "version": "v72-token-cleanup-dictionary",
+            "state": "TOKEN_CLEANUP_EMPTY",
+            "anchors": []
+        });
+    }
+    let anchors = records
+        .iter()
+        .filter(|record| record.next_token == top_token)
+        .take(5)
+        .map(|record| {
+            json!({
+                "token": record.next_token,
+                "phrase": record.next_phrase,
+                "pattern": record.pattern,
+                "triad": record.triad_id,
+                "route": record.route
+            })
+        })
+        .collect::<Vec<_>>();
+    let state = if margin < 0.015 && candidates.len() > 1 {
+        "TOKEN_CLEANUP_AMBIGUOUS"
+    } else if !anchors.is_empty() {
+        "TOKEN_CLEANUP_EXACT"
+    } else {
+        "TOKEN_CLEANUP_EMPTY"
+    };
+    json!({
+        "version": "v72-token-cleanup-dictionary",
+        "state": state,
+        "token": top_token,
+        "margin": margin,
+        "anchors": anchors,
+        "read_as": "Token cleanup maps a raw next-token peak back to known token-pattern records."
+    })
+}
+
+fn token_anti_wave_report(packet: &Packet, tokens: &[String]) -> Value {
+    let mut lanes = vec![];
+    for memory in &packet.continuation_memory {
+        if memory.decision != "reject" {
+            continue;
+        }
+        let sequence = tokenize_pattern(&format!(
+            "{} {} {}",
+            memory.subject, memory.relation, memory.object
+        ));
+        for index in 1..sequence.len() {
+            let prefix = sequence[index.saturating_sub(6)..index].to_vec();
+            let next = sequence[index].clone();
+            let match_score = token_suffix_match(tokens, &prefix);
+            if match_score >= 0.65 {
+                lanes.push(json!({
+                    "prefix": prefix.join(" "),
+                    "suppress_next": next,
+                    "route": memory.route,
+                    "match_score": round4(match_score),
+                    "penalty": memory.penalty,
+                    "source_feedback": memory.source_feedback
+                }));
+            }
+        }
+    }
+    json!({
+        "version": "v73-token-shortcut-anti-wave",
+        "state": if lanes.is_empty() { "TOKEN_ANTI_WAVE_NONE" } else { "TOKEN_ANTI_WAVE_APPLIED" },
+        "lanes": lanes,
+        "read_as": "Token anti-wave suppresses prefix-specific false next tokens without killing the whole token topic."
+    })
+}
+
+fn token_anti_penalty(anti: &Value, record: &TokenPatternRecord) -> f64 {
+    anti["lanes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|lane| lane["suppress_next"].as_str() == Some(record.next_token.as_str()))
+        .map(|lane| {
+            lane["penalty"].as_f64().unwrap_or(0.18) * lane["match_score"].as_f64().unwrap_or(1.0)
+        })
+        .fold(0.0, f64::max)
+}
+
+fn token_lens_baseline(tokens: &[String], records: &[TokenPatternRecord]) -> Value {
+    let mut by_token: BTreeMap<String, (f64, usize)> = BTreeMap::new();
+    for record in records {
+        let suffix = token_suffix_match(tokens, &record.prefix_tokens);
+        let entry = by_token
+            .entry(record.next_token.clone())
+            .or_insert((0.0, 0));
+        entry.0 = entry.0.max(suffix);
+        entry.1 += 1;
+    }
+    let mut rows = by_token
+        .into_iter()
+        .map(|(token, (suffix, count))| {
+            let frequency = count as f64 / records.len().max(1) as f64;
+            json!({
+                "token": token,
+                "score": round4((0.75 * suffix) + (0.25 * frequency)),
+                "suffix_score": round4(suffix),
+                "frequency": round4(frequency)
+            })
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    rows.truncate(5);
+    let top = rows
+        .first()
+        .and_then(|row| row["token"].as_str())
+        .unwrap_or("");
+    let top_score = rows
+        .first()
+        .and_then(|row| row["score"].as_f64())
+        .unwrap_or(0.0);
+    json!({
+        "version": "v74-token-baseline-compare",
+        "top_token": top,
+        "top_score": round4(top_score),
+        "top_k": rows,
+        "field_beats_baseline": false,
+        "baselines": ["suffix-ngram", "frequency"],
+        "read_as": "Cheap next-token baseline. Token Lens reports it explicitly before claiming resonance value."
+    })
+}
+
 fn llmwave_hot_budget_report(packet: &Packet, capacity: &Value, hot_cycle: &Value) -> Value {
     let pattern_bytes =
         (packet.triads.len() + packet.continuation_memory.len()) * PACKED_PATTERN_BYTES;
@@ -1551,6 +2005,8 @@ struct LlmwaveEvalCase {
     expected_proof_state: String,
     #[serde(default)]
     expected_demo_state: String,
+    #[serde(default)]
+    expected_next_token: String,
 }
 
 fn resolve_llmwave_suite_path(base: &Path, path: &Path) -> PathBuf {

@@ -2414,6 +2414,7 @@ pub(crate) enum LlmwaveLensKind {
     Pattern,
     Polarity,
     Cleanup,
+    Token,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

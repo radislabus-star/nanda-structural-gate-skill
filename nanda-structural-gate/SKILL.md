@@ -124,7 +124,9 @@ scripts/nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 scripts/nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --train
 scripts/nanda-llmwave .nanda/index.json --input-format json --text "declaration requires protocols" --lens polarity
+scripts/nanda-llmwave .nanda/index.json --input-format json --text "customs declaration requires" --lens token
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
+scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
 scripts/nanda-demo --from-text examples/demo-task.raw.txt --task-id demo-raw --domain certification --text "declaration requires protocols"
 scripts/nanda-demo --suite examples/demo-corpus.json --format json
@@ -145,6 +147,7 @@ scripts/nanda-waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | scripts/nanda-serve
 printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json"}\n' | scripts/nanda-serve
 printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json","response":"compact"}\n' | scripts/nanda-serve
+printf '{"command":"llmwave_token","input":"examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n' | scripts/nanda-serve
 scripts/nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
 scripts/nanda-doctor
 scripts/nanda-dogfood .
@@ -314,8 +317,12 @@ proof summary -> public demo packet. Use `nanda-llmwave-eval --suite
 examples/llmwave-corpus.json` before claiming LLMWave proof behavior.
 Inspect `llmwave_contract` after `nanda-llmwave`. It is the v67 Field + Lens
 contract: the shared field is read through `--lens pattern`, `--lens polarity`,
-or `--lens cleanup`. Treat `LLMWAVE_LENS_READY` as a usable structural readout;
-treat `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.
+`--lens cleanup`, or `--lens token`. Token Lens is the v68-v75 next-token path:
+token-pattern records, position-phase prefix waves, next-token resonance, token
+cleanup, shortcut-specific token anti-wave, token eval corpus, and compact
+`nanda-serve` `llmwave_token` responses. Treat `LLMWAVE_LENS_READY` as a usable
+structural readout; treat `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as
+unresolved.
 Use `nanda-demo` when a human or another agent needs the short weak-spot view:
 state, input, top pattern, proof state, compact signals, weak spots, safe
 claim, and boundary. If you do not yet have a packet but you have relation

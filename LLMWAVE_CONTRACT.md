@@ -128,9 +128,44 @@ Trust:
 - `AMBIGUOUS` is WATCH;
 - `EMPTY` means the field found no cleanup anchor.
 
+### Token Lens
+
+Purpose: read the next token or short phrase from the same field.
+
+Input:
+
+```text
+text prefix
+```
+
+Output:
+
+```text
+top-k next tokens and phrases
+```
+
+The first implementation uses:
+
+- `TokenPatternRecord` built from known triads;
+- deterministic token waves;
+- relative position phase for the last prefix tokens;
+- next-token resonance over token-pattern records;
+- token cleanup dictionary;
+- shortcut-specific token anti-wave;
+- suffix/frequency baseline comparison.
+
+Trust:
+
+- `TOKEN_LENS_READY` means the top token has cleanup support and enough margin;
+- `TOKEN_LENS_CONTESTED` means the top token is plausible but too close to a
+  rival;
+- `TOKEN_LENS_REVIEW` means token readout exists but full structural proof is
+  not ready;
+- anti-wave may suppress one false prefix+next shape without killing the token
+  topic.
+
 ### Future Lenses
 
-- Token Lens: next token/phrase readout.
 - Role Lens: subject/object/action/attribute readout.
 - Position Lens: ordering and distance readout.
 - Energy Lens: basin stability and route jumps.
@@ -187,7 +222,8 @@ Minimum lenses:
 
 - Pattern Lens;
 - Polarity Lens;
-- Cleanup Lens.
+- Cleanup Lens;
+- Token Lens.
 
 Minimum baselines:
 

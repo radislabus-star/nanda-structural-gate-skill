@@ -261,7 +261,9 @@ nanda-pattern-eval --suite examples/pattern-learning-corpus.json
 nanda-pattern-bank .nanda/index.json --input-format json --mode inspect
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --train
 nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols" --lens polarity
+nanda-llmwave examples/triad-packet.interference-search-route-trap.json --input-format json --text "customs declaration requires" --lens token
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
+nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
 nanda-demo --from-text examples/demo-task.raw.txt --task-id demo-raw --domain certification --text "declaration requires protocols"
 nanda-demo --suite examples/demo-corpus.json --format json
@@ -279,6 +281,7 @@ nanda-eval --suite examples/eval-corpus.json
 printf '{"command":"doctor"}\n' | nanda-serve
 printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json"}\n' | nanda-serve
 printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json","response":"compact"}\n' | nanda-serve
+printf '{"command":"llmwave_token","input":"examples/triad-packet.interference-search-route-trap.json","text":"customs declaration requires"}\n' | nanda-serve
 nanda-doctor
 nanda-dogfood .
 nanda-map-code src/main.rs
@@ -418,8 +421,11 @@ a cleanup-memory bank. `nanda-llmwave` reports v47 HRR binding, v48 cleanup,
 v49 attractor energy, v50 capacity, v51 anti-wave audit, v54 packed HRR,
 v55 cleanup thresholds, v56 anti-wave locality, v57 capacity baseline,
 v58 hot-cycle readiness, v59 proof summary, the v60 public demo packet, and
-the v67 `llmwave_contract` Field + Lens readout. Use `--lens pattern`,
-`--lens polarity`, or `--lens cleanup` to inspect the active lens. Treat
+the v67 `llmwave_contract` Field + Lens readout. v68-v75 add Token Lens:
+token-pattern records, position-phase prefix waves, next-token resonance,
+token cleanup, shortcut-specific token anti-wave, and a token eval corpus. Use
+`--lens pattern`, `--lens polarity`, `--lens cleanup`, or `--lens token` to
+inspect the active lens. Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.

@@ -258,6 +258,7 @@ pub(crate) fn serve_jsonl() -> Result<u8> {
 pub(crate) struct ServeState {
     focus_cache: HashMap<PathBuf, (focus::FocusBuild, Value)>,
     proof_cache: HashMap<ServeProofKey, Value>,
+    token_cache: HashMap<ServeTokenKey, Value>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -266,6 +267,13 @@ struct ServeProofKey {
     top_k: usize,
     group_by: String,
     sample: usize,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ServeTokenKey {
+    source: String,
+    text: String,
+    top_k: usize,
 }
 
 pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result<Value> {
@@ -391,8 +399,66 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
                 Ok(proof)
             }
         }
+        "llmwave_token" | "llmwave-token" => {
+            let text = request["text"].as_str().unwrap_or("");
+            let top_k = request["top_k"].as_u64().unwrap_or(5) as usize;
+            let (packet, source) = if let Some(packet_value) = request.get("packet") {
+                let packet: Packet = serde_json::from_value(packet_value.clone())?;
+                (packet, serve_packet_hash(packet_value)?)
+            } else {
+                let input = request["input"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("llmwave_token request requires packet or input"))?;
+                let task_id = request["task_id"].as_str().unwrap_or("serve-llmwave-token");
+                let domain = request["domain"].as_str().unwrap_or("general");
+                let normalize_paths = request["normalize_paths"].as_bool().unwrap_or(false);
+                let packet = load_packet_auto(
+                    Path::new(input),
+                    &InputFormat::Auto,
+                    task_id,
+                    domain,
+                    text,
+                    normalize_paths,
+                )?;
+                (
+                    packet,
+                    serve_manifest_key(Path::new(input))?.display().to_string(),
+                )
+            };
+            let key = ServeTokenKey {
+                source,
+                text: text.to_string(),
+                top_k,
+            };
+            if let Some(cached) = state.token_cache.get(&key) {
+                let mut out = cached.clone();
+                out["serve_cache"] = json!({
+                    "enabled": true,
+                    "state": "SERVE_TOKEN_HIT"
+                });
+                return Ok(out);
+            }
+            let mut out = llmwave_token_compact_report(&packet, text, top_k);
+            state.token_cache.insert(key, out.clone());
+            out["serve_cache"] = json!({
+                "enabled": true,
+                "state": "SERVE_TOKEN_WARMED"
+            });
+            Ok(out)
+        }
         other => Err(anyhow!("unsupported serve command: {other}")),
     }
+}
+
+fn serve_packet_hash(packet: &Value) -> Result<String> {
+    let mut hasher = Sha256::new();
+    hasher.update(serde_json::to_vec(packet)?);
+    Ok(hasher
+        .finalize()
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>())
 }
 
 fn serve_compact_proof_response(proof: &Value, serve_cache: Value, key: &ServeProofKey) -> Value {

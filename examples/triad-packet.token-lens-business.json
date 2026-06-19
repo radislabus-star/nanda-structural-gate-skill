@@ -1,0 +1,81 @@
+{
+  "task_id": "token-lens-business",
+  "domain": "business",
+  "query": "supplier buyer invoice payment",
+  "triads": [
+    {
+      "id": "b1",
+      "subject": "supplier",
+      "relation": "issues",
+      "object": "invoice",
+      "evidence": "token-lens-business:1",
+      "confidence": 0.95,
+      "subject_role": "seller",
+      "object_role": "document",
+      "route": "invoice",
+      "group": "invoice-flow"
+    },
+    {
+      "id": "b2",
+      "subject": "invoice",
+      "relation": "requests",
+      "object": "payment",
+      "evidence": "token-lens-business:2",
+      "confidence": 0.9,
+      "subject_role": "document",
+      "object_role": "money",
+      "route": "invoice",
+      "group": "invoice-flow"
+    },
+    {
+      "id": "b3",
+      "subject": "buyer",
+      "relation": "pays",
+      "object": "supplier",
+      "evidence": "token-lens-business:3",
+      "confidence": 0.95,
+      "subject_role": "buyer",
+      "object_role": "seller",
+      "route": "payment",
+      "group": "payment-flow"
+    },
+    {
+      "id": "b4",
+      "subject": "supplier",
+      "relation": "ships",
+      "object": "equipment",
+      "evidence": "token-lens-business:4",
+      "confidence": 0.9,
+      "subject_role": "seller",
+      "object_role": "goods",
+      "route": "delivery",
+      "group": "delivery-flow"
+    },
+    {
+      "id": "b5",
+      "subject": "buyer",
+      "relation": "receives",
+      "object": "equipment",
+      "evidence": "token-lens-business:5",
+      "confidence": 0.9,
+      "subject_role": "buyer",
+      "object_role": "goods",
+      "route": "delivery",
+      "group": "delivery-flow"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "q1",
+      "subject": "supplier",
+      "relation": "issues",
+      "object": "invoice",
+      "evidence": "query",
+      "confidence": 1.0,
+      "subject_role": "seller",
+      "object_role": "document",
+      "route": "",
+      "group": "query"
+    }
+  ]
+}
