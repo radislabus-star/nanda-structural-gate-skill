@@ -142,6 +142,7 @@ scripts/nanda-index memory.json .nanda/accept.json --out .nanda/index-with-posit
 scripts/nanda-eval --suite examples/eval-corpus.json
 scripts/nanda-waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | scripts/nanda-serve
+printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json"}\n' | scripts/nanda-serve
 scripts/nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
 scripts/nanda-doctor
 scripts/nanda-dogfood .
@@ -345,7 +346,10 @@ states. Treat `FIELD_CONTESTED`, `FIELD_THIN`, and `FIELD_NOISY` as retrieval
 hints only. Treat `FIELD_REVERSED` as a hard stop.
 Use `nanda-serve` when several checks/searches will run in one agent turn. It
 keeps one process alive and accepts JSONL requests, avoiding per-call process
-startup overhead.
+startup overhead. Use `{"command":"proof_cache_only","manifest":"..."}` for
+v66 cache-only proof inside the already-running server; repeated manifest
+requests reuse the in-process focused packet and repeated proof result, then
+report `serve_cache.state`.
 Use `nanda-feedback` after search when the agent has decided whether the peak
 was useful. It writes an accept/reject/WATCH memory trace that can be kept next
 to the task index. Reject feedback emits `negative_shortcuts`; accept feedback

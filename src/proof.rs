@@ -193,7 +193,7 @@ fn run_proof_once(
     ))
 }
 
-fn run_cache_only_proof(
+pub(crate) fn run_cache_only_proof(
     cache_path: &Path,
     top_k: usize,
     group_by: &PeakGroupBy,
@@ -201,6 +201,24 @@ fn run_cache_only_proof(
     include_focused_packet: bool,
 ) -> Result<Value> {
     let (focus_build, cache_report) = focus_cache::load_focus_cache_manifest(cache_path)?;
+    run_cache_only_proof_from_focus(
+        &focus_build,
+        cache_report,
+        top_k,
+        group_by,
+        sample,
+        include_focused_packet,
+    )
+}
+
+pub(crate) fn run_cache_only_proof_from_focus(
+    focus_build: &focus::FocusBuild,
+    cache_report: Value,
+    top_k: usize,
+    group_by: &PeakGroupBy,
+    sample: usize,
+    include_focused_packet: bool,
+) -> Result<Value> {
     let focused_source = normalize_ids(focus_build.packet.triads.clone(), "m");
     let focused_query = normalize_ids(focus_build.packet.candidate_triads.clone(), "q");
     let query_source = focus_build.metadata["query_source"]
@@ -228,7 +246,7 @@ fn run_cache_only_proof(
         original_memory_size,
         "cache-only-focused",
         corpus,
-        focus_build.metadata,
+        focus_build.metadata.clone(),
         budget,
         pack,
         raw_search,

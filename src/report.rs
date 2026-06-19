@@ -1,5 +1,8 @@
 use crate::*;
+use std::collections::HashMap;
 use std::io;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 pub(crate) fn make_report(
     packet: &Packet,
@@ -232,13 +235,17 @@ pub(crate) fn serve_cmd(args: ServeArgs) -> Result<u8> {
 
 pub(crate) fn serve_jsonl() -> Result<u8> {
     let stdin = io::stdin();
+    let mut state = ServeState::default();
     for line in stdin.lock().lines() {
         let line = line?;
         if line.trim().is_empty() {
             continue;
         }
-        let response = match handle_serve_request(&line) {
-            Ok(result) => json!({"ok": true, "result": result}),
+        let started = Instant::now();
+        let response = match handle_serve_request(&line, &mut state) {
+            Ok(result) => {
+                json!({"ok": true, "elapsed_ms": started.elapsed().as_secs_f64() * 1000.0, "result": result})
+            }
             Err(err) => json!({"ok": false, "error": format!("{err:#}")}),
         };
         println!("{}", serde_json::to_string(&response)?);
@@ -246,7 +253,21 @@ pub(crate) fn serve_jsonl() -> Result<u8> {
     Ok(EXIT_PASS)
 }
 
-pub(crate) fn handle_serve_request(line: &str) -> Result<Value> {
+#[derive(Default)]
+pub(crate) struct ServeState {
+    focus_cache: HashMap<PathBuf, (focus::FocusBuild, Value)>,
+    proof_cache: HashMap<ServeProofKey, Value>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ServeProofKey {
+    manifest: PathBuf,
+    top_k: usize,
+    group_by: String,
+    sample: usize,
+}
+
+pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result<Value> {
     let request: Value = serde_json::from_str(line).context("parse serve request JSON")?;
     let command = request["command"]
         .as_str()
@@ -301,8 +322,84 @@ pub(crate) fn handle_serve_request(line: &str) -> Result<Value> {
                 route_cap,
             ))
         }
+        "proof_cache_only" | "proof-cache-only" => {
+            let manifest = request["manifest"]
+                .as_str()
+                .or_else(|| request["cache_only"].as_str())
+                .ok_or_else(|| anyhow!("proof_cache_only request requires manifest"))?;
+            let top_k = request["top_k"].as_u64().unwrap_or(5) as usize;
+            let sample = request["sample"].as_u64().unwrap_or(8) as usize;
+            let group_by = match request["group_by"].as_str().unwrap_or("route") {
+                "group" => PeakGroupBy::Group,
+                "route" => PeakGroupBy::Route,
+                other => return Err(anyhow!("unsupported group_by: {other}")),
+            };
+            let group_by_name = match group_by {
+                PeakGroupBy::Group => "group",
+                PeakGroupBy::Route => "route",
+            };
+            let manifest_path = PathBuf::from(manifest);
+            let manifest_key = serve_manifest_key(manifest_path.as_path())?;
+            let proof_key = ServeProofKey {
+                manifest: manifest_key.clone(),
+                top_k,
+                group_by: group_by_name.to_string(),
+                sample,
+            };
+            if let Some(cached) = state.proof_cache.get(&proof_key) {
+                let mut proof = cached.clone();
+                proof["serve_cache"] = json!({
+                    "enabled": true,
+                    "state": "SERVE_PROOF_HIT"
+                });
+                return Ok(proof);
+            }
+            let ((focus_build, cache_report), cache_hit) =
+                load_serve_focus_cache(state, &manifest_key, manifest_path.as_path())?;
+            let mut proof = proof::run_cache_only_proof_from_focus(
+                focus_build,
+                cache_report.clone(),
+                top_k,
+                &group_by,
+                sample,
+                false,
+            )?;
+            state.proof_cache.insert(proof_key, proof.clone());
+            proof["serve_cache"] = json!({
+                "enabled": true,
+                "state": if cache_hit { "SERVE_MEMORY_HIT" } else { "SERVE_MEMORY_WARMED" }
+            });
+            Ok(proof)
+        }
         other => Err(anyhow!("unsupported serve command: {other}")),
     }
+}
+
+fn serve_manifest_key(manifest: &Path) -> Result<PathBuf> {
+    if manifest.is_file() {
+        manifest
+            .canonicalize()
+            .with_context(|| format!("canonicalize {}", manifest.display()))
+    } else {
+        Ok(manifest.to_path_buf())
+    }
+}
+
+fn load_serve_focus_cache<'a>(
+    state: &'a mut ServeState,
+    key: &Path,
+    manifest: &Path,
+) -> Result<(&'a (focus::FocusBuild, Value), bool)> {
+    let cache_hit = state.focus_cache.contains_key(key);
+    if !cache_hit {
+        let loaded = focus_cache::load_focus_cache_manifest(manifest)?;
+        state.focus_cache.insert(key.to_path_buf(), loaded);
+    }
+    let record = state
+        .focus_cache
+        .get(key)
+        .ok_or_else(|| anyhow!("serve focus cache did not retain {}", key.display()))?;
+    Ok((record, cache_hit))
 }
 
 pub(crate) fn doctor_cmd(args: DoctorArgs) -> Result<u8> {

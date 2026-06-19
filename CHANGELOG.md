@@ -4,6 +4,11 @@
 
 ### Changed
 
+- v66 adds a long-running server request,
+  `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
+  without per-query process startup. The server keeps focused cache packets in
+  memory after the first request, reuses repeated proof results, and reports
+  `serve_cache.state`.
 - `nanda --version` now reports package version plus core version, engine id,
   NANDA-6M runtime version, and wave dimension.
 - v65 adds cache-only proof: `nanda-cache list` shows available focused

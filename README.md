@@ -276,6 +276,7 @@ nanda-feedback .nanda/search.json --decision accept --note "accepted focused pea
 nanda-eval --case examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED --case examples/triad-packet.interference-search-noisy.json:certification:WATCH
 nanda-eval --suite examples/eval-corpus.json
 printf '{"command":"doctor"}\n' | nanda-serve
+printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json"}\n' | nanda-serve
 nanda-doctor
 nanda-dogfood .
 nanda-map-code src/main.rs
@@ -526,7 +527,11 @@ nanda-bench6m --mode hot-cycle --support-build-iterations 1000 --lane-sweep-widt
 ```
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
-or `{"command":"search","packet":...}`.
+`{"command":"search","packet":...}`, or
+`{"command":"proof_cache_only","manifest":"..."}`. For cache-only proof, the
+server keeps the focused packet in process memory after the first request and
+reuses repeated proof results for the same manifest/options. Inspect
+`serve_cache.state`.
 `nanda-feedback` is the feedback-memory surface. It records whether a search
 peak or decoded continuation was accepted, rejected, or kept under WATCH,
 together with margin, support ids, anti ids, and a compact memory patch. Reject
