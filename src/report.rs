@@ -260,6 +260,7 @@ pub(crate) struct ServeState {
     proof_cache: HashMap<ServeProofKey, Value>,
     token_cache: HashMap<ServeTokenKey, Value>,
     chat_cache: HashMap<ServeChatKey, Value>,
+    answer_cache: HashMap<ServeAnswerKey, Value>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -285,6 +286,15 @@ struct ServeChatKey {
     top_k: usize,
     beam_width: usize,
     temperature_milli: i64,
+    language: String,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ServeAnswerKey {
+    source: String,
+    prompt: String,
+    facts: usize,
+    top_k: usize,
     language: String,
 }
 
@@ -513,6 +523,52 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
             out["serve_cache"] = json!({
                 "enabled": true,
                 "state": "SERVE_CHAT_WARMED"
+            });
+            Ok(out)
+        }
+        "llmwave_answer" | "llmwave-answer" => {
+            let prompt = request["prompt"].as_str().unwrap_or("");
+            let facts = request["facts"].as_u64().unwrap_or(5) as usize;
+            let top_k = request["top_k"].as_u64().unwrap_or(3) as usize;
+            let language = request["language"].as_str().unwrap_or("en");
+            let (memory, source) = if let Some(memory_value) = request.get("memory_packet") {
+                (memory_value.clone(), serve_packet_hash(memory_value)?)
+            } else if let Some(memory_value) =
+                request.get("memory").filter(|value| value.is_object())
+            {
+                (memory_value.clone(), serve_packet_hash(memory_value)?)
+            } else {
+                let input = request["memory"]
+                    .as_str()
+                    .or_else(|| request["input"].as_str())
+                    .ok_or_else(|| {
+                        anyhow!("llmwave_answer request requires memory, memory_packet, or input")
+                    })?;
+                (
+                    llmwave_memory_load(Path::new(input))?,
+                    serve_manifest_key(Path::new(input))?.display().to_string(),
+                )
+            };
+            let key = ServeAnswerKey {
+                source,
+                prompt: prompt.to_string(),
+                facts,
+                top_k,
+                language: language.to_string(),
+            };
+            if let Some(cached) = state.answer_cache.get(&key) {
+                let mut out = cached.clone();
+                out["serve_cache"] = json!({
+                    "enabled": true,
+                    "state": "SERVE_ANSWER_HIT"
+                });
+                return Ok(out);
+            }
+            let mut out = llmwave_memory_answer_report(&memory, prompt, facts, top_k, language);
+            state.answer_cache.insert(key, out.clone());
+            out["serve_cache"] = json!({
+                "enabled": true,
+                "state": "SERVE_ANSWER_WARMED"
             });
             Ok(out)
         }

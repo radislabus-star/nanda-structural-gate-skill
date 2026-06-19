@@ -133,6 +133,7 @@ Commands:
 - `nanda-llmwave-memory unpack memory.llmw.bin`;
 - `nanda-llmwave-memory generate --beam-width N --temperature T`;
 - `nanda-llmwave-memory chat --prompt ...`;
+- `nanda-llmwave-memory answer --prompt ... --facts N`;
 - `nanda-llmwave-memory train corpus.txt`;
 - `nanda-llmwave-memory grow memory.json packet.json`;
 - `nanda-llmwave-memory correct --reject-token ... --accept-token ...`;
@@ -153,6 +154,19 @@ v110-v114 define the first chat-safe path:
 - `nanda-serve` supports cached `llmwave_chat` requests;
 - `v114-public-demo-script` trains a tiny corpus, runs chat, applies feedback
   lanes, and validates packed memory.
+
+v115-v119 add Answer Core. `retrieve` is next-token resonance, `generate` is
+recurrent continuation, `chat` is prompt-to-continuation, and `answer` is a
+grounded response assembled from memory records. Answer output must expose:
+
+- `state`: `ANSWER_READY`, `ANSWER_EMPTY`, or `ANSWER_CONTESTED`;
+- `safe_to_answer`;
+- selected prompt prefix;
+- grounding facts;
+- safe and suppressed beams;
+- review reasons.
+
+The QA eval corpus checks answer behavior directly, not only continuation text.
 
 ## Lenses
 

@@ -569,6 +569,7 @@ enum LlmwaveMemoryCommand {
     Decay(LlmwaveMemoryDecayArgs),
     Generate(LlmwaveMemoryGenerateArgs),
     Chat(LlmwaveMemoryChatArgs),
+    Answer(LlmwaveMemoryAnswerArgs),
     Train(LlmwaveMemoryTrainArgs),
     Grow(LlmwaveMemoryGrowArgs),
     Eval(LlmwaveMemoryEvalArgs),
@@ -707,6 +708,21 @@ struct LlmwaveMemoryChatArgs {
     beam_width: usize,
     #[arg(long, default_value_t = 0.0)]
     temperature: f64,
+    #[arg(long, default_value = "en")]
+    language: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryAnswerArgs {
+    memory: PathBuf,
+    #[arg(long, default_value = "")]
+    prompt: String,
+    #[arg(long, default_value_t = 5)]
+    facts: usize,
+    #[arg(long, default_value_t = 3)]
+    top_k: usize,
     #[arg(long, default_value = "en")]
     language: String,
     #[arg(long, value_enum, default_value = "json")]

@@ -66,8 +66,37 @@
       "expected_top_token": "payment",
       "expected_state": "MEMORY_RETRIEVE_READY",
       "expected_generated_contains": "payment",
+      "expected_answer_state": "ANSWER_READY",
+      "expected_answer_contains": "customs declaration requires payment confirmation",
       "expected_memory_version": "v101-training-from-text",
       "steps": 2
+    },
+    {
+      "id": "qa-who-issues-invoice",
+      "train_text_path": "llmwave-tiny-corpus.txt",
+      "prompt": "who issues invoice?",
+      "expected_answer_state": "ANSWER_READY",
+      "expected_answer_contains": "supplier issues invoice",
+      "expected_memory_version": "v101-training-from-text",
+      "facts": 3
+    },
+    {
+      "id": "qa-what-supports-declaration",
+      "train_text_path": "llmwave-tiny-corpus.txt",
+      "prompt": "what supports customs declaration?",
+      "expected_answer_state": "ANSWER_READY",
+      "expected_answer_contains": "payment confirmation supports customs declaration",
+      "expected_memory_version": "v101-training-from-text",
+      "facts": 3
+    },
+    {
+      "id": "qa-who-pays-supplier",
+      "train_text_path": "llmwave-tiny-corpus.txt",
+      "prompt": "who pays supplier?",
+      "expected_answer_state": "ANSWER_READY",
+      "expected_answer_contains": "buyer pays supplier",
+      "expected_memory_version": "v101-training-from-text",
+      "facts": 3
     }
   ]
 }

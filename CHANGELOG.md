@@ -37,6 +37,9 @@
 - v110-v114 add the first chat-safe LLMWave memory loop: prompt adapter,
   semantic guard, multi-step coherence, cached `nanda-serve` `llmwave_chat`,
   and a public tiny-corpus memory demo.
+- v115-v119 add LLMWave Answer Core: `answer` CLI, grounded multi-fact
+  evidence, explicit answer review states, cached `nanda-serve`
+  `llmwave_answer`, and QA eval cases for natural questions.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in
