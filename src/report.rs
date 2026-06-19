@@ -1,4 +1,5 @@
 use crate::*;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -329,6 +330,9 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
                 .ok_or_else(|| anyhow!("proof_cache_only request requires manifest"))?;
             let top_k = request["top_k"].as_u64().unwrap_or(5) as usize;
             let sample = request["sample"].as_u64().unwrap_or(8) as usize;
+            let compact = request["compact"].as_bool().unwrap_or(false)
+                || request["response"].as_str() == Some("compact")
+                || request["format"].as_str() == Some("compact");
             let group_by = match request["group_by"].as_str().unwrap_or("route") {
                 "group" => PeakGroupBy::Group,
                 "route" => PeakGroupBy::Route,
@@ -347,11 +351,19 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
                 sample,
             };
             if let Some(cached) = state.proof_cache.get(&proof_key) {
-                let mut proof = cached.clone();
-                proof["serve_cache"] = json!({
+                let serve_cache = json!({
                     "enabled": true,
                     "state": "SERVE_PROOF_HIT"
                 });
+                if compact {
+                    return Ok(serve_compact_proof_response(
+                        cached,
+                        serve_cache,
+                        &proof_key,
+                    ));
+                }
+                let mut proof = cached.clone();
+                proof["serve_cache"] = serve_cache;
                 return Ok(proof);
             }
             let ((focus_build, cache_report), cache_hit) =
@@ -364,15 +376,66 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
                 sample,
                 false,
             )?;
-            state.proof_cache.insert(proof_key, proof.clone());
+            state.proof_cache.insert(proof_key.clone(), proof.clone());
             proof["serve_cache"] = json!({
                 "enabled": true,
                 "state": if cache_hit { "SERVE_MEMORY_HIT" } else { "SERVE_MEMORY_WARMED" }
             });
-            Ok(proof)
+            if compact {
+                Ok(serve_compact_proof_response(
+                    &proof,
+                    proof["serve_cache"].clone(),
+                    &proof_key,
+                ))
+            } else {
+                Ok(proof)
+            }
         }
         other => Err(anyhow!("unsupported serve command: {other}")),
     }
+}
+
+fn serve_compact_proof_response(proof: &Value, serve_cache: Value, key: &ServeProofKey) -> Value {
+    json!({
+        "mode": "proof-cache-only-compact",
+        "proof_id": serve_proof_id(key),
+        "proof_state": proof["proof_state"],
+        "verdict": proof["verdict"],
+        "safe_to_answer": proof["safe_to_answer"],
+        "answer_ready": proof["answer_ready"],
+        "top_peak": proof["top_peak"],
+        "field_state": proof["field_state"],
+        "proof_confidence": proof["proof_confidence"],
+        "reason_codes": proof["reason_codes"],
+        "proof_mode": proof["proof_mode"],
+        "proof_compare_state": proof["proof_compare"]["state"],
+        "focus_cache": {
+            "state": proof["focus_cache"]["state"],
+            "key": proof["focus_cache"]["key"]
+        },
+        "serve_cache": serve_cache,
+        "runtime_contract": {
+            "state": proof["runtime_contract"]["state"],
+            "focus_state": proof["runtime_contract"]["focus"]["state"]
+        },
+        "focused_memory_size": proof["focused_memory_size"],
+        "focused_query_size": proof["focused_query_size"],
+        "read_as": "Compact serve proof response. Use full response only when support, anti-support, or diagnostics are needed."
+    })
+}
+
+fn serve_proof_id(key: &ServeProofKey) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(key.manifest.to_string_lossy().as_bytes());
+    hasher.update(key.top_k.to_le_bytes());
+    hasher.update(key.group_by.as_bytes());
+    hasher.update(key.sample.to_le_bytes());
+    hasher
+        .finalize()
+        .iter()
+        .take(8)
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>()
 }
 
 fn serve_manifest_key(manifest: &Path) -> Result<PathBuf> {

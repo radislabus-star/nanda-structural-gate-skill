@@ -143,6 +143,7 @@ scripts/nanda-eval --suite examples/eval-corpus.json
 scripts/nanda-waw --suite examples/waw-corpus.json
 printf '{"command":"doctor"}\n' | scripts/nanda-serve
 printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json"}\n' | scripts/nanda-serve
+printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json","response":"compact"}\n' | scripts/nanda-serve
 scripts/nanda-eval --case route-trap.json:certification:FOCUSED --case noisy.json:certification:WATCH
 scripts/nanda-doctor
 scripts/nanda-dogfood .
@@ -349,7 +350,8 @@ keeps one process alive and accepts JSONL requests, avoiding per-call process
 startup overhead. Use `{"command":"proof_cache_only","manifest":"..."}` for
 v66 cache-only proof inside the already-running server; repeated manifest
 requests reuse the in-process focused packet and repeated proof result, then
-report `serve_cache.state`.
+report `serve_cache.state`. Prefer `response:"compact"` when only verdict,
+top peak, confidence, reason codes, and cache state are needed.
 Use `nanda-feedback` after search when the agent has decided whether the peak
 was useful. It writes an accept/reject/WATCH memory trace that can be kept next
 to the task index. Reject feedback emits `negative_shortcuts`; accept feedback

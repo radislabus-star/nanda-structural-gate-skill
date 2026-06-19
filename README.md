@@ -277,6 +277,7 @@ nanda-eval --case examples/triad-packet.interference-search-route-trap.json:cert
 nanda-eval --suite examples/eval-corpus.json
 printf '{"command":"doctor"}\n' | nanda-serve
 printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json"}\n' | nanda-serve
+printf '{"command":"proof_cache_only","manifest":".nanda/cache/<key>.manifest.json","response":"compact"}\n' | nanda-serve
 nanda-doctor
 nanda-dogfood .
 nanda-map-code src/main.rs
@@ -531,7 +532,8 @@ requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 `{"command":"proof_cache_only","manifest":"..."}`. For cache-only proof, the
 server keeps the focused packet in process memory after the first request and
 reuses repeated proof results for the same manifest/options. Inspect
-`serve_cache.state`.
+`serve_cache.state`. Use `response:"compact"` when the agent only needs the
+verdict, peak, confidence, reason codes, and cache state.
 `nanda-feedback` is the feedback-memory surface. It records whether a search
 peak or decoded continuation was accepted, rejected, or kept under WATCH,
 together with margin, support ids, anti ids, and a compact memory patch. Reject
