@@ -107,6 +107,17 @@ Status: started.
 - `nanda-feedback` accepts decoder output and emits `continuation_memory`.
 - `nanda-index` merges continuation memory, and `nanda-decode` applies it as a
   local training signal before recurrent selection.
-- Next milestone is a compact pattern store: continuation memory should become
-  packable into the NANDA-6M hot contract rather than remaining only JSON-side
-  decoder metadata.
+- v35 compact pattern store: each continuation memory record can be represented
+  as a 32-byte packed pattern signature.
+- v36 pattern replay: decode applies the compact store before recurrent
+  selection.
+- v37 capacity: `nanda-pattern-capacity` shows 1k, 4k, 16k and 64k learned
+  pattern pressure.
+- v38 negative continuation lanes: rejects suppress only the local false
+  continuation signature, not the whole route.
+- v39 mini-loop: `nanda-llmwave` runs raw text -> encode -> decode ->
+  feedback preview.
+- v40 NANDA-6M pattern runtime: budget/pack reports include the compact pattern
+  arena contract.
+- Next milestone is making pattern replay participate earlier in the packed
+  hot cycle, not only in cold decode ranking.

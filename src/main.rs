@@ -22,6 +22,7 @@ mod map_gate;
 mod model;
 mod nanda_6m;
 mod pack6m;
+mod pattern_store;
 mod proof;
 mod report;
 mod search;
@@ -35,12 +36,13 @@ pub(crate) use feedback::*;
 pub(crate) use io::*;
 pub(crate) use map_gate::*;
 pub(crate) use model::*;
+pub(crate) use pattern_store::*;
 pub(crate) use report::*;
 pub(crate) use search::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v3.9-continuation-training";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v3.9-rust";
+const CORE_VERSION: &str = "sparse-triad-v4.0-llmwave-runtime";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v4.0-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -73,6 +75,9 @@ enum Command {
     Encode(EncodeArgs),
     Decode(DecodeArgs),
     DecodeEval(DecodeEvalArgs),
+    PatternStore(PatternStoreArgs),
+    PatternCapacity(PatternCapacityArgs),
+    Llmwave(LlmwaveArgs),
     Focus(FocusArgs),
     Proof(ProofArgs),
     Probe(ProbeArgs),
@@ -368,6 +373,72 @@ struct DecodeEvalArgs {
     route_triad_cap: usize,
     #[arg(long, value_enum, default_value = "route")]
     group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct PatternStoreArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "pattern-store")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long, default_value_t = 8)]
+    sample: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+    #[arg(long)]
+    normalize_paths: bool,
+}
+
+#[derive(Parser)]
+struct PatternCapacityArgs {
+    #[arg(long = "count")]
+    counts: Vec<usize>,
+    #[arg(long, default_value_t = 8)]
+    query_patterns: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveArgs {
+    input: PathBuf,
+    #[arg(long, value_enum, default_value = "auto")]
+    input_format: InputFormat,
+    #[arg(long, default_value = "llmwave")]
+    task_id: String,
+    #[arg(long, default_value = "general")]
+    domain: String,
+    #[arg(long, default_value = "")]
+    text: String,
+    #[arg(long)]
+    text_file: Option<PathBuf>,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, default_value_t = 1)]
+    steps: usize,
+    #[arg(long, default_value_t = 8)]
+    search_top_k: usize,
+    #[arg(long, default_value_t = 256)]
+    route_cap: usize,
+    #[arg(long, default_value_t = 32)]
+    route_triad_cap: usize,
+    #[arg(long, value_enum, default_value = "route")]
+    group_by: PeakGroupBy,
+    #[arg(long)]
+    train: bool,
+    #[arg(long, value_enum, default_value = "accept")]
+    decision: FeedbackDecision,
+    #[arg(long, default_value = "")]
+    note: String,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]
@@ -712,6 +783,9 @@ fn run() -> Result<u8> {
         Command::Encode(args) => encode_cmd(args),
         Command::Decode(args) => decode_cmd(args),
         Command::DecodeEval(args) => decode_eval_cmd(args),
+        Command::PatternStore(args) => pattern_store_cmd(args),
+        Command::PatternCapacity(args) => pattern_capacity_cmd(args),
+        Command::Llmwave(args) => llmwave_cmd(args),
         Command::Focus(args) => focus::focus_cmd(args),
         Command::Proof(args) => proof::proof_cmd(args),
         Command::Probe(args) => probe_cmd(args),

@@ -88,12 +88,19 @@
 - v34 adds continuation training: `nanda-feedback` can now accept decode
   output, `nanda-index` merges `continuation_memory`, and `nanda-decode`
   reinforces accepted continuations or suppresses rejected ones.
-- Core version is now `sparse-triad-v3.9-continuation-training`.
+- v35 adds a compact 32-byte pattern store for continuation memory.
+- v36 replays the compact pattern store during decode ranking.
+- v37 adds `nanda-pattern-capacity` for 1k/4k/16k/64k learned-pattern checks.
+- v38 makes rejected continuations shortcut-specific negative lanes.
+- v39 adds `nanda-llmwave`, a raw text -> encode -> decode -> feedback-preview
+  mini-loop.
+- v40 reports the NANDA-6M pattern runtime contract in budget/pack outputs.
+- Core version is now `sparse-triad-v4.0-llmwave-runtime`.
 - Added an explicit heavy 16k finance fixture generator and
   `scripts/test-heavy-16k.sh` to verify route-balanced corpus loading, full
   16,384-triad search, packed `FOCUS_REQUIRED`, and focused proof behavior
   without committing a multi-megabyte JSON fixture.
-- NANDA-6M version is now `nanda-6m-v24-focused-packet-runtime`.
+- NANDA-6M version is now `nanda-6m-v40-llmwave-pattern-runtime`.
 
 ## v3.3.0 - 2026-06-18
 

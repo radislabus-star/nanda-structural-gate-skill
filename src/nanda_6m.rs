@@ -12,7 +12,7 @@ mod wave;
 pub use replay::*;
 pub use wave::*;
 
-pub const VERSION: &str = "nanda-6m-v24-focused-packet-runtime";
+pub const VERSION: &str = "nanda-6m-v40-llmwave-pattern-runtime";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -26,6 +26,9 @@ pub const INDEX_STATS_BYTES: usize = 245_760;
 pub const TRIAD_BYTES: usize = 32;
 pub const CENTROID_BYTES: usize = 1024;
 pub const LANE_BYTES: usize = 64;
+pub const PATTERN_BYTES: usize = 32;
+pub const PATTERN_ARENA_BYTES: usize = 524_288;
+pub const PATTERN_CAPACITY: usize = PATTERN_ARENA_BYTES / PATTERN_BYTES;
 pub const QUERY_WAVE_BYTES: usize = WAVE_DIM * core::mem::size_of::<i16>();
 pub const PACKED_MIN_FOCUS_SCORE: f64 = 0.01;
 pub const PACKED_MIN_FOCUS_MARGIN: f64 = 0.003;

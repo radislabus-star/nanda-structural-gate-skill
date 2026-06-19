@@ -60,6 +60,7 @@ pub(crate) fn pack6m_cmd(args: Pack6mArgs) -> Result<u8> {
 pub(crate) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Triad]) -> Value {
     let active_triads = source.len() + candidates.len();
     let active_lanes = packet.negative_shortcuts.len() + packet.positive_shortcuts.len();
+    let active_patterns = packet.continuation_memory.len();
     let mut entities = BTreeSet::<String>::new();
     let mut relations = BTreeSet::<String>::new();
     let mut routes = BTreeSet::<String>::new();
@@ -127,6 +128,21 @@ pub(crate) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
             insert_label(&mut cold_labels, term);
         }
     }
+    for memory in &packet.continuation_memory {
+        insert_label(&mut cold_labels, &memory.id);
+        insert_label(&mut cold_labels, &memory.pattern_id);
+        insert_label(&mut cold_labels, &memory.subject);
+        insert_label(&mut cold_labels, &memory.relation);
+        insert_label(&mut cold_labels, &memory.object);
+        insert_label(&mut cold_labels, &memory.route);
+        insert_label(&mut cold_labels, &memory.group);
+        insert_label(&mut cold_labels, &memory.peak);
+        insert_label(&mut routes, &memory.route);
+        insert_label(&mut groups, &memory.group);
+        for term in memory.terms.iter().chain(memory.support_terms.iter()) {
+            insert_label(&mut cold_labels, term);
+        }
+    }
 
     let centroid_count = routes.len() + groups.len();
     let budget_usage = nanda_6m::BudgetUsage {
@@ -143,6 +159,7 @@ pub(crate) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
     let triads_ok = active_triads <= nanda_6m::TRIAD_CAPACITY;
     let centroids_ok = centroid_count <= nanda_6m::CENTROID_CAPACITY;
     let lanes_ok = active_lanes <= nanda_6m::LANE_CAPACITY;
+    let patterns_ok = active_patterns <= nanda_6m::PATTERN_CAPACITY;
     let hot_bytes_ok = estimated_hot_bytes <= nanda_6m::BUDGET_BYTES;
     let fits_l3 = budget_usage.fits();
     let runtime_focus = nanda_6m::validate_packed_runtime(nanda_6m::PackedRuntimeShape {
@@ -175,6 +192,14 @@ pub(crate) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
             "count": active_lanes,
             "capacity": nanda_6m::LANE_CAPACITY,
             "repair": "keep only active positive/negative lanes for this focus packet"
+        }));
+    }
+    if !patterns_ok {
+        blockers.push(json!({
+            "state": "TOO_MANY_PATTERNS",
+            "count": active_patterns,
+            "capacity": nanda_6m::PATTERN_CAPACITY,
+            "repair": "focus continuation memory by active route/group before hot decode replay"
         }));
     }
     if !hot_bytes_ok {
@@ -224,6 +249,16 @@ pub(crate) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
             "workspace_budget_bytes": runtime_focus.workspace_budget_bytes,
             "max_memory_records_for_requests": runtime_focus.max_memory_records_for_requests
         },
+        "pattern_runtime": {
+            "version": "v40-6m-pattern-runtime-contract",
+            "packed_pattern_bytes": nanda_6m::PATTERN_BYTES,
+            "arena_bytes": nanda_6m::PATTERN_ARENA_BYTES,
+            "capacity": nanda_6m::PATTERN_CAPACITY,
+            "active_patterns": active_patterns,
+            "used_bytes": active_patterns * nanda_6m::PATTERN_BYTES,
+            "fits_pattern_arena": patterns_ok,
+            "note": "Pattern arena is a compact continuation-memory overlay inside the fixed NANDA-6M hot contract; cold strings stay outside."
+        },
         "hard_budget_bytes": nanda_6m::BUDGET_BYTES,
         "reserved_core_bytes": reserved_core_bytes,
         "estimated_hot_bytes": estimated_hot_bytes,
@@ -234,12 +269,14 @@ pub(crate) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
         "record_sizes": {
             "packed_triad_bytes": nanda_6m::TRIAD_BYTES,
             "centroid_bytes": nanda_6m::CENTROID_BYTES,
-            "lane_bytes": nanda_6m::LANE_BYTES
+            "lane_bytes": nanda_6m::LANE_BYTES,
+            "packed_pattern_bytes": nanda_6m::PATTERN_BYTES
         },
         "capacity": {
             "triads": nanda_6m::TRIAD_CAPACITY,
             "centroids": nanda_6m::CENTROID_CAPACITY,
-            "lanes": nanda_6m::LANE_CAPACITY
+            "lanes": nanda_6m::LANE_CAPACITY,
+            "patterns": nanda_6m::PATTERN_CAPACITY
         },
         "counts": {
             "source_triads": source.len(),
@@ -253,12 +290,14 @@ pub(crate) fn budget_report(packet: &Packet, source: &[Triad], candidates: &[Tri
             "evidence_refs": evidence_refs.len(),
             "negative_lanes": packet.negative_shortcuts.len(),
             "positive_lanes": packet.positive_shortcuts.len(),
-            "active_lanes": active_lanes
+            "active_lanes": active_lanes,
+            "continuation_patterns": active_patterns
         },
         "usage": {
             "triad_arena": usage_row(active_triads, nanda_6m::TRIAD_CAPACITY, active_triads * nanda_6m::TRIAD_BYTES, nanda_6m::TRIAD_ARENA_BYTES),
             "centroid_arena": usage_row(centroid_count, nanda_6m::CENTROID_CAPACITY, centroid_count * nanda_6m::CENTROID_BYTES, nanda_6m::CENTROID_ARENA_BYTES),
             "lane_arena": usage_row(active_lanes, nanda_6m::LANE_CAPACITY, active_lanes * nanda_6m::LANE_BYTES, nanda_6m::LANE_ARENA_BYTES),
+            "pattern_arena": usage_row(active_patterns, nanda_6m::PATTERN_CAPACITY, active_patterns * nanda_6m::PATTERN_BYTES, nanda_6m::PATTERN_ARENA_BYTES),
             "workspace": usage_row(1, 1, nanda_6m::WORKSPACE_BYTES, nanda_6m::WORKSPACE_BYTES),
             "index_stats": usage_row(1, 1, nanda_6m::INDEX_STATS_BYTES, nanda_6m::INDEX_STATS_BYTES)
         },
@@ -358,6 +397,7 @@ pub(crate) fn pack_report(
     let packed_lane_keys = packed_lane_keys_report(&packed_support);
     let packed_lanes = packed_lane_preview(&packed_support, &packed_lane_keys);
     let packed_lane_store = packed_lane_store_report(&packed_lane_keys, &packed_lanes);
+    let compact_pattern_store = compact_pattern_store_report(packet, sample);
     let runtime_contract = packed_runtime_contract_report(
         memory_packed.len(),
         route_centroids.len() + group_centroids.len(),
@@ -437,6 +477,7 @@ pub(crate) fn pack_report(
         "packed_lane_keys": packed_lane_keys,
         "packed_lanes": packed_lanes,
         "packed_lane_store": packed_lane_store,
+        "compact_pattern_store": compact_pattern_store,
         "runtime_contract": runtime_contract,
         "packed_lane_application": packed_lane_application,
         "packed_lane_replay": packed_lane_replay,

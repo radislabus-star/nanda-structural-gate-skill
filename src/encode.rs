@@ -59,7 +59,7 @@ pub(crate) fn encode_cmd(args: EncodeArgs) -> Result<u8> {
     Ok(EXIT_PASS)
 }
 
-fn encode_input_text(args: &EncodeArgs) -> Result<String> {
+pub(crate) fn encode_input_text(args: &EncodeArgs) -> Result<String> {
     if let Some(path) = &args.text_file {
         return fs::read_to_string(path).with_context(|| format!("read {}", path.display()));
     }
@@ -84,7 +84,7 @@ pub(crate) fn tokenize_pattern(text: &str) -> Vec<String> {
     tokens
 }
 
-fn encode_tokens_to_field(tokens: &[String]) -> Vec<i32> {
+pub(crate) fn encode_tokens_to_field(tokens: &[String]) -> Vec<i32> {
     let mut field = vec![0; WAVE_DIM];
     for (idx, token) in tokens.iter().enumerate() {
         let token_wave = vector(&format!("token:{token}"));
@@ -99,7 +99,7 @@ fn encode_tokens_to_field(tokens: &[String]) -> Vec<i32> {
     field
 }
 
-fn tokens_to_query_triads(tokens: &[String], task_id: &str, domain: &str) -> Vec<Triad> {
+pub(crate) fn tokens_to_query_triads(tokens: &[String], task_id: &str, domain: &str) -> Vec<Triad> {
     let mut triads = vec![];
     if tokens.len() == 1 {
         triads.push(encoded_triad(

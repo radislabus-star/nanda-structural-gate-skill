@@ -1,0 +1,521 @@
+use crate::*;
+use sha2::Digest;
+
+pub(crate) const PACKED_PATTERN_BYTES: usize = 32;
+pub(crate) const PATTERN_STORE_ARENA_BYTES: usize = 524_288;
+pub(crate) const PATTERN_STORE_CAPACITY: usize = PATTERN_STORE_ARENA_BYTES / PACKED_PATTERN_BYTES;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PackedPattern32 {
+    pub signature: u64,
+    pub subject_hash: u32,
+    pub relation_hash: u32,
+    pub object_hash: u32,
+    pub route_hash: u32,
+    pub group_hash: u32,
+    pub boost_i16: i16,
+    pub penalty_i16: i16,
+    pub accepted: u16,
+    pub rejected: u16,
+    pub flags: u16,
+}
+
+impl PackedPattern32 {
+    pub(crate) fn from_memory(memory: &ContinuationMemory) -> Self {
+        Self {
+            signature: pattern_signature(
+                &memory.subject,
+                &memory.relation,
+                &memory.object,
+                &memory.route,
+            ),
+            subject_hash: hash32(&memory.subject),
+            relation_hash: hash32(&memory.relation),
+            object_hash: hash32(&memory.object),
+            route_hash: hash32(&memory.route),
+            group_hash: hash32(&memory.group),
+            boost_i16: quantize_weight(memory.boost),
+            penalty_i16: quantize_weight(memory.penalty),
+            accepted: memory.accepted_count.min(u16::MAX as usize) as u16,
+            rejected: memory.rejected_count.min(u16::MAX as usize) as u16,
+            flags: match memory.decision.as_str() {
+                "accept" => 1,
+                "reject" => 2,
+                _ => 4,
+            },
+        }
+    }
+}
+
+pub(crate) fn pattern_store_cmd(args: PatternStoreArgs) -> Result<u8> {
+    let packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &args.query,
+        args.normalize_paths,
+    )?;
+    let out = compact_pattern_store_report(&packet, args.sample);
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_pattern_store_text(&out),
+        OutputFormat::Md => print_pattern_store_md(&out),
+    }
+    Ok(EXIT_PASS)
+}
+
+pub(crate) fn pattern_capacity_cmd(args: PatternCapacityArgs) -> Result<u8> {
+    let counts = if args.counts.is_empty() {
+        vec![1024, 4096, 16_384, 65_536]
+    } else {
+        args.counts.clone()
+    };
+    let rows = counts
+        .into_iter()
+        .map(|count| pattern_capacity_row(count, args.query_patterns.max(1)))
+        .collect::<Vec<_>>();
+    let out = json!({
+        "core_version": CORE_VERSION,
+        "mode": "llmwave-pattern-capacity",
+        "version": "v37-pattern-capacity",
+        "packed_pattern_bytes": PACKED_PATTERN_BYTES,
+        "pattern_store_arena_bytes": PATTERN_STORE_ARENA_BYTES,
+        "pattern_store_capacity": PATTERN_STORE_CAPACITY,
+        "rows": rows,
+        "read_as": "Capacity estimates when learned continuation patterns stay compact enough for the NANDA-6M pattern arena."
+    });
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_capacity_text(&out),
+        OutputFormat::Md => print_capacity_md(&out),
+    }
+    Ok(EXIT_PASS)
+}
+
+pub(crate) fn llmwave_cmd(args: LlmwaveArgs) -> Result<u8> {
+    let text = if let Some(path) = &args.text_file {
+        fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?
+    } else {
+        args.text.clone()
+    };
+    let mut packet = load_packet_auto(
+        &args.input,
+        &args.input_format,
+        &args.task_id,
+        &args.domain,
+        &text,
+        args.normalize_paths,
+    )?;
+    let tokens = tokenize_pattern(&text);
+    let query = tokens_to_query_triads(&tokens, &args.task_id, &args.domain);
+    packet.query = text.clone();
+    let memory = normalize_ids(packet.triads.clone(), "m");
+    let decode_args = DecodeArgs {
+        input: args.input.clone(),
+        input_format: args.input_format.clone(),
+        task_id: args.task_id.clone(),
+        domain: args.domain.clone(),
+        query: text.clone(),
+        query_file: None,
+        query_format: args.input_format.clone(),
+        top_k: args.top_k,
+        steps: args.steps.clamp(1, 16),
+        search_top_k: args.search_top_k,
+        route_cap: args.route_cap,
+        route_triad_cap: args.route_triad_cap,
+        group_by: args.group_by.clone(),
+        format: OutputFormat::Json,
+        normalize_paths: args.normalize_paths,
+    };
+    let decode = recurrent_decode_report(
+        &packet,
+        &memory,
+        &query,
+        "llmwave-auto-query",
+        &decode_args,
+        decode_args.steps,
+    );
+    let feedback_preview = if args.train {
+        decode_feedback_preview(&decode, &args.decision, &args.note)
+    } else {
+        json!({
+            "enabled": false,
+            "reason": "pass --train to preview continuation feedback"
+        })
+    };
+    let out = json!({
+        "core_version": CORE_VERSION,
+        "mode": "llmwave-mini-loop",
+        "version": "v39-encode-decode-train-loop",
+        "text": text,
+        "tokens": tokens,
+        "encoded_query_triads": query.iter().map(triad_json).collect::<Vec<_>>(),
+        "pattern_store": compact_pattern_store_report(&packet, 3),
+        "decode": decode,
+        "feedback_preview": feedback_preview,
+        "read_as": "Mini-loop: raw text -> token wave query -> structural decode -> optional continuation feedback preview."
+    });
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => print_llmwave_text(&out),
+        OutputFormat::Md => print_llmwave_md(&out),
+    }
+    Ok(EXIT_PASS)
+}
+
+pub(crate) fn compact_pattern_store_report(packet: &Packet, sample: usize) -> Value {
+    let records = packet
+        .continuation_memory
+        .iter()
+        .map(PackedPattern32::from_memory)
+        .collect::<Vec<_>>();
+    let used_bytes = records.len() * PACKED_PATTERN_BYTES;
+    let capacity = PATTERN_STORE_CAPACITY;
+    let accepted = packet
+        .continuation_memory
+        .iter()
+        .filter(|item| item.decision == "accept")
+        .count();
+    let rejected = packet
+        .continuation_memory
+        .iter()
+        .filter(|item| item.decision == "reject")
+        .count();
+    json!({
+        "core_version": CORE_VERSION,
+        "mode": "compact-pattern-store",
+        "version": "v35-compact-pattern-store",
+        "runtime_version": "v40-6m-pattern-runtime-contract",
+        "packed_pattern_bytes": PACKED_PATTERN_BYTES,
+        "arena_bytes": PATTERN_STORE_ARENA_BYTES,
+        "capacity": capacity,
+        "records": records.len(),
+        "accepted": accepted,
+        "rejected": rejected,
+        "used_bytes": used_bytes,
+        "remaining_bytes": PATTERN_STORE_ARENA_BYTES.saturating_sub(used_bytes),
+        "fits_pattern_arena": records.len() <= capacity,
+        "records_sample": packet.continuation_memory.iter().zip(records.iter()).take(sample).map(|(memory, record)| packed_pattern_json(memory, record)).collect::<Vec<_>>()
+    })
+}
+
+pub(crate) fn apply_compact_pattern_store(
+    candidates: &mut [Value],
+    query: &[Triad],
+    memories: &[ContinuationMemory],
+) -> Value {
+    let query_terms = query_term_set(query);
+    let mut applications = vec![];
+    let store_records = memories.len();
+    if candidates.is_empty() || memories.is_empty() {
+        return json!({
+            "version": "v36-pattern-replay",
+            "applied": false,
+            "store_records": store_records,
+            "applications": applications
+        });
+    }
+    for memory in memories {
+        let query_ratio = continuation_query_ratio(&query_terms, memory);
+        if query_ratio <= 0.0 {
+            continue;
+        }
+        let packed = PackedPattern32::from_memory(memory);
+        for candidate in candidates.iter_mut() {
+            let candidate_signature = pattern_signature(
+                candidate["subject"].as_str().unwrap_or(""),
+                candidate["relation"].as_str().unwrap_or(""),
+                candidate["object"].as_str().unwrap_or(""),
+                candidate["route"].as_str().unwrap_or(""),
+            );
+            if candidate_signature != packed.signature {
+                continue;
+            }
+            let support_ratio = continuation_candidate_support_ratio(memory, candidate);
+            let match_ratio = round4(query_ratio * support_ratio);
+            if match_ratio <= 0.0 {
+                continue;
+            }
+            let old_score = candidate["score"].as_f64().unwrap_or(0.0);
+            let (delta, action, version) = match memory.decision.as_str() {
+                "accept" => (
+                    round4(
+                        dequantize_weight(packed.boost_i16)
+                            * learned_multiplier(memory.accepted_count)
+                            * match_ratio,
+                    ),
+                    "reinforce",
+                    "v36-pattern-replay",
+                ),
+                "reject" => (
+                    -round4(
+                        dequantize_weight(packed.penalty_i16)
+                            * learned_multiplier(memory.rejected_count)
+                            * match_ratio,
+                    ),
+                    "suppress",
+                    "v38-negative-continuation-lane",
+                ),
+                _ => (0.0, "watch", "v36-pattern-replay"),
+            };
+            if delta == 0.0 {
+                continue;
+            }
+            let new_score = round4((old_score + delta).clamp(-1.0, 1.5));
+            if let Some(object) = candidate.as_object_mut() {
+                object.insert("score".to_string(), json!(new_score));
+                object.insert("raw_decode_score".to_string(), json!(round4(old_score)));
+                object.insert("compact_pattern_delta".to_string(), json!(delta));
+                object.insert("continuation_memory_delta".to_string(), json!(delta));
+                object.insert(
+                    "compact_pattern_signature".to_string(),
+                    json!(format!("{:016x}", packed.signature)),
+                );
+            }
+            applications.push(json!({
+                "version": version,
+                "memory": memory.id,
+                "action": action,
+                "pattern": format!("{} -> {} -> {}", memory.subject, memory.relation, memory.object),
+                "signature": format!("{:016x}", packed.signature),
+                "delta": delta,
+                "match_ratio": match_ratio,
+                "query_match_ratio": round4(query_ratio),
+                "support_match_ratio": round4(support_ratio),
+                "accepted_count": memory.accepted_count,
+                "rejected_count": memory.rejected_count,
+                "locality": if memory.decision == "reject" { "shortcut-specific-negative-lane" } else { "pattern-specific-positive-replay" },
+                "reason": memory.reason
+            }));
+        }
+    }
+    json!({
+        "version": "v36-pattern-replay",
+        "negative_lane_version": "v38-negative-continuation-lane",
+        "applied": !applications.is_empty(),
+        "store_records": store_records,
+        "applications": applications,
+        "read_as": "Compact pattern store replays accepted continuations and suppresses rejected local pattern signatures before recurrent selection."
+    })
+}
+
+fn decode_feedback_preview(decode: &Value, decision: &FeedbackDecision, note: &str) -> Value {
+    let decision_label = feedback_decision_label(decision);
+    let patterns = decode["patterns"].as_array().cloned().unwrap_or_default();
+    let Some(pattern) = patterns.first() else {
+        return json!({
+            "enabled": true,
+            "decision": decision_label,
+            "continuation_memory": []
+        });
+    };
+    let subject = pattern["subject"].as_str().unwrap_or("").to_string();
+    let relation = pattern["relation"].as_str().unwrap_or("").to_string();
+    let object = pattern["object"].as_str().unwrap_or("").to_string();
+    let memory = ContinuationMemory {
+        id: format!(
+            "cont-{}",
+            slug(&format!("{decision_label}-{subject}-{relation}-{object}"))
+        ),
+        decision: decision_label.to_string(),
+        pattern_id: pattern["pattern_id"].as_str().unwrap_or("").to_string(),
+        subject,
+        relation,
+        object,
+        route: pattern["route"].as_str().unwrap_or("").to_string(),
+        group: pattern["group"].as_str().unwrap_or("").to_string(),
+        peak: pattern["peak"].as_str().unwrap_or("").to_string(),
+        boost: default_positive_boost(),
+        penalty: default_negative_penalty(),
+        terms: vec![],
+        support_terms: vec![],
+        reason: if note.trim().is_empty() {
+            "llmwave mini-loop preview".to_string()
+        } else {
+            note.to_string()
+        },
+        source_feedback: "llmwave-preview".to_string(),
+        observations: 1,
+        accepted_count: usize::from(decision_label == "accept"),
+        rejected_count: usize::from(decision_label == "reject"),
+    };
+    json!({
+        "enabled": true,
+        "decision": decision_label,
+        "continuation_memory": [memory],
+        "read_as": "Preview only; use nanda-feedback on decode output to persist this memory."
+    })
+}
+
+fn pattern_capacity_row(count: usize, query_patterns: usize) -> Value {
+    let used_bytes = count * PACKED_PATTERN_BYTES;
+    let load_factor = count as f64 / PATTERN_STORE_CAPACITY as f64;
+    let estimated_collision = (load_factor * load_factor * query_patterns as f64).min(1.0);
+    let state = if count <= PATTERN_STORE_CAPACITY {
+        "FITS_PATTERN_ARENA"
+    } else {
+        "FOCUS_OR_SPLIT_PATTERN_STORE"
+    };
+    json!({
+        "patterns": count,
+        "used_bytes": used_bytes,
+        "fits_pattern_arena": count <= PATTERN_STORE_CAPACITY,
+        "state": state,
+        "load_factor": round4(load_factor),
+        "estimated_collision_pressure": round4(estimated_collision),
+        "repair": if count <= PATTERN_STORE_CAPACITY { "none" } else { "keep active continuation focus <= 16k or split by route/group" }
+    })
+}
+
+fn packed_pattern_json(memory: &ContinuationMemory, record: &PackedPattern32) -> Value {
+    json!({
+        "id": memory.id,
+        "decision": memory.decision,
+        "pattern": format!("{} -> {} -> {}", memory.subject, memory.relation, memory.object),
+        "route": memory.route,
+        "group": memory.group,
+        "signature": format!("{:016x}", record.signature),
+        "boost_i16": record.boost_i16,
+        "penalty_i16": record.penalty_i16,
+        "accepted": record.accepted,
+        "rejected": record.rejected,
+        "flags": record.flags
+    })
+}
+
+fn continuation_query_ratio(query_terms: &BTreeSet<String>, memory: &ContinuationMemory) -> f64 {
+    if memory.terms.is_empty() || query_terms.is_empty() {
+        return 1.0;
+    }
+    let terms = normalized_shortcut_terms(&memory.terms);
+    if terms.is_empty() {
+        return 1.0;
+    }
+    terms.intersection(query_terms).count() as f64 / terms.len() as f64
+}
+
+fn continuation_candidate_support_ratio(memory: &ContinuationMemory, candidate: &Value) -> f64 {
+    if memory.support_terms.is_empty() {
+        return 1.0;
+    }
+    let candidate_terms = ["subject", "relation", "object", "route", "group", "peak"]
+        .into_iter()
+        .filter_map(|key| candidate[key].as_str())
+        .flat_map(|value| {
+            norm(value)
+                .split(|ch: char| !ch.is_ascii_alphanumeric())
+                .filter(|token| token.len() >= 2)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect::<BTreeSet<_>>();
+    let support_terms = normalized_shortcut_terms(&memory.support_terms);
+    if support_terms.is_empty() || candidate_terms.is_empty() {
+        return 1.0;
+    }
+    support_terms.intersection(&candidate_terms).count() as f64 / support_terms.len() as f64
+}
+
+fn pattern_signature(subject: &str, relation: &str, object: &str, route: &str) -> u64 {
+    hash64(&format!(
+        "{}|{}|{}|{}",
+        norm(subject),
+        norm(relation),
+        norm(object),
+        norm(route)
+    ))
+}
+
+fn hash32(value: &str) -> u32 {
+    let digest = Sha256::digest(norm(value).as_bytes());
+    u32::from_le_bytes([digest[0], digest[1], digest[2], digest[3]])
+}
+
+fn hash64(value: &str) -> u64 {
+    let digest = Sha256::digest(value.as_bytes());
+    u64::from_le_bytes([
+        digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+    ])
+}
+
+fn quantize_weight(value: f64) -> i16 {
+    (value.clamp(-1.0, 1.0) * 10_000.0).round() as i16
+}
+
+fn dequantize_weight(value: i16) -> f64 {
+    value as f64 / 10_000.0
+}
+
+fn learned_multiplier(count: usize) -> f64 {
+    (1.0 + count.saturating_sub(1) as f64 * 0.25).min(3.0)
+}
+
+fn print_pattern_store_text(out: &Value) {
+    println!("mode: compact-pattern-store");
+    println!("records: {}", out["records"].as_u64().unwrap_or(0));
+    println!("capacity: {}", out["capacity"].as_u64().unwrap_or(0));
+    println!(
+        "fits: {}",
+        out["fits_pattern_arena"].as_bool().unwrap_or(false)
+    );
+}
+
+fn print_pattern_store_md(out: &Value) {
+    println!("# NANDA Pattern Store\n");
+    println!("- records: `{}`", out["records"]);
+    println!("- capacity: `{}`", out["capacity"]);
+    println!("- fits_pattern_arena: `{}`", out["fits_pattern_arena"]);
+}
+
+fn print_capacity_text(out: &Value) {
+    println!("mode: {}", out["mode"].as_str().unwrap_or(""));
+    if let Some(rows) = out["rows"].as_array() {
+        for row in rows {
+            println!(
+                "{} patterns: {}",
+                row["patterns"].as_u64().unwrap_or(0),
+                row["state"].as_str().unwrap_or("")
+            );
+        }
+    }
+}
+
+fn print_capacity_md(out: &Value) {
+    println!("# NANDA Pattern Capacity\n");
+    if let Some(rows) = out["rows"].as_array() {
+        for row in rows {
+            println!(
+                "- `{}` patterns: `{}`",
+                row["patterns"].as_u64().unwrap_or(0),
+                row["state"].as_str().unwrap_or("")
+            );
+        }
+    }
+}
+
+fn print_llmwave_text(out: &Value) {
+    println!("mode: {}", out["mode"].as_str().unwrap_or(""));
+    println!(
+        "top_pattern: {}",
+        out["decode"]["top_pattern"].as_str().unwrap_or("")
+    );
+    println!(
+        "decoder_state: {}",
+        out["decode"]["decoder_state"].as_str().unwrap_or("")
+    );
+}
+
+fn print_llmwave_md(out: &Value) {
+    println!("# NANDA LLMWave Mini Loop\n");
+    println!("- mode: `{}`", out["mode"].as_str().unwrap_or(""));
+    println!(
+        "- top_pattern: `{}`",
+        out["decode"]["top_pattern"].as_str().unwrap_or("")
+    );
+    println!(
+        "- decoder_state: `{}`",
+        out["decode"]["decoder_state"].as_str().unwrap_or("")
+    );
+}

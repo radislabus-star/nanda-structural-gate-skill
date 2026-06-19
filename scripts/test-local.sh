@@ -20,6 +20,9 @@ search="$root/nanda-structural-gate/scripts/nanda-search"
 encode="$root/nanda-structural-gate/scripts/nanda-encode"
 decode="$root/nanda-structural-gate/scripts/nanda-decode"
 decode_eval="$root/nanda-structural-gate/scripts/nanda-decode-eval"
+pattern_store="$root/nanda-structural-gate/scripts/nanda-pattern-store"
+pattern_capacity="$root/nanda-structural-gate/scripts/nanda-pattern-capacity"
+llmwave="$root/nanda-structural-gate/scripts/nanda-llmwave"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
 proof="$root/nanda-structural-gate/scripts/nanda-proof"
 probe="$root/nanda-structural-gate/scripts/nanda-probe"
@@ -166,7 +169,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v3.9-continuation-training"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v4.0-llmwave-runtime"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -488,6 +491,17 @@ jq -e '.continuation_memory[0].accepted_count == 1' "$tmp_decode_index" >/dev/nu
 trained_decode_json="$("$decode" "$tmp_decode_index" --input-format json --query-file "$root/examples/triad-packet.interference-search-route-trap.json" --query-format json --top-k 3)"
 jq -e '.continuation_training.applied == true' <<<"$trained_decode_json" >/dev/null
 jq -e '.patterns[0].continuation_memory_delta > 0' <<<"$trained_decode_json" >/dev/null
+jq -e '.compact_pattern_store.version == "v35-compact-pattern-store" and .continuation_training.version == "v36-pattern-replay"' <<<"$trained_decode_json" >/dev/null
+pattern_store_json="$("$pattern_store" "$tmp_decode_index" --input-format json)"
+jq -e '.mode == "compact-pattern-store" and .packed_pattern_bytes == 32 and .records == 1 and .fits_pattern_arena == true' <<<"$pattern_store_json" >/dev/null
+pattern_capacity_json="$("$pattern_capacity")"
+jq -e '.mode == "llmwave-pattern-capacity" and .pattern_store_capacity == 16384' <<<"$pattern_capacity_json" >/dev/null
+jq -e '.rows[] | select(.patterns == 65536 and .fits_pattern_arena == false)' <<<"$pattern_capacity_json" >/dev/null
+llmwave_json="$("$llmwave" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --train)"
+jq -e '.mode == "llmwave-mini-loop" and .version == "v39-encode-decode-train-loop"' <<<"$llmwave_json" >/dev/null
+jq -e '.decode.top_pattern == "declaration -> requires -> protocols" and .feedback_preview.enabled == true' <<<"$llmwave_json" >/dev/null
+trained_budget_json="$("$budget" "$tmp_decode_index" --input-format json)"
+jq -e '.pattern_runtime.version == "v40-6m-pattern-runtime-contract" and .pattern_runtime.active_patterns == 1 and .pattern_runtime.fits_pattern_arena == true' <<<"$trained_budget_json" >/dev/null
 serve_json="$(printf '{"command":"doctor"}\n' | "$serve")"
 jq -e '.ok == true and .result.mode == "doctor" and .result.healthy == true' <<<"$serve_json" >/dev/null
 tmp_search="$(mktemp)"

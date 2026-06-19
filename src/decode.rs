@@ -251,6 +251,7 @@ pub(crate) fn recurrent_decode_report(
         "decoder_state": first["decoder_state"],
         "safe_to_generate": first["safe_to_generate"],
         "continuation_training": first["continuation_training"],
+        "compact_pattern_store": first["compact_pattern_store"],
         "top_pattern": first["top_pattern"],
         "patterns": first["patterns"],
         "recurrent": {
@@ -279,8 +280,11 @@ pub(crate) fn decode_step_report(
     step: usize,
 ) -> Value {
     let mut candidates = decode_candidates(search, query);
-    let continuation_training =
-        apply_continuation_memory(&mut candidates, query, &packet.continuation_memory);
+    let continuation_training = if packet.continuation_memory.is_empty() {
+        apply_continuation_memory(&mut candidates, query, &packet.continuation_memory)
+    } else {
+        apply_compact_pattern_store(&mut candidates, query, &packet.continuation_memory)
+    };
     candidates.sort_by(|a, b| {
         b["score"]
             .as_f64()
@@ -329,6 +333,7 @@ pub(crate) fn decode_step_report(
         "decoder_state": decoder_state,
         "safe_to_generate": decoder_state == "PATTERN_READY",
         "continuation_training": continuation_training,
+        "compact_pattern_store": compact_pattern_store_report(packet, 3),
         "top_pattern": top_candidate,
         "patterns": candidates
     })
