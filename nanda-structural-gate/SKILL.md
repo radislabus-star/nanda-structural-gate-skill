@@ -103,6 +103,7 @@ scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
 scripts/nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
 scripts/nanda-proof .nanda/index.json --input-format json --query-file query.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
+scripts/nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast
 scripts/nanda-proof --suite examples/proof-corpus.json --input-format json
 scripts/nanda-search task.json --input-format json --top-k 5
 scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
@@ -186,6 +187,12 @@ why a peak is not answer-ready, confidence is only a review aid, and compare
 shows whether raw search, focused search, and packed peak agree. Use
 `nanda-proof --suite examples/proof-corpus.json --input-format json` after
 core/search/pack changes to catch proof regressions.
+Use `nanda-proof --fast` for large-corpus agent loops where full raw search is
+too expensive. Fast proof still runs corpus diagnostics, focused search, and
+packed proof, but explicitly marks `raw_search_summary.skipped=true`, adds
+`RAW_SEARCH_SKIPPED`, and reports `proof_compare.state` as
+`FOCUSED_PACKED_ALIGNED` or `FOCUSED_ONLY_REVIEW`; do not describe it as a full
+raw/focused compare.
 Inspect `resonant_field` after search/proof. It is the v28 physical field
 layer: phase lock, standing-wave reflection, route-boundary leakage,
 destructive locality, multiscale agreement, energy accounting, mode scan,

@@ -4,6 +4,10 @@
 
 ### Changed
 
+- v63 adds `nanda-proof --fast`, an explicit large-corpus focused proof mode.
+  It skips full raw search only when requested, reports
+  `raw_search_summary.skipped=true`, adds `RAW_SEARCH_SKIPPED`, and keeps
+  default proof behavior unchanged.
 - v62 adds `nanda-demo --from-text`, a raw relation-note adapter for demo
   runs. Explicit `subject -> relation -> object [route=x group=y]` lines are
   converted into a temporary packet; free-text fallback is marked review-only

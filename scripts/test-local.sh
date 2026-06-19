@@ -278,6 +278,7 @@ if [[ "$proof_status" -ne 0 && "$proof_status" -ne 3 ]]; then
   exit 1
 fi
 jq -e '.mode == "proof-from-focus"' <<<"$proof_json" >/dev/null
+jq -e '.proof_mode == "full-compare"' <<<"$proof_json" >/dev/null
 jq -e '.proof_version == "v27-proof-reason-suite"' <<<"$proof_json" >/dev/null
 jq -e '.reason_codes | length >= 1' <<<"$proof_json" >/dev/null
 jq -e '.proof_confidence.score >= 0' <<<"$proof_json" >/dev/null

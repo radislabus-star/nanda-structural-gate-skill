@@ -637,6 +637,8 @@ struct ProofArgs {
     focus_out: Option<PathBuf>,
     #[arg(long)]
     include_focused_packet: bool,
+    #[arg(long)]
+    fast: bool,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]

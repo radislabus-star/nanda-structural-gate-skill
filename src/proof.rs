@@ -70,6 +70,7 @@ fn proof_report_from_args(args: &ProofArgs) -> Result<Value> {
         args.sample,
         args.normalize_paths,
         args.include_focused_packet || args.focus_out.is_some(),
+        args.fast,
     )
 }
 
@@ -90,6 +91,7 @@ fn run_proof_once(
     sample: usize,
     normalize_paths: bool,
     include_focused_packet: bool,
+    fast: bool,
 ) -> Result<Value> {
     let mut packet = load_packet_auto(
         input,
@@ -124,15 +126,6 @@ fn run_proof_once(
     let memory = normalize_ids(packet.triads.clone(), "m");
     let (query, query_source) = search_query_triads(&query_packet, &query_text);
     let corpus = corpus_diagnostics(&memory, &query, &packet.query, route_cap);
-    let raw_search = interference_search(
-        &packet,
-        &memory,
-        &query,
-        top_k,
-        group_by,
-        query_source,
-        no_focus_metadata(memory.len()),
-    );
     let focus_build = focus::build_focused_packet(
         &packet,
         &memory,
@@ -155,6 +148,19 @@ fn run_proof_once(
         query_source,
         focus_build.metadata.clone(),
     );
+    let raw_search = if fast {
+        skipped_raw_search_summary(memory.len(), &search)
+    } else {
+        interference_search(
+            &packet,
+            &memory,
+            &query,
+            top_k,
+            group_by,
+            query_source,
+            no_focus_metadata(memory.len()),
+        )
+    };
     Ok(proof_report(
         &packet,
         &focus_build.packet,
@@ -165,6 +171,7 @@ fn run_proof_once(
         raw_search,
         search,
         include_focused_packet,
+        fast,
     ))
 }
 
@@ -210,6 +217,7 @@ pub(crate) fn proof_suite_cmd(args: &ProofArgs, suite_path: &Path) -> Result<u8>
             args.sample,
             args.normalize_paths,
             false,
+            args.fast,
         )?;
         let actual_codes = value_string_array(&result["reason_codes"]);
         let state_ok = case.expected_proof_state.is_empty()
@@ -298,6 +306,7 @@ fn proof_report(
     raw_search: Value,
     search: Value,
     include_focused_packet: bool,
+    fast: bool,
 ) -> Value {
     let runtime_ready = focus["runtime_contract"]["ready"]
         .as_bool()
@@ -343,6 +352,7 @@ fn proof_report(
         "nanda_6m_version": nanda_6m::VERSION,
         "mode": "proof-from-focus",
         "proof_version": "v27-proof-reason-suite",
+        "proof_mode": if fast { "fast-focused" } else { "full-compare" },
         "proof_state": proof_state,
         "reason_codes": reason_codes,
         "proof_confidence": confidence,
@@ -390,6 +400,8 @@ fn proof_report(
             "peaks": search["peaks"]
         },
         "raw_search_summary": {
+            "skipped": raw_search["skipped"],
+            "reason": raw_search["reason"],
             "verdict": raw_search["verdict"],
             "field_state": raw_search["field_state"],
             "safe_to_answer": raw_search["safe_to_answer"],
@@ -413,6 +425,25 @@ fn proof_report(
         out["focused_packet"] = json!(focused_packet);
     }
     out
+}
+
+fn skipped_raw_search_summary(memory_size: usize, focused_search: &Value) -> Value {
+    json!({
+        "skipped": true,
+        "reason": "nanda-proof --fast skips full-corpus raw_search after corpus diagnostics and uses focused search plus packed proof as the answer gate.",
+        "verdict": "SKIPPED",
+        "field_state": "RAW_SEARCH_SKIPPED",
+        "safe_to_answer": false,
+        "top_peak": Value::Null,
+        "peak_margin": Value::Null,
+        "input_memory_size": memory_size,
+        "focused_top_peak": focused_search["top_peak"].clone(),
+        "focused_field_state": focused_search["field_state"].clone(),
+        "field_interpretation": {
+            "state": "raw_search_skipped",
+            "read_as": "Fast proof did not run the unfocused full-corpus field; inspect focused and packed sections instead."
+        }
+    })
 }
 
 fn proof_reason_codes(
@@ -443,9 +474,16 @@ fn proof_reason_codes(
     if !pack["packed_ok"].as_bool().unwrap_or(false) {
         codes.push("PACKED_NOT_OK".to_string());
     }
+    if raw_search["skipped"].as_bool().unwrap_or(false) {
+        codes.push("RAW_SEARCH_SKIPPED".to_string());
+    }
     let raw_peak = raw_search["top_peak"].as_str().unwrap_or("");
     let focused_peak = search["top_peak"].as_str().unwrap_or("");
-    if !raw_peak.is_empty() && !focused_peak.is_empty() && raw_peak != focused_peak {
+    if !raw_search["skipped"].as_bool().unwrap_or(false)
+        && !raw_peak.is_empty()
+        && !focused_peak.is_empty()
+        && raw_peak != focused_peak
+    {
         codes.push("FOCUS_SHIFTED_PEAK".to_string());
     }
     let field_state = search["field_state"].as_str().unwrap_or("NO_FIELD");
@@ -591,6 +629,7 @@ fn proof_confidence(
 }
 
 fn proof_compare(raw_search: &Value, focused_search: &Value, pack: &Value) -> Value {
+    let raw_skipped = raw_search["skipped"].as_bool().unwrap_or(false);
     let raw_peak = raw_search["top_peak"].as_str().unwrap_or("");
     let focused_peak = focused_search["top_peak"].as_str().unwrap_or("");
     let raw_safe = raw_search["safe_to_answer"].as_bool().unwrap_or(false);
@@ -601,7 +640,11 @@ fn proof_compare(raw_search: &Value, focused_search: &Value, pack: &Value) -> Va
     let packed_state = pack["peak_decision"]["state"]
         .as_str()
         .unwrap_or("PACKED_REVIEW_REQUIRED");
-    let state = if raw_peak != focused_peak {
+    let state = if raw_skipped && focused_safe && packed_safe {
+        "FOCUSED_PACKED_ALIGNED"
+    } else if raw_skipped {
+        "FOCUSED_ONLY_REVIEW"
+    } else if raw_peak != focused_peak {
         "FOCUS_SHIFTED_PEAK"
     } else if focused_safe && !packed_safe {
         "PACKED_DISAGREES"
@@ -613,6 +656,8 @@ fn proof_compare(raw_search: &Value, focused_search: &Value, pack: &Value) -> Va
     json!({
         "state": state,
         "raw": {
+            "skipped": raw_skipped,
+            "reason": raw_search["reason"],
             "top_peak": raw_search["top_peak"],
             "field_state": raw_search["field_state"],
             "safe_to_answer": raw_safe,
@@ -630,7 +675,11 @@ fn proof_compare(raw_search: &Value, focused_search: &Value, pack: &Value) -> Va
             "route": pack["peaks"]["route"].clone(),
             "group": pack["peaks"]["group"].clone()
         },
-        "read_as": "Raw search shows the unfocused corpus pull; focused search shows the proof window; packed shows whether the 6M bridge agrees strongly enough."
+        "read_as": if raw_skipped {
+            "Fast proof skipped the unfocused raw field; focused search shows the proof window and packed shows whether the 6M bridge agrees strongly enough."
+        } else {
+            "Raw search shows the unfocused corpus pull; focused search shows the proof window; packed shows whether the 6M bridge agrees strongly enough."
+        }
     })
 }
 

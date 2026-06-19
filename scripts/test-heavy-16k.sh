@@ -3,18 +3,22 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 packet="${1:-"$root/.nanda/finance-16k-risk-cluster.json"}"
+dataset_doctor="$root/nanda-structural-gate/scripts/nanda-dataset-doctor"
+pack6m="$root/nanda-structural-gate/scripts/nanda-pack6m"
+search="$root/nanda-structural-gate/scripts/nanda-search"
+proof="$root/nanda-structural-gate/scripts/nanda-proof"
 
 node "$root/scripts/generate-finance-16k-fixture.js" "$packet" >/tmp/nanda-heavy-16k-generate.json
 jq -e '.triads == 16384 and .candidate_triads == 3' /tmp/nanda-heavy-16k-generate.json >/dev/null
 jq -e '.triads | length == 16384' "$packet" >/dev/null
 
-doctor_json="$(nanda-dataset-doctor "$packet" --input-format json)"
+doctor_json="$("$dataset_doctor" "$packet" --input-format json)"
 jq -e '.triad_count == 16384' <<<"$doctor_json" >/dev/null
 jq -e '.verdict == "PASS"' <<<"$doctor_json" >/dev/null
 jq -e '.notices[]? | select(.kind == "large_but_route_balanced_focus")' <<<"$doctor_json" >/dev/null
 
 set +e
-pack_json="$(nanda-pack6m "$packet" --input-format json --sample 1)"
+pack_json="$("$pack6m" "$packet" --input-format json --sample 1)"
 pack_status=$?
 set -e
 if [[ "$pack_status" -ne 3 ]]; then
@@ -28,7 +32,7 @@ jq -e '.runtime_contract.state == "FOCUS_REQUIRED"' <<<"$pack_json" >/dev/null
 jq -e '.runtime_contract.ready == false' <<<"$pack_json" >/dev/null
 
 set +e
-search_json="$(nanda-search "$packet" --input-format json --route-cap 64 --route-triad-cap 2000 --top-k 5)"
+search_json="$("$search" "$packet" --input-format json --route-cap 64 --route-triad-cap 2000 --top-k 5)"
 search_status=$?
 set -e
 if [[ "$search_status" -ne 0 ]]; then
@@ -47,7 +51,7 @@ jq -e '.resonant_field.phase_lock.state == "PHASE_PARTIAL"' <<<"$search_json" >/
 jq -e '.resonant_field.standing_wave.state == "STANDING_UNSTABLE"' <<<"$search_json" >/dev/null
 
 set +e
-proof_json="$(nanda-proof "$packet" --input-format json --max-triads 15000 --route-cap 32 --route-triad-cap 600 --format json)"
+proof_json="$("$proof" "$packet" --input-format json --max-triads 15000 --route-cap 32 --route-triad-cap 600 --format json)"
 proof_status=$?
 set -e
 if [[ "$proof_status" -ne 3 ]]; then
@@ -63,5 +67,21 @@ jq -e '.field_state == "FIELD_CONTESTED"' <<<"$proof_json" >/dev/null
 jq -e '.reason_codes | index("FIELD_CONTESTED")' <<<"$proof_json" >/dev/null
 jq -e '.reason_codes | index("RESONANCE_FIELD_DIFFUSE")' <<<"$proof_json" >/dev/null
 jq -e '.hot_proof.packed_peak_state == "PACKED_FOCUSED"' <<<"$proof_json" >/dev/null
+
+set +e
+fast_proof_json="$("$proof" "$packet" --input-format json --max-triads 15000 --route-cap 32 --route-triad-cap 600 --fast --format json)"
+fast_proof_status=$?
+set -e
+if [[ "$fast_proof_status" -ne 3 ]]; then
+  echo "expected fast focused proof WATCH exit status 3, got $fast_proof_status" >&2
+  echo "$fast_proof_json" >&2
+  exit 1
+fi
+jq -e '.proof_mode == "fast-focused"' <<<"$fast_proof_json" >/dev/null
+jq -e '.raw_search_summary.skipped == true' <<<"$fast_proof_json" >/dev/null
+jq -e '.reason_codes | index("RAW_SEARCH_SKIPPED")' <<<"$fast_proof_json" >/dev/null
+jq -e '.proof_compare.state == "FOCUSED_ONLY_REVIEW"' <<<"$fast_proof_json" >/dev/null
+jq -e '.focused_memory_size == 9620' <<<"$fast_proof_json" >/dev/null
+jq -e '.field_state == "FIELD_CONTESTED"' <<<"$fast_proof_json" >/dev/null
 
 echo "ok"

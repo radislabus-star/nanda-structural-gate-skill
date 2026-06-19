@@ -239,6 +239,7 @@ nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000 --lane-i
 nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
 nanda-focus .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --out .nanda/focus.json
 nanda-proof .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --focus-out .nanda/focus.json --out .nanda/proof.json
+nanda-proof .nanda/index.json --input-format json --query "declaration requires protocols" --fast
 nanda-search .nanda/index.json --input-format json --query-file examples/triad-packet.interference-search-route-trap.json --query-format json --top-k 3
 nanda-search .nanda/focus.json --input-format json --top-k 3
 nanda-search examples/triad-packet.interference-search.json --input-format json --top-k 3
@@ -349,6 +350,12 @@ packed peak to be safe; otherwise the output is an explainable review report.
 Inspect top-level `reason_codes`, `proof_confidence`, and `proof_compare`
 before trusting a peak. Use `nanda-proof --suite examples/proof-corpus.json`
 to run the proof regression corpus.
+Use `nanda-proof --fast` for large-corpus agent loops where full raw search is
+too expensive. Fast proof still runs corpus diagnostics, focused search, and
+packed proof, but explicitly marks `raw_search_summary.skipped=true`, adds
+`RAW_SEARCH_SKIPPED`, and reports `proof_compare.state` as
+`FOCUSED_PACKED_ALIGNED` or `FOCUSED_ONLY_REVIEW` instead of pretending the
+full raw/focused compare ran.
 `nanda-search` now emits `resonant_field`, the v28 physical field layer. It
 checks phase lock, standing-wave reflection, route-boundary leakage,
 destructive locality, multiscale agreement, energy conservation,
