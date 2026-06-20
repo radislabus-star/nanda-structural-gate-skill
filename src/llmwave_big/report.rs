@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use super::active_core::ActiveCoreReport;
 use super::atlas::AtlasReport;
+use super::consolidation::ConsolidationReport;
 use super::l2_word_field::L2WordFieldReport;
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
@@ -57,6 +58,18 @@ pub(crate) fn print_write_report(report: &WriteReport, format: &OutputFormat) ->
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_write_text(report),
         OutputFormat::Md => print_write_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_consolidation_report(
+    report: &ConsolidationReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_consolidation_text(report),
+        OutputFormat::Md => print_consolidation_md(report),
     }
     Ok(())
 }
@@ -177,6 +190,29 @@ fn print_write_text(report: &WriteReport) {
         report.write_curve.residual_saving_ratio
     );
     println!("curve_state: {}", report.write_curve.state);
+}
+
+fn print_consolidation_text(report: &ConsolidationReport) {
+    println!("LLMWave-Big Consolidation Sleep");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "sleep: {} -> {}",
+        report.sleep_pass.input, report.sleep_pass.output
+    );
+    println!(
+        "memory_bytes: {} -> {}",
+        report.eval.before.memory_bytes, report.eval.after.memory_bytes
+    );
+    println!(
+        "role_safety: {:.3} -> {:.3}",
+        report.eval.before.role_safety, report.eval.after.role_safety
+    );
+    println!(
+        "compression_score: {:.3}",
+        report.cognitive_compression_score
+    );
 }
 
 fn print_contract_md(report: &LlmwaveBigReport) {
@@ -301,4 +337,25 @@ fn print_write_md(report: &WriteReport) {
         report.write_curve.residual_saving_ratio
     );
     println!("- curve state: `{}`", report.write_curve.state);
+}
+
+fn print_consolidation_md(report: &ConsolidationReport) {
+    println!("# LLMWave-Big Consolidation Sleep");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- conflict state: `{}`", report.conflict_preservation.state);
+    println!(
+        "- memory bytes: `{}` -> `{}`",
+        report.eval.before.memory_bytes, report.eval.after.memory_bytes
+    );
+    println!(
+        "- role safety: `{:.3}` -> `{:.3}`",
+        report.eval.before.role_safety, report.eval.after.role_safety
+    );
+    println!(
+        "- cognitive compression score: `{:.3}`",
+        report.cognitive_compression_score
+    );
 }

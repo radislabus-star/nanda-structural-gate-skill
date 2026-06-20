@@ -42,6 +42,8 @@ enum LlmwaveBigCommand {
     L2(LlmwaveBigL2Args),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
+    /// Print the v206-v218 consolidation/sleep contract.
+    Consolidate(LlmwaveBigConsolidateArgs),
 }
 
 #[derive(Parser)]
@@ -70,6 +72,12 @@ struct LlmwaveBigL2Args {
 
 #[derive(Parser)]
 struct LlmwaveBigWriteArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigConsolidateArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -125,6 +133,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::Write(args) => {
             let report = write::build_write_report();
             report::print_write_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::Consolidate(args) => {
+            let report = consolidation::build_consolidation_report();
+            report::print_consolidation_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
@@ -297,6 +310,25 @@ mod tests {
             .residual_format_v1
             .fields
             .contains(&"phase_delta:i16"));
+    }
+
+    #[test]
+    fn consolidation_preserves_conflicts_and_safety() {
+        let report = consolidation::build_consolidation_report();
+        assert_eq!(report.roadmap_block, "v206-v218");
+        assert_eq!(report.verdict, "CONSOLIDATION_SAFE");
+        assert_eq!(report.conflict_preservation.state, "CONFLICTS_PRESERVED");
+        assert!(report.eval.safe);
+        assert_eq!(report.duplicate_merge.new_records_created, 0);
+    }
+
+    #[test]
+    fn consolidation_reduces_memory_without_role_safety_regression() {
+        let report = consolidation::build_consolidation_report();
+        assert!(report.eval.after.memory_bytes < report.eval.before.memory_bytes);
+        assert!(report.eval.after.role_safety >= report.eval.before.role_safety);
+        assert!(report.eval.after.false_positives <= report.eval.before.false_positives);
+        assert!(report.cognitive_compression_score > 1.0);
     }
 
     #[test]

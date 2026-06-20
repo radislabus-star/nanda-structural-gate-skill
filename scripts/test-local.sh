@@ -80,6 +80,11 @@ jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
 jq -e '.write_curve.state == "SYNTHETIC_CONTRACT_CURVE_NOT_NONLINEAR_PROOF" and .write_curve.residual_saving_ratio > 0.5' <<<"$big_write_json" >/dev/null
 jq -e '.compression_safety.safe == true and .anti_residual.anti_lane_id == 90001' <<<"$big_write_json" >/dev/null
+big_consolidate_json="$("$llmwave_big" consolidate --format json)"
+jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null
+jq -e '.conflict_preservation.state == "CONFLICTS_PRESERVED" and .eval.safe == true' <<<"$big_consolidate_json" >/dev/null
+jq -e '.eval.after.memory_bytes < .eval.before.memory_bytes and .eval.after.role_safety >= .eval.before.role_safety' <<<"$big_consolidate_json" >/dev/null
+jq -e '.anti_memory.anti_lanes_created == 1 and .cognitive_compression_score > 1' <<<"$big_consolidate_json" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"
@@ -487,6 +492,9 @@ jq -e '.benchmarks.active_core.ns_per_query > 0 and .benchmarks.active_core.chec
 bench6m_write_json="$("$bench6m" --mode write-density --support-build-iterations 1000 --format json)"
 jq -e '.benchmarks.write_density.mode == "llmwave-big-write-density" and .benchmarks.write_density.iterations == 1000' <<<"$bench6m_write_json" >/dev/null
 jq -e '.benchmarks.write_density.ns_per_write > 0 and .benchmarks.write_density.checksum != 0' <<<"$bench6m_write_json" >/dev/null
+bench6m_consolidate_json="$("$bench6m" --mode consolidate --support-build-iterations 1000 --format json)"
+jq -e '.benchmarks.consolidate.mode == "llmwave-big-consolidate" and .benchmarks.consolidate.iterations == 1000' <<<"$bench6m_consolidate_json" >/dev/null
+jq -e '.benchmarks.consolidate.ns_per_pass > 0 and .benchmarks.consolidate.checksum != 0' <<<"$bench6m_consolidate_json" >/dev/null
 pack6m_replay_json="$("$pack6m" "$root/examples/triad-packet.negative-shortcut-lanes.json" --input-format json)"
 jq -e '.packed_lane_replay.state == "PACKED_LANE_REPLAY_FOCUSED" and .packed_lane_replay.matched_keys == 2 and .packed_lane_replay.compiled_lanes == 2' <<<"$pack6m_replay_json" >/dev/null
 jq -e '.packed_lane_replay.sample[0].source == "negative_shortcuts" and .packed_lane_replay.sample[0].query_match_ratio == 1' <<<"$pack6m_replay_json" >/dev/null

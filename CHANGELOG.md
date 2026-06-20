@@ -23,6 +23,10 @@
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split
   contracts, ablation, source-aware weighting, and a typed write microbench.
+- v206-v218 add `nanda-llmwave-big consolidate` and `nanda-bench6m --mode
+  consolidate`: sleep pass, duplicate/alias merge, conflict preservation,
+  schema strength, forgetting, anti-memory, before/after eval, Atlas rebuild,
+  cartridge repacking, and a typed consolidation microbench.
 - v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active

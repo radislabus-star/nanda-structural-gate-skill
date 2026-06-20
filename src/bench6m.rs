@@ -45,6 +45,7 @@ enum Bench6mMode {
     HotCycle,
     ActiveCore,
     WriteDensity,
+    Consolidate,
     Density,
     All,
 }
@@ -82,6 +83,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     let include_hot_cycle = matches!(args.mode, Bench6mMode::HotCycle | Bench6mMode::All);
     let include_active_core = matches!(args.mode, Bench6mMode::ActiveCore | Bench6mMode::All);
     let include_write_density = matches!(args.mode, Bench6mMode::WriteDensity | Bench6mMode::All);
+    let include_consolidate = matches!(args.mode, Bench6mMode::Consolidate | Bench6mMode::All);
     let include_density = matches!(args.mode, Bench6mMode::Density | Bench6mMode::All);
     let replay = if include_replay {
         Some(bench6m_replay(args.replay_iterations))
@@ -207,6 +209,11 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
+    let consolidate = if include_consolidate {
+        Some(bench6m_consolidate(args.support_build_iterations))
+    } else {
+        None
+    };
     let density = if include_density {
         Some(bench6m_density(
             args.support_build_iterations,
@@ -237,6 +244,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "hot_cycle": hot_cycle,
             "active_core": active_core,
             "write_density": write_density,
+            "consolidate": consolidate,
             "density": density
         },
         "interpretation": {
@@ -255,6 +263,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "hot_cycle": "Single typed hot-cycle call: score cache, route/group buckets, support fields, lane compilation, and aligned sweep.",
             "active_core": "LLMWave-Big v171-v180 typed active-core sample cycle: schema/residual projection, settle/peak/veto/reconstruct.",
             "write_density": "LLMWave-Big v191-v205 typed reconstructability/write-density microbenchmark.",
+            "consolidate": "LLMWave-Big v206-v218 typed consolidation count/merge/decay microbenchmark.",
             "density": "Typed packed density probe: fixed relation/polarity traps over in-memory PackedTriad32 records.",
             "not_measured": "CLI startup, JSON parsing, dictionary packing, and report serialization are intentionally excluded."
         }
@@ -300,6 +309,25 @@ fn bench6m_write_density(iterations: u64) -> Value {
             "cli_startup",
             "json_parsing",
             "atlas_loading",
+            "report_serialization"
+        ]
+    })
+}
+
+fn bench6m_consolidate(iterations: u64) -> Value {
+    let bench = llmwave_big::consolidation::bench_consolidate(iterations);
+    json!({
+        "mode": "llmwave-big-consolidate",
+        "version": llmwave_big::consolidation::CONSOLIDATION_VERSION,
+        "iterations": bench.iterations,
+        "total_ns": bench.total_ns,
+        "ns_per_pass": bench.ns_per_pass,
+        "passes_per_sec": bench.passes_per_sec,
+        "checksum": bench.checksum,
+        "not_measured": [
+            "cli_startup",
+            "json_parsing",
+            "atlas_rewrite_io",
             "report_serialization"
         ]
     })

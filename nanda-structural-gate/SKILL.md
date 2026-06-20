@@ -158,8 +158,10 @@ scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
 scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-llmwave-big write --format json
+scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 scripts/nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
+scripts/nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -423,6 +425,12 @@ v191-v205 add `nanda-llmwave-big write` and
 score, residual V1, centroid update, anti-residual, schema promotion/split
 rules, ablation, source-aware weighting, and write-density microbench. Treat
 `RESIDUAL_SAVING` as a measured sample saving, not nonlinear memory proof.
+v206-v218 add `nanda-llmwave-big consolidate` and
+`nanda-bench6m --mode consolidate`: sleep pass, duplicate merge, alias merge,
+conflict preservation, schema strength, forgetting, anti-memory,
+before/after eval, cognitive compression score, Atlas rebuild, and cartridge
+repacking. Treat `CONSOLIDATION_SAFE` as sample safety, not broad cognition
+proof.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

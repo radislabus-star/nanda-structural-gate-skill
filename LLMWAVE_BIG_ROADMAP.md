@@ -804,6 +804,18 @@ CONSOLIDATION_LOSSY
 CONSOLIDATION_CONFLICTED
 ```
 
+Implementation checkpoint:
+
+```text
+v206-v218: implemented as nanda-llmwave-big consolidate
+bench: nanda-bench6m --mode consolidate
+state: CONSOLIDATION_SAFE for the built-in sleep sample
+scope: sleep pass, duplicate merge, alias merge, conflict preservation,
+       schema strength, forgetting, anti-memory, before/after eval,
+       cognitive compression score, Atlas rebuild, cartridge repacking
+not claimed: broad cognitive compression proof, lossy conflict resolution
+```
+
 ## Phase 6: Big Cognition Eval, v219-v230
 
 ### v219 Big Eval Corpus
