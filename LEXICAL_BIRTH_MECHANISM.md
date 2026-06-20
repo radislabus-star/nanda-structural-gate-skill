@@ -9,7 +9,7 @@ claim boundary.
 
 ## Core Idea
 
-A word is not born when a UTF-8 string, hash, or `token_id` appears.
+A word is not born when a UTF-8 string, hash, or numeric handle appears.
 
 A word is born when a surface form becomes a stable memory binding:
 
@@ -43,11 +43,12 @@ The base idea is taken from several lines of work:
 
 LLMWave stores a word as layered memory, not as only text.
 
-Cold memory owns the invertible and evidence-heavy parts:
+Cold memory owns the productive and evidence-heavy parts:
 
 ```text
-surface dictionary: token_id -> UTF-8 forms
-surface variants: spelling, language, morphology, aliases
+surface production atoms: graphemes, bytes, morphemes, roots, endings
+surface programs: ordered atom recipes, casing, punctuation, script flags
+exact copy spans: observed bytes for names, codes, rare forms
 observation traces: where the candidate appeared
 context evidence: surrounding words, roles, routes, documents
 grammar frames: how the candidate behaves syntactically
@@ -68,9 +69,18 @@ syntactic_frame_id
 evidence_ref count
 ```
 
-This is why `surface_hash` alone is not enough. A hash can select or compare a
-candidate, but it cannot spell the word. Text generation requires an invertible
-surface dictionary.
+This is why `surface_hash` alone is not enough. A hash can compare or route a
+candidate, but it cannot spell the word. Text output needs a surface production
+path:
+
+```text
+common form -> compose from grapheme/morpheme atoms
+rare exact form -> copy observed evidence span
+unknown form -> fall back to bytes/chars
+```
+
+A numeric handle may exist inside one runtime packet, but it is not the storage
+principle and not the source of the word.
 
 ## Birth Mechanism
 
@@ -291,7 +301,8 @@ and IDs used to decide whether a surface fragment can become a word.
 
 `LexicalBindingRecord32` is the accepted binding. It connects the surface hash,
 lemma, concept centroid, context centroid, cleanup target, morphology, grammar
-frame, and evidence count.
+frame, and evidence count. It still does not claim that visible spelling is
+stored as a flat lookup. Visible spelling belongs to surface production memory.
 
 ## Claim Boundary
 
@@ -307,6 +318,7 @@ Forbidden claims:
 ```text
 the model has already learned words from a real corpus
 the model can generate text from hashes alone
+the model stores words as a flat numeric-handle -> UTF-8 lookup
 the model has proven nonlinear lexical memory density
 the word-birth gate proves semantic understanding
 ```
@@ -316,6 +328,7 @@ The next proof step is not another metaphor. It is a corpus experiment:
 ```text
 real corpus
   -> surface observations
+  -> surface production atoms/programs/copy spans
   -> LexicalBirthCandidate32 records
   -> birth gates
   -> accepted LexicalBindingRecord32 records

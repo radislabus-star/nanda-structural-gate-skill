@@ -226,22 +226,23 @@ Sources:
 
 What to import:
 
-- A word is not born as a UTF-8 string or a hash. It is born as a stable binding
-  across surface form, meaning context, syntactic behavior, usage evidence, and
-  recoverability.
+- A word is not born as a UTF-8 string, hash, or numeric handle. It is born as a
+  stable binding across surface production, meaning context, syntactic behavior,
+  usage evidence, and recoverability.
 - Word birth needs staged gates: segmentation, fast mapping, cross-situational
   convergence, usage/exemplar strengthening, grammar integration,
   attractor/cleanup stability, and anti-confusion against nearby words.
 - Store provisional words separately from accepted lexical bindings. A noisy
   surface fragment should remain provisional until it survives context and
   anti-confusion tests.
-- Keep an invertible surface dictionary for actual text output. A wave seed or
-  surface hash can select a word candidate, but cannot spell it by itself.
+- Keep a surface production path for actual text output: grapheme/byte atoms,
+  morpheme atoms, surface programs, and exact evidence-copy spans. A wave seed
+  or surface hash can compare a word candidate, but cannot spell it by itself.
 
 What not to claim:
 
 - A high context score is not a word.
-- A token id without an invertible surface form cannot generate text.
+- A numeric handle without a surface production path cannot generate text.
 - A single observation is not lexical learning.
 - A lexical birth mechanism is not proof that a real corpus has learned new
   vocabulary.

@@ -48,6 +48,7 @@ pub(crate) struct LexicalBirthReport {
     pub word_definition: &'static str,
     pub literature_scope: Vec<LiteratureAnchor>,
     pub storage_laws: Vec<StorageLaw>,
+    pub surface_production: SurfaceProductionContract,
     pub birth_stages: Vec<BirthStage>,
     pub record_formats: Vec<RecordFormat>,
     pub sample: LexicalBirthSample,
@@ -69,6 +70,21 @@ pub(crate) struct StorageLaw {
     pub stores_word_as: &'static str,
     pub key_mechanism: &'static str,
     pub engine_boundary: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct SurfaceProductionContract {
+    pub primary_rule: &'static str,
+    pub hot_core_rule: &'static str,
+    pub production_layers: Vec<SurfaceProductionLayer>,
+    pub exact_form_rule: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct SurfaceProductionLayer {
+    pub layer: &'static str,
+    pub role: &'static str,
+    pub stores: &'static str,
 }
 
 #[derive(Serialize, Clone)]
@@ -172,6 +188,7 @@ pub(crate) fn build_lexical_birth_report() -> LexicalBirthReport {
             "stable binding of surface form, meaning context, syntactic behavior, usage memory, and cleanup attractor",
         literature_scope: literature_scope(),
         storage_laws: storage_laws(),
+        surface_production: surface_production_contract(),
         birth_stages: birth_stages(),
         record_formats: vec![
             RecordFormat {
@@ -216,12 +233,12 @@ pub(crate) fn build_lexical_birth_report() -> LexicalBirthReport {
             forbidden_claims: vec![
                 "the model can invent reliable new words from hashes alone",
                 "a real corpus has proven lexical growth",
-                "new words are generated without an invertible surface dictionary",
+                "new words are generated without a surface production path",
                 "this proves nonlinear memory density",
             ],
         },
         next_engine_steps: vec![
-            "add physical surface dictionary token_id_to_utf8",
+            "add surface production memory with grapheme_morpheme_byte_copy layers",
             "collect corpus observations into LexicalBirthCandidate32 records",
             "run cross_situational_birth_eval against lexical and random baselines",
             "promote only accepted candidates into LexicalBindingRecord32",
@@ -366,6 +383,39 @@ fn storage_laws() -> Vec<StorageLaw> {
             engine_boundary: "accepted words need margin and anti-confusion checks",
         },
     ]
+}
+
+fn surface_production_contract() -> SurfaceProductionContract {
+    SurfaceProductionContract {
+        primary_rule:
+            "do_not_store_words_as_token_id_to_string; produce surfaces from composable form memory",
+        hot_core_rule:
+            "hot_core_selects_compact_form_program_ids; cold_surface_memory_materializes_utf8",
+        production_layers: vec![
+            SurfaceProductionLayer {
+                layer: "grapheme_or_byte_atoms",
+                role: "universal fallback",
+                stores: "small alphabet plus byte escape path",
+            },
+            SurfaceProductionLayer {
+                layer: "morpheme_atoms",
+                role: "compact productive spelling",
+                stores: "roots prefixes suffixes endings stems",
+            },
+            SurfaceProductionLayer {
+                layer: "surface_program",
+                role: "compose visible form",
+                stores: "ordered atoms plus casing punctuation and script flags",
+            },
+            SurfaceProductionLayer {
+                layer: "evidence_copy_span",
+                role: "exact rare form recovery",
+                stores: "pointer to observed bytes for names codes and one-off strings",
+            },
+        ],
+        exact_form_rule:
+            "exact names/codes may be copied from evidence spans; common forms should be composed from atoms",
+    }
 }
 
 fn birth_stages() -> Vec<BirthStage> {

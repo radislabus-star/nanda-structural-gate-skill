@@ -1146,7 +1146,7 @@ LexicalBindingRecord32
 Stop rules:
 
 ```text
-no invertible surface form -> no text generation
+no surface production path -> no text generation
 one observation -> provisional only
 context-only peak -> not a word
 high anti-confusion penalty -> do not promote

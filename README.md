@@ -533,8 +533,10 @@ the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor
 cleanup, and anti-confusion. It reports fixed 32-byte candidate and binding
 records plus a strict claim boundary: this is a mechanism contract, not proof
-that a real corpus has learned new words. The canonical mechanism note is
-[`LEXICAL_BIRTH_MECHANISM.md`](LEXICAL_BIRTH_MECHANISM.md).
+that a real corpus has learned new words. Surface text is produced from
+grapheme/byte atoms, morpheme atoms, surface programs, and exact evidence-copy
+spans; words are not modeled as a flat numeric-handle-to-string lookup. The
+canonical mechanism note is [`LEXICAL_BIRTH_MECHANISM.md`](LEXICAL_BIRTH_MECHANISM.md).
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual
 decision, Residual V1 format, anti-residual, promotion/split rules, ablation,

@@ -376,6 +376,29 @@ mod tests {
     }
 
     #[test]
+    fn lexical_birth_surface_is_produced_not_token_string_lookup() {
+        let report = lexical_birth::build_lexical_birth_report();
+        assert!(report
+            .surface_production
+            .primary_rule
+            .contains("do_not_store_words_as_token_id_to_string"));
+        assert!(report
+            .surface_production
+            .production_layers
+            .iter()
+            .any(|layer| layer.layer == "morpheme_atoms"));
+        assert!(report
+            .surface_production
+            .production_layers
+            .iter()
+            .any(|layer| layer.layer == "evidence_copy_span"));
+        assert!(!report
+            .next_engine_steps
+            .iter()
+            .any(|step| step.contains("token_id_to_utf8")));
+    }
+
+    #[test]
     fn write_report_keeps_nonlinear_claim_unproven() {
         let report = write::build_write_report();
         assert_eq!(report.roadmap_block, "v191-v205");

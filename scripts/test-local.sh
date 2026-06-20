@@ -81,6 +81,8 @@ jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol
 jq -e '.rejection_control.gate.verdict == "WORD_REJECTED_OR_WAITING" and .rejection_control.binding_record == null' <<<"$big_word_birth_json" >/dev/null
 jq -e '([.birth_stages[].stage] | index("segmentation") and index("cross_situational_convergence") and index("attractor_cleanup") and index("anti_confusion"))' <<<"$big_word_birth_json" >/dev/null
 jq -e '([.record_formats[] | select(.bytes == 32) | .name] | index("LexicalBirthCandidate32") and index("LexicalBindingRecord32"))' <<<"$big_word_birth_json" >/dev/null
+jq -e '.surface_production.primary_rule == "do_not_store_words_as_token_id_to_string; produce surfaces from composable form memory"' <<<"$big_word_birth_json" >/dev/null
+jq -e '([.surface_production.production_layers[].layer] | index("grapheme_or_byte_atoms") and index("morpheme_atoms") and index("surface_program") and index("evidence_copy_span"))' <<<"$big_word_birth_json" >/dev/null
 jq -e '.claim_boundary.corpus_proven == false and .claim_boundary.generator_ready == false and .claim_boundary.nonlinear_density_proven == false' <<<"$big_word_birth_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
