@@ -294,6 +294,7 @@ nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
+nanda-llmwave-big l2 --format json
 nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
@@ -510,6 +511,10 @@ schema/residual wave projection, focus competition axes, runtime operation
 list, and an `ACTIVE_CORE_READY` sample verdict. `nanda-bench6m --mode
 active-core` measures that typed in-memory microkernel and excludes CLI, JSON,
 Atlas loading, and report serialization.
+`nanda-llmwave-big l2` adds the v181-v190 L2 Word Field contract: active
+surface slice, prefix wave, 128-4096 candidate cache, L3 bias into surface
+candidates, anti-wave suppression for schema-breaking prefix matches, L2/L3
+sync policy, multilingual surface banks, and L2 eval metrics.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

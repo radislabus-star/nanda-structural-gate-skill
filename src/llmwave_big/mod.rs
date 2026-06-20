@@ -38,6 +38,8 @@ enum LlmwaveBigCommand {
     Atlas(LlmwaveBigAtlasArgs),
     /// Print the v171-v180 hot Active Core contract and sample cycle.
     ActiveCore(LlmwaveBigActiveCoreArgs),
+    /// Print the v181-v190 L2 Word Field contract and surface sample.
+    L2(LlmwaveBigL2Args),
 }
 
 #[derive(Parser)]
@@ -54,6 +56,12 @@ struct LlmwaveBigAtlasArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigActiveCoreArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigL2Args {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -98,6 +106,12 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::ActiveCore(args) => {
             let report = active_core::build_active_core_report();
             report::print_active_core_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::L2(args) => {
+            let report =
+                l2_word_field::build_l2_word_field_report(l3_schema_field::business_invoice_bias());
+            report::print_l2_word_field_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
@@ -219,6 +233,32 @@ mod tests {
         assert!(report.cycle.margin > 0);
         assert_eq!(report.loader_eval.sample_lifted_operator, 3);
         assert_eq!(report.loader_eval.sample_lifted_schema, 101);
+    }
+
+    #[test]
+    fn l2_word_field_uses_l3_bias_without_l3_storage_mix() {
+        let report =
+            l2_word_field::build_l2_word_field_report(l3_schema_field::business_invoice_bias());
+        assert_eq!(report.roadmap_block, "v181-v190");
+        assert_eq!(report.verdict, "L2_READY");
+        assert_eq!(report.candidate_cache.record_bytes, 32);
+        assert_eq!(report.candidate_cache.top_token_label, "invoice");
+        assert_eq!(report.l3_bias.operator, "issues");
+        assert_eq!(report.sync_policy.l2_update, "per_keystroke");
+    }
+
+    #[test]
+    fn l2_anti_wave_suppresses_schema_breaking_prefix_match() {
+        let report =
+            l2_word_field::build_l2_word_field_report(l3_schema_field::business_invoice_bias());
+        let inventory = report
+            .candidate_cache
+            .sample
+            .iter()
+            .find(|candidate| candidate.label == "inventory")
+            .expect("inventory candidate");
+        assert!(inventory.anti_score > 0);
+        assert!(inventory.final_score < report.candidate_cache.sample[0].final_score);
     }
 
     #[test]

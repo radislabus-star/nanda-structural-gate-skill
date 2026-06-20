@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use super::active_core::ActiveCoreReport;
 use super::atlas::AtlasReport;
+use super::l2_word_field::L2WordFieldReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
 
@@ -34,6 +35,18 @@ pub(crate) fn print_active_core_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_active_core_text(report),
         OutputFormat::Md => print_active_core_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_l2_word_field_report(
+    report: &L2WordFieldReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_l2_word_field_text(report),
+        OutputFormat::Md => print_l2_word_field_md(report),
     }
     Ok(())
 }
@@ -125,6 +138,21 @@ fn print_active_core_text(report: &ActiveCoreReport) {
     );
 }
 
+fn print_l2_word_field_text(report: &L2WordFieldReport) {
+    println!("LLMWave-Big L2 Word Field");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("prefix: {}", report.prefix_wave.prefix);
+    println!("top_token: {}", report.candidate_cache.top_token_label);
+    println!("margin: {}", report.candidate_cache.margin);
+    println!("record_bytes: {}", report.candidate_cache.record_bytes);
+    println!(
+        "sync: {}/{}",
+        report.sync_policy.l2_update, report.sync_policy.l3_update
+    );
+}
+
 fn print_contract_md(report: &LlmwaveBigReport) {
     println!("# LLMWave-Big Contract");
     println!();
@@ -207,4 +235,24 @@ fn print_active_core_md(report: &ActiveCoreReport) {
     println!("- top score: `{}`", report.cycle.top_score);
     println!("- margin: `{}`", report.cycle.margin);
     println!("- safe to answer: `{}`", report.cycle.safe_to_answer);
+}
+
+fn print_l2_word_field_md(report: &L2WordFieldReport) {
+    println!("# LLMWave-Big L2 Word Field");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- prefix: `{}`", report.prefix_wave.prefix);
+    println!("- top token: `{}`", report.candidate_cache.top_token_label);
+    println!("- margin: `{}`", report.candidate_cache.margin);
+    println!();
+    println!("## Candidate Sample");
+    println!();
+    for candidate in &report.candidate_cache.sample {
+        println!(
+            "- `{}`: final={} anti={}",
+            candidate.label, candidate.final_score, candidate.anti_score
+        );
+    }
 }

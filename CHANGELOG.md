@@ -15,6 +15,10 @@
   active-core`: fixed ActivePacket records, a 6,291,456-byte budget,
   schema/residual projection, focus competition, runtime operation list, sample
   Active Core verdict, and a typed in-memory microbenchmark.
+- v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface
+  slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
+  L2/L3 sync policy, multilingual surface banks, eval metrics, and L2 runtime
+  verdicts.
 - v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active

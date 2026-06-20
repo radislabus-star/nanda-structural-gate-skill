@@ -156,6 +156,7 @@ scripts/nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
+scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
@@ -410,6 +411,11 @@ split, schema/residual projection, focus competition, runtime operation list,
 sample Active Core verdict, and a typed microbenchmark. Treat the sample
 `ACTIVE_CORE_READY` as a hot-core cycle result, not as LLM readiness or
 nonlinear memory proof.
+v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface
+slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
+L2/L3 sync policy, multilingual surface banks, L2 eval metrics, and
+`L2_READY` / `L2_NEEDS_L3` / `L2_AMBIGUOUS` verdicts. Keep L2 as
+token/root/morpheme/form surface; do not store schemas/routes as L2 facts.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

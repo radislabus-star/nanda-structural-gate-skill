@@ -572,6 +572,16 @@ L2_NEEDS_L3
 L2_AMBIGUOUS
 ```
 
+Implementation checkpoint:
+
+```text
+v181-v190: implemented as nanda-llmwave-big l2
+state: L2_READY for the built-in L3-biased prefix sample
+scope: L2 ownership, active slice, prefix wave, candidate cache,
+       L3 bias, anti-wave, sync policy, multilingual surface, eval metrics
+not claimed: natural language generation, full tokenizer, L3 schema storage in L2
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

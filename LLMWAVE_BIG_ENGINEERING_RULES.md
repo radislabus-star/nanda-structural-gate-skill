@@ -288,6 +288,7 @@ Current v158-v170 commands:
 nanda llmwave-big contract --format json
 nanda llmwave-big atlas --format json
 nanda llmwave-big active-core --format json
+nanda llmwave-big l2 --format json
 nanda bench6m --mode active-core --support-build-iterations 1000 --format json
 ```
 

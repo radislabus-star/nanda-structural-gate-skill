@@ -70,6 +70,11 @@ jq -e '.roadmap_block == "v171-v180" and .verdict == "ACTIVE_CORE_READY"' <<<"$b
 jq -e '.budget.total_bytes == 6291456 and .budget.fits_nanda_6m_budget == true' <<<"$big_active_core_json" >/dev/null
 jq -e '.packet_format.schema_record_bytes == 32 and .packet_format.residual_record_bytes == 32 and .packet_format.lane_record_bytes == 64' <<<"$big_active_core_json" >/dev/null
 jq -e '.cycle.top_schema_id == 101 and .cycle.safe_to_answer == true and .cycle.margin > 0' <<<"$big_active_core_json" >/dev/null
+big_l2_json="$("$llmwave_big" l2 --format json)"
+jq -e '.roadmap_block == "v181-v190" and .verdict == "L2_READY"' <<<"$big_l2_json" >/dev/null
+jq -e '.candidate_cache.record_bytes == 32 and .candidate_cache.top_token_label == "invoice" and .candidate_cache.margin >= 12' <<<"$big_l2_json" >/dev/null
+jq -e '.sync_policy.l2_update == "per_keystroke" and .sync_policy.l3_update == "word_boundary_punctuation_semantic_shift"' <<<"$big_l2_json" >/dev/null
+jq -e '.candidate_cache.sample[] | select(.label == "inventory" and .anti_score > 0 and .final_score < 0)' <<<"$big_l2_json" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"
