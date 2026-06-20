@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use super::active_core::ActiveCoreReport;
 use super::atlas::AtlasReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
@@ -21,6 +22,18 @@ pub(crate) fn print_atlas_report(report: &AtlasReport, format: &OutputFormat) ->
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_atlas_text(report),
         OutputFormat::Md => print_atlas_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_active_core_report(
+    report: &ActiveCoreReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_active_core_text(report),
+        OutputFormat::Md => print_active_core_md(report),
     }
     Ok(())
 }
@@ -80,6 +93,35 @@ fn print_atlas_text(report: &AtlasReport) {
         report.loader_preview.top_schemas.len(),
         report.loader_preview.evidence_refs.len(),
         report.loader_preview.fits_active_core_contract
+    );
+}
+
+fn print_active_core_text(report: &ActiveCoreReport) {
+    println!("LLMWave-Big Active Core");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("total_bytes: {}", report.budget.total_bytes);
+    println!(
+        "fits_nanda_6m_budget: {}",
+        report.budget.fits_nanda_6m_budget
+    );
+    println!("packet_records:");
+    println!(
+        "  schema: {} bytes",
+        report.packet_format.schema_record_bytes
+    );
+    println!(
+        "  residual: {} bytes",
+        report.packet_format.residual_record_bytes
+    );
+    println!("cycle:");
+    println!(
+        "  top_schema={} top_score={} margin={} safe_to_answer={}",
+        report.cycle.top_schema_id,
+        report.cycle.top_score,
+        report.cycle.margin,
+        report.cycle.safe_to_answer
     );
 }
 
@@ -145,4 +187,24 @@ fn print_atlas_md(report: &AtlasReport) {
         "- fits active core contract: `{}`",
         report.loader_preview.fits_active_core_contract
     );
+}
+
+fn print_active_core_md(report: &ActiveCoreReport) {
+    println!("# LLMWave-Big Active Core");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- total bytes: `{}`", report.budget.total_bytes);
+    println!(
+        "- fits NANDA-6M budget: `{}`",
+        report.budget.fits_nanda_6m_budget
+    );
+    println!();
+    println!("## Runtime Cycle");
+    println!();
+    println!("- top schema: `{}`", report.cycle.top_schema_id);
+    println!("- top score: `{}`", report.cycle.top_score);
+    println!("- margin: `{}`", report.cycle.margin);
+    println!("- safe to answer: `{}`", report.cycle.safe_to_answer);
 }

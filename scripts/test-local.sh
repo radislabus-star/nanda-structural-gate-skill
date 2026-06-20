@@ -65,6 +65,11 @@ jq -e '([.record_formats[].name] | index("SymbolAtom") and index("OperatorAtom")
 jq -e '.evidence_store.active_core_field == "evidence_ref" and (.active_packet_contract.must_not_contain | index("evidence_text"))' <<<"$big_atlas_json" >/dev/null
 jq -e '.loader_preview.l2_projection == "surface_symbol_projection_only" and .loader_preview.l3_projection == "schema_operator_role_route_projection_only" and .loader_preview.fits_active_core_contract == true' <<<"$big_atlas_json" >/dev/null
 jq -e '.doctor.verdict == "ATLAS_SAMPLE_OK"' <<<"$big_atlas_json" >/dev/null
+big_active_core_json="$("$llmwave_big" active-core --format json)"
+jq -e '.roadmap_block == "v171-v180" and .verdict == "ACTIVE_CORE_READY"' <<<"$big_active_core_json" >/dev/null
+jq -e '.budget.total_bytes == 6291456 and .budget.fits_nanda_6m_budget == true' <<<"$big_active_core_json" >/dev/null
+jq -e '.packet_format.schema_record_bytes == 32 and .packet_format.residual_record_bytes == 32 and .packet_format.lane_record_bytes == 64' <<<"$big_active_core_json" >/dev/null
+jq -e '.cycle.top_schema_id == 101 and .cycle.safe_to_answer == true and .cycle.margin > 0' <<<"$big_active_core_json" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"
@@ -466,6 +471,9 @@ jq -e '.packed_lane_application.mode == "single-pass-suppress-anti-support"' <<<
 jq -e '.packed_lane_application.raw_state == "PACKED_THIN" and .packed_lane_application.state == "PACKED_LANE_FOCUSED_CANDIDATE"' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_application.ready_for_hot_loop == true and .packed_lane_application.safe_to_answer == false' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_lane_application.route.state == "LANE_AXIS_FOCUSED_CANDIDATE" and .packed_lane_application.route.after_net_dot == 288' <<<"$pack6m_json" >/dev/null
+bench6m_active_core_json="$("$bench6m" --mode active-core --support-build-iterations 1000 --format json)"
+jq -e '.benchmarks.active_core.mode == "llmwave-big-active-core" and .benchmarks.active_core.iterations == 1000' <<<"$bench6m_active_core_json" >/dev/null
+jq -e '.benchmarks.active_core.ns_per_query > 0 and .benchmarks.active_core.checksum != 0' <<<"$bench6m_active_core_json" >/dev/null
 pack6m_replay_json="$("$pack6m" "$root/examples/triad-packet.negative-shortcut-lanes.json" --input-format json)"
 jq -e '.packed_lane_replay.state == "PACKED_LANE_REPLAY_FOCUSED" and .packed_lane_replay.matched_keys == 2 and .packed_lane_replay.compiled_lanes == 2' <<<"$pack6m_replay_json" >/dev/null
 jq -e '.packed_lane_replay.sample[0].source == "negative_shortcuts" and .packed_lane_replay.sample[0].query_match_ratio == 1' <<<"$pack6m_replay_json" >/dev/null

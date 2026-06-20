@@ -287,6 +287,8 @@ Current v158-v170 commands:
 ```bash
 nanda llmwave-big contract --format json
 nanda llmwave-big atlas --format json
+nanda llmwave-big active-core --format json
+nanda bench6m --mode active-core --support-build-iterations 1000 --format json
 ```
 
 This command must stay contract-only until Wave Atlas, Active Core, L2/L3,

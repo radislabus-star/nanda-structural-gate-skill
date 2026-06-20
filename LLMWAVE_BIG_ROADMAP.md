@@ -458,6 +458,17 @@ ACTIVE_CORE_CONTESTED
 ACTIVE_CORE_SPILL
 ```
 
+Implementation checkpoint:
+
+```text
+v171-v180: implemented as nanda-llmwave-big active-core
+bench: nanda-bench6m --mode active-core
+state: ACTIVE_CORE_READY for the built-in typed sample cycle
+scope: ActivePacket records, 6 MiB budget, schema/residual projection,
+       loader eval sample, focus competition, runtime ops, microbenchmark
+not claimed: full LLM, nonlinear memory proof, Atlas-scale cache-only execution
+```
+
 ## Phase 3: L2 Word Field, v181-v190
 
 ### v181 L2 Word Atlas

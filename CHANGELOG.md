@@ -11,6 +11,10 @@
 - v161-v170 add `nanda-llmwave-big atlas`, a cold Wave Atlas contract with
   Symbol/Operator/Schema/Residual records, cold evidence refs, cartridge banks,
   indexes, Atlas Doctor checks, and a loader preview for compact active packets.
+- v171-v180 add `nanda-llmwave-big active-core` and `nanda-bench6m --mode
+  active-core`: fixed ActivePacket records, a 6,291,456-byte budget,
+  schema/residual projection, focus competition, runtime operation list, sample
+  Active Core verdict, and a typed in-memory microbenchmark.
 - v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active

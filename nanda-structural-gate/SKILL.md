@@ -155,6 +155,8 @@ scripts/nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --pr
 scripts/nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
+scripts/nanda-llmwave-big active-core --format json
+scripts/nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -402,6 +404,12 @@ SymbolAtom, OperatorAtom, SchemaRecord, ResidualRecord, cold evidence refs,
 domain cartridges, loader indexes, Atlas Doctor checks, and an active-packet
 preview. Treat it as cold/warm memory and loader planning; the hot Active Core
 starts later.
+v171-v180 add `nanda-llmwave-big active-core` and
+`nanda-bench6m --mode active-core`: fixed ActivePacket records, a 6 MiB budget
+split, schema/residual projection, focus competition, runtime operation list,
+sample Active Core verdict, and a typed microbenchmark. Treat the sample
+`ACTIVE_CORE_READY` as a hot-core cycle result, not as LLM readiness or
+nonlinear memory proof.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

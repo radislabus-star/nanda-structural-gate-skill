@@ -36,6 +36,8 @@ enum LlmwaveBigCommand {
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
     Atlas(LlmwaveBigAtlasArgs),
+    /// Print the v171-v180 hot Active Core contract and sample cycle.
+    ActiveCore(LlmwaveBigActiveCoreArgs),
 }
 
 #[derive(Parser)]
@@ -46,6 +48,12 @@ struct LlmwaveBigContractArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigAtlasArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigActiveCoreArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -85,6 +93,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::Atlas(args) => {
             let report = atlas::build_atlas_report();
             report::print_atlas_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ActiveCore(args) => {
+            let report = active_core::build_active_core_report();
+            report::print_active_core_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
@@ -186,6 +199,26 @@ mod tests {
             .indexes
             .iter()
             .any(|index| index.name == "query_wave_to_candidate_schemas"));
+    }
+
+    #[test]
+    fn active_core_budget_matches_nanda_6m_budget() {
+        let report = active_core::build_active_core_report();
+        assert_eq!(report.roadmap_block, "v171-v180");
+        assert_eq!(report.budget.total_bytes, nanda_6m::BUDGET_BYTES);
+        assert!(report.budget.fits_nanda_6m_budget);
+        assert_eq!(report.packet_format.schema_record_bytes, 32);
+        assert_eq!(report.packet_format.residual_record_bytes, 32);
+    }
+
+    #[test]
+    fn active_core_sample_cycle_is_ready_but_not_llm_proof() {
+        let report = active_core::build_active_core_report();
+        assert_eq!(report.cycle.verdict, "ACTIVE_CORE_READY");
+        assert!(report.cycle.safe_to_answer);
+        assert!(report.cycle.margin > 0);
+        assert_eq!(report.loader_eval.sample_lifted_operator, 3);
+        assert_eq!(report.loader_eval.sample_lifted_schema, 101);
     }
 
     #[test]

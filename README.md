@@ -293,6 +293,8 @@ nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "wh
 nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
+nanda-llmwave-big active-core --format json
+nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -502,6 +504,12 @@ Symbol/Operator/Schema/Residual records, cold evidence refs, cartridges,
 indexes, Atlas Doctor checks, and a loader preview that outputs compact IDs,
 negative lanes, and evidence refs without evidence text or JSON in the active
 packet.
+`nanda-llmwave-big active-core` adds the v171-v180 Active Core contract and a
+typed sample cycle: fixed ActivePacket records, a 6,291,456-byte budget,
+schema/residual wave projection, focus competition axes, runtime operation
+list, and an `ACTIVE_CORE_READY` sample verdict. `nanda-bench6m --mode
+active-core` measures that typed in-memory microkernel and excludes CLI, JSON,
+Atlas loading, and report serialization.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit
