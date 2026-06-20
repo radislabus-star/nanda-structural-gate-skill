@@ -15,6 +15,7 @@ pub mod loader;
 pub mod operators;
 pub mod residuals;
 pub mod schemas;
+pub mod surface_corpus_eval;
 pub mod surface_production;
 pub mod surface_reconstruct;
 pub mod symbols;
@@ -49,6 +50,8 @@ enum LlmwaveBigCommand {
     SurfaceProduction(LlmwaveBigSurfaceProductionArgs),
     /// Run the v261-v270 cold surface reconstruction eval.
     SurfaceReconstruct(LlmwaveBigSurfaceReconstructArgs),
+    /// Run the v271-v280 corpus surface-density candidate eval.
+    SurfaceCorpusEval(LlmwaveBigSurfaceCorpusEvalArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
@@ -97,6 +100,12 @@ struct LlmwaveBigSurfaceProductionArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigSurfaceReconstructArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSurfaceCorpusEvalArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -188,6 +197,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SurfaceReconstruct(args) => {
             let report = surface_reconstruct::build_surface_reconstruct_report();
             report::print_surface_reconstruct_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SurfaceCorpusEval(args) => {
+            let report = surface_corpus_eval::build_surface_corpus_eval_report();
+            report::print_surface_corpus_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Write(args) => {
@@ -504,6 +518,33 @@ mod tests {
         assert!(!report.claim_boundary.real_corpus_trained);
         assert!(!report.claim_boundary.free_form_spelling_proven);
         assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
+    }
+
+    #[test]
+    fn surface_corpus_eval_shows_family_template_density_candidate() {
+        let report = surface_corpus_eval::build_surface_corpus_eval_report();
+        assert_eq!(report.roadmap_block, "v271-v280");
+        assert_eq!(report.verdict, "SURFACE_DENSITY_CANDIDATE_NOT_PROVEN");
+        assert_eq!(report.corpus.productive_forms, 512);
+        assert_eq!(report.reconstruction.exact_match_rate, 1.0);
+        assert_eq!(report.reconstruction.held_out_exact_match_rate, 1.0);
+        assert!(report.baselines.family_template_bytes < report.baselines.direct_lookup_bytes);
+        assert!(report.baselines.family_template_bytes < report.baselines.per_form_program_bytes);
+        assert!(report.baselines.family_vs_direct_saving_ratio > 0.0);
+        assert_eq!(report.family_reuse.state, "FAMILY_REUSE_VISIBLE");
+    }
+
+    #[test]
+    fn surface_corpus_eval_keeps_nonlinear_claim_unproven() {
+        let report = surface_corpus_eval::build_surface_corpus_eval_report();
+        assert!(report.verdict_boundary.useful_density_candidate);
+        assert!(!report.verdict_boundary.nonlinear_surface_memory_proven);
+        assert!(!report.verdict_boundary.real_corpus_trained);
+        assert!(!report.verdict_boundary.free_form_spelling_proven);
+        assert!(report
+            .sample_cases
+            .iter()
+            .any(|case| case.held_out && case.exact_match));
     }
 
     #[test]

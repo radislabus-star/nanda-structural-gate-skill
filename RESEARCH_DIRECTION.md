@@ -65,6 +65,18 @@ can be materialized correctly. Treat the current result as a toy materializer
 pass only; the density claim needs corpus-scale exact-match, false-surface,
 copy-error, reuse, and bytes-per-useful-surface evidence.
 
+The first corpus-scale density candidate check is:
+
+```bash
+nanda-llmwave-big surface-corpus-eval --format json
+```
+
+This introduces family-template reuse: `SurfaceFamily32` plus `SurfaceBinding8`
+lets shared roots and suffixes produce many virtual forms. The scientific claim
+is still narrow: synthetic family reuse is visible, but nonlinear surface memory
+is not proven until a real corpus beats direct lookup and per-form program
+baselines under exact-match and false-surface constraints.
+
 ### Holographic Reduced Representations
 
 Sources:

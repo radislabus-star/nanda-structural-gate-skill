@@ -7,6 +7,7 @@ use super::eval::BigEvalReport;
 use super::l2_word_field::L2WordFieldReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
+use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
 use super::write::WriteReport;
@@ -90,6 +91,18 @@ pub(crate) fn print_surface_reconstruct_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_surface_reconstruct_text(report),
         OutputFormat::Md => print_surface_reconstruct_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_surface_corpus_eval_report(
+    report: &SurfaceCorpusEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_surface_corpus_eval_text(report),
+        OutputFormat::Md => print_surface_corpus_eval_md(report),
     }
     Ok(())
 }
@@ -297,6 +310,28 @@ fn print_surface_reconstruct_text(report: &SurfaceReconstructReport) {
         report.claim_boundary.real_corpus_trained,
         report.claim_boundary.free_form_spelling_proven,
         report.claim_boundary.nonlinear_surface_memory_proven
+    );
+}
+
+fn print_surface_corpus_eval_text(report: &SurfaceCorpusEvalReport) {
+    println!("LLMWave-Big Surface Corpus Eval");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("forms: {}", report.corpus.total_forms);
+    println!("family_bytes: {}", report.baselines.family_template_bytes);
+    println!("direct_bytes: {}", report.baselines.direct_lookup_bytes);
+    println!(
+        "family_vs_direct_saving_ratio: {:.3}",
+        report.baselines.family_vs_direct_saving_ratio
+    );
+    println!(
+        "exact_match_rate: {:.3}",
+        report.reconstruction.exact_match_rate
+    );
+    println!(
+        "nonlinear_surface_memory_proven: {}",
+        report.verdict_boundary.nonlinear_surface_memory_proven
     );
 }
 
@@ -604,6 +639,55 @@ fn print_surface_reconstruct_md(report: &SurfaceReconstructReport) {
     println!(
         "- hot core UTF-8 free: `{}`",
         report.claim_boundary.hot_core_utf8_free
+    );
+}
+
+fn print_surface_corpus_eval_md(report: &SurfaceCorpusEvalReport) {
+    println!("# LLMWave-Big Surface Corpus Eval");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- read as: {}", report.read_as);
+    println!();
+    println!("## Corpus");
+    println!();
+    println!("- productive forms: `{}`", report.corpus.productive_forms);
+    println!("- total forms: `{}`", report.corpus.total_forms);
+    println!("- held-out forms: `{}`", report.corpus.held_out_forms);
+    println!();
+    println!("## Baselines");
+    println!();
+    println!(
+        "- direct lookup bytes: `{}`",
+        report.baselines.direct_lookup_bytes
+    );
+    println!(
+        "- per-form program bytes: `{}`",
+        report.baselines.per_form_program_bytes
+    );
+    println!(
+        "- family template bytes: `{}`",
+        report.baselines.family_template_bytes
+    );
+    println!(
+        "- family/direct saving ratio: `{:.3}`",
+        report.baselines.family_vs_direct_saving_ratio
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- useful density candidate: `{}`",
+        report.verdict_boundary.useful_density_candidate
+    );
+    println!(
+        "- nonlinear surface memory proven: `{}`",
+        report.verdict_boundary.nonlinear_surface_memory_proven
+    );
+    println!(
+        "- real corpus trained: `{}`",
+        report.verdict_boundary.real_corpus_trained
     );
 }
 

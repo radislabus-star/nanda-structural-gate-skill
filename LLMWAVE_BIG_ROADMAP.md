@@ -1227,6 +1227,45 @@ copy-span match -> exact recovery, not semantic understanding
 program reuse -> candidate signal, not nonlinear memory proof
 ```
 
+v271-v280: implemented as nanda-llmwave-big surface-corpus-eval
+
+## Phase 11: Surface Corpus Density Candidate, v271-v280
+
+Goal:
+
+```text
+many surface forms
+  -> compare direct lookup
+  -> compare per-form SurfaceProgram32
+  -> compare byte-only fallback
+  -> test family-template reuse
+```
+
+New records:
+
+```text
+SurfaceFamily32
+SurfaceBinding8
+```
+
+Core idea:
+
+```text
+roots + suffixes + family bindings
+  -> many virtual forms
+  -> one shared surface family
+  -> measurable density candidate
+```
+
+Stop rules:
+
+```text
+synthetic family reuse -> candidate, not proof
+real corpus not trained -> no broad claim
+held-out template exact match -> morphology check, not intelligence
+nonlinear_surface_memory_proven remains false
+```
+
 ## Summary
 
 ```text

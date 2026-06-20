@@ -304,6 +304,7 @@ nanda-llmwave-big l2 --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
+nanda-llmwave-big surface-corpus-eval --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -557,6 +558,15 @@ unknown forms. Its report includes `exact_match_rate`, `copy_error_rate`,
 `fallback_rate`, `program_reuse_ratio`, `bytes_per_reconstructable_surface`,
 and direct-lookup baseline bytes. The current state is deliberately
 `TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF`.
+
+`nanda-llmwave-big surface-corpus-eval` adds the v271-v280 corpus-scale surface
+memory eval. It compares direct lookup, per-form `SurfaceProgram32`, byte-only
+fallback, and family-template reuse. The report introduces `SurfaceFamily32` and
+`SurfaceBinding8` as the first measurable route toward combinatorial surface
+memory: shared roots and suffixes can generate many virtual forms. Its verdict
+is deliberately `SURFACE_DENSITY_CANDIDATE_NOT_PROVEN`: useful density is
+visible on the synthetic suite, but real corpus training and nonlinear surface
+memory proof remain false.
 
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual

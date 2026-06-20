@@ -160,6 +160,7 @@ scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
+scripts/nanda-llmwave-big surface-corpus-eval --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -441,7 +442,11 @@ numeric-handle-to-UTF-8 lookup. v261-v270 add
 reconstruction eval. Inspect exact-match, copy-error, fallback-rate,
 program-reuse, bytes-per-reconstructable-surface, and the
 `TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF` state before making any surface
-memory claim.
+memory claim. v271-v280 add `nanda-llmwave-big surface-corpus-eval`: a
+synthetic corpus-scale surface-memory eval with `SurfaceFamily32` and
+`SurfaceBinding8`, comparing direct lookup, per-form programs, byte-only
+fallback, and family-template reuse. Treat
+`SURFACE_DENSITY_CANDIDATE_NOT_PROVEN` as progress, not proof.
 v191-v205 add `nanda-llmwave-big write` and
 `nanda-bench6m --mode write-density`: write decomposition, reconstructability
 score, residual V1, centroid update, anti-residual, schema promotion/split

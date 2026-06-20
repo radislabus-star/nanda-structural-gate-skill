@@ -283,6 +283,7 @@ The current implementation is:
 src/llmwave_big/lexical_birth.rs
 src/llmwave_big/surface_production.rs
 src/llmwave_big/surface_reconstruct.rs
+src/llmwave_big/surface_corpus_eval.rs
 ```
 
 The current inspection commands are:
@@ -291,6 +292,7 @@ The current inspection commands are:
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
+nanda-llmwave-big surface-corpus-eval --format json
 ```
 
 The implemented records are:
@@ -325,6 +327,12 @@ from atom programs, recovers rare codes from evidence spans, and uses byte
 fallback for unknown forms. It reports exact-match and baseline metrics, but its
 state remains `TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF` until a real corpus
 suite shows useful compression and low false-surface rate.
+
+`surface-corpus-eval` is the first density candidate check. It compares direct
+lookup, per-form programs, byte-only fallback, and family-template reuse. The
+new records `SurfaceFamily32` and `SurfaceBinding8` model productive families:
+shared roots and suffixes can create many virtual forms. This is still a
+synthetic suite, so `nonlinear_surface_memory_proven` remains false.
 
 ## Claim Boundary
 

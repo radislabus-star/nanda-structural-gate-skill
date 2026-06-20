@@ -33,6 +33,10 @@
   toy reconstruction eval for surface programs, exact evidence-copy spans, byte
   fallback, direct-lookup baseline bytes, and the
   `TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF` claim boundary.
+- v271-v280 add `nanda-llmwave-big surface-corpus-eval`: a synthetic corpus
+  surface-memory eval with `SurfaceFamily32` and `SurfaceBinding8`, comparing
+  direct lookup, per-form programs, byte-only fallback, and family-template
+  reuse while keeping nonlinear surface memory unproven.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split

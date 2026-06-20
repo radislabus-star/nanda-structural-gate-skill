@@ -96,6 +96,11 @@ jq -e '.roadmap_block == "v261-v270" and .verdict == "SURFACE_RECONSTRUCT_READY"
 jq -e '.eval.cases == 4 and .eval.exact_matches == 4 and .eval.exact_match_rate == 1 and .eval.state == "TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF"' <<<"$big_surface_reconstruct_json" >/dev/null
 jq -e '([.cases[] | "\(.path):\(.reconstructed)"] | index("surface_program:invoice") and index("surface_program:invoicing") and index("evidence_copy_span:PI-HL-RLTG-GZ-20260611-03") and index("byte_fallback:zxq"))' <<<"$big_surface_reconstruct_json" >/dev/null
 jq -e '.bank_summary.hot_core_contains_utf8 == false and .claim_boundary.hot_core_utf8_free == true and .claim_boundary.real_corpus_trained == false and .claim_boundary.free_form_spelling_proven == false and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_reconstruct_json" >/dev/null
+big_surface_corpus_json="$("$llmwave_big" surface-corpus-eval --format json)"
+jq -e '.roadmap_block == "v271-v280" and .verdict == "SURFACE_DENSITY_CANDIDATE_NOT_PROVEN"' <<<"$big_surface_corpus_json" >/dev/null
+jq -e '.corpus.productive_forms == 512 and .reconstruction.exact_match_rate == 1 and .reconstruction.held_out_exact_match_rate == 1' <<<"$big_surface_corpus_json" >/dev/null
+jq -e '.baselines.family_template_bytes < .baselines.direct_lookup_bytes and .baselines.family_template_bytes < .baselines.per_form_program_bytes and .baselines.family_vs_direct_saving_ratio > 0' <<<"$big_surface_corpus_json" >/dev/null
+jq -e '.family_reuse.state == "FAMILY_REUSE_VISIBLE" and .verdict_boundary.useful_density_candidate == true and .verdict_boundary.nonlinear_surface_memory_proven == false and .verdict_boundary.real_corpus_trained == false' <<<"$big_surface_corpus_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
