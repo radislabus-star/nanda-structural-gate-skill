@@ -19,6 +19,7 @@ mod feedback;
 mod focus;
 mod focus_cache;
 mod io;
+mod llmwave_big;
 mod map_gate;
 mod model;
 mod nanda_6m;
@@ -98,6 +99,7 @@ enum Command {
     Llmwave(LlmwaveArgs),
     LlmwaveEval(LlmwaveEvalArgs),
     LlmwaveMemory(LlmwaveMemoryArgs),
+    LlmwaveBig(llmwave_big::LlmwaveBigArgs),
     Demo(DemoArgs),
     Cache {
         #[command(subcommand)]
@@ -1248,6 +1250,7 @@ fn run() -> Result<u8> {
         Command::Llmwave(args) => llmwave_cmd(args),
         Command::LlmwaveEval(args) => llmwave_eval_cmd(args),
         Command::LlmwaveMemory(args) => llmwave_memory_cmd(args),
+        Command::LlmwaveBig(args) => llmwave_big::cmd(args),
         Command::Demo(args) => demo_cmd(args),
         Command::Cache { command } => focus_cache::cache_cmd(command),
         Command::Focus(args) => focus::focus_cmd(args),

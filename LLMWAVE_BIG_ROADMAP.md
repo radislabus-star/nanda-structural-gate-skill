@@ -97,6 +97,15 @@ LLMWAVE_BIG_CANDIDATE
 
 No "we built an LLM" claim before eval.
 
+Implementation checkpoint:
+
+```text
+v158-v160: implemented as nanda-llmwave-big contract
+state: BIG_MODEL_NOT_PROVEN
+scope: contract, metrics, L2/L3 boundary, claim firewall
+not claimed: LLM_READY, NONLINEAR_MEMORY_PROVEN, CACHE_ONLY_EXECUTION_PROVEN
+```
+
 ## Phase 1: Wave Atlas, v161-v170
 
 ### v161 Atlas File Format

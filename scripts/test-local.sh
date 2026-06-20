@@ -27,6 +27,7 @@ pattern_bank="$root/nanda-structural-gate/scripts/nanda-pattern-bank"
 llmwave="$root/nanda-structural-gate/scripts/nanda-llmwave"
 llmwave_eval="$root/nanda-structural-gate/scripts/nanda-llmwave-eval"
 llmwave_memory="$root/nanda-structural-gate/scripts/nanda-llmwave-memory"
+llmwave_big="$root/nanda-structural-gate/scripts/nanda-llmwave-big"
 demo="$root/nanda-structural-gate/scripts/nanda-demo"
 cache="$root/nanda-structural-gate/scripts/nanda-cache"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
@@ -52,6 +53,12 @@ version_text="$("$root/target/debug/nanda" --version)"
 grep -q '^nanda ' <<<"$version_text"
 grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
 grep -q 'nanda_6m:' <<<"$version_text"
+big_contract_json="$("$llmwave_big" contract --format json)"
+jq -e '.roadmap_block == "v158-v160"' <<<"$big_contract_json" >/dev/null
+jq -e '.contract.layers[] | select(.name == "L2 Word Field" and (.must_not_contain | index("schema_route_authority")))' <<<"$big_contract_json" >/dev/null
+jq -e '.contract.layers[] | select(.name == "L3 Schema Field" and (.must_not_contain | index("surface_token_storage")))' <<<"$big_contract_json" >/dev/null
+jq -e '.bigness_metrics.measured_baseline.status == "CONTRACT_BASELINE_ONLY_UNMEASURED_CORPUS"' <<<"$big_contract_json" >/dev/null
+jq -e '.claim_boundary.current_state == "BIG_MODEL_NOT_PROVEN" and .claim_boundary.claims.llm_ready == false and .claim_boundary.claims.nonlinear_memory_proven == false' <<<"$big_contract_json" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"

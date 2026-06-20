@@ -144,6 +144,8 @@ evidence-conflict tasks do.
         ├── nanda-pattern-bank
         ├── nanda-llmwave
         ├── nanda-llmwave-eval
+        ├── nanda-llmwave-memory
+        ├── nanda-llmwave-big
         ├── nanda-demo
         ├── nanda-cache
         ├── nanda-focus
@@ -289,6 +291,7 @@ nanda-llmwave-memory grow .nanda/llmwave-memory.json examples/triad-packet.token
 nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
 nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
+nanda-llmwave-big contract --format json
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -488,6 +491,11 @@ proof that nonlinear density is solved. Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.
+`nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
+the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
+It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and
+measurement surface for the future Wave Atlas + small Active Core, not a claim
+that an LLM or nonlinear memory has already been proven.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

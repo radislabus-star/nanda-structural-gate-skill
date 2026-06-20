@@ -4,6 +4,10 @@
 
 ### Changed
 
+- v158-v160 start the LLMWave-Big track with `nanda-llmwave-big contract`.
+  The command reports the Big Model Contract, required bigness metrics, L2 Word
+  Field vs L3 Schema Field separation, and an explicit claim firewall. Its
+  initial state is deliberately `BIG_MODEL_NOT_PROVEN`.
 - v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active

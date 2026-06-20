@@ -153,6 +153,7 @@ scripts/nanda-llmwave-memory grow .nanda/llmwave-memory.json .nanda/index.json -
 scripts/nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 scripts/nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
 scripts/nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
+scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -390,6 +391,11 @@ duel, margin-vs-baseline compare, anti-wave ablation proxy, fixed-basis sweep
 plan, useful-capacity score, packed density hot-loop report, `bench6m --mode
 density`, L2 candidate cache, and L3 phase-bias into L2. Use `bench6m --mode
 density` when the question is hot-loop speed, not cold JSON report behavior.
+v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
+Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
+separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest
+initial state. Do not claim LLM readiness, nonlinear memory proof, or
+cache-only execution from this contract.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.
