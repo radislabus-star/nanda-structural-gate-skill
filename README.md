@@ -292,6 +292,7 @@ nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
 nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 nanda-llmwave-big contract --format json
+nanda-llmwave-big atlas --format json
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -496,6 +497,11 @@ the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and
 measurement surface for the future Wave Atlas + small Active Core, not a claim
 that an LLM or nonlinear memory has already been proven.
+`nanda-llmwave-big atlas` adds the v161-v170 Wave Atlas contract: fixed
+Symbol/Operator/Schema/Residual records, cold evidence refs, cartridges,
+indexes, Atlas Doctor checks, and a loader preview that outputs compact IDs,
+negative lanes, and evidence refs without evidence text or JSON in the active
+packet.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

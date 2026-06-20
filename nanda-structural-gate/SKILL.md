@@ -154,6 +154,7 @@ scripts/nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 scripts/nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
 scripts/nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 scripts/nanda-llmwave-big contract --format json
+scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -396,6 +397,11 @@ Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest
 initial state. Do not claim LLM readiness, nonlinear memory proof, or
 cache-only execution from this contract.
+v161-v170 add the cold Wave Atlas contract through `nanda-llmwave-big atlas`:
+SymbolAtom, OperatorAtom, SchemaRecord, ResidualRecord, cold evidence refs,
+domain cartridges, loader indexes, Atlas Doctor checks, and an active-packet
+preview. Treat it as cold/warm memory and loader planning; the hot Active Core
+starts later.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

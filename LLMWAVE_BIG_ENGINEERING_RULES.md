@@ -282,10 +282,11 @@ v231-v245   Runtime product
 The first implementation step should create module skeletons and contracts,
 not another report layer in `pattern_store.rs`.
 
-Current v158-v160 command:
+Current v158-v170 commands:
 
 ```bash
 nanda llmwave-big contract --format json
+nanda llmwave-big atlas --format json
 ```
 
 This command must stay contract-only until Wave Atlas, Active Core, L2/L3,

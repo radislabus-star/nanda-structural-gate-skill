@@ -34,10 +34,18 @@ pub(super) struct LlmwaveBigArgs {
 enum LlmwaveBigCommand {
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
+    /// Print the v161-v170 Wave Atlas file/index/loader contract.
+    Atlas(LlmwaveBigAtlasArgs),
 }
 
 #[derive(Parser)]
 struct LlmwaveBigContractArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigAtlasArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -72,6 +80,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::Contract(args) => {
             let report = build_contract_report();
             report::print_contract_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::Atlas(args) => {
+            let report = atlas::build_atlas_report();
+            report::print_atlas_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
@@ -135,6 +148,44 @@ mod tests {
         assert!(!report.claim_boundary.claims.llm_ready);
         assert!(!report.claim_boundary.claims.nonlinear_memory_proven);
         assert!(!report.claim_boundary.claims.cache_only_execution_proven);
+    }
+
+    #[test]
+    fn atlas_contract_keeps_cold_evidence_out_of_active_core() {
+        let report = atlas::build_atlas_report();
+        assert_eq!(report.roadmap_block, "v161-v170");
+        assert_eq!(report.doctor.verdict, "ATLAS_SAMPLE_OK");
+        assert!(report
+            .active_packet_contract
+            .must_not_contain
+            .contains(&"evidence_text"));
+        assert!(report
+            .loader_preview
+            .evidence_refs
+            .iter()
+            .all(|evidence_ref| *evidence_ref > 0));
+    }
+
+    #[test]
+    fn atlas_contract_has_required_record_formats() {
+        let report = atlas::build_atlas_report();
+        let names: Vec<_> = report
+            .record_formats
+            .iter()
+            .map(|record| record.name)
+            .collect();
+        for required in [
+            "SymbolAtom",
+            "OperatorAtom",
+            "SchemaRecord",
+            "ResidualRecord",
+        ] {
+            assert!(names.contains(&required));
+        }
+        assert!(report
+            .indexes
+            .iter()
+            .any(|index| index.name == "query_wave_to_candidate_schemas"));
     }
 
     #[test]

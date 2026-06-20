@@ -311,6 +311,16 @@ negative lanes
 evidence refs
 ```
 
+Implementation checkpoint:
+
+```text
+v161-v170: implemented as nanda-llmwave-big atlas
+state: ATLAS_CONTRACT_READY_NOT_HOT_RUNTIME
+scope: file layout, records, symbol/operator/schema/residual reports,
+       cold evidence refs, cartridges, indexes, doctor, loader preview
+not claimed: hot runtime, cache-only execution, nonlinear memory proof
+```
+
 ## Phase 2: Hot Active Core, v171-v180
 
 ### v171 Active Core Contract

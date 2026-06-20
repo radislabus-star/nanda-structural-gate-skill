@@ -8,6 +8,9 @@
   The command reports the Big Model Contract, required bigness metrics, L2 Word
   Field vs L3 Schema Field separation, and an explicit claim firewall. Its
   initial state is deliberately `BIG_MODEL_NOT_PROVEN`.
+- v161-v170 add `nanda-llmwave-big atlas`, a cold Wave Atlas contract with
+  Symbol/Operator/Schema/Residual records, cold evidence refs, cartridge banks,
+  indexes, Atlas Doctor checks, and a loader preview for compact active packets.
 - v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active

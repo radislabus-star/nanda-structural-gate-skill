@@ -59,6 +59,12 @@ jq -e '.contract.layers[] | select(.name == "L2 Word Field" and (.must_not_conta
 jq -e '.contract.layers[] | select(.name == "L3 Schema Field" and (.must_not_contain | index("surface_token_storage")))' <<<"$big_contract_json" >/dev/null
 jq -e '.bigness_metrics.measured_baseline.status == "CONTRACT_BASELINE_ONLY_UNMEASURED_CORPUS"' <<<"$big_contract_json" >/dev/null
 jq -e '.claim_boundary.current_state == "BIG_MODEL_NOT_PROVEN" and .claim_boundary.claims.llm_ready == false and .claim_boundary.claims.nonlinear_memory_proven == false' <<<"$big_contract_json" >/dev/null
+big_atlas_json="$("$llmwave_big" atlas --format json)"
+jq -e '.roadmap_block == "v161-v170" and .state == "ATLAS_CONTRACT_READY_NOT_HOT_RUNTIME"' <<<"$big_atlas_json" >/dev/null
+jq -e '([.record_formats[].name] | index("SymbolAtom") and index("OperatorAtom") and index("SchemaRecord") and index("ResidualRecord"))' <<<"$big_atlas_json" >/dev/null
+jq -e '.evidence_store.active_core_field == "evidence_ref" and (.active_packet_contract.must_not_contain | index("evidence_text"))' <<<"$big_atlas_json" >/dev/null
+jq -e '.loader_preview.l2_projection == "surface_symbol_projection_only" and .loader_preview.l3_projection == "schema_operator_role_route_projection_only" and .loader_preview.fits_active_core_contract == true' <<<"$big_atlas_json" >/dev/null
+jq -e '.doctor.verdict == "ATLAS_SAMPLE_OK"' <<<"$big_atlas_json" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"

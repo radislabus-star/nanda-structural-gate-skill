@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use super::atlas::AtlasReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
 
@@ -11,6 +12,15 @@ pub(crate) fn print_contract_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_contract_text(report),
         OutputFormat::Md => print_contract_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_atlas_report(report: &AtlasReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_atlas_text(report),
+        OutputFormat::Md => print_atlas_md(report),
     }
     Ok(())
 }
@@ -49,6 +59,30 @@ fn print_contract_text(report: &LlmwaveBigReport) {
     }
 }
 
+fn print_atlas_text(report: &AtlasReport) {
+    println!("LLMWave-Big Wave Atlas");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("state: {}", report.state);
+    println!("doctor: {}", report.doctor.verdict);
+    println!("records:");
+    for record in &report.record_formats {
+        println!("  - {}: {} bytes", record.name, record.bytes);
+    }
+    println!("indexes:");
+    for index in &report.indexes {
+        println!("  - {}: {} -> {}", index.name, index.input, index.output);
+    }
+    println!("loader:");
+    println!(
+        "  top_symbols={} top_schemas={} evidence_refs={} fits_active_core={}",
+        report.loader_preview.top_symbols.len(),
+        report.loader_preview.top_schemas.len(),
+        report.loader_preview.evidence_refs.len(),
+        report.loader_preview.fits_active_core_contract
+    );
+}
+
 fn print_contract_md(report: &LlmwaveBigReport) {
     println!("# LLMWave-Big Contract");
     println!();
@@ -77,4 +111,38 @@ fn print_contract_md(report: &LlmwaveBigReport) {
     for claim in &report.claim_boundary.forbidden_claims {
         println!("- `{claim}`");
     }
+}
+
+fn print_atlas_md(report: &AtlasReport) {
+    println!("# LLMWave-Big Wave Atlas");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- state: `{}`", report.state);
+    println!("- doctor: `{}`", report.doctor.verdict);
+    println!();
+    println!("## Record Formats");
+    println!();
+    for record in &report.record_formats {
+        println!("- `{}`: {} bytes", record.name, record.bytes);
+    }
+    println!();
+    println!("## Loader Preview");
+    println!();
+    println!(
+        "- top symbols: `{}`",
+        report.loader_preview.top_symbols.len()
+    );
+    println!(
+        "- top schemas: `{}`",
+        report.loader_preview.top_schemas.len()
+    );
+    println!(
+        "- evidence refs: `{}`",
+        report.loader_preview.evidence_refs.len()
+    );
+    println!(
+        "- fits active core contract: `{}`",
+        report.loader_preview.fits_active_core_contract
+    );
 }
