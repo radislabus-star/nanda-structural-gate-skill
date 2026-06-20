@@ -291,6 +291,7 @@ nanda llmwave-big active-core --format json
 nanda llmwave-big l2 --format json
 nanda llmwave-big write --format json
 nanda llmwave-big consolidate --format json
+nanda llmwave-big eval --format json
 nanda bench6m --mode active-core --support-build-iterations 1000 --format json
 nanda bench6m --mode write-density --support-build-iterations 1000 --format json
 nanda bench6m --mode consolidate --support-build-iterations 1000 --format json

@@ -297,6 +297,7 @@ nanda-llmwave-big active-core --format json
 nanda-llmwave-big l2 --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
+nanda-llmwave-big eval --format json
 nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
 nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json
@@ -528,6 +529,12 @@ source-aware weighting, and a write-density microbenchmark. It reports
 duplicate merge, alias merge, conflict preservation, schema strength, weak
 residual decay, anti-memory, before/after eval, Atlas rebuild, cartridge
 repacking, cognitive compression score, and `nanda-bench6m --mode consolidate`.
+`nanda-llmwave-big eval` adds the v219-v230 Big Cognition Eval surface:
+documents/money/goods/certification/code/config/source/route domains,
+inference, role-swap, contradiction, multi-hop, missing-evidence, generation,
+style, code, and business task families. It can report `COGNITIVE_LIFT` while
+still keeping LLM, nonlinear-memory, cache-only, and final-candidate claims
+false.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

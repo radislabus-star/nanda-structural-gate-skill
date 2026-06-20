@@ -3,6 +3,7 @@ use anyhow::Result;
 use super::active_core::ActiveCoreReport;
 use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
+use super::eval::BigEvalReport;
 use super::l2_word_field::L2WordFieldReport;
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
@@ -70,6 +71,15 @@ pub(crate) fn print_consolidation_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_consolidation_text(report),
         OutputFormat::Md => print_consolidation_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_big_eval_report(report: &BigEvalReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_big_eval_text(report),
+        OutputFormat::Md => print_big_eval_md(report),
     }
     Ok(())
 }
@@ -215,6 +225,20 @@ fn print_consolidation_text(report: &ConsolidationReport) {
     );
 }
 
+fn print_big_eval_text(report: &BigEvalReport) {
+    println!("LLMWave-Big Cognition Eval");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("cases: {}", report.cases.len());
+    println!("score: {:.3}", report.cognitive_score.total);
+    println!("llm_ready: {}", report.claim_boundary.llm_ready);
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
 fn print_contract_md(report: &LlmwaveBigReport) {
     println!("# LLMWave-Big Contract");
     println!();
@@ -357,5 +381,20 @@ fn print_consolidation_md(report: &ConsolidationReport) {
     println!(
         "- cognitive compression score: `{:.3}`",
         report.cognitive_compression_score
+    );
+}
+
+fn print_big_eval_md(report: &BigEvalReport) {
+    println!("# LLMWave-Big Cognition Eval");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- cases: `{}`", report.cases.len());
+    println!("- cognitive score: `{:.3}`", report.cognitive_score.total);
+    println!("- LLM ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
     );
 }

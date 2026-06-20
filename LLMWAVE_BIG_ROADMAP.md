@@ -95,6 +95,16 @@ COGNITIVE_LIFT_CANDIDATE
 LLMWAVE_BIG_CANDIDATE
 ```
 
+Implementation checkpoint:
+
+```text
+v219-v230: implemented as nanda-llmwave-big eval
+state: COGNITIVE_LIFT for the built-in eval surface
+scope: corpus domains, inference, role swap, contradiction, multi-hop,
+       missing evidence, generation, style, code, business, cognitive score
+not claimed: LLM_READY, LLMWAVE_BIG_CANDIDATE, nonlinear memory proof
+```
+
 No "we built an LLM" claim before eval.
 
 Implementation checkpoint:

@@ -44,6 +44,8 @@ enum LlmwaveBigCommand {
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
     Consolidate(LlmwaveBigConsolidateArgs),
+    /// Print the v219-v230 Big Cognition Eval report.
+    Eval(LlmwaveBigEvalArgs),
 }
 
 #[derive(Parser)]
@@ -78,6 +80,12 @@ struct LlmwaveBigWriteArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigConsolidateArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigEvalArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -138,6 +146,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::Consolidate(args) => {
             let report = consolidation::build_consolidation_report();
             report::print_consolidation_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::Eval(args) => {
+            let report = eval::build_big_eval_report();
+            report::print_big_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
@@ -329,6 +342,36 @@ mod tests {
         assert!(report.eval.after.role_safety >= report.eval.before.role_safety);
         assert!(report.eval.after.false_positives <= report.eval.before.false_positives);
         assert!(report.cognitive_compression_score > 1.0);
+    }
+
+    #[test]
+    fn big_eval_reports_cognitive_lift_without_final_claims() {
+        let report = eval::build_big_eval_report();
+        assert_eq!(report.roadmap_block, "v219-v230");
+        assert_eq!(report.verdict, "COGNITIVE_LIFT");
+        assert!(report.cases.iter().all(|case| case.passed));
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(!report.claim_boundary.candidate_ready);
+    }
+
+    #[test]
+    fn big_eval_covers_required_task_families() {
+        let report = eval::build_big_eval_report();
+        for task_type in [
+            "inference",
+            "role_swap",
+            "contradiction",
+            "multi_hop",
+            "missing_evidence",
+            "generation",
+            "style",
+            "code",
+            "business",
+        ] {
+            assert!(report.cases.iter().any(|case| case.task_type == task_type));
+        }
+        assert!(report.cognitive_score.total >= 0.8);
     }
 
     #[test]

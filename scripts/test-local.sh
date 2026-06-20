@@ -85,6 +85,11 @@ jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$
 jq -e '.conflict_preservation.state == "CONFLICTS_PRESERVED" and .eval.safe == true' <<<"$big_consolidate_json" >/dev/null
 jq -e '.eval.after.memory_bytes < .eval.before.memory_bytes and .eval.after.role_safety >= .eval.before.role_safety' <<<"$big_consolidate_json" >/dev/null
 jq -e '.anti_memory.anti_lanes_created == 1 and .cognitive_compression_score > 1' <<<"$big_consolidate_json" >/dev/null
+big_eval_json="$("$llmwave_big" eval --format json)"
+jq -e '.roadmap_block == "v219-v230" and .verdict == "COGNITIVE_LIFT"' <<<"$big_eval_json" >/dev/null
+jq -e '(.cases | length) == 9 and ([.cases[].task_type] | index("role_swap") and index("contradiction") and index("multi_hop") and index("business"))' <<<"$big_eval_json" >/dev/null
+jq -e '.cognitive_score.total >= 0.8 and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_eval_json" >/dev/null
+jq -e '.claim_boundary.candidate_ready == false' <<<"$big_eval_json" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"

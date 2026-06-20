@@ -159,6 +159,7 @@ scripts/nanda-llmwave-big active-core --format json
 scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
+scripts/nanda-llmwave-big eval --format json
 scripts/nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 scripts/nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
 scripts/nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json
@@ -431,6 +432,10 @@ conflict preservation, schema strength, forgetting, anti-memory,
 before/after eval, cognitive compression score, Atlas rebuild, and cartridge
 repacking. Treat `CONSOLIDATION_SAFE` as sample safety, not broad cognition
 proof.
+v219-v230 add `nanda-llmwave-big eval`: built-in Big Cognition Eval domains
+and task families for inference, role swaps, contradictions, multi-hop,
+missing evidence, generation, style, code, and business routes. Treat
+`COGNITIVE_LIFT` as eval-surface progress only; it is not final LLMWave-Big v1.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

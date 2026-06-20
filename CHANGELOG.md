@@ -27,6 +27,10 @@
   consolidate`: sleep pass, duplicate/alias merge, conflict preservation,
   schema strength, forgetting, anti-memory, before/after eval, Atlas rebuild,
   cartridge repacking, and a typed consolidation microbench.
+- v219-v230 add `nanda-llmwave-big eval`: Big Cognition Eval domains and task
+  families for inference, role swaps, contradictions, multi-hop, missing
+  evidence, generation, style, code, and business routes with a `COGNITIVE_LIFT`
+  verdict that still keeps final LLMWave-Big claims false.
 - v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active
