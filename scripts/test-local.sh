@@ -84,6 +84,13 @@ jq -e '([.record_formats[] | select(.bytes == 32) | .name] | index("LexicalBirth
 jq -e '.surface_production.primary_rule == "do_not_store_words_as_token_id_to_string; produce surfaces from composable form memory"' <<<"$big_word_birth_json" >/dev/null
 jq -e '([.surface_production.production_layers[].layer] | index("grapheme_or_byte_atoms") and index("morpheme_atoms") and index("surface_program") and index("evidence_copy_span"))' <<<"$big_word_birth_json" >/dev/null
 jq -e '.claim_boundary.corpus_proven == false and .claim_boundary.generator_ready == false and .claim_boundary.nonlinear_density_proven == false' <<<"$big_word_birth_json" >/dev/null
+big_surface_json="$("$llmwave_big" surface-production --format json)"
+jq -e '.roadmap_block == "v253-v260" and .verdict == "SURFACE_PRODUCTION_READY"' <<<"$big_surface_json" >/dev/null
+jq -e '.production_law.primary_rule == "do_not_store_words_as_token_id_to_utf8; produce visible forms from composable surface memory"' <<<"$big_surface_json" >/dev/null
+jq -e '([.record_formats[] | "\(.name):\(.bytes)"] | index("SurfaceAtom16:16") and index("SurfaceProgram32:32") and index("EvidenceCopySpan24:24") and index("SurfaceProductionCandidate32:32"))' <<<"$big_surface_json" >/dev/null
+jq -e '.selected.production_path == "surface_program" and .selected.materialization_scope == "cold_report_preview_only_not_hot_storage"' <<<"$big_surface_json" >/dev/null
+jq -e '([.atoms[].layer] | index("grapheme_or_byte_atoms") and index("morpheme_atoms")) and ([.programs[].path] | index("surface_program") and index("evidence_copy_span") and index("byte_fallback"))' <<<"$big_surface_json" >/dev/null
+jq -e '.copy_spans[0].role == "exact rare form recovery" and .claim_boundary.real_corpus_trained == false and .claim_boundary.free_form_spelling_proven == false and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null

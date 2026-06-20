@@ -302,6 +302,7 @@ nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
 nanda-llmwave-big l2 --format json
 nanda-llmwave-big word-birth --format json
+nanda-llmwave-big surface-production --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -537,6 +538,17 @@ that a real corpus has learned new words. Surface text is produced from
 grapheme/byte atoms, morpheme atoms, surface programs, and exact evidence-copy
 spans; words are not modeled as a flat numeric-handle-to-string lookup. The
 canonical mechanism note is [`LEXICAL_BIRTH_MECHANISM.md`](LEXICAL_BIRTH_MECHANISM.md).
+
+`nanda-llmwave-big surface-production` adds the v253-v260 surface production
+memory layer. It fixes the concrete record boundary for producing visible forms:
+`SurfaceAtom16`, `SurfaceProgram32`, `EvidenceCopySpan24`, and
+`SurfaceProductionCandidate32`. The hot core scores compact program ids and copy
+span refs; UTF-8 materialization stays outside the hot loop. Common forms are
+composed from atoms and morphemes, while rare names/codes use exact evidence
+copy spans. The report keeps `real_corpus_trained`,
+`free_form_spelling_proven`, and `nonlinear_surface_memory_proven` false until
+evals prove those claims.
+
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual
 decision, Residual V1 format, anti-residual, promotion/split rules, ablation,

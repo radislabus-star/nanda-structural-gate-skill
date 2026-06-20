@@ -15,6 +15,7 @@ pub mod loader;
 pub mod operators;
 pub mod residuals;
 pub mod schemas;
+pub mod surface_production;
 pub mod symbols;
 pub mod write;
 
@@ -43,6 +44,8 @@ enum LlmwaveBigCommand {
     L2(LlmwaveBigL2Args),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
+    /// Print the v253-v260 surface production memory contract.
+    SurfaceProduction(LlmwaveBigSurfaceProductionArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
@@ -79,6 +82,12 @@ struct LlmwaveBigL2Args {
 
 #[derive(Parser)]
 struct LlmwaveBigWordBirthArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSurfaceProductionArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -160,6 +169,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::WordBirth(args) => {
             let report = lexical_birth::build_lexical_birth_report();
             report::print_lexical_birth_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SurfaceProduction(args) => {
+            let report = surface_production::build_surface_production_report();
+            report::print_surface_production_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Write(args) => {
@@ -396,6 +410,49 @@ mod tests {
             .next_engine_steps
             .iter()
             .any(|step| step.contains("token_id_to_utf8")));
+    }
+
+    #[test]
+    fn surface_production_records_are_fixed_size_boundaries() {
+        assert_eq!(
+            core::mem::size_of::<surface_production::SurfaceAtom16>(),
+            16
+        );
+        assert_eq!(
+            core::mem::size_of::<surface_production::SurfaceProgram32>(),
+            32
+        );
+        assert_eq!(
+            core::mem::size_of::<surface_production::EvidenceCopySpan24>(),
+            24
+        );
+        assert_eq!(
+            core::mem::size_of::<surface_production::SurfaceProductionCandidate32>(),
+            32
+        );
+    }
+
+    #[test]
+    fn surface_production_selects_composition_before_flat_lookup() {
+        let report = surface_production::build_surface_production_report();
+        assert_eq!(report.roadmap_block, "v253-v260");
+        assert_eq!(report.verdict, "SURFACE_PRODUCTION_READY");
+        assert_eq!(report.selected.production_path, "surface_program");
+        assert!(report
+            .production_law
+            .primary_rule
+            .contains("do_not_store_words_as_token_id_to_utf8"));
+        assert!(report
+            .atoms
+            .iter()
+            .any(|atom| atom.layer == "morpheme_atoms"));
+        assert!(report
+            .copy_spans
+            .iter()
+            .any(|span| span.role == "exact rare form recovery"));
+        assert!(!report.claim_boundary.real_corpus_trained);
+        assert!(!report.claim_boundary.free_form_spelling_proven);
+        assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
     }
 
     #[test]

@@ -7,6 +7,7 @@ use super::eval::BigEvalReport;
 use super::l2_word_field::L2WordFieldReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
+use super::surface_production::SurfaceProductionReport;
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
@@ -64,6 +65,18 @@ pub(crate) fn print_lexical_birth_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_lexical_birth_text(report),
         OutputFormat::Md => print_lexical_birth_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_surface_production_report(
+    report: &SurfaceProductionReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_surface_production_text(report),
+        OutputFormat::Md => print_surface_production_md(report),
     }
     Ok(())
 }
@@ -230,6 +243,26 @@ fn print_lexical_birth_text(report: &LexicalBirthReport) {
         report.claim_boundary.corpus_proven,
         report.claim_boundary.generator_ready,
         report.claim_boundary.nonlinear_density_proven
+    );
+}
+
+fn print_surface_production_text(report: &SurfaceProductionReport) {
+    println!("LLMWave-Big Surface Production");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("primary_rule: {}", report.production_law.primary_rule);
+    println!("selected_path: {}", report.selected.production_path);
+    println!("selected_score: {}", report.selected.final_score);
+    println!(
+        "materialized_preview: {}",
+        report.selected.materialized_preview
+    );
+    println!(
+        "claims: real_corpus_trained={} free_form_spelling_proven={} nonlinear_surface_memory_proven={}",
+        report.claim_boundary.real_corpus_trained,
+        report.claim_boundary.free_form_spelling_proven,
+        report.claim_boundary.nonlinear_surface_memory_proven
     );
 }
 
@@ -443,6 +476,51 @@ fn print_lexical_birth_md(report: &LexicalBirthReport) {
     println!(
         "- nonlinear density proven: `{}`",
         report.claim_boundary.nonlinear_density_proven
+    );
+}
+
+fn print_surface_production_md(report: &SurfaceProductionReport) {
+    println!("# LLMWave-Big Surface Production");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- read as: {}", report.read_as);
+    println!("- primary rule: {}", report.production_law.primary_rule);
+    println!();
+    println!("## Record Formats");
+    println!();
+    for record in &report.record_formats {
+        println!("- `{}`: {} bytes", record.name, record.bytes);
+    }
+    println!();
+    println!("## Selected Path");
+    println!();
+    println!("- production path: `{}`", report.selected.production_path);
+    println!("- program id: `{}`", report.selected.program_id);
+    println!("- final score: `{}`", report.selected.final_score);
+    println!(
+        "- materialized preview: `{}`",
+        report.selected.materialized_preview
+    );
+    println!(
+        "- materialization scope: `{}`",
+        report.selected.materialization_scope
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- real corpus trained: `{}`",
+        report.claim_boundary.real_corpus_trained
+    );
+    println!(
+        "- free-form spelling proven: `{}`",
+        report.claim_boundary.free_form_spelling_proven
+    );
+    println!(
+        "- nonlinear surface memory proven: `{}`",
+        report.claim_boundary.nonlinear_surface_memory_proven
     );
 }
 

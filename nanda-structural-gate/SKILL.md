@@ -158,6 +158,7 @@ scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
 scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-llmwave-big word-birth --format json
+scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -429,7 +430,12 @@ candidate from a surface fragment: segmentation, fast mapping,
 cross-situational convergence, usage/exemplar strengthening, grammar
 integration, attractor cleanup, and anti-confusion must all pass before a
 `LexicalBindingRecord32` is created. Treat it as a mechanism contract, not as
-proof that a real corpus has learned new words.
+proof that a real corpus has learned new words. v253-v260 add
+`nanda-llmwave-big surface-production`: fixed `SurfaceAtom16`,
+`SurfaceProgram32`, `EvidenceCopySpan24`, and
+`SurfaceProductionCandidate32` records for composing common forms, copying
+exact rare forms, and falling back to bytes without storing words as a flat
+numeric-handle-to-UTF-8 lookup.
 v191-v205 add `nanda-llmwave-big write` and
 `nanda-bench6m --mode write-density`: write decomposition, reconstructability
 score, residual V1, centroid update, anti-residual, schema promotion/split

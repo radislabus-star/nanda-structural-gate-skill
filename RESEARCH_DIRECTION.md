@@ -42,6 +42,18 @@ The word-birth mechanism is fixed in
 footnotes to the language-acquisition and lexical-memory sources that motivate
 the staged gates.
 
+The surface-production mechanism is implemented in
+`src/llmwave_big/surface_production.rs` and exposed through:
+
+```bash
+nanda-llmwave-big surface-production --format json
+```
+
+This locks the form-memory direction: the model must produce visible forms from
+grapheme/byte atoms, morpheme atoms, surface programs, and exact evidence-copy
+spans. It must not fall back to a flat numeric-handle-to-UTF-8 lookup as the
+core memory story.
+
 ### Holographic Reduced Representations
 
 Sources:

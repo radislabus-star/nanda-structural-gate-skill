@@ -1152,6 +1152,47 @@ context-only peak -> not a word
 high anti-confusion penalty -> do not promote
 ```
 
+v253-v260: implemented as nanda-llmwave-big surface-production
+
+## Phase 9: Surface Production Memory, v253-v260
+
+Goal:
+
+```text
+accepted lexical binding
+  -> surface production candidate
+  -> surface program or exact copy span
+  -> cold UTF-8 materialization
+```
+
+Records:
+
+```text
+SurfaceAtom16
+SurfaceProgram32
+EvidenceCopySpan24
+SurfaceProductionCandidate32
+```
+
+Rules:
+
+```text
+common forms -> compose from atoms and morphemes
+rare names/codes -> copy from evidence spans
+unknown forms -> byte fallback
+hot core -> compact ids, hashes, scores, refs only
+UTF-8 materialization -> outside hot loop
+```
+
+Claim boundary:
+
+```text
+surface production implemented
+real corpus training not proven
+free-form spelling not proven
+nonlinear surface memory not proven
+```
+
 ## Summary
 
 ```text

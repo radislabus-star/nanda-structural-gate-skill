@@ -281,12 +281,14 @@ The current implementation is:
 
 ```text
 src/llmwave_big/lexical_birth.rs
+src/llmwave_big/surface_production.rs
 ```
 
-The current inspection command is:
+The current inspection commands are:
 
 ```bash
 nanda-llmwave-big word-birth --format json
+nanda-llmwave-big surface-production --format json
 ```
 
 The implemented records are:
@@ -294,6 +296,10 @@ The implemented records are:
 ```text
 LexicalBirthCandidate32
 LexicalBindingRecord32
+SurfaceAtom16
+SurfaceProgram32
+EvidenceCopySpan24
+SurfaceProductionCandidate32
 ```
 
 `LexicalBirthCandidate32` is a provisional candidate. It stores compact scores
@@ -303,6 +309,14 @@ and IDs used to decide whether a surface fragment can become a word.
 lemma, concept centroid, context centroid, cleanup target, morphology, grammar
 frame, and evidence count. It still does not claim that visible spelling is
 stored as a flat lookup. Visible spelling belongs to surface production memory.
+
+`SurfaceAtom16` stores compact form atoms: grapheme, byte fallback, root, stem,
+suffix, or ending. `SurfaceProgram32` is the ordered recipe that composes a
+visible form from those atoms. `EvidenceCopySpan24` is the exact recovery path
+for names, codes, and one-off strings observed in evidence. `SurfaceProductionCandidate32`
+scores whether the current field should compose, copy, or fall back to bytes.
+The hot core sees compact ids, scores, hashes, and byte-span refs; UTF-8
+materialization stays outside the hot loop.
 
 ## Claim Boundary
 

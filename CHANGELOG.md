@@ -25,6 +25,10 @@
   integration, attractor cleanup, anti-confusion, fixed 32-byte lexical
   candidate/binding records, and a claim boundary that keeps corpus learning and
   generator readiness unproven.
+- v253-v260 add `nanda-llmwave-big surface-production`: fixed
+  `SurfaceAtom16`, `SurfaceProgram32`, `EvidenceCopySpan24`, and
+  `SurfaceProductionCandidate32` records for producing visible word forms from
+  composable form memory instead of a flat numeric-handle-to-UTF-8 lookup.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split
