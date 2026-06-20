@@ -281,6 +281,7 @@ pub(crate) fn llmwave_memory_cmd(args: LlmwaveMemoryArgs) -> Result<u8> {
         LlmwaveMemoryCommand::Grow(args) => llmwave_memory_grow_cmd(args),
         LlmwaveMemoryCommand::Eval(args) => llmwave_memory_eval_cmd(args),
         LlmwaveMemoryCommand::Demo(args) => llmwave_memory_demo_cmd(args),
+        LlmwaveMemoryCommand::Density(args) => llmwave_memory_density_cmd(args),
         LlmwaveMemoryCommand::Pack(args) => llmwave_memory_pack_cmd(args),
         LlmwaveMemoryCommand::Unpack(args) => llmwave_memory_unpack_cmd(args),
     }
@@ -679,6 +680,331 @@ fn llmwave_memory_demo_cmd(args: LlmwaveMemoryDemoArgs) -> Result<u8> {
     });
     llmwave_memory_emit(out, None, &args.format)?;
     Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_density_cmd(args: LlmwaveMemoryDensityArgs) -> Result<u8> {
+    let out = llmwave_memory_density_report(&args.counts, args.facts);
+    llmwave_memory_emit(out, None, &args.format)?;
+    Ok(EXIT_PASS)
+}
+
+fn llmwave_memory_density_report(counts: &[usize], facts: usize) -> Value {
+    let mut rows = vec![];
+    let mut first_degraded = Value::Null;
+    for &count in counts {
+        let row = llmwave_memory_density_row(count.max(16), facts.max(1));
+        if first_degraded.is_null() && row["state"].as_str() != Some("DENSITY_STABLE") {
+            first_degraded = row.clone();
+        }
+        rows.push(row);
+    }
+    json!({
+        "mode": "llmwave-memory-density",
+        "version": "v127-density-reality-check",
+        "wave_dim": WAVE_DIM,
+        "hot_budget_bytes": nanda_6m::BUDGET_BYTES,
+        "record_bytes": 32,
+        "focus_runtime_triads": nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY,
+        "rows": rows,
+        "first_degraded": first_degraded,
+        "claims_boundary": {
+            "nonlinear_density_proven": false,
+            "cache_only_execution_proven": false,
+            "what_this_measures": "Synthetic useful recall, reversed-trap safety, field-state drift, packed bytes, and hot-focus boundary."
+        },
+        "read_as": "Density reality check is a guardrail against overclaiming: stable rows keep useful recall and reversed traps while record count grows."
+    })
+}
+
+fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
+    let memory = llmwave_synthetic_density_memory(records);
+    let actual_records = memory_record_count(&memory);
+    let probes = [
+        (
+            "what does customs declaration require?",
+            "ANSWER_READY",
+            "customs declaration requires payment confirmation",
+        ),
+        (
+            "who issues invoice?",
+            "ANSWER_READY",
+            "supplier issues invoice",
+        ),
+        (
+            "what supports customs declaration?",
+            "ANSWER_READY",
+            "payment confirmation supports customs declaration",
+        ),
+        ("who pays supplier?", "ANSWER_READY", "buyer pays supplier"),
+        ("what does invoice issue?", "ANSWER_EMPTY", ""),
+    ];
+    let started = std::time::Instant::now();
+    let mut probe_rows = vec![];
+    let mut passed = 0usize;
+    let mut reversed_false_positive = false;
+    let mut state_counts = BTreeMap::<String, usize>::new();
+    let mut field_counts = BTreeMap::<String, usize>::new();
+    let mut margin_sum = 0.0;
+    for (prompt, expected_state, expected_contains) in probes {
+        let answer = llmwave_memory_answer_report(&memory, prompt, facts, 3, "en");
+        let answer_text = answer["answer"].as_str().unwrap_or("");
+        let state = answer["state"]
+            .as_str()
+            .unwrap_or("ANSWER_EMPTY")
+            .to_string();
+        let field_state = answer["field_core"]["state"]
+            .as_str()
+            .unwrap_or("FIELD_EMPTY")
+            .to_string();
+        let ok = state == expected_state
+            && (expected_contains.is_empty() || answer_text.contains(expected_contains));
+        if prompt == "what does invoice issue?" && state == "ANSWER_READY" {
+            reversed_false_positive = true;
+        }
+        passed += usize::from(ok);
+        *state_counts.entry(state.clone()).or_insert(0) += 1;
+        *field_counts.entry(field_state.clone()).or_insert(0) += 1;
+        margin_sum += answer["field_core"]["margin"].as_f64().unwrap_or(0.0);
+        probe_rows.push(json!({
+            "prompt": prompt,
+            "expected_state": expected_state,
+            "actual_state": state,
+            "field_state": field_state,
+            "ok": ok,
+            "answer": answer_text,
+            "top_score": answer["field_core"]["top_score"],
+            "margin": answer["field_core"]["margin"],
+            "facts": answer["grounding"]["facts"]
+        }));
+    }
+    let elapsed_ns = started.elapsed().as_nanos() as u64;
+    let packed_bytes = actual_records * 32;
+    let accuracy = round4(passed as f64 / probes.len() as f64);
+    let avg_margin = round4(margin_sum / probes.len() as f64);
+    let focus_state = if actual_records <= nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY {
+        "HOT_FOCUS_READY"
+    } else if actual_records <= nanda_6m::TRIAD_CAPACITY {
+        "STORAGE_OK_FOCUS_REQUIRED"
+    } else {
+        "OVER_PACKED_TRIAD_CAPACITY"
+    };
+    let state = if accuracy >= 1.0 && !reversed_false_positive {
+        "DENSITY_STABLE"
+    } else if reversed_false_positive {
+        "DENSITY_REVERSED_LEAK"
+    } else {
+        "DENSITY_REVIEW"
+    };
+    json!({
+        "records": actual_records,
+        "requested_records": records,
+        "state": state,
+        "accuracy": accuracy,
+        "passed": passed,
+        "total": probes.len(),
+        "reversed_false_positive": reversed_false_positive,
+        "avg_margin": avg_margin,
+        "elapsed_ns": elapsed_ns,
+        "ns_per_probe": elapsed_ns / probes.len() as u64,
+        "packed_bytes": packed_bytes,
+        "fits_6m": packed_bytes <= nanda_6m::BUDGET_BYTES,
+        "focus_state": focus_state,
+        "answer_states": state_counts,
+        "field_states": field_counts,
+        "probes": probe_rows
+    })
+}
+
+fn llmwave_synthetic_density_memory(records: usize) -> Value {
+    let token_patterns = llmwave_synthetic_density_token_patterns();
+    let mut phrase_patterns = llmwave_synthetic_density_base_phrases();
+    let target_phrase_records = records
+        .saturating_sub(token_patterns.len())
+        .max(phrase_patterns.len());
+    while phrase_patterns.len() < target_phrase_records {
+        let index = phrase_patterns.len() - 4;
+        phrase_patterns.push(llmwave_synthetic_density_noise_phrase(index));
+    }
+    let packed_bytes = (token_patterns.len() + phrase_patterns.len()) * 32;
+    json!({
+        "mode": "llmwave-memory",
+        "version": "v127-density-synthetic-memory",
+        "source": {
+            "text": "synthetic density corpus",
+            "triads": 0,
+            "task_id": "llmwave-density",
+            "domain": "density"
+        },
+        "write_path": {
+            "version": "v127-density-synthetic-memory",
+            "state": "SYNTHETIC_MEMORY_WRITTEN",
+            "token_records": token_patterns.len(),
+            "phrase_records": phrase_patterns.len()
+        },
+        "vocabulary": llmwave_memory_vocabulary_from_records(&token_patterns, &phrase_patterns),
+        "wave_memory": {
+            "patterns": [],
+            "token_patterns": token_patterns,
+            "phrase_patterns": phrase_patterns,
+            "phrase_memory": {
+                "version": "v92-phrase-memory",
+                "state": "PHRASE_MEMORY_READY",
+                "records": target_phrase_records
+            },
+            "positive_lanes": [],
+            "negative_lanes": [],
+            "resonance_traces": [],
+            "consolidation": {
+                "version": "v90-consolidation",
+                "state": "NOT_CONSOLIDATED"
+            },
+            "decay": {
+                "version": "v91-decay-forgetting",
+                "state": "NOT_APPLIED"
+            },
+            "packed_runtime": {
+                "version": "v93-packed-6m-memory",
+                "record_bytes": 32,
+                "estimated_packed_bytes": packed_bytes,
+                "hot_budget_bytes": nanda_6m::BUDGET_BYTES,
+                "fits_6m": packed_bytes <= nanda_6m::BUDGET_BYTES
+            }
+        }
+    })
+}
+
+fn llmwave_synthetic_density_token_patterns() -> Vec<Value> {
+    [
+        (
+            "customs declaration",
+            "requires",
+            "customs declaration requires",
+        ),
+        (
+            "customs declaration requires",
+            "payment",
+            "customs declaration requires payment confirmation",
+        ),
+        (
+            "payment confirmation",
+            "supports",
+            "payment confirmation supports customs declaration",
+        ),
+        (
+            "payment confirmation supports",
+            "customs",
+            "payment confirmation supports customs declaration",
+        ),
+        ("supplier", "issues", "supplier issues invoice"),
+        ("supplier issues", "invoice", "supplier issues invoice"),
+        ("buyer", "pays", "buyer pays supplier"),
+        ("buyer pays", "supplier", "buyer pays supplier"),
+        (
+            "what does customs declaration",
+            "requires",
+            "customs declaration requires payment",
+        ),
+        ("who issues", "invoice", "supplier issues invoice"),
+        (
+            "what supports",
+            "customs",
+            "payment confirmation supports customs declaration",
+        ),
+        ("who pays", "supplier", "buyer pays supplier"),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, (prefix, next_token, next_phrase))| {
+        json!({
+            "id": format!("density-token-{index:04}"),
+            "prefix": prefix,
+            "next_token": next_token,
+            "next_phrase": next_phrase,
+            "pattern": format!("{prefix} -> continues -> {next_token}"),
+            "route": "density-control",
+            "group": "density-control",
+            "polarity": "text->continues->token",
+            "strength": 0.75,
+            "accepted": 0,
+            "rejected": 0,
+            "observations": 1
+        })
+    })
+    .collect()
+}
+
+fn llmwave_synthetic_density_base_phrases() -> Vec<Value> {
+    [
+        (
+            "customs declaration requires",
+            "customs declaration requires payment confirmation",
+            "customs declaration",
+            "requires",
+            "payment confirmation",
+        ),
+        (
+            "payment confirmation supports",
+            "payment confirmation supports customs declaration",
+            "payment confirmation",
+            "supports",
+            "customs declaration",
+        ),
+        (
+            "supplier issues invoice",
+            "supplier issues invoice",
+            "supplier",
+            "issues",
+            "invoice",
+        ),
+        (
+            "buyer pays supplier",
+            "buyer pays supplier",
+            "buyer",
+            "pays",
+            "supplier",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, (prefix, phrase, subject, relation, object))| {
+        json!({
+            "id": format!("density-phrase-{index:04}"),
+            "prefix": prefix,
+            "phrase": phrase,
+            "pattern": format!("{prefix} -> phrase -> {phrase}"),
+            "subject": subject,
+            "relation": relation,
+            "object": object,
+            "polarity": "subject->relation->object",
+            "route": "density-control",
+            "strength": 0.75
+        })
+    })
+    .collect()
+}
+
+fn llmwave_synthetic_density_noise_phrase(index: usize) -> Value {
+    let relation = match index % 4 {
+        0 => "requires",
+        1 => "supports",
+        2 => "issues",
+        _ => "pays",
+    };
+    let subject = format!("noise_subject_{index}");
+    let object = format!("noise_object_{index}");
+    let phrase = format!("{subject} {relation} {object}");
+    json!({
+        "id": format!("density-noise-{index:06}"),
+        "prefix": format!("{subject} {relation}"),
+        "phrase": phrase,
+        "pattern": format!("{subject} {relation} -> phrase -> {phrase}"),
+        "subject": subject,
+        "relation": relation,
+        "object": object,
+        "polarity": "subject->relation->object",
+        "route": "density-noise",
+        "strength": 0.35
+    })
 }
 
 fn llmwave_memory_pack_cmd(args: LlmwaveMemoryPackArgs) -> Result<u8> {

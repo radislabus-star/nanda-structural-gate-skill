@@ -43,6 +43,9 @@
 - v120-v126 strengthen the answer field core with relation phase channels,
   subject/object polarity, bidirectional recall, field decomposition,
   phase-collision detection, and reversed-polarity core eval.
+- v127 adds `nanda-llmwave-memory density`, a synthetic density reality check
+  for useful recall, reversed traps, field-state drift, packed bytes, focus
+  boundaries, and claim discipline around nonlinear density.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

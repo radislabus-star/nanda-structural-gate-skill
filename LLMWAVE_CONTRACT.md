@@ -181,6 +181,12 @@ v120-v126 move precision into the field core:
 - core eval includes a reversed-polarity trap such as
   `what does invoice issue?`.
 
+v127 adds Density Reality Check. It synthesizes larger LLMWave memories and
+measures useful recall, reversed-trap safety, field-state drift, packed bytes,
+hot-focus boundary, and timing. It explicitly does not prove nonlinear density
+or cache-only execution; those remain research claims until supported by
+capacity and perf-counter evidence.
+
 ## Lenses
 
 A lens is a readout/projection over the field. The same field can be read

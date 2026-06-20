@@ -574,6 +574,7 @@ enum LlmwaveMemoryCommand {
     Grow(LlmwaveMemoryGrowArgs),
     Eval(LlmwaveMemoryEvalArgs),
     Demo(LlmwaveMemoryDemoArgs),
+    Density(LlmwaveMemoryDensityArgs),
     Pack(LlmwaveMemoryPackArgs),
     Unpack(LlmwaveMemoryUnpackArgs),
 }
@@ -782,6 +783,16 @@ struct LlmwaveMemoryDemoArgs {
     accept_token: String,
     #[arg(long, default_value_t = 3)]
     steps: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveMemoryDensityArgs {
+    #[arg(long, value_delimiter = ',', default_value = "16,64,256,1024,4096")]
+    counts: Vec<usize>,
+    #[arg(long, default_value_t = 3)]
+    facts: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }

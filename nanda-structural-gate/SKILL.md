@@ -151,6 +151,7 @@ scripts/nanda-llmwave-memory train corpus.txt --out .nanda/llmwave-text-memory.j
 scripts/nanda-llmwave-memory grow .nanda/llmwave-memory.json .nanda/index.json --input-format json --out .nanda/llmwave-grown.json
 scripts/nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 scripts/nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
+scripts/nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 scripts/nanda-llmwave-eval --suite examples/llmwave-corpus.json
 scripts/nanda-llmwave-eval --suite examples/token-lens-corpus.json
 scripts/nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -366,7 +367,9 @@ guard for unsafe/rejected beams, multi-step coherence stops, `nanda-serve`
 evidence, review states, `llmwave_answer` serve cache, and QA eval cases.
 v120-v126 strengthen the answer field core with relation phase channels,
 subject/object polarity, bidirectional recall, field decomposition,
-phase-collision detection, and reversed-polarity QA.
+phase-collision detection, and reversed-polarity QA. v127 adds
+`nanda-llmwave-memory density`, a reality check for useful recall,
+reversed-trap safety, field-state drift, packed bytes, and focus boundaries.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

@@ -636,6 +636,8 @@ serve_answer_json="$(printf '{"command":"llmwave_answer","memory":"%s","prompt":
 jq -e 'length == 2 and .[0].ok == true and .[0].result.mode == "llmwave-memory-answer" and .[0].result.state == "ANSWER_READY" and .[0].result.serve_cache.state == "SERVE_ANSWER_WARMED" and .[1].result.serve_cache.state == "SERVE_ANSWER_HIT"' <<<"$(jq -s . <<<"$serve_answer_json")" >/dev/null
 memory_demo_json="$("$llmwave_memory" demo --corpus "$root/examples/llmwave-tiny-corpus.txt" --prompt "what does customs declaration require?")"
 jq -e '.mode == "llmwave-memory-demo" and .version == "v114-public-demo-script" and .state == "LLMWAVE_MEMORY_DEMO_READY" and .after.prompt_adapter.version == "v110-prompt-adapter" and .after.generation.coherence.version == "v112-multi-step-coherence" and .packed.state == "PACKED_MEMORY_OK"' <<<"$memory_demo_json" >/dev/null
+memory_density_json="$("$llmwave_memory" density --counts 16,64,256 --facts 3)"
+jq -e '.mode == "llmwave-memory-density" and .version == "v127-density-reality-check" and .claims_boundary.nonlinear_density_proven == false and .rows[0].records == 16 and .rows[0].state == "DENSITY_STABLE" and .rows[2].records == 256 and .rows[2].focus_state == "HOT_FOCUS_READY" and .rows[].accuracy == 1' <<<"$memory_density_json" >/dev/null
 demo_json="$("$demo" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --text "declaration requires protocols" --format json)"
 jq -e '.mode == "llmwave-demo" and .version == "v62-demo-raw-text-adapter" and .state == "PUBLIC_DEMO_READY" and (.weak_spots | length) == 0' <<<"$demo_json" >/dev/null
 demo_review_json="$("$demo" "$root/examples/triad-packet.demo-review-empty.json" --input-format json --text "unsupported relation" --format json || true)"

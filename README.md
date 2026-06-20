@@ -288,6 +288,7 @@ nanda-llmwave-memory train corpus.txt --out .nanda/llmwave-text-memory.json
 nanda-llmwave-memory grow .nanda/llmwave-memory.json examples/triad-packet.token-lens-business.json --input-format json --out .nanda/llmwave-grown.json
 nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
+nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
