@@ -10,6 +10,7 @@ pub mod consolidation;
 pub mod eval;
 pub mod l2_word_field;
 pub mod l3_schema_field;
+pub mod lexical_birth;
 pub mod loader;
 pub mod operators;
 pub mod residuals;
@@ -40,6 +41,8 @@ enum LlmwaveBigCommand {
     ActiveCore(LlmwaveBigActiveCoreArgs),
     /// Print the v181-v190 L2 Word Field contract and surface sample.
     L2(LlmwaveBigL2Args),
+    /// Print the v246-v252 literature-grounded lexical birth mechanism.
+    WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
@@ -70,6 +73,12 @@ struct LlmwaveBigActiveCoreArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigL2Args {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigWordBirthArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -146,6 +155,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 l2_word_field::build_l2_word_field_report(l3_schema_field::business_invoice_bias());
             report::print_l2_word_field_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::WordBirth(args) => {
+            let report = lexical_birth::build_lexical_birth_report();
+            report::print_lexical_birth_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Write(args) => {
@@ -313,6 +327,52 @@ mod tests {
             .expect("inventory candidate");
         assert!(inventory.anti_score > 0);
         assert!(inventory.final_score < report.candidate_cache.sample[0].final_score);
+    }
+
+    #[test]
+    fn lexical_birth_mechanism_uses_literature_stages() {
+        let report = lexical_birth::build_lexical_birth_report();
+        assert_eq!(report.roadmap_block, "v246-v252");
+        assert_eq!(report.verdict, "LEXICAL_BIRTH_MECHANISM_READY");
+        for stage in [
+            "segmentation",
+            "fast_mapping",
+            "cross_situational_convergence",
+            "usage_exemplar_strengthening",
+            "grammar_integration",
+            "attractor_cleanup",
+            "anti_confusion",
+        ] {
+            assert!(report.birth_stages.iter().any(|item| item.stage == stage));
+        }
+    }
+
+    #[test]
+    fn lexical_birth_accepts_only_stable_nonconfused_sample() {
+        let report = lexical_birth::build_lexical_birth_report();
+        assert_eq!(report.sample.gate.verdict, "WORD_ACCEPTED");
+        assert!(report.sample.binding_record.is_some());
+        assert_eq!(
+            report.rejection_control.gate.verdict,
+            "WORD_REJECTED_OR_WAITING"
+        );
+        assert!(report.rejection_control.binding_record.is_none());
+        assert!(!report.claim_boundary.corpus_proven);
+        assert!(!report.claim_boundary.generator_ready);
+        assert!(!report.claim_boundary.nonlinear_density_proven);
+    }
+
+    #[test]
+    fn lexical_birth_records_are_fixed_size_boundaries() {
+        let report = lexical_birth::build_lexical_birth_report();
+        assert!(report
+            .record_formats
+            .iter()
+            .any(|record| { record.name == "LexicalBirthCandidate32" && record.bytes == 32 }));
+        assert!(report
+            .record_formats
+            .iter()
+            .any(|record| { record.name == "LexicalBindingRecord32" && record.bytes == 32 }));
     }
 
     #[test]

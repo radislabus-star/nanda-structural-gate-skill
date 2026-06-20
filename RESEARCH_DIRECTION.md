@@ -200,6 +200,43 @@ What not to copy:
   and mixed evidence are messier. NANDA should borrow the inspection discipline,
   not pretend every problem is modular arithmetic.
 
+### Word Birth / Mental Lexicon
+
+Sources:
+
+- Levelt et al., lexical access model: lexical concept -> lemma -> word form.
+- Plaut, McClelland, Seidenberg, Patterson, triangle model of word reading:
+  orthography, phonology, and semantics are coupled distributed fields.
+- Saffran, Aslin, Newport, statistical learning and word segmentation, 1996.
+- Smith and Yu, cross-situational word learning, 2008.
+- Bates and Goodman, grammar and lexicon are not cleanly separable, 1997.
+- Bybee / usage-based and exemplar lexicon: repeated traces strengthen lexical
+  storage.
+- DevLex / Li, Farkas, MacWhinney: self-organizing lexical maps bind surface
+  and meaning over development.
+
+What to import:
+
+- A word is not born as a UTF-8 string or a hash. It is born as a stable binding
+  across surface form, meaning context, syntactic behavior, usage evidence, and
+  recoverability.
+- Word birth needs staged gates: segmentation, fast mapping, cross-situational
+  convergence, usage/exemplar strengthening, grammar integration,
+  attractor/cleanup stability, and anti-confusion against nearby words.
+- Store provisional words separately from accepted lexical bindings. A noisy
+  surface fragment should remain provisional until it survives context and
+  anti-confusion tests.
+- Keep an invertible surface dictionary for actual text output. A wave seed or
+  surface hash can select a word candidate, but cannot spell it by itself.
+
+What not to claim:
+
+- A high context score is not a word.
+- A token id without an invertible surface form cannot generate text.
+- A single observation is not lexical learning.
+- A lexical birth mechanism is not proof that a real corpus has learned new
+  vocabulary.
+
 ## NANDA Design Consequences
 
 The next LLMWave line should preserve these laws:

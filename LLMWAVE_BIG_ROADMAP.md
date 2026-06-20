@@ -129,7 +129,7 @@ atlas/
   schemas.bin
   residuals.bin
   evidence.bin
-  cartridges/
+  domain_banks/
     code.bin
     business.bin
     customs.bin
@@ -263,9 +263,9 @@ canonical/current/archive
 
 Only `evidence_ref` enters the active core.
 
-### v167 Cartridge Banks
+### v167 Domain Memory Banks
 
-Domain cartridges:
+Domain memory banks:
 
 ```text
 language_ru
@@ -327,7 +327,7 @@ Implementation checkpoint:
 v161-v170: implemented as nanda-llmwave-big atlas
 state: ATLAS_CONTRACT_READY_NOT_HOT_RUNTIME
 scope: file layout, records, symbol/operator/schema/residual reports,
-       cold evidence refs, cartridges, indexes, doctor, loader preview
+       cold evidence refs, domain banks, indexes, doctor, loader preview
 not claimed: hot runtime, cache-only execution, nonlinear memory proof
 ```
 
@@ -822,7 +822,7 @@ bench: nanda-bench6m --mode consolidate
 state: CONSOLIDATION_SAFE for the built-in sleep sample
 scope: sleep pass, duplicate merge, alias merge, conflict preservation,
        schema strength, forgetting, anti-memory, before/after eval,
-       cognitive compression score, Atlas rebuild, cartridge repacking
+       cognitive compression score, Atlas rebuild, memory-bank repacking
 not claimed: broad cognitive compression proof, lossy conflict resolution
 ```
 
@@ -960,7 +960,7 @@ code
 
 ### v237 Memory Export
 
-Export cartridges and active packets.
+Export domain memory banks and active packets.
 
 ### v238 Personal Atlas
 
@@ -1101,6 +1101,57 @@ compression_gain
 generation_consistency
 ```
 
+## v246-v252: Lexical Birth Mechanism
+
+Question:
+
+```text
+when is a repeated surface fragment allowed to become a word?
+```
+
+Literature basis:
+
+```text
+mental lexicon
+triangle form/meaning models
+statistical word segmentation
+fast mapping
+cross-situational learning
+usage/exemplar strengthening
+grammar/lexicon coupling
+attractor cleanup
+```
+
+Mechanism:
+
+```text
+surface stream
+  -> segmentation candidate
+  -> provisional symbol_id
+  -> cross-situational context centroid
+  -> usage/exemplar strengthening
+  -> grammar frame binding
+  -> attractor cleanup target
+  -> anti-confusion gate
+  -> accepted lexical binding
+```
+
+Records:
+
+```text
+LexicalBirthCandidate32
+LexicalBindingRecord32
+```
+
+Stop rules:
+
+```text
+no invertible surface form -> no text generation
+one observation -> provisional only
+context-only peak -> not a word
+high anti-confusion penalty -> do not promote
+```
+
 ## Summary
 
 ```text
@@ -1108,6 +1159,7 @@ Wave Atlas is large.
 Hot Core is small.
 L2 speaks.
 L3 thinks.
+Words are born through staged lexicalization.
 Residuals store private facts.
 Schemas store general cognition.
 Consolidation grows intelligence.

@@ -295,6 +295,7 @@ nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
 nanda-llmwave-big l2 --format json
+nanda-llmwave-big word-birth --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -507,7 +508,7 @@ It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and
 measurement surface for the future Wave Atlas + small Active Core, not a claim
 that an LLM or nonlinear memory has already been proven.
 `nanda-llmwave-big atlas` adds the v161-v170 Wave Atlas contract: fixed
-Symbol/Operator/Schema/Residual records, cold evidence refs, cartridges,
+Symbol/Operator/Schema/Residual records, cold evidence refs, domain banks,
 indexes, Atlas Doctor checks, and a loader preview that outputs compact IDs,
 negative lanes, and evidence refs without evidence text or JSON in the active
 packet.
@@ -521,6 +522,12 @@ Atlas loading, and report serialization.
 surface slice, prefix wave, 128-4096 candidate cache, L3 bias into surface
 candidates, anti-wave suppression for schema-breaking prefix matches, L2/L3
 sync policy, multilingual surface banks, and L2 eval metrics.
+`nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
+the literature line: statistical segmentation, fast mapping, cross-situational
+convergence, usage/exemplar strengthening, grammar integration, attractor
+cleanup, and anti-confusion. It reports fixed 32-byte candidate and binding
+records plus a strict claim boundary: this is a mechanism contract, not proof
+that a real corpus has learned new words.
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual
 decision, Residual V1 format, anti-residual, promotion/split rules, ablation,
@@ -528,8 +535,9 @@ source-aware weighting, and a write-density microbenchmark. It reports
 `RESIDUAL_SAVING`, not nonlinear memory proof.
 `nanda-llmwave-big consolidate` adds the v206-v218 consolidation/sleep contract:
 duplicate merge, alias merge, conflict preservation, schema strength, weak
-residual decay, anti-memory, before/after eval, Atlas rebuild, cartridge
-repacking, cognitive compression score, and `nanda-bench6m --mode consolidate`.
+residual decay, anti-memory, before/after eval, Atlas rebuild, memory-bank
+repacking, cognitive compression score, and `nanda-bench6m --mode
+consolidate`.
 `nanda-llmwave-big eval` adds the v219-v230 Big Cognition Eval surface:
 documents/money/goods/certification/code/config/source/route domains,
 inference, role-swap, contradiction, multi-hop, missing-evidence, generation,

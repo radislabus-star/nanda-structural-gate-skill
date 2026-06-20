@@ -157,6 +157,7 @@ scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
 scripts/nanda-llmwave-big l2 --format json
+scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -408,7 +409,7 @@ initial state. Do not claim LLM readiness, nonlinear memory proof, or
 cache-only execution from this contract.
 v161-v170 add the cold Wave Atlas contract through `nanda-llmwave-big atlas`:
 SymbolAtom, OperatorAtom, SchemaRecord, ResidualRecord, cold evidence refs,
-domain cartridges, loader indexes, Atlas Doctor checks, and an active-packet
+domain memory banks, loader indexes, Atlas Doctor checks, and an active-packet
 preview. Treat it as cold/warm memory and loader planning; the hot Active Core
 starts later.
 v171-v180 add `nanda-llmwave-big active-core` and
@@ -422,6 +423,13 @@ slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
 L2/L3 sync policy, multilingual surface banks, L2 eval metrics, and
 `L2_READY` / `L2_NEEDS_L3` / `L2_AMBIGUOUS` verdicts. Keep L2 as
 token/root/morpheme/form surface; do not store schemas/routes as L2 facts.
+v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
+birth mechanism. Inspect it when the agent needs to distinguish a real word
+candidate from a surface fragment: segmentation, fast mapping,
+cross-situational convergence, usage/exemplar strengthening, grammar
+integration, attractor cleanup, and anti-confusion must all pass before a
+`LexicalBindingRecord32` is created. Treat it as a mechanism contract, not as
+proof that a real corpus has learned new words.
 v191-v205 add `nanda-llmwave-big write` and
 `nanda-bench6m --mode write-density`: write decomposition, reconstructability
 score, residual V1, centroid update, anti-residual, schema promotion/split
@@ -430,7 +438,7 @@ rules, ablation, source-aware weighting, and write-density microbench. Treat
 v206-v218 add `nanda-llmwave-big consolidate` and
 `nanda-bench6m --mode consolidate`: sleep pass, duplicate merge, alias merge,
 conflict preservation, schema strength, forgetting, anti-memory,
-before/after eval, cognitive compression score, Atlas rebuild, and cartridge
+before/after eval, cognitive compression score, Atlas rebuild, and memory-bank
 repacking. Treat `CONSOLIDATION_SAFE` as sample safety, not broad cognition
 proof.
 v219-v230 add `nanda-llmwave-big eval`: built-in Big Cognition Eval domains

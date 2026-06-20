@@ -9,7 +9,7 @@
   Field vs L3 Schema Field separation, and an explicit claim firewall. Its
   initial state is deliberately `BIG_MODEL_NOT_PROVEN`.
 - v161-v170 add `nanda-llmwave-big atlas`, a cold Wave Atlas contract with
-  Symbol/Operator/Schema/Residual records, cold evidence refs, cartridge banks,
+  Symbol/Operator/Schema/Residual records, cold evidence refs, domain banks,
   indexes, Atlas Doctor checks, and a loader preview for compact active packets.
 - v171-v180 add `nanda-llmwave-big active-core` and `nanda-bench6m --mode
   active-core`: fixed ActivePacket records, a 6,291,456-byte budget,
@@ -19,6 +19,12 @@
   slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
   L2/L3 sync policy, multilingual surface banks, eval metrics, and L2 runtime
   verdicts.
+- v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
+  birth mechanism with statistical segmentation, fast mapping,
+  cross-situational convergence, usage/exemplar strengthening, grammar
+  integration, attractor cleanup, anti-confusion, fixed 32-byte lexical
+  candidate/binding records, and a claim boundary that keeps corpus learning and
+  generator readiness unproven.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split
@@ -26,7 +32,7 @@
 - v206-v218 add `nanda-llmwave-big consolidate` and `nanda-bench6m --mode
   consolidate`: sleep pass, duplicate/alias merge, conflict preservation,
   schema strength, forgetting, anti-memory, before/after eval, Atlas rebuild,
-  cartridge repacking, and a typed consolidation microbench.
+  memory-bank repacking, and a typed consolidation microbench.
 - v219-v230 add `nanda-llmwave-big eval`: Big Cognition Eval domains and task
   families for inference, role swaps, contradictions, multi-hop, missing
   evidence, generation, style, code, and business routes with a `COGNITIVE_LIFT`

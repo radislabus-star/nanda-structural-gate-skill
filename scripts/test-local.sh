@@ -75,6 +75,13 @@ jq -e '.roadmap_block == "v181-v190" and .verdict == "L2_READY"' <<<"$big_l2_jso
 jq -e '.candidate_cache.record_bytes == 32 and .candidate_cache.top_token_label == "invoice" and .candidate_cache.margin >= 12' <<<"$big_l2_json" >/dev/null
 jq -e '.sync_policy.l2_update == "per_keystroke" and .sync_policy.l3_update == "word_boundary_punctuation_semantic_shift"' <<<"$big_l2_json" >/dev/null
 jq -e '.candidate_cache.sample[] | select(.label == "inventory" and .anti_score > 0 and .final_score < 0)' <<<"$big_l2_json" >/dev/null
+big_word_birth_json="$("$llmwave_big" word-birth --format json)"
+jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
+jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null
+jq -e '.rejection_control.gate.verdict == "WORD_REJECTED_OR_WAITING" and .rejection_control.binding_record == null' <<<"$big_word_birth_json" >/dev/null
+jq -e '([.birth_stages[].stage] | index("segmentation") and index("cross_situational_convergence") and index("attractor_cleanup") and index("anti_confusion"))' <<<"$big_word_birth_json" >/dev/null
+jq -e '([.record_formats[] | select(.bytes == 32) | .name] | index("LexicalBirthCandidate32") and index("LexicalBindingRecord32"))' <<<"$big_word_birth_json" >/dev/null
+jq -e '.claim_boundary.corpus_proven == false and .claim_boundary.generator_ready == false and .claim_boundary.nonlinear_density_proven == false' <<<"$big_word_birth_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null

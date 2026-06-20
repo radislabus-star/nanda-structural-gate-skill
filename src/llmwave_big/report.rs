@@ -5,6 +5,7 @@ use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::eval::BigEvalReport;
 use super::l2_word_field::L2WordFieldReport;
+use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
@@ -51,6 +52,18 @@ pub(crate) fn print_l2_word_field_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_l2_word_field_text(report),
         OutputFormat::Md => print_l2_word_field_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_lexical_birth_report(
+    report: &LexicalBirthReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_lexical_birth_text(report),
+        OutputFormat::Md => print_lexical_birth_md(report),
     }
     Ok(())
 }
@@ -196,6 +209,27 @@ fn print_l2_word_field_text(report: &L2WordFieldReport) {
     println!(
         "sync: {}/{}",
         report.sync_policy.l2_update, report.sync_policy.l3_update
+    );
+}
+
+fn print_lexical_birth_text(report: &LexicalBirthReport) {
+    println!("LLMWave-Big Lexical Birth");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("word_definition: {}", report.word_definition);
+    println!("sample_surface: {}", report.sample.surface);
+    println!("sample_gate: {}", report.sample.gate.verdict);
+    println!("sample_score: {}", report.sample.gate.total_score);
+    println!(
+        "rejection_control: {}",
+        report.rejection_control.gate.verdict
+    );
+    println!(
+        "claims: corpus_proven={} generator_ready={} nonlinear_density_proven={}",
+        report.claim_boundary.corpus_proven,
+        report.claim_boundary.generator_ready,
+        report.claim_boundary.nonlinear_density_proven
     );
 }
 
@@ -369,6 +403,47 @@ fn print_l2_word_field_md(report: &L2WordFieldReport) {
             candidate.label, candidate.final_score, candidate.anti_score
         );
     }
+}
+
+fn print_lexical_birth_md(report: &LexicalBirthReport) {
+    println!("# LLMWave-Big Lexical Birth");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- read as: {}", report.read_as);
+    println!("- word definition: {}", report.word_definition);
+    println!();
+    println!("## Birth Stages");
+    println!();
+    for stage in &report.birth_stages {
+        println!(
+            "- `{}`: {} -> {}",
+            stage.stage, stage.input_signal, stage.gate
+        );
+    }
+    println!();
+    println!("## Sample Gate");
+    println!();
+    println!("- surface: `{}`", report.sample.surface);
+    println!("- verdict: `{}`", report.sample.gate.verdict);
+    println!("- score: `{}`", report.sample.gate.total_score);
+    println!(
+        "- rejection control: `{}`",
+        report.rejection_control.gate.verdict
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!("- corpus proven: `{}`", report.claim_boundary.corpus_proven);
+    println!(
+        "- generator ready: `{}`",
+        report.claim_boundary.generator_ready
+    );
+    println!(
+        "- nonlinear density proven: `{}`",
+        report.claim_boundary.nonlinear_density_proven
+    );
 }
 
 fn print_write_md(report: &WriteReport) {
