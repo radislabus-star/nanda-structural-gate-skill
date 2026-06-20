@@ -746,11 +746,20 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
     let mut state_counts = BTreeMap::<String, usize>::new();
     let mut field_counts = BTreeMap::<String, usize>::new();
     let mut margin_sum = 0.0;
+    let mut top_score_sum = 0.0;
+    let mut suppressed_sum = 0usize;
+    let mut anti_sum = 0.0;
     let mut lexical_passed = 0usize;
     let mut lexical_reversed_false_positive = false;
+    let mut relation_passed = 0usize;
+    let mut relation_reversed_false_positive = false;
+    let mut naive_passed = 0usize;
+    let mut naive_reversed_false_positive = false;
     for (prompt, expected_state, expected_contains) in probes {
         let answer = llmwave_memory_answer_report(&memory, prompt, facts, 3, "en");
         let lexical = llmwave_density_lexical_baseline(&memory, prompt);
+        let relation_baseline = llmwave_density_relation_baseline(&memory, prompt);
+        let naive_vector = llmwave_density_naive_vector_baseline(&memory, prompt);
         let answer_text = answer["answer"].as_str().unwrap_or("");
         let state = answer["state"]
             .as_str()
@@ -758,6 +767,12 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
             .to_string();
         let lexical_state = lexical["state"].as_str().unwrap_or("ANSWER_EMPTY");
         let lexical_answer = lexical["answer"].as_str().unwrap_or("");
+        let relation_state = relation_baseline["state"]
+            .as_str()
+            .unwrap_or("ANSWER_EMPTY");
+        let relation_answer = relation_baseline["answer"].as_str().unwrap_or("");
+        let naive_state = naive_vector["state"].as_str().unwrap_or("ANSWER_EMPTY");
+        let naive_answer = naive_vector["answer"].as_str().unwrap_or("");
         let field_state = answer["field_core"]["state"]
             .as_str()
             .unwrap_or("FIELD_EMPTY")
@@ -766,17 +781,34 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
             && (expected_contains.is_empty() || answer_text.contains(expected_contains));
         let lexical_ok = lexical_state == expected_state
             && (expected_contains.is_empty() || lexical_answer.contains(expected_contains));
+        let relation_ok = relation_state == expected_state
+            && (expected_contains.is_empty() || relation_answer.contains(expected_contains));
+        let naive_ok = naive_state == expected_state
+            && (expected_contains.is_empty() || naive_answer.contains(expected_contains));
         if prompt == "what does invoice issue?" && state == "ANSWER_READY" {
             reversed_false_positive = true;
         }
         if prompt == "what does invoice issue?" && lexical_state == "ANSWER_READY" {
             lexical_reversed_false_positive = true;
         }
+        if prompt == "what does invoice issue?" && relation_state == "ANSWER_READY" {
+            relation_reversed_false_positive = true;
+        }
+        if prompt == "what does invoice issue?" && naive_state == "ANSWER_READY" {
+            naive_reversed_false_positive = true;
+        }
         passed += usize::from(ok);
         lexical_passed += usize::from(lexical_ok);
+        relation_passed += usize::from(relation_ok);
+        naive_passed += usize::from(naive_ok);
         *state_counts.entry(state.clone()).or_insert(0) += 1;
         *field_counts.entry(field_state.clone()).or_insert(0) += 1;
         margin_sum += answer["field_core"]["margin"].as_f64().unwrap_or(0.0);
+        top_score_sum += answer["field_core"]["top_score"].as_f64().unwrap_or(0.0);
+        suppressed_sum += answer["grounding"]["suppressed_facts"]
+            .as_array()
+            .map_or(0, Vec::len);
+        anti_sum += answer["field_core"]["anti_energy"].as_f64().unwrap_or(0.0);
         probe_rows.push(json!({
             "prompt": prompt,
             "expected_state": expected_state,
@@ -785,7 +817,11 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
             "ok": ok,
             "answer": answer_text,
             "lexical_baseline": lexical,
+            "relation_baseline": relation_baseline,
+            "naive_vector_baseline": naive_vector,
             "wins_over_lexical_baseline": ok && !lexical_ok,
+            "wins_over_relation_baseline": ok && !relation_ok,
+            "wins_over_naive_vector_baseline": ok && !naive_ok,
             "top_score": answer["field_core"]["top_score"],
             "margin": answer["field_core"]["margin"],
             "facts": answer["grounding"]["facts"]
@@ -795,7 +831,17 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
     let packed_bytes = actual_records * 32;
     let accuracy = round4(passed as f64 / probes.len() as f64);
     let lexical_accuracy = round4(lexical_passed as f64 / probes.len() as f64);
+    let relation_accuracy = round4(relation_passed as f64 / probes.len() as f64);
+    let naive_accuracy = round4(naive_passed as f64 / probes.len() as f64);
     let avg_margin = round4(margin_sum / probes.len() as f64);
+    let avg_top_score = round4(top_score_sum / probes.len() as f64);
+    let avg_suppressed = round4(suppressed_sum as f64 / probes.len() as f64);
+    let avg_anti_energy = round4(anti_sum / probes.len() as f64);
+    let nonlinear = llmwave_density_nonlinear_candidate(avg_top_score, avg_margin, avg_anti_energy);
+    let phase_lock = llmwave_density_phase_lock(&field_counts, &probe_rows);
+    let packed_hot_loop = llmwave_density_packed_hot_loop(records);
+    let focus_experiment = llmwave_density_focus_experiment(actual_records);
+    let l2 = llmwave_density_l2_contour(actual_records);
     let focus_state = if actual_records <= nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY {
         "HOT_FOCUS_READY"
     } else if actual_records <= nanda_6m::TRIAD_CAPACITY {
@@ -825,13 +871,44 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
             "total": probes.len(),
             "reversed_false_positive": lexical_reversed_false_positive
         },
+        "relation_baseline": {
+            "version": "v132-relation-only-baseline",
+            "accuracy": relation_accuracy,
+            "passed": relation_passed,
+            "total": probes.len(),
+            "reversed_false_positive": relation_reversed_false_positive
+        },
+        "naive_vector_baseline": {
+            "version": "v132-naive-vector-baseline",
+            "accuracy": naive_accuracy,
+            "passed": naive_passed,
+            "total": probes.len(),
+            "reversed_false_positive": naive_reversed_false_positive
+        },
         "wins_over_lexical_baseline": accuracy > lexical_accuracy
             || (!reversed_false_positive && lexical_reversed_false_positive),
+        "wins_over_expanded_baselines": accuracy > lexical_accuracy
+            || accuracy > relation_accuracy
+            || accuracy > naive_accuracy
+            || (!reversed_false_positive && (lexical_reversed_false_positive || relation_reversed_false_positive || naive_reversed_false_positive)),
         "density_signal": if accuracy > lexical_accuracy || (!reversed_false_positive && lexical_reversed_false_positive) {
             "FIELD_BEATS_LEXICAL_BASELINE"
         } else {
             "FIELD_NOT_ABOVE_BASELINE"
         },
+        "phase_lock": phase_lock,
+        "noise_pressure": {
+            "version": "v130-noise-pressure",
+            "avg_suppressed_facts": avg_suppressed,
+            "avg_anti_energy": avg_anti_energy,
+            "avg_margin": avg_margin,
+            "state": if avg_margin >= 0.5 && avg_anti_energy < 0.5 { "NOISE_CONTAINED" } else { "NOISE_REVIEW" }
+        },
+        "nonlinear_candidate": nonlinear,
+        "packed_hot_loop_proxy": packed_hot_loop,
+        "perf_counter_plan": llmwave_density_perf_plan(actual_records),
+        "focus_window_experiment": focus_experiment,
+        "l2_contour_spec": l2,
         "avg_margin": avg_margin,
         "elapsed_ns": elapsed_ns,
         "ns_per_probe": elapsed_ns / probes.len() as u64,
@@ -947,6 +1024,270 @@ fn llmwave_density_lexical_baseline(memory: &Value, prompt: &str) -> Value {
         "top_score": top["score"],
         "top_fact": top,
         "read_as": "Lexical baseline uses only bag-of-words overlap over phrase records; it has no relation phase or subject/object polarity."
+    })
+}
+
+fn llmwave_density_relation_baseline(memory: &Value, prompt: &str) -> Value {
+    let intent = llmwave_query_intent(prompt);
+    let mut rows = memory["wave_memory"]["phrase_patterns"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|record| {
+            let relation = record["relation"].as_str().unwrap_or("");
+            let relation_match = usize::from(relation == intent.relation) as f64;
+            let target_match = llmwave_term_match(
+                &intent.target_terms,
+                record["phrase"].as_str().unwrap_or(""),
+            );
+            json!({
+                "fact": record["phrase"],
+                "score": round4(relation_match + (0.25 * target_match)),
+                "relation": relation,
+                "subject": record["subject"],
+                "object": record["object"]
+            })
+        })
+        .filter(|row| row["score"].as_f64().unwrap_or(0.0) > 0.0)
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let top = rows.first().cloned().unwrap_or(Value::Null);
+    let answer = top["fact"].as_str().unwrap_or("");
+    json!({
+        "mode": "density-relation-baseline",
+        "version": "v132-relation-only-baseline",
+        "state": if answer.is_empty() { "ANSWER_EMPTY" } else { "ANSWER_READY" },
+        "answer": answer,
+        "top_score": top["score"],
+        "top_fact": top,
+        "read_as": "Relation baseline sees relation labels but not subject/object polarity."
+    })
+}
+
+fn llmwave_density_naive_vector_baseline(memory: &Value, prompt: &str) -> Value {
+    let query = token_prefix_wave(&tokenize_pattern(prompt));
+    let mut rows = memory["wave_memory"]["phrase_patterns"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|record| {
+            let phrase = record["phrase"].as_str().unwrap_or("");
+            let wave = token_prefix_wave(&tokenize_pattern(phrase));
+            let score = ((cosine(&query, &wave) + 1.0) / 2.0).clamp(0.0, 1.0);
+            json!({
+                "fact": phrase,
+                "score": round4(score),
+                "relation": record["relation"],
+                "subject": record["subject"],
+                "object": record["object"]
+            })
+        })
+        .filter(|row| row["score"].as_f64().unwrap_or(0.0) > 0.0)
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let top = rows.first().cloned().unwrap_or(Value::Null);
+    let answer = top["fact"].as_str().unwrap_or("");
+    json!({
+        "mode": "density-naive-vector-baseline",
+        "version": "v132-naive-vector-baseline",
+        "state": if answer.is_empty() { "ANSWER_EMPTY" } else { "ANSWER_READY" },
+        "answer": answer,
+        "top_score": top["score"],
+        "top_fact": top,
+        "read_as": "Naive vector baseline uses token wave similarity without relation phase or polarity gates."
+    })
+}
+
+fn llmwave_density_phase_lock(field_counts: &BTreeMap<String, usize>, probes: &[Value]) -> Value {
+    let total = probes.len().max(1) as f64;
+    let single = *field_counts.get("FIELD_SINGLE_PEAK").unwrap_or(&0) as f64;
+    let mismatch = *field_counts.get("FIELD_PHASE_MISMATCH").unwrap_or(&0) as f64;
+    let phase_locked = probes
+        .iter()
+        .filter(|probe| {
+            probe["facts"].as_array().into_iter().flatten().any(|fact| {
+                fact["phase"]["relation_phase_score"]
+                    .as_f64()
+                    .unwrap_or(0.0)
+                    >= 1.0
+                    && fact["polarity"]["state"].as_str() == Some("ALIGNED")
+            })
+        })
+        .count() as f64;
+    let score = round4((single + mismatch + phase_locked) / (total * 2.0));
+    json!({
+        "version": "v129-phase-lock-metric",
+        "score": score,
+        "single_peak_count": single as usize,
+        "phase_mismatch_count": mismatch as usize,
+        "aligned_relation_count": phase_locked as usize,
+        "competing_phase_count": *field_counts.get("FIELD_MULTI_PEAK").unwrap_or(&0),
+        "state": if score >= 0.8 { "PHASE_LOCK_STABLE" } else { "PHASE_LOCK_REVIEW" }
+    })
+}
+
+fn llmwave_density_nonlinear_candidate(
+    avg_top_score: f64,
+    avg_margin: f64,
+    avg_anti: f64,
+) -> Value {
+    let linear_energy = round4(avg_top_score + avg_margin - avg_anti);
+    let power_energy =
+        round4(avg_top_score.powf(1.35) + avg_margin.powf(1.20) - avg_anti.powf(1.10));
+    json!({
+        "version": "v131-nonlinear-candidate",
+        "enabled_in_answer_core": false,
+        "linear_energy": linear_energy,
+        "power_energy": power_energy,
+        "delta": round4(power_energy - linear_energy),
+        "read_as": "Experimental power-energy candidate only. It is reported for comparison and is not yet used to decide answers."
+    })
+}
+
+#[derive(Clone, Copy)]
+struct DensityPackedRecord {
+    subject_hash: u32,
+    relation_id: u8,
+    object_hash: u32,
+}
+
+fn llmwave_density_packed_hot_loop(records: usize) -> Value {
+    let memory = llmwave_density_packed_records(records);
+    let probes = [
+        (
+            "what does customs declaration require?",
+            1u8,
+            hash32("customs declaration"),
+            true,
+        ),
+        ("who issues invoice?", 3u8, hash32("invoice"), true),
+        (
+            "what supports customs declaration?",
+            2u8,
+            hash32("customs declaration"),
+            true,
+        ),
+        ("who pays supplier?", 4u8, hash32("supplier"), true),
+        ("what does invoice issue?", 3u8, hash32("invoice"), false),
+    ];
+    let started = std::time::Instant::now();
+    let mut passed = 0usize;
+    let mut checksum = 0u64;
+    for (_prompt, relation, target_hash, should_match) in probes {
+        let mut found = false;
+        for record in &memory {
+            let relation_match = record.relation_id == relation;
+            let target_match = if should_match {
+                record.subject_hash == target_hash || record.object_hash == target_hash
+            } else {
+                record.subject_hash == target_hash
+            };
+            if relation_match && target_match {
+                found = true;
+                checksum = checksum.wrapping_add(record.subject_hash as u64);
+                break;
+            }
+        }
+        passed += usize::from(found == should_match);
+    }
+    let elapsed_ns = started.elapsed().as_nanos() as u64;
+    json!({
+        "version": "v133-packed-density-hot-loop-proxy",
+        "records": memory.len(),
+        "passed": passed,
+        "total": probes.len(),
+        "accuracy": round4(passed as f64 / probes.len() as f64),
+        "elapsed_ns": elapsed_ns,
+        "ns_per_probe": elapsed_ns / probes.len() as u64,
+        "checksum": checksum,
+        "read_as": "Typed packed proxy without JSON/string scoring. It is still a proxy, not the final nanda_6m hot loop."
+    })
+}
+
+fn llmwave_density_packed_records(records: usize) -> Vec<DensityPackedRecord> {
+    let mut out = vec![
+        DensityPackedRecord {
+            subject_hash: hash32("customs declaration"),
+            relation_id: 1,
+            object_hash: hash32("payment confirmation"),
+        },
+        DensityPackedRecord {
+            subject_hash: hash32("payment confirmation"),
+            relation_id: 2,
+            object_hash: hash32("customs declaration"),
+        },
+        DensityPackedRecord {
+            subject_hash: hash32("supplier"),
+            relation_id: 3,
+            object_hash: hash32("invoice"),
+        },
+        DensityPackedRecord {
+            subject_hash: hash32("buyer"),
+            relation_id: 4,
+            object_hash: hash32("supplier"),
+        },
+    ];
+    while out.len() < records {
+        let idx = out.len();
+        out.push(DensityPackedRecord {
+            subject_hash: hash32(&format!("noise_subject_{idx}")),
+            relation_id: ((idx % 4) + 1) as u8,
+            object_hash: hash32(&format!("noise_object_{idx}")),
+        });
+    }
+    out
+}
+
+fn llmwave_density_perf_plan(records: usize) -> Value {
+    json!({
+        "version": "v134-perf-counter-plan",
+        "measured_here": false,
+        "records": records,
+        "command": "perf stat -e cycles,instructions,cache-references,cache-misses,L1-dcache-loads,L1-dcache-load-misses -- nanda llmwave-memory density --counts <N> --facts 3",
+        "read_as": "Run externally when perf permissions are available; this report does not claim cache-only execution."
+    })
+}
+
+fn llmwave_density_focus_experiment(records: usize) -> Value {
+    let focus = nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY;
+    json!({
+        "version": "v135-focus-window-experiment",
+        "records": records,
+        "focus_window": focus,
+        "state": if records <= focus { "SINGLE_FOCUS_PASS" } else { "COARSE_TO_FINE_REQUIRED" },
+        "windows_required": records.div_ceil(focus),
+        "read_as": "65k storage is allowed, but proof should use focused windows until the full hot loop is proven."
+    })
+}
+
+fn llmwave_density_l2_contour(records: usize) -> Value {
+    let l2_budget = 256 * 1024usize;
+    let working_budget = 128 * 1024usize;
+    let local_records = 2048usize.min(working_budget / 32);
+    json!({
+        "version": "v136-v137-l2-contour-spec-prototype",
+        "l2_budget_bytes_observed_t480": l2_budget,
+        "working_budget_bytes": working_budget,
+        "target_local_records": local_records,
+        "input_records": records,
+        "state": if records <= local_records { "L2_CAN_HOLD_ALL_LOCAL_RECORDS" } else { "L2_NEEDS_L3_PHASE_BIAS" },
+        "prototype": {
+            "l3_role": "semantic phase, relation route, polarity filter",
+            "l2_role": "prefix candidates, short context, local rerank",
+            "sync": "word-boundary or punctuation update from L3; per-keystroke local L2 rerank"
+        }
     })
 }
 

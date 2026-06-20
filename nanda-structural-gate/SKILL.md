@@ -373,6 +373,12 @@ reversed-trap safety, field-state drift, packed bytes, and focus boundaries.
 v128 compares the field against a lexical bag-of-words baseline; treat
 `FIELD_BEATS_LEXICAL_BASELINE` as a narrow positive signal, not proof of
 nonlinear density.
+v129-v137 extend density into the LLMWave research probe: phase-lock,
+noise-pressure, nonlinear scoring candidate, relation-only and naive-vector
+baselines, typed packed hot-loop proxy, perf-counter plan, focus-window
+experiment, and L2 local contour spec/prototype. Treat these as measurement
+surfaces. Do not claim nonlinear density unless the fixed-basis field beats
+linear/lexical/vector baselines under capacity and perf-counter evidence.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

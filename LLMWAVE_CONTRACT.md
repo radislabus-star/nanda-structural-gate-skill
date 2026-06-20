@@ -183,11 +183,25 @@ v120-v126 move precision into the field core:
 
 v127-v128 add Density Reality Check. It synthesizes larger LLMWave memories and
 measures useful recall, reversed-trap safety, field-vs-lexical baseline,
-field-state drift, packed bytes, hot-focus boundary, and timing. It explicitly
-does not prove nonlinear density or cache-only execution; those remain research
-claims until supported by capacity and perf-counter evidence. The first useful
-signal is narrower: relation phase and subject/object polarity can beat a
-lexical baseline on reversed-direction traps.
+field-state drift, packed bytes, hot-focus boundary, and timing.
+
+v129-v137 turn that check into a core research probe:
+
+- phase-lock metric over single peaks, phase mismatches, and aligned relation
+  evidence;
+- noise-pressure counters for suppressed facts, anti-energy, and margin;
+- nonlinear scoring candidate reported but not used by the answer core;
+- expanded baselines: lexical, relation-only, and naive token-vector;
+- typed packed hot-loop proxy without JSON/string scoring;
+- perf-counter plan for cycles, instructions, and cache misses;
+- focus-window experiment for 15k proof windows versus wider storage;
+- L2 local contour spec/prototype for prefix candidates and short-context
+  rerank under L3 phase bias.
+
+It explicitly does not prove nonlinear density or cache-only execution; those
+remain research claims until supported by capacity and perf-counter evidence.
+The first useful signal is narrower: relation phase and subject/object polarity
+can beat simple baselines on reversed-direction traps.
 
 ## Lenses
 

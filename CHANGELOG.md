@@ -49,6 +49,12 @@
 - v128 adds a lexical bag-of-words baseline to density checks, making
   `FIELD_BEATS_LEXICAL_BASELINE` visible when relation phase and polarity avoid
   reversed-direction false positives.
+- v129-v137 extend density into a roadmap-grade core probe: phase-lock score,
+  noise-pressure counters, an off-by-default nonlinear scoring candidate,
+  relation-only and naive-vector baselines, a typed packed hot-loop proxy, a
+  perf-counter command plan, a focus-window experiment, and the first L2 local
+  contour spec/prototype. These reports still do not prove nonlinear density;
+  they define the measurements needed before making that claim.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

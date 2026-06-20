@@ -477,7 +477,11 @@ self-correction through `correct`. v105-v109 add model-core checks: `inspect`
 reports memory file format, schema hash, tokenizer contract, and model config;
 `pack`/`unpack` write and validate the first binary `.llmw.bin` prototype; the
 quality eval now covers direct retrieve, feedback shift, text training, memory
-growth, and decay. Treat
+growth, and decay. v127-v137 add the density research path: useful recall and
+reversed-trap checks, lexical/relation/vector baselines, phase-lock,
+noise-pressure, packed hot-loop proxy, focus-window experiment, perf-counter
+plan, and the first L2 local contour spec. Treat these as measurements and
+guardrails, not proof that nonlinear density is solved. Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.
