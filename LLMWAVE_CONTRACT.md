@@ -181,11 +181,13 @@ v120-v126 move precision into the field core:
 - core eval includes a reversed-polarity trap such as
   `what does invoice issue?`.
 
-v127 adds Density Reality Check. It synthesizes larger LLMWave memories and
-measures useful recall, reversed-trap safety, field-state drift, packed bytes,
-hot-focus boundary, and timing. It explicitly does not prove nonlinear density
-or cache-only execution; those remain research claims until supported by
-capacity and perf-counter evidence.
+v127-v128 add Density Reality Check. It synthesizes larger LLMWave memories and
+measures useful recall, reversed-trap safety, field-vs-lexical baseline,
+field-state drift, packed bytes, hot-focus boundary, and timing. It explicitly
+does not prove nonlinear density or cache-only execution; those remain research
+claims until supported by capacity and perf-counter evidence. The first useful
+signal is narrower: relation phase and subject/object polarity can beat a
+lexical baseline on reversed-direction traps.
 
 ## Lenses
 

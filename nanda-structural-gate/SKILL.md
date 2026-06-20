@@ -370,6 +370,9 @@ subject/object polarity, bidirectional recall, field decomposition,
 phase-collision detection, and reversed-polarity QA. v127 adds
 `nanda-llmwave-memory density`, a reality check for useful recall,
 reversed-trap safety, field-state drift, packed bytes, and focus boundaries.
+v128 compares the field against a lexical bag-of-words baseline; treat
+`FIELD_BEATS_LEXICAL_BASELINE` as a narrow positive signal, not proof of
+nonlinear density.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

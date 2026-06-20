@@ -710,7 +710,8 @@ fn llmwave_memory_density_report(counts: &[usize], facts: usize) -> Value {
         "claims_boundary": {
             "nonlinear_density_proven": false,
             "cache_only_execution_proven": false,
-            "what_this_measures": "Synthetic useful recall, reversed-trap safety, field-state drift, packed bytes, and hot-focus boundary."
+            "lexical_baseline_compared": true,
+            "what_this_measures": "Synthetic useful recall, reversed-trap safety, field-vs-lexical baseline, field-state drift, packed bytes, and hot-focus boundary."
         },
         "read_as": "Density reality check is a guardrail against overclaiming: stable rows keep useful recall and reversed traps while record count grows."
     })
@@ -745,23 +746,34 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
     let mut state_counts = BTreeMap::<String, usize>::new();
     let mut field_counts = BTreeMap::<String, usize>::new();
     let mut margin_sum = 0.0;
+    let mut lexical_passed = 0usize;
+    let mut lexical_reversed_false_positive = false;
     for (prompt, expected_state, expected_contains) in probes {
         let answer = llmwave_memory_answer_report(&memory, prompt, facts, 3, "en");
+        let lexical = llmwave_density_lexical_baseline(&memory, prompt);
         let answer_text = answer["answer"].as_str().unwrap_or("");
         let state = answer["state"]
             .as_str()
             .unwrap_or("ANSWER_EMPTY")
             .to_string();
+        let lexical_state = lexical["state"].as_str().unwrap_or("ANSWER_EMPTY");
+        let lexical_answer = lexical["answer"].as_str().unwrap_or("");
         let field_state = answer["field_core"]["state"]
             .as_str()
             .unwrap_or("FIELD_EMPTY")
             .to_string();
         let ok = state == expected_state
             && (expected_contains.is_empty() || answer_text.contains(expected_contains));
+        let lexical_ok = lexical_state == expected_state
+            && (expected_contains.is_empty() || lexical_answer.contains(expected_contains));
         if prompt == "what does invoice issue?" && state == "ANSWER_READY" {
             reversed_false_positive = true;
         }
+        if prompt == "what does invoice issue?" && lexical_state == "ANSWER_READY" {
+            lexical_reversed_false_positive = true;
+        }
         passed += usize::from(ok);
+        lexical_passed += usize::from(lexical_ok);
         *state_counts.entry(state.clone()).or_insert(0) += 1;
         *field_counts.entry(field_state.clone()).or_insert(0) += 1;
         margin_sum += answer["field_core"]["margin"].as_f64().unwrap_or(0.0);
@@ -772,6 +784,8 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
             "field_state": field_state,
             "ok": ok,
             "answer": answer_text,
+            "lexical_baseline": lexical,
+            "wins_over_lexical_baseline": ok && !lexical_ok,
             "top_score": answer["field_core"]["top_score"],
             "margin": answer["field_core"]["margin"],
             "facts": answer["grounding"]["facts"]
@@ -780,6 +794,7 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
     let elapsed_ns = started.elapsed().as_nanos() as u64;
     let packed_bytes = actual_records * 32;
     let accuracy = round4(passed as f64 / probes.len() as f64);
+    let lexical_accuracy = round4(lexical_passed as f64 / probes.len() as f64);
     let avg_margin = round4(margin_sum / probes.len() as f64);
     let focus_state = if actual_records <= nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY {
         "HOT_FOCUS_READY"
@@ -803,6 +818,20 @@ fn llmwave_memory_density_row(records: usize, facts: usize) -> Value {
         "passed": passed,
         "total": probes.len(),
         "reversed_false_positive": reversed_false_positive,
+        "lexical_baseline": {
+            "version": "v128-density-lexical-baseline",
+            "accuracy": lexical_accuracy,
+            "passed": lexical_passed,
+            "total": probes.len(),
+            "reversed_false_positive": lexical_reversed_false_positive
+        },
+        "wins_over_lexical_baseline": accuracy > lexical_accuracy
+            || (!reversed_false_positive && lexical_reversed_false_positive),
+        "density_signal": if accuracy > lexical_accuracy || (!reversed_false_positive && lexical_reversed_false_positive) {
+            "FIELD_BEATS_LEXICAL_BASELINE"
+        } else {
+            "FIELD_NOT_ABOVE_BASELINE"
+        },
         "avg_margin": avg_margin,
         "elapsed_ns": elapsed_ns,
         "ns_per_probe": elapsed_ns / probes.len() as u64,
@@ -870,6 +899,54 @@ fn llmwave_synthetic_density_memory(records: usize) -> Value {
                 "fits_6m": packed_bytes <= nanda_6m::BUDGET_BYTES
             }
         }
+    })
+}
+
+fn llmwave_density_lexical_baseline(memory: &Value, prompt: &str) -> Value {
+    let query_terms = tokenize_pattern(prompt)
+        .into_iter()
+        .map(|token| norm(&token))
+        .filter(|token| !llmwave_prompt_stopword(token))
+        .collect::<BTreeSet<_>>();
+    let mut rows = memory["wave_memory"]["phrase_patterns"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|record| {
+            let phrase = record["phrase"].as_str().unwrap_or("");
+            let terms = tokenize_pattern(phrase)
+                .into_iter()
+                .map(|token| norm(&token))
+                .collect::<BTreeSet<_>>();
+            let overlap =
+                query_terms.intersection(&terms).count() as f64 / query_terms.len().max(1) as f64;
+            json!({
+                "fact": phrase,
+                "score": round4(overlap),
+                "relation": record["relation"],
+                "subject": record["subject"],
+                "object": record["object"]
+            })
+        })
+        .filter(|row| row["score"].as_f64().unwrap_or(0.0) > 0.0)
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b["score"]
+            .as_f64()
+            .unwrap_or(0.0)
+            .partial_cmp(&a["score"].as_f64().unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let top = rows.first().cloned().unwrap_or(Value::Null);
+    let answer = top["fact"].as_str().unwrap_or("");
+    json!({
+        "mode": "density-lexical-baseline",
+        "version": "v128-density-lexical-baseline",
+        "state": if answer.is_empty() { "ANSWER_EMPTY" } else { "ANSWER_READY" },
+        "answer": answer,
+        "top_score": top["score"],
+        "top_fact": top,
+        "read_as": "Lexical baseline uses only bag-of-words overlap over phrase records; it has no relation phase or subject/object polarity."
     })
 }
 

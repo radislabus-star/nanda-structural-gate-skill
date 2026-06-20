@@ -46,6 +46,9 @@
 - v127 adds `nanda-llmwave-memory density`, a synthetic density reality check
   for useful recall, reversed traps, field-state drift, packed bytes, focus
   boundaries, and claim discipline around nonlinear density.
+- v128 adds a lexical bag-of-words baseline to density checks, making
+  `FIELD_BEATS_LEXICAL_BASELINE` visible when relation phase and polarity avoid
+  reversed-direction false positives.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in
