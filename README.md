@@ -298,6 +298,7 @@ nanda-llmwave-big l2 --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
+nanda-llmwave-big query --text "supplier invoice payment customs" --format json
 nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
 nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json
@@ -535,6 +536,11 @@ inference, role-swap, contradiction, multi-hop, missing-evidence, generation,
 style, code, and business task families. It can report `COGNITIVE_LIFT` while
 still keeping LLM, nonlinear-memory, cache-only, and final-candidate claims
 false.
+`nanda-llmwave-big query` adds the v231-v245 runtime product surface: local
+daemon contract, skill integration command, editor typing mode, code-review and
+business-graph modes, memory import/export, personal/domain Atlas, contested
+field safety, explainability fields, performance target, 1M-fact load-test
+contract, release-candidate checklist, and v1-candidate criteria.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

@@ -90,6 +90,12 @@ jq -e '.roadmap_block == "v219-v230" and .verdict == "COGNITIVE_LIFT"' <<<"$big_
 jq -e '(.cases | length) == 9 and ([.cases[].task_type] | index("role_swap") and index("contradiction") and index("multi_hop") and index("business"))' <<<"$big_eval_json" >/dev/null
 jq -e '.cognitive_score.total >= 0.8 and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_eval_json" >/dev/null
 jq -e '.claim_boundary.candidate_ready == false' <<<"$big_eval_json" >/dev/null
+big_query_json="$("$llmwave_big" query --text "supplier invoice payment customs" --format json)"
+jq -e '.roadmap_block == "v231-v245" and .verdict == "LLMWAVE_BIG_V1_CANDIDATE"' <<<"$big_query_json" >/dev/null
+jq -e '.safety.safe_to_answer == true and .skill_integration.state == "CLI_SURFACE_READY"' <<<"$big_query_json" >/dev/null
+jq -e '.v1_criteria.large_long_term_memory == true and .v1_criteria.schema_residual_write == true and .claim_boundary.llm_ready == false' <<<"$big_query_json" >/dev/null
+big_query_contested_json="$("$llmwave_big" query --text "role swap conflict" --format json)"
+jq -e '.safety.field_state == "FIELD_CONTESTED" and .safety.safe_to_answer == false' <<<"$big_query_contested_json" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"

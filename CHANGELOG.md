@@ -31,6 +31,11 @@
   families for inference, role swaps, contradictions, multi-hop, missing
   evidence, generation, style, code, and business routes with a `COGNITIVE_LIFT`
   verdict that still keeps final LLMWave-Big claims false.
+- v231-v245 add `nanda-llmwave-big query`: runtime product surface with local
+  daemon contract, skill integration, editor typing, code-review/business graph
+  modes, import/export, personal/domain Atlas, safety, explainability,
+  performance/load-test contracts, release-candidate checklist, and
+  LLMWave-Big v1 candidate criteria.
 - v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active

@@ -46,6 +46,8 @@ enum LlmwaveBigCommand {
     Consolidate(LlmwaveBigConsolidateArgs),
     /// Print the v219-v230 Big Cognition Eval report.
     Eval(LlmwaveBigEvalArgs),
+    /// Run the v231-v245 runtime product query surface.
+    Query(LlmwaveBigQueryArgs),
 }
 
 #[derive(Parser)]
@@ -86,6 +88,14 @@ struct LlmwaveBigConsolidateArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigEvalArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigQueryArgs {
+    #[arg(long, default_value = "supplier invoice payment customs")]
+    text: String,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -151,6 +161,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::Eval(args) => {
             let report = eval::build_big_eval_report();
             report::print_big_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::Query(args) => {
+            let report = loader::build_runtime_product_report(args.text);
+            report::print_runtime_product_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
@@ -372,6 +387,25 @@ mod tests {
             assert!(report.cases.iter().any(|case| case.task_type == task_type));
         }
         assert!(report.cognitive_score.total >= 0.8);
+    }
+
+    #[test]
+    fn runtime_product_reports_v1_candidate_without_llm_claim() {
+        let report =
+            loader::build_runtime_product_report("supplier invoice payment customs".to_string());
+        assert_eq!(report.roadmap_block, "v231-v245");
+        assert_eq!(report.verdict, "LLMWAVE_BIG_V1_CANDIDATE");
+        assert!(report.v1_criteria.large_long_term_memory);
+        assert!(report.v1_criteria.small_active_core);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.cache_only_execution_proven);
+    }
+
+    #[test]
+    fn runtime_product_blocks_contested_field() {
+        let report = loader::build_runtime_product_report("role swap conflict".to_string());
+        assert_eq!(report.safety.field_state, "FIELD_CONTESTED");
+        assert!(!report.safety.safe_to_answer);
     }
 
     #[test]

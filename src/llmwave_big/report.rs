@@ -5,6 +5,7 @@ use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::eval::BigEvalReport;
 use super::l2_word_field::L2WordFieldReport;
+use super::loader::RuntimeProductReport;
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
@@ -80,6 +81,18 @@ pub(crate) fn print_big_eval_report(report: &BigEvalReport, format: &OutputForma
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_big_eval_text(report),
         OutputFormat::Md => print_big_eval_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_runtime_product_report(
+    report: &RuntimeProductReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_product_text(report),
+        OutputFormat::Md => print_runtime_product_md(report),
     }
     Ok(())
 }
@@ -237,6 +250,21 @@ fn print_big_eval_text(report: &BigEvalReport) {
         "nonlinear_memory_proven: {}",
         report.claim_boundary.nonlinear_memory_proven
     );
+}
+
+fn print_runtime_product_text(report: &RuntimeProductReport) {
+    println!("LLMWave-Big Runtime Product");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("query: {}", report.query);
+    println!("field_state: {}", report.safety.field_state);
+    println!("safe_to_answer: {}", report.safety.safe_to_answer);
+    println!(
+        "target_hot_query_ms: {:.3}",
+        report.performance.target_hot_query_ms
+    );
+    println!("llm_ready: {}", report.claim_boundary.llm_ready);
 }
 
 fn print_contract_md(report: &LlmwaveBigReport) {
@@ -397,4 +425,20 @@ fn print_big_eval_md(report: &BigEvalReport) {
         "- nonlinear memory proven: `{}`",
         report.claim_boundary.nonlinear_memory_proven
     );
+}
+
+fn print_runtime_product_md(report: &RuntimeProductReport) {
+    println!("# LLMWave-Big Runtime Product");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- query: `{}`", report.query);
+    println!("- field state: `{}`", report.safety.field_state);
+    println!("- safe to answer: `{}`", report.safety.safe_to_answer);
+    println!(
+        "- target hot query ms: `{:.3}`",
+        report.performance.target_hot_query_ms
+    );
+    println!("- LLM ready: `{}`", report.claim_boundary.llm_ready);
 }

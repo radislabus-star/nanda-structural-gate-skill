@@ -1015,6 +1015,18 @@ schema/residual nonlinear write
 cognitive eval passes
 ```
 
+Implementation checkpoint:
+
+```text
+v231-v245: implemented as nanda-llmwave-big query
+state: LLMWAVE_BIG_V1_CANDIDATE for the runtime product surface
+scope: local daemon contract, skill integration, typing mode, code review,
+       business graph, import/export, personal/domain Atlas, safety,
+       explainability, performance target, load-test contract, RC checklist,
+       v1 criteria
+not claimed: LLM_READY, nonlinear memory proof, cache-only execution proof
+```
+
 ## Hard Problems
 
 ### Nonlinear Write Without Hallucination
