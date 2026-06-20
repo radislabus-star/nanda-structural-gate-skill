@@ -54,6 +54,17 @@ grapheme/byte atoms, morpheme atoms, surface programs, and exact evidence-copy
 spans. It must not fall back to a flat numeric-handle-to-UTF-8 lookup as the
 core memory story.
 
+The first reconstruction check is:
+
+```bash
+nanda-llmwave-big surface-reconstruct --format json
+```
+
+It measures whether common forms, rare evidence-copy forms, and byte fallback
+can be materialized correctly. Treat the current result as a toy materializer
+pass only; the density claim needs corpus-scale exact-match, false-surface,
+copy-error, reuse, and bytes-per-useful-surface evidence.
+
 ### Holographic Reduced Representations
 
 Sources:

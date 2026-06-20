@@ -448,7 +448,7 @@ fn evidence_copy_spans() -> Vec<EvidenceCopySpanView> {
             surface_hash: 0xC0DE_0603,
             program_id: 61_002,
             checksum: 0xCC00_0603,
-            byte_len: 27,
+            byte_len: 25,
             mode_bits: 0b0010,
         },
     }]

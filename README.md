@@ -303,6 +303,7 @@ nanda-llmwave-big active-core --format json
 nanda-llmwave-big l2 --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
+nanda-llmwave-big surface-reconstruct --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -548,6 +549,14 @@ composed from atoms and morphemes, while rare names/codes use exact evidence
 copy spans. The report keeps `real_corpus_trained`,
 `free_form_spelling_proven`, and `nonlinear_surface_memory_proven` false until
 evals prove those claims.
+
+`nanda-llmwave-big surface-reconstruct` adds the v261-v270 cold materializer and
+toy reconstruction eval. It expands `SurfaceProgram32` through `SurfaceAtom16`,
+copies exact rare forms through `EvidenceCopySpan24`, and uses byte fallback for
+unknown forms. Its report includes `exact_match_rate`, `copy_error_rate`,
+`fallback_rate`, `program_reuse_ratio`, `bytes_per_reconstructable_surface`,
+and direct-lookup baseline bytes. The current state is deliberately
+`TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF`.
 
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual

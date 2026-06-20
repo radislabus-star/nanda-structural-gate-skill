@@ -159,6 +159,7 @@ scripts/nanda-llmwave-big active-core --format json
 scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
+scripts/nanda-llmwave-big surface-reconstruct --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -435,7 +436,12 @@ proof that a real corpus has learned new words. v253-v260 add
 `SurfaceProgram32`, `EvidenceCopySpan24`, and
 `SurfaceProductionCandidate32` records for composing common forms, copying
 exact rare forms, and falling back to bytes without storing words as a flat
-numeric-handle-to-UTF-8 lookup.
+numeric-handle-to-UTF-8 lookup. v261-v270 add
+`nanda-llmwave-big surface-reconstruct`: a cold materializer and toy
+reconstruction eval. Inspect exact-match, copy-error, fallback-rate,
+program-reuse, bytes-per-reconstructable-surface, and the
+`TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF` state before making any surface
+memory claim.
 v191-v205 add `nanda-llmwave-big write` and
 `nanda-bench6m --mode write-density`: write decomposition, reconstructability
 score, residual V1, centroid update, anti-residual, schema promotion/split

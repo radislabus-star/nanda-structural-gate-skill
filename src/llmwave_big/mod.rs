@@ -16,6 +16,7 @@ pub mod operators;
 pub mod residuals;
 pub mod schemas;
 pub mod surface_production;
+pub mod surface_reconstruct;
 pub mod symbols;
 pub mod write;
 
@@ -46,6 +47,8 @@ enum LlmwaveBigCommand {
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
     SurfaceProduction(LlmwaveBigSurfaceProductionArgs),
+    /// Run the v261-v270 cold surface reconstruction eval.
+    SurfaceReconstruct(LlmwaveBigSurfaceReconstructArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
@@ -88,6 +91,12 @@ struct LlmwaveBigWordBirthArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigSurfaceProductionArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSurfaceReconstructArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -174,6 +183,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SurfaceProduction(args) => {
             let report = surface_production::build_surface_production_report();
             report::print_surface_production_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SurfaceReconstruct(args) => {
+            let report = surface_reconstruct::build_surface_reconstruct_report();
+            report::print_surface_reconstruct_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Write(args) => {
@@ -450,6 +464,43 @@ mod tests {
             .copy_spans
             .iter()
             .any(|span| span.role == "exact rare form recovery"));
+        assert!(!report.claim_boundary.real_corpus_trained);
+        assert!(!report.claim_boundary.free_form_spelling_proven);
+        assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
+    }
+
+    #[test]
+    fn surface_reconstruct_materializes_all_three_paths() {
+        let report = surface_reconstruct::build_surface_reconstruct_report();
+        assert_eq!(report.roadmap_block, "v261-v270");
+        assert_eq!(report.verdict, "SURFACE_RECONSTRUCT_READY");
+        assert_eq!(report.eval.cases, 4);
+        assert_eq!(report.eval.exact_matches, 4);
+        assert_eq!(report.eval.exact_match_rate, 1.0);
+        assert!(report
+            .cases
+            .iter()
+            .any(|case| case.path == "surface_program" && case.reconstructed == "invoice"));
+        assert!(report.cases.iter().any(|case| {
+            case.path == "evidence_copy_span" && case.reconstructed == "PI-HL-RLTG-GZ-20260611-03"
+        }));
+        assert!(report
+            .cases
+            .iter()
+            .any(|case| case.path == "byte_fallback" && case.reconstructed == "zxq"));
+    }
+
+    #[test]
+    fn surface_reconstruct_keeps_density_claim_unproven() {
+        let report = surface_reconstruct::build_surface_reconstruct_report();
+        assert_eq!(
+            report.eval.state,
+            "TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF"
+        );
+        assert!(report.eval.program_reuse_ratio > 1.0);
+        assert!(report.bank_summary.total_surface_memory_bytes > 0);
+        assert!(!report.bank_summary.hot_core_contains_utf8);
+        assert!(report.claim_boundary.hot_core_utf8_free);
         assert!(!report.claim_boundary.real_corpus_trained);
         assert!(!report.claim_boundary.free_form_spelling_proven);
         assert!(!report.claim_boundary.nonlinear_surface_memory_proven);

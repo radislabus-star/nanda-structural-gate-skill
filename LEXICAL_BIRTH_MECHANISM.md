@@ -282,6 +282,7 @@ The current implementation is:
 ```text
 src/llmwave_big/lexical_birth.rs
 src/llmwave_big/surface_production.rs
+src/llmwave_big/surface_reconstruct.rs
 ```
 
 The current inspection commands are:
@@ -289,6 +290,7 @@ The current inspection commands are:
 ```bash
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
+nanda-llmwave-big surface-reconstruct --format json
 ```
 
 The implemented records are:
@@ -317,6 +319,12 @@ for names, codes, and one-off strings observed in evidence. `SurfaceProductionCa
 scores whether the current field should compose, copy, or fall back to bytes.
 The hot core sees compact ids, scores, hashes, and byte-span refs; UTF-8
 materialization stays outside the hot loop.
+
+`surface-reconstruct` is the first materializer check. It expands common forms
+from atom programs, recovers rare codes from evidence spans, and uses byte
+fallback for unknown forms. It reports exact-match and baseline metrics, but its
+state remains `TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF` until a real corpus
+suite shows useful compression and low false-surface rate.
 
 ## Claim Boundary
 

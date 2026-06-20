@@ -91,6 +91,11 @@ jq -e '([.record_formats[] | "\(.name):\(.bytes)"] | index("SurfaceAtom16:16") a
 jq -e '.selected.production_path == "surface_program" and .selected.materialization_scope == "cold_report_preview_only_not_hot_storage"' <<<"$big_surface_json" >/dev/null
 jq -e '([.atoms[].layer] | index("grapheme_or_byte_atoms") and index("morpheme_atoms")) and ([.programs[].path] | index("surface_program") and index("evidence_copy_span") and index("byte_fallback"))' <<<"$big_surface_json" >/dev/null
 jq -e '.copy_spans[0].role == "exact rare form recovery" and .claim_boundary.real_corpus_trained == false and .claim_boundary.free_form_spelling_proven == false and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_json" >/dev/null
+big_surface_reconstruct_json="$("$llmwave_big" surface-reconstruct --format json)"
+jq -e '.roadmap_block == "v261-v270" and .verdict == "SURFACE_RECONSTRUCT_READY"' <<<"$big_surface_reconstruct_json" >/dev/null
+jq -e '.eval.cases == 4 and .eval.exact_matches == 4 and .eval.exact_match_rate == 1 and .eval.state == "TOY_RECONSTRUCTION_PASS_NOT_DENSITY_PROOF"' <<<"$big_surface_reconstruct_json" >/dev/null
+jq -e '([.cases[] | "\(.path):\(.reconstructed)"] | index("surface_program:invoice") and index("surface_program:invoicing") and index("evidence_copy_span:PI-HL-RLTG-GZ-20260611-03") and index("byte_fallback:zxq"))' <<<"$big_surface_reconstruct_json" >/dev/null
+jq -e '.bank_summary.hot_core_contains_utf8 == false and .claim_boundary.hot_core_utf8_free == true and .claim_boundary.real_corpus_trained == false and .claim_boundary.free_form_spelling_proven == false and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_reconstruct_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null

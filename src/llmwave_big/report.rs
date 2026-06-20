@@ -8,6 +8,7 @@ use super::l2_word_field::L2WordFieldReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::surface_production::SurfaceProductionReport;
+use super::surface_reconstruct::SurfaceReconstructReport;
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
@@ -77,6 +78,18 @@ pub(crate) fn print_surface_production_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_surface_production_text(report),
         OutputFormat::Md => print_surface_production_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_surface_reconstruct_report(
+    report: &SurfaceReconstructReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_surface_reconstruct_text(report),
+        OutputFormat::Md => print_surface_reconstruct_md(report),
     }
     Ok(())
 }
@@ -258,6 +271,27 @@ fn print_surface_production_text(report: &SurfaceProductionReport) {
         "materialized_preview: {}",
         report.selected.materialized_preview
     );
+    println!(
+        "claims: real_corpus_trained={} free_form_spelling_proven={} nonlinear_surface_memory_proven={}",
+        report.claim_boundary.real_corpus_trained,
+        report.claim_boundary.free_form_spelling_proven,
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+}
+
+fn print_surface_reconstruct_text(report: &SurfaceReconstructReport) {
+    println!("LLMWave-Big Surface Reconstruct");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("cases: {}", report.eval.cases);
+    println!("exact_match_rate: {:.3}", report.eval.exact_match_rate);
+    println!("fallback_rate: {:.3}", report.eval.fallback_rate);
+    println!(
+        "bytes_per_reconstructable_surface: {:.3}",
+        report.eval.bytes_per_reconstructable_surface
+    );
+    println!("state: {}", report.eval.state);
     println!(
         "claims: real_corpus_trained={} free_form_spelling_proven={} nonlinear_surface_memory_proven={}",
         report.claim_boundary.real_corpus_trained,
@@ -521,6 +555,55 @@ fn print_surface_production_md(report: &SurfaceProductionReport) {
     println!(
         "- nonlinear surface memory proven: `{}`",
         report.claim_boundary.nonlinear_surface_memory_proven
+    );
+}
+
+fn print_surface_reconstruct_md(report: &SurfaceReconstructReport) {
+    println!("# LLMWave-Big Surface Reconstruct");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- read as: {}", report.read_as);
+    println!();
+    println!("## Eval");
+    println!();
+    println!("- cases: `{}`", report.eval.cases);
+    println!("- exact matches: `{}`", report.eval.exact_matches);
+    println!("- exact match rate: `{:.3}`", report.eval.exact_match_rate);
+    println!("- fallback rate: `{:.3}`", report.eval.fallback_rate);
+    println!(
+        "- bytes per reconstructable surface: `{:.3}`",
+        report.eval.bytes_per_reconstructable_surface
+    );
+    println!("- state: `{}`", report.eval.state);
+    println!();
+    println!("## Cases");
+    println!();
+    for case in &report.cases {
+        println!(
+            "- `{}` via `{}`: `{}` exact={}",
+            case.case_id, case.path, case.reconstructed, case.exact_match
+        );
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- real corpus trained: `{}`",
+        report.claim_boundary.real_corpus_trained
+    );
+    println!(
+        "- free-form spelling proven: `{}`",
+        report.claim_boundary.free_form_spelling_proven
+    );
+    println!(
+        "- nonlinear surface memory proven: `{}`",
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+    println!(
+        "- hot core UTF-8 free: `{}`",
+        report.claim_boundary.hot_core_utf8_free
     );
 }
 

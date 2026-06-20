@@ -1193,6 +1193,40 @@ free-form spelling not proven
 nonlinear surface memory not proven
 ```
 
+v261-v270: implemented as nanda-llmwave-big surface-reconstruct
+
+## Phase 10: Surface Reconstruction Eval, v261-v270
+
+Goal:
+
+```text
+surface program / copy span / byte fallback
+  -> cold materializer
+  -> visible UTF-8 surface
+  -> reconstruction metrics
+```
+
+Metrics:
+
+```text
+exact_match_rate
+copy_error_rate
+fallback_rate
+false_surface_rate
+program_reuse_ratio
+bytes_per_reconstructable_surface
+direct_lookup_baseline_bytes
+```
+
+Stop rules:
+
+```text
+toy reconstruction pass -> not density proof
+UTF-8 in hot core -> architecture violation
+copy-span match -> exact recovery, not semantic understanding
+program reuse -> candidate signal, not nonlinear memory proof
+```
+
 ## Summary
 
 ```text
