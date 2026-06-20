@@ -698,6 +698,23 @@ fn llmwave_memory_density_report(counts: &[usize], facts: usize) -> Value {
         }
         rows.push(row);
     }
+    let density_reader = llmwave_density_reader(&rows, &first_degraded);
+    let stress_pack = llmwave_density_stress_pack(&rows);
+    let margin_erosion_curve = llmwave_density_margin_erosion_curve(&rows);
+    let fixed_basis_test = llmwave_density_fixed_basis_test(&rows);
+    let useful_capacity_threshold = llmwave_density_useful_capacity_threshold(&rows);
+    let anti_wave_capacity_lift = llmwave_density_anti_wave_capacity_lift(&rows);
+    let packed_runtime_density = llmwave_density_packed_runtime_density(&rows);
+    let l2_prefix_contour = llmwave_density_l2_prefix_contour(&rows);
+    let l3_to_l2_rerank = llmwave_density_l3_to_l2_rerank(&rows);
+    let nonlinear_density_verdict = llmwave_density_verdict(
+        &rows,
+        &margin_erosion_curve,
+        &fixed_basis_test,
+        &useful_capacity_threshold,
+        &anti_wave_capacity_lift,
+        &packed_runtime_density,
+    );
     json!({
         "mode": "llmwave-memory-density",
         "version": "v127-density-reality-check",
@@ -707,6 +724,16 @@ fn llmwave_memory_density_report(counts: &[usize], facts: usize) -> Value {
         "focus_runtime_triads": nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY,
         "rows": rows,
         "first_degraded": first_degraded,
+        "density_reader": density_reader,
+        "stress_pack": stress_pack,
+        "margin_erosion_curve": margin_erosion_curve,
+        "fixed_basis_test": fixed_basis_test,
+        "useful_capacity_threshold": useful_capacity_threshold,
+        "anti_wave_capacity_lift": anti_wave_capacity_lift,
+        "packed_runtime_density": packed_runtime_density,
+        "l2_prefix_contour": l2_prefix_contour,
+        "l3_to_l2_rerank": l3_to_l2_rerank,
+        "nonlinear_density_verdict": nonlinear_density_verdict,
         "claims_boundary": {
             "nonlinear_density_proven": false,
             "cache_only_execution_proven": false,
@@ -714,6 +741,269 @@ fn llmwave_memory_density_report(counts: &[usize], facts: usize) -> Value {
             "what_this_measures": "Synthetic useful recall, reversed-trap safety, field-vs-lexical baseline, field-state drift, packed bytes, and hot-focus boundary."
         },
         "read_as": "Density reality check is a guardrail against overclaiming: stable rows keep useful recall and reversed traps while record count grows."
+    })
+}
+
+fn llmwave_density_reader(rows: &[Value], first_degraded: &Value) -> Value {
+    let stable = rows
+        .iter()
+        .filter(|row| row["state"].as_str() == Some("DENSITY_STABLE"))
+        .count();
+    let wins = rows
+        .iter()
+        .filter(|row| row["wins_over_expanded_baselines"].as_bool() == Some(true))
+        .count();
+    let focus_required = rows
+        .iter()
+        .filter(|row| row["focus_state"].as_str() == Some("STORAGE_OK_FOCUS_REQUIRED"))
+        .count();
+    json!({
+        "version": "v138-density-report-reader",
+        "state": if stable == rows.len() && wins == rows.len() { "DENSITY_READER_READY" } else { "DENSITY_READER_REVIEW" },
+        "stable_rows": stable,
+        "rows": rows.len(),
+        "rows_winning_expanded_baselines": wins,
+        "focus_required_rows": focus_required,
+        "first_degraded_records": first_degraded["records"],
+        "read_as": "Human/agent summary: stable rows plus expanded-baseline wins are useful signals; focus-required rows still need coarse-to-fine proof."
+    })
+}
+
+fn llmwave_density_stress_pack(rows: &[Value]) -> Value {
+    let mut reversed_relation_passed = 0usize;
+    let mut baseline_traps_seen = 0usize;
+    for row in rows {
+        if row["reversed_false_positive"].as_bool() == Some(false) {
+            reversed_relation_passed += 1;
+        }
+        if row["lexical_baseline"]["reversed_false_positive"].as_bool() == Some(true)
+            || row["relation_baseline"]["reversed_false_positive"].as_bool() == Some(true)
+            || row["naive_vector_baseline"]["reversed_false_positive"].as_bool() == Some(true)
+        {
+            baseline_traps_seen += 1;
+        }
+    }
+    json!({
+        "version": "v139-baseline-stress-pack",
+        "implemented_cases": [
+            "reversed_relation_invoice_issue",
+            "lexical_false_positive",
+            "relation_only_false_positive",
+            "naive_vector_false_positive"
+        ],
+        "planned_cases": [
+            "role_swap_subject_object",
+            "explicit_alias_synonym",
+            "duplicate_current_fact",
+            "near_lexical_decoy"
+        ],
+        "reversed_relation_passed_rows": reversed_relation_passed,
+        "baseline_trap_rows": baseline_traps_seen,
+        "state": if reversed_relation_passed == rows.len() && baseline_traps_seen > 0 { "STRESS_PACK_ACTIVE" } else { "STRESS_PACK_REVIEW" }
+    })
+}
+
+fn llmwave_density_margin_erosion_curve(rows: &[Value]) -> Value {
+    let points = rows
+        .iter()
+        .map(|row| {
+            json!({
+                "records": row["records"],
+                "avg_margin": row["avg_margin"],
+                "accuracy": row["accuracy"],
+                "density_signal": row["density_signal"]
+            })
+        })
+        .collect::<Vec<_>>();
+    let first = rows
+        .first()
+        .and_then(|row| row["avg_margin"].as_f64())
+        .unwrap_or(0.0);
+    let last = rows
+        .last()
+        .and_then(|row| row["avg_margin"].as_f64())
+        .unwrap_or(0.0);
+    json!({
+        "version": "v140-margin-erosion-curve",
+        "points": points,
+        "first_margin": first,
+        "last_margin": last,
+        "delta": round4(last - first),
+        "state": if last >= first * 0.80 { "MARGIN_HELD" } else { "MARGIN_ERODED" },
+        "read_as": "A true density claim needs slow margin erosion under fixed-basis growth, not only accuracy."
+    })
+}
+
+fn llmwave_density_fixed_basis_test(rows: &[Value]) -> Value {
+    let all_record_bytes_fixed = rows.iter().all(|row| {
+        row["packed_bytes"].as_u64().unwrap_or(0) == row["records"].as_u64().unwrap_or(0) * 32
+    });
+    let all_fit = rows
+        .iter()
+        .all(|row| row["fits_6m"].as_bool() == Some(true));
+    json!({
+        "version": "v141-fixed-basis-test",
+        "wave_dim": WAVE_DIM,
+        "record_bytes": 32,
+        "basis_state": "FIXED_WAVE_DIM",
+        "record_growth_state": if all_record_bytes_fixed { "PACKED_RECORDS_LINEAR" } else { "PACKED_RECORDS_REVIEW" },
+        "all_rows_fit_6m": all_fit,
+        "state": if all_record_bytes_fixed && all_fit { "FIXED_BASIS_HELD" } else { "FIXED_BASIS_REVIEW" },
+        "read_as": "The basis is fixed; useful nonlinearity must come from retrieval quality versus baselines, not from pretending records cost no bytes."
+    })
+}
+
+fn llmwave_density_useful_capacity_threshold(rows: &[Value]) -> Value {
+    let max_stable = rows
+        .iter()
+        .filter(|row| row["state"].as_str() == Some("DENSITY_STABLE"))
+        .filter_map(|row| row["records"].as_u64())
+        .max()
+        .unwrap_or(0);
+    let first_review = rows
+        .iter()
+        .find(|row| row["state"].as_str() != Some("DENSITY_STABLE"))
+        .cloned()
+        .unwrap_or(Value::Null);
+    json!({
+        "version": "v142-useful-capacity-threshold",
+        "max_stable_records_seen": max_stable,
+        "first_review": first_review,
+        "hot_focus_cap": nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY,
+        "storage_cap": nanda_6m::TRIAD_CAPACITY,
+        "state": if max_stable >= nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY as u64 { "FOCUS_CAPACITY_HELD" } else { "CAPACITY_NEEDS_MORE_SWEEP" }
+    })
+}
+
+fn llmwave_density_anti_wave_capacity_lift(rows: &[Value]) -> Value {
+    let protected_rows = rows
+        .iter()
+        .filter(|row| {
+            row["reversed_false_positive"].as_bool() == Some(false)
+                && (row["lexical_baseline"]["reversed_false_positive"].as_bool() == Some(true)
+                    || row["relation_baseline"]["reversed_false_positive"].as_bool() == Some(true)
+                    || row["naive_vector_baseline"]["reversed_false_positive"].as_bool()
+                        == Some(true))
+        })
+        .count();
+    let max_protected_records = rows
+        .iter()
+        .filter(|row| {
+            row["reversed_false_positive"].as_bool() == Some(false)
+                && (row["lexical_baseline"]["reversed_false_positive"].as_bool() == Some(true)
+                    || row["relation_baseline"]["reversed_false_positive"].as_bool() == Some(true)
+                    || row["naive_vector_baseline"]["reversed_false_positive"].as_bool()
+                        == Some(true))
+        })
+        .filter_map(|row| row["records"].as_u64())
+        .max()
+        .unwrap_or(0);
+    json!({
+        "version": "v143-anti-wave-capacity-lift",
+        "protected_rows": protected_rows,
+        "max_protected_records": max_protected_records,
+        "state": if protected_rows == rows.len() && protected_rows > 0 { "ANTI_WAVE_LIFT_CANDIDATE" } else { "ANTI_WAVE_LIFT_NOT_SHOWN" },
+        "read_as": "Candidate lift means the field avoids reversed false positives that simple baselines hit; it is not proof of broad nonlinear memory."
+    })
+}
+
+fn llmwave_density_packed_runtime_density(rows: &[Value]) -> Value {
+    let all_proxy_pass = rows.iter().all(|row| {
+        row["packed_hot_loop_proxy"]["accuracy"]
+            .as_f64()
+            .unwrap_or(0.0)
+            >= 1.0
+    });
+    let max_records = rows
+        .iter()
+        .filter_map(|row| row["packed_hot_loop_proxy"]["records"].as_u64())
+        .max()
+        .unwrap_or(0);
+    json!({
+        "version": "v144-packed-runtime-density",
+        "proxy_accuracy_all_rows": all_proxy_pass,
+        "max_proxy_records": max_records,
+        "state": if all_proxy_pass { "PACKED_PROXY_HELD" } else { "PACKED_PROXY_REVIEW" },
+        "read_as": "Typed packed proxy held; final claim still needs the real nanda_6m hot loop and perf counters."
+    })
+}
+
+fn llmwave_density_l2_prefix_contour(rows: &[Value]) -> Value {
+    let l2_all = rows
+        .iter()
+        .filter(|row| {
+            row["l2_contour_spec"]["state"].as_str() == Some("L2_CAN_HOLD_ALL_LOCAL_RECORDS")
+        })
+        .count();
+    let needs_l3 = rows.len().saturating_sub(l2_all);
+    json!({
+        "version": "v145-l2-prefix-contour",
+        "rows_fitting_l2_local_records": l2_all,
+        "rows_needing_l3_phase_bias": needs_l3,
+        "state": if needs_l3 == 0 { "L2_PREFIX_SELF_CONTAINED" } else { "L2_PREFIX_NEEDS_L3" },
+        "read_as": "L2 should hold prefix/local candidates; broad semantic memory must stay in L3/focus windows."
+    })
+}
+
+fn llmwave_density_l3_to_l2_rerank(rows: &[Value]) -> Value {
+    let broad_rows = rows
+        .iter()
+        .filter(|row| {
+            row["focus_window_experiment"]["state"].as_str() == Some("COARSE_TO_FINE_REQUIRED")
+        })
+        .count();
+    json!({
+        "version": "v146-l3-bias-to-l2-rerank",
+        "broad_rows": broad_rows,
+        "contract": {
+            "l3": "choose semantic route, relation phase, and polarity",
+            "l2": "rerank prefix/local candidates inside that bias",
+            "sync": "word-boundary semantic refresh plus per-keystroke local rerank"
+        },
+        "state": if broad_rows > 0 { "L3_TO_L2_CONTRACT_REQUIRED" } else { "L3_TO_L2_OPTIONAL_FOR_ROWS" }
+    })
+}
+
+fn llmwave_density_verdict(
+    rows: &[Value],
+    margin: &Value,
+    fixed_basis: &Value,
+    capacity: &Value,
+    anti_wave: &Value,
+    packed: &Value,
+) -> Value {
+    let all_stable = rows
+        .iter()
+        .all(|row| row["state"].as_str() == Some("DENSITY_STABLE"));
+    let all_win = rows
+        .iter()
+        .all(|row| row["wins_over_expanded_baselines"].as_bool() == Some(true));
+    let weak_signal = all_stable
+        && all_win
+        && margin["state"].as_str() == Some("MARGIN_HELD")
+        && fixed_basis["state"].as_str() == Some("FIXED_BASIS_HELD");
+    let capacity_lift = weak_signal
+        && capacity["state"].as_str() == Some("FOCUS_CAPACITY_HELD")
+        && anti_wave["state"].as_str() == Some("ANTI_WAVE_LIFT_CANDIDATE")
+        && packed["state"].as_str() == Some("PACKED_PROXY_HELD");
+    json!({
+        "version": "v147-nonlinear-density-verdict",
+        "state": if capacity_lift { "CAPACITY_LIFT_CANDIDATE" } else if weak_signal { "WEAK_NONLINEAR_SIGNAL" } else { "NOT_PROVEN" },
+        "nonlinear_density_proven": false,
+        "safe_claim": if capacity_lift {
+            "Fixed-basis density shows a capacity-lift candidate on synthetic traps; broader nonlinear memory is still unproven."
+        } else if weak_signal {
+            "Fixed-basis field shows a weak signal versus simple baselines; nonlinear density is still unproven."
+        } else {
+            "No nonlinear-density claim is supported by this run."
+        },
+        "requirements_before_stronger_claim": [
+            "larger adversarial stress corpus",
+            "real packed hot-loop density",
+            "perf counters",
+            "non-synthetic data",
+            "quality curve versus stronger baselines"
+        ]
     })
 }
 

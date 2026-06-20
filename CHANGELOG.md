@@ -55,6 +55,11 @@
   perf-counter command plan, a focus-window experiment, and the first L2 local
   contour spec/prototype. These reports still do not prove nonlinear density;
   they define the measurements needed before making that claim.
+- v138-v147 add the density verdict layer: report reader, baseline stress pack,
+  margin-erosion curve, fixed-basis check, useful-capacity threshold,
+  anti-wave lift candidate, packed-runtime density proxy, L2 prefix contour,
+  L3-to-L2 rerank contract, and final nonlinear-density verdict. The verdict
+  can intentionally return `NOT_PROVEN` even when recall passes.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

@@ -379,6 +379,11 @@ baselines, typed packed hot-loop proxy, perf-counter plan, focus-window
 experiment, and L2 local contour spec/prototype. Treat these as measurement
 surfaces. Do not claim nonlinear density unless the fixed-basis field beats
 linear/lexical/vector baselines under capacity and perf-counter evidence.
+v138-v147 add the density verdict layer: report reader, stress pack,
+margin-erosion curve, fixed-basis test, useful-capacity threshold, anti-wave
+lift candidate, packed-runtime density proxy, L2 prefix contour, L3-to-L2
+rerank contract, and final verdict. Treat `NOT_PROVEN` as a valid successful
+guardrail result when the evidence is still too weak.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

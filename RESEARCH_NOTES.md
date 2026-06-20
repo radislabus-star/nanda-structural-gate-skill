@@ -51,3 +51,21 @@ The next required evidence is stronger:
 - suppression or nonlinear scoring extends useful recall;
 - packed hot-loop results are measured without JSON/string overhead;
 - perf counters show cache behavior.
+
+## Current Density Verdict Path
+
+`nanda llmwave-memory density` now reports v138-v147:
+
+- read the density report;
+- stress reversed/baseline traps;
+- track margin erosion;
+- verify fixed basis;
+- find useful capacity threshold;
+- mark anti-wave lift candidates;
+- compare packed proxy behavior;
+- separate L2 prefix work from L3 semantic bias;
+- emit a final nonlinear-density verdict.
+
+`NOT_PROVEN` is an acceptable verdict. It means the guardrail worked and the
+system refused to turn a pretty field peak into a stronger claim than the data
+supports.

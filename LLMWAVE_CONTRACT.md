@@ -198,6 +198,21 @@ v129-v137 turn that check into a core research probe:
 - L2 local contour spec/prototype for prefix candidates and short-context
   rerank under L3 phase bias.
 
+v138-v147 add the verdict layer over those measurements:
+
+- density report reader for humans and agents;
+- baseline stress pack for reversed, lexical, relation-only, and naive-vector
+  traps;
+- margin-erosion curve across record growth;
+- fixed-basis test that keeps `WAVE_DIM` constant and records explicit;
+- useful-capacity threshold for the largest stable row seen;
+- anti-wave capacity-lift candidate for rows where baselines false-positive
+  but the field does not;
+- packed-runtime density proxy;
+- L2 prefix contour and L3-to-L2 rerank contract;
+- nonlinear-density verdict: `NOT_PROVEN`, `WEAK_NONLINEAR_SIGNAL`, or
+  `CAPACITY_LIFT_CANDIDATE`.
+
 It explicitly does not prove nonlinear density or cache-only execution; those
 remain research claims until supported by capacity and perf-counter evidence.
 The first useful signal is narrower: relation phase and subject/object polarity
