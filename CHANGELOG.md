@@ -60,6 +60,11 @@
   anti-wave lift candidate, packed-runtime density proxy, L2 prefix contour,
   L3-to-L2 rerank contract, and final nonlinear-density verdict. The verdict
   can intentionally return `NOT_PROVEN` even when recall passes.
+- v148-v157 add the useful-capacity layer: adversarial density corpus metadata,
+  baseline duel report, margin-vs-baseline compare, anti-wave ablation proxy,
+  fixed-basis capacity sweep plan, useful-capacity score, packed density
+  hot-loop report, `nanda bench6m --mode density`, L2 candidate cache, and the
+  L3 phase-bias into L2 contract.
 - v66 adds a long-running server request,
   `{"command":"proof_cache_only","manifest":"..."}`, for cache-only proof
   without per-query process startup. The server keeps focused cache packets in

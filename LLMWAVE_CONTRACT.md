@@ -213,6 +213,20 @@ v138-v147 add the verdict layer over those measurements:
 - nonlinear-density verdict: `NOT_PROVEN`, `WEAK_NONLINEAR_SIGNAL`, or
   `CAPACITY_LIFT_CANDIDATE`.
 
+v148-v157 add the useful-capacity layer:
+
+- adversarial density corpus metadata;
+- baseline duel report across field, lexical, relation-only, naive-vector, and
+  Markov-like baselines;
+- margin-vs-baseline compare;
+- anti-wave ablation proxy;
+- fixed-basis capacity sweep plan;
+- useful-capacity score;
+- packed density hot-loop report;
+- `nanda bench6m --mode density` for typed hot-loop timing;
+- L2 candidate cache;
+- L3 phase-bias into L2 rerank contract.
+
 It explicitly does not prove nonlinear density or cache-only execution; those
 remain research claims until supported by capacity and perf-counter evidence.
 The first useful signal is narrower: relation phase and subject/object polarity

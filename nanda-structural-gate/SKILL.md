@@ -101,6 +101,7 @@ scripts/nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-fo
 scripts/nanda-budget .nanda/index.json --input-format json
 scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
+scripts/nanda-bench6m --mode density --support-build-iterations 1000 --triads 15000 --format json
 scripts/nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
 scripts/nanda-cache list .nanda/cache
 scripts/nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
@@ -384,6 +385,11 @@ margin-erosion curve, fixed-basis test, useful-capacity threshold, anti-wave
 lift candidate, packed-runtime density proxy, L2 prefix contour, L3-to-L2
 rerank contract, and final verdict. Treat `NOT_PROVEN` as a valid successful
 guardrail result when the evidence is still too weak.
+v148-v157 add the useful-capacity layer: adversarial corpus metadata, baseline
+duel, margin-vs-baseline compare, anti-wave ablation proxy, fixed-basis sweep
+plan, useful-capacity score, packed density hot-loop report, `bench6m --mode
+density`, L2 candidate cache, and L3 phase-bias into L2. Use `bench6m --mode
+density` when the question is hot-loop speed, not cold JSON report behavior.
 Treat
 `LLMWAVE_LENS_READY` as a usable structural readout; treat
 `LLMWAVE_LENS_REVIEW` or `LLMWAVE_LENS_WATCH` as unresolved.

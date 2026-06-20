@@ -69,3 +69,22 @@ The next required evidence is stronger:
 `NOT_PROVEN` is an acceptable verdict. It means the guardrail worked and the
 system refused to turn a pretty field peak into a stronger claim than the data
 supports.
+
+## Useful-Capacity Layer
+
+v148-v157 extend the same path with:
+
+- adversarial corpus metadata;
+- baseline duel report;
+- margin-vs-baseline compare;
+- anti-wave ablation proxy;
+- fixed-basis sweep plan;
+- useful-capacity score;
+- packed density hot-loop report;
+- `nanda bench6m --mode density`;
+- L2 candidate cache;
+- L3 phase-bias into L2.
+
+This is still not a proof of nonlinear density. It is a tighter experiment:
+field quality must beat stronger baselines, anti-wave must show ablation lift,
+and the packed density loop must be measured separately from cold JSON reports.

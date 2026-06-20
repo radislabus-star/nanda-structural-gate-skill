@@ -43,6 +43,7 @@ enum Bench6mMode {
     SupportBucketBuild,
     SupportBucketBuildCompileSweep,
     HotCycle,
+    Density,
     All,
 }
 
@@ -77,6 +78,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
         Bench6mMode::SupportBucketBuildCompileSweep | Bench6mMode::All
     );
     let include_hot_cycle = matches!(args.mode, Bench6mMode::HotCycle | Bench6mMode::All);
+    let include_density = matches!(args.mode, Bench6mMode::Density | Bench6mMode::All);
     let replay = if include_replay {
         Some(bench6m_replay(args.replay_iterations))
     } else {
@@ -191,6 +193,14 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
+    let density = if include_density {
+        Some(bench6m_density(
+            args.support_build_iterations,
+            args.triads.clamp(1, nanda_6m::TRIAD_CAPACITY),
+        ))
+    } else {
+        None
+    };
     let out = json!({
         "mode": "nanda-6m-hot-benchmark",
         "core_version": CORE_VERSION,
@@ -210,7 +220,8 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "support_score_build_compile_sweep": support_score_build_compile_sweep,
             "support_bucket_build": support_bucket_build,
             "support_bucket_build_compile_sweep": support_bucket_build_compile_sweep,
-            "hot_cycle": hot_cycle
+            "hot_cycle": hot_cycle,
+            "density": density
         },
         "interpretation": {
             "replay": "Pure typed replay firewall; no JSON, no file IO, no process spawn.",
@@ -226,6 +237,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "support_bucket_build": "Build cached support scores, bucket them by route/group, then assemble fields from bucket ranges.",
             "support_bucket_build_compile_sweep": "Build cached support score buckets, assemble fields, compile aligned lanes, and apply the sweep.",
             "hot_cycle": "Single typed hot-cycle call: score cache, route/group buckets, support fields, lane compilation, and aligned sweep.",
+            "density": "Typed packed density probe: fixed relation/polarity traps over in-memory PackedTriad32 records.",
             "not_measured": "CLI startup, JSON parsing, dictionary packing, and report serialization are intentionally excluded."
         }
     });
@@ -777,6 +789,50 @@ fn bench6m_hot_cycle(iterations: u64, triad_count: usize, field_count: usize) ->
     out["query_triads"] = json!(query_len);
     out["ns_per_field"] = json!(out["ns_per_op"].as_f64().unwrap_or(0.0) / field_count as f64);
     out["runtime_contract"] = runtime_usage_json(runtime_usage);
+    out
+}
+
+fn bench6m_density(iterations: u64, triad_count: usize) -> Value {
+    let memory = bench6m_triads(triad_count);
+    let positive_relation = 10u16;
+    let positive_subject = 1_000u32;
+    let positive_object = 10_000u32;
+    let reversed_subject = positive_object;
+    let started = Instant::now();
+    let mut checksum = 0u64;
+    let mut passed = 0u64;
+    let mut false_positive = 0u64;
+    for iter in 0..iterations {
+        let mut positive_found = false;
+        let mut reversed_found = false;
+        for record in &memory {
+            let relation_match = record.relation_id == positive_relation;
+            let forward_match =
+                record.subject_id == positive_subject && record.object_id == positive_object;
+            let reverse_match = record.subject_id == reversed_subject
+                && record.object_id == positive_subject
+                && relation_match;
+            if relation_match && forward_match {
+                positive_found = true;
+                checksum = checksum.wrapping_add(record.wave_seed as u64);
+            }
+            if reverse_match {
+                reversed_found = true;
+            }
+        }
+        passed += u64::from(positive_found && !reversed_found);
+        false_positive += u64::from(reversed_found);
+        checksum = checksum.wrapping_add(iter & 0xff);
+        black_box(checksum);
+    }
+    let elapsed_ns = started.elapsed().as_nanos();
+    let mut out = bench_result_json(iterations, elapsed_ns, checksum, "packed_density_probe");
+    out["triads_in_memory"] = json!(memory.len());
+    out["record_bytes"] = json!(32);
+    out["passed"] = json!(passed);
+    out["false_positive"] = json!(false_positive);
+    out["accuracy"] = json!(passed as f64 / iterations.max(1) as f64);
+    out["read_as"] = json!("Hot packed density microbench: relation and polarity trap over typed records; no JSON/string scoring inside the loop.");
     out
 }
 

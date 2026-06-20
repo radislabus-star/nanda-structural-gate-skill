@@ -707,6 +707,16 @@ fn llmwave_memory_density_report(counts: &[usize], facts: usize) -> Value {
     let packed_runtime_density = llmwave_density_packed_runtime_density(&rows);
     let l2_prefix_contour = llmwave_density_l2_prefix_contour(&rows);
     let l3_to_l2_rerank = llmwave_density_l3_to_l2_rerank(&rows);
+    let adversarial_density_corpus = llmwave_density_adversarial_corpus(&rows);
+    let baseline_duel_report = llmwave_density_baseline_duel(&rows);
+    let margin_baseline_compare = llmwave_density_margin_baseline_compare(&rows);
+    let anti_wave_ablation = llmwave_density_anti_wave_ablation(&rows);
+    let fixed_basis_capacity_sweep = llmwave_density_fixed_basis_capacity_sweep(&rows);
+    let useful_capacity_score = llmwave_density_useful_capacity_score(&rows);
+    let packed_density_hot_loop = llmwave_density_packed_hot_loop_report(&rows);
+    let perf_density_mode = llmwave_density_perf_mode(&rows);
+    let l2_candidate_cache = llmwave_density_l2_candidate_cache(&rows);
+    let l3_phase_bias_into_l2 = llmwave_density_l3_phase_bias_into_l2(&rows);
     let nonlinear_density_verdict = llmwave_density_verdict(
         &rows,
         &margin_erosion_curve,
@@ -733,6 +743,16 @@ fn llmwave_memory_density_report(counts: &[usize], facts: usize) -> Value {
         "packed_runtime_density": packed_runtime_density,
         "l2_prefix_contour": l2_prefix_contour,
         "l3_to_l2_rerank": l3_to_l2_rerank,
+        "adversarial_density_corpus": adversarial_density_corpus,
+        "baseline_duel_report": baseline_duel_report,
+        "margin_baseline_compare": margin_baseline_compare,
+        "anti_wave_ablation": anti_wave_ablation,
+        "fixed_basis_capacity_sweep": fixed_basis_capacity_sweep,
+        "useful_capacity_score": useful_capacity_score,
+        "packed_density_hot_loop": packed_density_hot_loop,
+        "perf_density_mode": perf_density_mode,
+        "l2_candidate_cache": l2_candidate_cache,
+        "l3_phase_bias_into_l2": l3_phase_bias_into_l2,
         "nonlinear_density_verdict": nonlinear_density_verdict,
         "claims_boundary": {
             "nonlinear_density_proven": false,
@@ -741,6 +761,245 @@ fn llmwave_memory_density_report(counts: &[usize], facts: usize) -> Value {
             "what_this_measures": "Synthetic useful recall, reversed-trap safety, field-vs-lexical baseline, field-state drift, packed bytes, and hot-focus boundary."
         },
         "read_as": "Density reality check is a guardrail against overclaiming: stable rows keep useful recall and reversed traps while record count grows."
+    })
+}
+
+fn row_baseline_accuracy(row: &Value, key: &str) -> f64 {
+    row[key]["accuracy"].as_f64().unwrap_or(0.0)
+}
+
+fn llmwave_density_adversarial_corpus(rows: &[Value]) -> Value {
+    let active_traps = rows
+        .iter()
+        .flat_map(|row| row["probes"].as_array().into_iter().flatten())
+        .filter(|probe| probe["expected_state"].as_str() == Some("ANSWER_EMPTY"))
+        .count();
+    json!({
+        "version": "v148-adversarial-density-corpus",
+        "active_traps": active_traps,
+        "active_cases": [
+            "reversed_relation_invoice_issue",
+            "lexical_overlap_false_positive",
+            "relation_only_direction_loss",
+            "naive_vector_direction_loss"
+        ],
+        "next_cases": [
+            "role_swap_subject_object",
+            "explicit_alias_synonym",
+            "duplicate_current_fact",
+            "near_lexical_decoy",
+            "noisy_archive_overweight"
+        ],
+        "state": if active_traps > 0 { "ADVERSARIAL_CORPUS_ACTIVE" } else { "ADVERSARIAL_CORPUS_EMPTY" }
+    })
+}
+
+fn llmwave_density_baseline_duel(rows: &[Value]) -> Value {
+    let duels = rows
+        .iter()
+        .map(|row| {
+            let field = row["accuracy"].as_f64().unwrap_or(0.0);
+            let lexical = row_baseline_accuracy(row, "lexical_baseline");
+            let relation = row_baseline_accuracy(row, "relation_baseline");
+            let naive = row_baseline_accuracy(row, "naive_vector_baseline");
+            let markov_like = (lexical + naive) / 2.0;
+            json!({
+                "records": row["records"],
+                "field": field,
+                "lexical": lexical,
+                "relation_only": relation,
+                "naive_vector": naive,
+                "markov_like": round4(markov_like),
+                "winner": if field >= lexical && field >= relation && field >= naive && field >= markov_like { "field" } else { "baseline" }
+            })
+        })
+        .collect::<Vec<_>>();
+    let field_wins = duels
+        .iter()
+        .filter(|duel| duel["winner"].as_str() == Some("field"))
+        .count();
+    json!({
+        "version": "v149-baseline-duel-report",
+        "duels": duels,
+        "field_wins": field_wins,
+        "rows": rows.len(),
+        "state": if field_wins == rows.len() { "FIELD_WINS_DUEL" } else { "BASELINE_DUEL_CONTESTED" }
+    })
+}
+
+fn llmwave_density_margin_baseline_compare(rows: &[Value]) -> Value {
+    let points = rows
+        .iter()
+        .map(|row| {
+            let field = row["accuracy"].as_f64().unwrap_or(0.0);
+            let best_baseline = row_baseline_accuracy(row, "lexical_baseline")
+                .max(row_baseline_accuracy(row, "relation_baseline"))
+                .max(row_baseline_accuracy(row, "naive_vector_baseline"));
+            json!({
+                "records": row["records"],
+                "field_margin": row["avg_margin"],
+                "field_accuracy": field,
+                "best_baseline_accuracy": round4(best_baseline),
+                "accuracy_gap": round4(field - best_baseline)
+            })
+        })
+        .collect::<Vec<_>>();
+    let min_gap = points
+        .iter()
+        .filter_map(|point| point["accuracy_gap"].as_f64())
+        .fold(f64::INFINITY, f64::min);
+    json!({
+        "version": "v150-margin-erosion-baseline-compare",
+        "points": points,
+        "min_accuracy_gap": if min_gap.is_finite() { round4(min_gap) } else { 0.0 },
+        "state": if min_gap.is_finite() && min_gap > 0.0 { "FIELD_ABOVE_BASELINES" } else { "BASELINE_CAUGHT_FIELD" },
+        "read_as": "Compares field accuracy and margin against the best simple baseline; margin must hold before stronger density claims."
+    })
+}
+
+fn llmwave_density_anti_wave_ablation(rows: &[Value]) -> Value {
+    let cases = rows
+        .iter()
+        .map(|row| {
+            let with_anti_false_positive = row["reversed_false_positive"].as_bool().unwrap_or(true);
+            let without_anti_false_positive = row["lexical_baseline"]["reversed_false_positive"]
+                .as_bool()
+                .unwrap_or(false)
+                || row["relation_baseline"]["reversed_false_positive"]
+                    .as_bool()
+                    .unwrap_or(false)
+                || row["naive_vector_baseline"]["reversed_false_positive"]
+                    .as_bool()
+                    .unwrap_or(false);
+            json!({
+                "records": row["records"],
+                "with_anti_wave_false_positive": with_anti_false_positive,
+                "without_anti_wave_baseline_false_positive": without_anti_false_positive,
+                "lift": without_anti_false_positive && !with_anti_false_positive
+            })
+        })
+        .collect::<Vec<_>>();
+    let lifted = cases
+        .iter()
+        .filter(|case| case["lift"].as_bool() == Some(true))
+        .count();
+    json!({
+        "version": "v151-anti-wave-ablation",
+        "cases": cases,
+        "lifted_rows": lifted,
+        "state": if lifted == rows.len() && lifted > 0 { "ANTI_WAVE_ABLATION_POSITIVE" } else { "ANTI_WAVE_ABLATION_REVIEW" },
+        "read_as": "Ablation proxy: compares field with polarity/anti gating against simple baselines that lack the anti-wave."
+    })
+}
+
+fn llmwave_density_fixed_basis_capacity_sweep(rows: &[Value]) -> Value {
+    let requested = [16usize, 64, 256, 1024, 4096, 8192, 15_000, 32_768, 65_536];
+    let observed = rows
+        .iter()
+        .filter_map(|row| row["records"].as_u64().map(|records| records as usize))
+        .collect::<Vec<_>>();
+    let missing = requested
+        .iter()
+        .copied()
+        .filter(|count| !observed.contains(count))
+        .collect::<Vec<_>>();
+    json!({
+        "version": "v152-fixed-basis-capacity-sweep",
+        "recommended_counts": requested,
+        "observed_counts": observed,
+        "missing_counts": missing,
+        "state": if missing.is_empty() { "FULL_SWEEP_PRESENT" } else { "PARTIAL_SWEEP" },
+        "command": "nanda llmwave-memory density --counts 16,64,256,1024,4096,8192,15000,32768,65536 --facts 3"
+    })
+}
+
+fn llmwave_density_useful_capacity_score(rows: &[Value]) -> Value {
+    let max_records = rows
+        .iter()
+        .filter(|row| {
+            row["accuracy"].as_f64().unwrap_or(0.0) >= 1.0
+                && row["reversed_false_positive"].as_bool() == Some(false)
+                && row["wins_over_expanded_baselines"].as_bool() == Some(true)
+        })
+        .filter_map(|row| row["records"].as_u64())
+        .max()
+        .unwrap_or(0);
+    let score = round4(max_records as f64 / nanda_6m::TRIAD_CAPACITY as f64);
+    json!({
+        "version": "v153-useful-capacity-score",
+        "max_useful_records_seen": max_records,
+        "storage_capacity": nanda_6m::TRIAD_CAPACITY,
+        "score": score,
+        "state": if max_records >= nanda_6m::RUNTIME_FOCUS_TRIAD_CAPACITY as u64 { "USEFUL_FOCUS_CAP_REACHED" } else { "USEFUL_CAPACITY_PARTIAL" }
+    })
+}
+
+fn llmwave_density_packed_hot_loop_report(rows: &[Value]) -> Value {
+    let max_records = rows
+        .iter()
+        .filter_map(|row| row["packed_hot_loop_proxy"]["records"].as_u64())
+        .max()
+        .unwrap_or(0);
+    let min_accuracy = rows
+        .iter()
+        .filter_map(|row| row["packed_hot_loop_proxy"]["accuracy"].as_f64())
+        .fold(f64::INFINITY, f64::min);
+    json!({
+        "version": "v154-packed-density-hot-loop",
+        "proxy_records_max": max_records,
+        "proxy_accuracy_min": if min_accuracy.is_finite() { round4(min_accuracy) } else { 0.0 },
+        "state": if min_accuracy.is_finite() && min_accuracy >= 1.0 { "PACKED_DENSITY_PROXY_READY" } else { "PACKED_DENSITY_PROXY_REVIEW" },
+        "next": "Move from proxy scan to nanda_6m packed density bench for real hot-loop evidence."
+    })
+}
+
+fn llmwave_density_perf_mode(rows: &[Value]) -> Value {
+    let max_records = rows
+        .iter()
+        .filter_map(|row| row["records"].as_u64())
+        .max()
+        .unwrap_or(0);
+    json!({
+        "version": "v155-perf-density-mode",
+        "bench_command": format!("nanda bench6m --mode density --support-build-iterations 1000 --triads {} --format json", max_records.clamp(1, nanda_6m::TRIAD_CAPACITY as u64)),
+        "state": "BENCH_MODE_AVAILABLE",
+        "read_as": "Use bench6m density for hot-loop timing; llmwave-memory density is still a cold report."
+    })
+}
+
+fn llmwave_density_l2_candidate_cache(rows: &[Value]) -> Value {
+    let l2_bytes = 128 * 1024usize;
+    let record_bytes = 32usize;
+    let candidate_capacity = l2_bytes / record_bytes;
+    let largest_row = rows
+        .iter()
+        .filter_map(|row| row["records"].as_u64())
+        .max()
+        .unwrap_or(0);
+    json!({
+        "version": "v156-l2-candidate-cache",
+        "working_budget_bytes": l2_bytes,
+        "record_bytes": record_bytes,
+        "candidate_capacity": candidate_capacity,
+        "largest_density_row": largest_row,
+        "state": if largest_row <= candidate_capacity as u64 { "L2_CAN_HOLD_ROW" } else { "L2_CACHE_IS_LOCAL_WINDOW" },
+        "read_as": "L2 is a local candidate cache, not the whole semantic memory."
+    })
+}
+
+fn llmwave_density_l3_phase_bias_into_l2(rows: &[Value]) -> Value {
+    let requires_bias = rows
+        .iter()
+        .any(|row| row["l2_contour_spec"]["state"].as_str() == Some("L2_NEEDS_L3_PHASE_BIAS"));
+    json!({
+        "version": "v157-l3-phase-bias-into-l2",
+        "state": if requires_bias { "L3_BIAS_REQUIRED" } else { "L3_BIAS_OPTIONAL_FOR_THIS_SWEEP" },
+        "contract": {
+            "l3_output": ["route", "relation_phase", "polarity", "anti_wave_mask"],
+            "l2_input": ["prefix_candidates", "local_context", "candidate_cache"],
+            "l2_output": ["reranked_token_or_word", "local_margin", "needs_l3_refresh"]
+        },
+        "read_as": "This is the next LLMWave bridge: L3 chooses semantic phase, L2 chooses the local token."
     })
 }
 
