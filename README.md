@@ -25,6 +25,12 @@ Sparse Distributed Memory, Hopfield-style associative memory, superposition,
 and Fourier/grokking work into concrete NANDA mechanisms and v47-v60
 milestones.
 
+For the word-birth and lexical-memory mechanism, see
+[`LEXICAL_BIRTH_MECHANISM.md`](LEXICAL_BIRTH_MECHANISM.md). It fixes the staged
+mechanism with literature footnotes: segmentation, fast mapping,
+cross-situational convergence, usage/exemplar strengthening, grammar
+integration, attractor cleanup, and anti-confusion.
+
 ## Why
 
 LLMs can read individual facts correctly and still confuse the relation shape:
@@ -527,7 +533,8 @@ the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor
 cleanup, and anti-confusion. It reports fixed 32-byte candidate and binding
 records plus a strict claim boundary: this is a mechanism contract, not proof
-that a real corpus has learned new words.
+that a real corpus has learned new words. The canonical mechanism note is
+[`LEXICAL_BIRTH_MECHANISM.md`](LEXICAL_BIRTH_MECHANISM.md).
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual
 decision, Residual V1 format, anti-residual, promotion/split rules, ablation,

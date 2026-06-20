@@ -37,6 +37,11 @@ a plain associative store.
 
 ## Literature Anchors
 
+The word-birth mechanism is fixed in
+[`LEXICAL_BIRTH_MECHANISM.md`](LEXICAL_BIRTH_MECHANISM.md), with explicit
+footnotes to the language-acquisition and lexical-memory sources that motivate
+the staged gates.
+
 ### Holographic Reduced Representations
 
 Sources:
@@ -201,6 +206,10 @@ What not to copy:
   not pretend every problem is modular arithmetic.
 
 ### Word Birth / Mental Lexicon
+
+Canonical mechanism note:
+
+- [`LEXICAL_BIRTH_MECHANISM.md`](LEXICAL_BIRTH_MECHANISM.md)
 
 Sources:
 
