@@ -295,7 +295,9 @@ nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
 nanda-llmwave-big l2 --format json
+nanda-llmwave-big write --format json
 nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
+nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
 nanda-llmwave-eval --suite examples/llmwave-corpus.json
 nanda-llmwave-eval --suite examples/token-lens-corpus.json
 nanda-demo examples/triad-packet.interference-search-route-trap.json --input-format json --text "declaration requires protocols"
@@ -515,6 +517,11 @@ Atlas loading, and report serialization.
 surface slice, prefix wave, 128-4096 candidate cache, L3 bias into surface
 candidates, anti-wave suppression for schema-breaking prefix matches, L2/L3
 sync policy, multilingual surface banks, and L2 eval metrics.
+`nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
+write decomposition, reconstructability score, centroid update plus residual
+decision, Residual V1 format, anti-residual, promotion/split rules, ablation,
+source-aware weighting, and a write-density microbenchmark. It reports
+`RESIDUAL_SAVING`, not nonlinear memory proof.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

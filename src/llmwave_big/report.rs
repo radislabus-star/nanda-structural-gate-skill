@@ -3,6 +3,7 @@ use anyhow::Result;
 use super::active_core::ActiveCoreReport;
 use super::atlas::AtlasReport;
 use super::l2_word_field::L2WordFieldReport;
+use super::write::WriteReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
 
@@ -47,6 +48,15 @@ pub(crate) fn print_l2_word_field_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_l2_word_field_text(report),
         OutputFormat::Md => print_l2_word_field_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_write_report(report: &WriteReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_write_text(report),
+        OutputFormat::Md => print_write_md(report),
     }
     Ok(())
 }
@@ -153,6 +163,22 @@ fn print_l2_word_field_text(report: &L2WordFieldReport) {
     );
 }
 
+fn print_write_text(report: &WriteReport) {
+    println!("LLMWave-Big Schema/Residual Write");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("sample: {}", report.sample_input);
+    println!("score: {}", report.reconstructability.total);
+    println!("decision: {}", report.write_decision.decision);
+    println!("bytes_written: {}", report.write_decision.bytes_written);
+    println!(
+        "residual_saving_ratio: {:.4}",
+        report.write_curve.residual_saving_ratio
+    );
+    println!("curve_state: {}", report.write_curve.state);
+}
+
 fn print_contract_md(report: &LlmwaveBigReport) {
     println!("# LLMWave-Big Contract");
     println!();
@@ -255,4 +281,24 @@ fn print_l2_word_field_md(report: &L2WordFieldReport) {
             candidate.label, candidate.final_score, candidate.anti_score
         );
     }
+}
+
+fn print_write_md(report: &WriteReport) {
+    println!("# LLMWave-Big Schema/Residual Write");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- sample: `{}`", report.sample_input);
+    println!(
+        "- reconstructability score: `{}`",
+        report.reconstructability.total
+    );
+    println!("- write decision: `{}`", report.write_decision.decision);
+    println!("- bytes written: `{}`", report.write_decision.bytes_written);
+    println!(
+        "- residual saving ratio: `{:.4}`",
+        report.write_curve.residual_saving_ratio
+    );
+    println!("- curve state: `{}`", report.write_curve.state);
 }

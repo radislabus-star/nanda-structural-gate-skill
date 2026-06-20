@@ -40,6 +40,8 @@ enum LlmwaveBigCommand {
     ActiveCore(LlmwaveBigActiveCoreArgs),
     /// Print the v181-v190 L2 Word Field contract and surface sample.
     L2(LlmwaveBigL2Args),
+    /// Print the v191-v205 schema/residual write contract.
+    Write(LlmwaveBigWriteArgs),
 }
 
 #[derive(Parser)]
@@ -62,6 +64,12 @@ struct LlmwaveBigActiveCoreArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigL2Args {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigWriteArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -112,6 +120,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 l2_word_field::build_l2_word_field_report(l3_schema_field::business_invoice_bias());
             report::print_l2_word_field_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::Write(args) => {
+            let report = write::build_write_report();
+            report::print_write_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
@@ -259,6 +272,31 @@ mod tests {
             .expect("inventory candidate");
         assert!(inventory.anti_score > 0);
         assert!(inventory.final_score < report.candidate_cache.sample[0].final_score);
+    }
+
+    #[test]
+    fn write_report_keeps_nonlinear_claim_unproven() {
+        let report = write::build_write_report();
+        assert_eq!(report.roadmap_block, "v191-v205");
+        assert_eq!(report.verdict, "RESIDUAL_SAVING");
+        assert_eq!(
+            report.write_curve.state,
+            "SYNTHETIC_CONTRACT_CURVE_NOT_NONLINEAR_PROOF"
+        );
+        assert!(report.write_curve.residual_saving_ratio > 0.0);
+        assert!(report.compression_safety.safe);
+    }
+
+    #[test]
+    fn write_residual_v1_has_expected_size_and_fields() {
+        let report = write::build_write_report();
+        assert_eq!(report.residual_format_v1.bytes, 20);
+        assert_eq!(report.write_decision.residual.schema_id, 101);
+        assert_eq!(report.write_decision.residual.evidence_ref, 10_001);
+        assert!(report
+            .residual_format_v1
+            .fields
+            .contains(&"phase_delta:i16"));
     }
 
     #[test]

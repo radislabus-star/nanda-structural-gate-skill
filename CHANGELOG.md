@@ -19,6 +19,10 @@
   slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
   L2/L3 sync policy, multilingual surface banks, eval metrics, and L2 runtime
   verdicts.
+- v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
+  write-density`: write decomposition, reconstructability scoring, residual V1,
+  centroid update plus residual decision, anti-residuals, promotion/split
+  contracts, ablation, source-aware weighting, and a typed write microbench.
 - v67 adds the LLMWave Field + Lens Contract. `nanda-llmwave` now reports
   `llmwave_contract` with field state, selected lens, Pattern/Polarity/Cleanup
   lenses, baseline compare, and hot-budget status; `--lens` selects the active

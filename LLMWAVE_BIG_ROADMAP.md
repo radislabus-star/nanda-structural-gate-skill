@@ -713,6 +713,18 @@ SUBLINEAR_WRITE
 COGNITIVE_COMPRESSION
 ```
 
+Implementation checkpoint:
+
+```text
+v191-v205: implemented as nanda-llmwave-big write
+bench: nanda-bench6m --mode write-density
+state: RESIDUAL_SAVING for the built-in schema+residual sample
+scope: decomposition, reconstructability, write decision, residual V1,
+       centroid update, anti-residual, promotion/split, ablation,
+       write curve, compression safety, source-aware write, microbenchmark
+not claimed: SUBLINEAR_WRITE, COGNITIVE_COMPRESSION, nonlinear memory proof
+```
+
 ## Phase 5: Consolidation / Sleep, v206-v218
 
 ### v206 Sleep Pass

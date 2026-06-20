@@ -75,6 +75,11 @@ jq -e '.roadmap_block == "v181-v190" and .verdict == "L2_READY"' <<<"$big_l2_jso
 jq -e '.candidate_cache.record_bytes == 32 and .candidate_cache.top_token_label == "invoice" and .candidate_cache.margin >= 12' <<<"$big_l2_json" >/dev/null
 jq -e '.sync_policy.l2_update == "per_keystroke" and .sync_policy.l3_update == "word_boundary_punctuation_semantic_shift"' <<<"$big_l2_json" >/dev/null
 jq -e '.candidate_cache.sample[] | select(.label == "inventory" and .anti_score > 0 and .final_score < 0)' <<<"$big_l2_json" >/dev/null
+big_write_json="$("$llmwave_big" write --format json)"
+jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
+jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
+jq -e '.write_curve.state == "SYNTHETIC_CONTRACT_CURVE_NOT_NONLINEAR_PROOF" and .write_curve.residual_saving_ratio > 0.5' <<<"$big_write_json" >/dev/null
+jq -e '.compression_safety.safe == true and .anti_residual.anti_lane_id == 90001' <<<"$big_write_json" >/dev/null
 jq empty "$root/examples/triad-packet.example.json"
 jq empty "$root/examples/triad-packet.role-swap.json"
 jq empty "$root/examples/triad-packet.route-splice.json"
@@ -479,6 +484,9 @@ jq -e '.packed_lane_application.route.state == "LANE_AXIS_FOCUSED_CANDIDATE" and
 bench6m_active_core_json="$("$bench6m" --mode active-core --support-build-iterations 1000 --format json)"
 jq -e '.benchmarks.active_core.mode == "llmwave-big-active-core" and .benchmarks.active_core.iterations == 1000' <<<"$bench6m_active_core_json" >/dev/null
 jq -e '.benchmarks.active_core.ns_per_query > 0 and .benchmarks.active_core.checksum != 0' <<<"$bench6m_active_core_json" >/dev/null
+bench6m_write_json="$("$bench6m" --mode write-density --support-build-iterations 1000 --format json)"
+jq -e '.benchmarks.write_density.mode == "llmwave-big-write-density" and .benchmarks.write_density.iterations == 1000' <<<"$bench6m_write_json" >/dev/null
+jq -e '.benchmarks.write_density.ns_per_write > 0 and .benchmarks.write_density.checksum != 0' <<<"$bench6m_write_json" >/dev/null
 pack6m_replay_json="$("$pack6m" "$root/examples/triad-packet.negative-shortcut-lanes.json" --input-format json)"
 jq -e '.packed_lane_replay.state == "PACKED_LANE_REPLAY_FOCUSED" and .packed_lane_replay.matched_keys == 2 and .packed_lane_replay.compiled_lanes == 2' <<<"$pack6m_replay_json" >/dev/null
 jq -e '.packed_lane_replay.sample[0].source == "negative_shortcuts" and .packed_lane_replay.sample[0].query_match_ratio == 1' <<<"$pack6m_replay_json" >/dev/null
