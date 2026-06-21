@@ -5,6 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
@@ -55,9 +56,13 @@ pub(crate) struct FieldBudget {
     pub token_record_bytes: usize,
     pub transition_record_bytes: usize,
     pub chunk_record_bytes: usize,
+    #[serde(default = "default_schema_record_bytes")]
+    pub schema_record_bytes: usize,
     pub token_records: usize,
     pub transition_records: usize,
     pub chunk_records: usize,
+    #[serde(default)]
+    pub schema_records: usize,
     pub estimated_hot_bytes: usize,
     pub fits_hot_budget: bool,
 }
@@ -231,6 +236,45 @@ pub(crate) struct ArtifactAskEvalMetrics {
     pub answer_accuracy: f32,
     pub false_positive_rate: f32,
     pub false_negative_rate: f32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotPackReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub artifact: String,
+    pub out: String,
+    pub record_counts: HotPackRecordCounts,
+    pub bytes: HotPackBytes,
+    pub claim_boundary: HotPackClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotPackRecordCounts {
+    pub tokens: usize,
+    pub transitions: usize,
+    pub chunks: usize,
+    pub schema_hints: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotPackBytes {
+    pub actual_file_bytes: usize,
+    pub estimated_hot_bytes: usize,
+    pub hot_budget_bytes: usize,
+    pub fits_hot_budget: bool,
+    pub header_bytes: usize,
+    pub record_bytes: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotPackClaimBoundary {
+    pub binary_hot_pack_written: bool,
+    pub strings_excluded_from_hot_pack: bool,
+    pub json_excluded_from_hot_pack: bool,
+    pub cache_only_execution_proven: bool,
+    pub broad_chat_llm_ready: bool,
 }
 
 #[derive(Deserialize)]
@@ -410,6 +454,7 @@ pub(crate) fn compile_training_corpus(config: TrainingConfig) -> Result<Training
         token_records.len(),
         transition_records.len(),
         chunks.len(),
+        schema_hints.len(),
     );
     let eval = eval_next_token(&held_out, &transition_records);
     let artifact = TrainingArtifact {
@@ -488,6 +533,94 @@ pub(crate) fn load_training_artifact(path: &Path) -> Result<TrainingArtifact> {
         .with_context(|| format!("read training artifact {}", path.display()))?;
     serde_json::from_str(&raw)
         .with_context(|| format!("parse training artifact {}", path.display()))
+}
+
+pub(crate) fn pack_hot_artifact(artifact_path: &Path, out: &Path) -> Result<HotPackReport> {
+    let artifact = load_training_artifact(artifact_path)?;
+    if let Some(parent) = out.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("create hot pack directory {}", parent.display()))?;
+    }
+
+    let mut writer = BufWriter::new(
+        fs::File::create(out).with_context(|| format!("create hot pack {}", out.display()))?,
+    );
+    let counts = HotPackRecordCounts {
+        tokens: artifact.records.tokens.len(),
+        transitions: artifact.records.transitions.len(),
+        chunks: artifact.records.chunks.len(),
+        schema_hints: artifact.records.schema_hints.len(),
+    };
+    write_hot_header(&mut writer, &counts)?;
+    for record in &artifact.records.tokens {
+        write_u32(&mut writer, hash32(&record.token))?;
+        write_u32(&mut writer, record.count)?;
+        write_u16(&mut writer, record.phase)?;
+        writer.write_all(&record.polarity.to_le_bytes())?;
+        writer.write_all(&[0; 5])?;
+    }
+    for record in &artifact.records.transitions {
+        write_u32(&mut writer, hash32(&record.from))?;
+        write_u32(&mut writer, hash32(&record.to))?;
+        write_u32(&mut writer, record.count)?;
+        write_i16(&mut writer, record.phase_delta)?;
+        writer.write_all(&[0; 2])?;
+    }
+    for record in &artifact.records.chunks {
+        write_u64(&mut writer, chunk_hash64(&record.hash))?;
+        write_u16(&mut writer, record.centroid_phase)?;
+        write_u32(&mut writer, record.energy)?;
+        write_u16(
+            &mut writer,
+            record.token_count.min(u16::MAX as usize) as u16,
+        )?;
+        write_u32(&mut writer, record.file_id)?;
+        write_u32(&mut writer, record.id)?;
+        writer.write_all(&[0; 8])?;
+    }
+    for record in &artifact.records.schema_hints {
+        write_u32(&mut writer, hash32(&record.subject))?;
+        write_u32(&mut writer, hash32(&record.relation))?;
+        write_u32(&mut writer, hash32(&record.object))?;
+        write_u32(&mut writer, record.count)?;
+    }
+    writer.flush()?;
+
+    let actual_file_bytes = fs::metadata(out)
+        .with_context(|| format!("stat hot pack {}", out.display()))?
+        .len() as usize;
+    let header_bytes = hot_header_bytes();
+    let record_bytes = counts.tokens * 16
+        + counts.transitions * 16
+        + counts.chunks * 32
+        + counts.schema_hints * 16;
+    Ok(HotPackReport {
+        mode: "llmwave-big-pack-hot",
+        version: "llmwave-big-v1904-hot-pack",
+        verdict: if actual_file_bytes <= artifact.field_budget.hot_budget_bytes {
+            "HOT_PACK_READY_NOT_CACHE_ONLY_PROOF"
+        } else {
+            "HOT_PACK_EXCEEDS_HOT_BUDGET"
+        },
+        artifact: artifact_path.display().to_string(),
+        out: out.display().to_string(),
+        record_counts: counts,
+        bytes: HotPackBytes {
+            actual_file_bytes,
+            estimated_hot_bytes: record_bytes,
+            hot_budget_bytes: artifact.field_budget.hot_budget_bytes,
+            fits_hot_budget: actual_file_bytes <= artifact.field_budget.hot_budget_bytes,
+            header_bytes,
+            record_bytes,
+        },
+        claim_boundary: HotPackClaimBoundary {
+            binary_hot_pack_written: true,
+            strings_excluded_from_hot_pack: true,
+            json_excluded_from_hot_pack: true,
+            cache_only_execution_proven: false,
+            broad_chat_llm_ready: false,
+        },
+    })
 }
 
 pub(crate) fn ask_training_artifact(
@@ -943,25 +1076,34 @@ fn build_field_budget(
     token_records: usize,
     transition_records: usize,
     chunk_records: usize,
+    schema_records: usize,
 ) -> FieldBudget {
     let token_record_bytes = 16;
     let transition_record_bytes = 16;
     let chunk_record_bytes = 32;
+    let schema_record_bytes = default_schema_record_bytes();
     let estimated_hot_bytes = token_records * token_record_bytes
         + transition_records * transition_record_bytes
-        + chunk_records * chunk_record_bytes;
+        + chunk_records * chunk_record_bytes
+        + schema_records * schema_record_bytes;
     FieldBudget {
         wave_dim: WAVE_DIM,
         hot_budget_bytes,
         token_record_bytes,
         transition_record_bytes,
         chunk_record_bytes,
+        schema_record_bytes,
         token_records,
         transition_records,
         chunk_records,
+        schema_records,
         estimated_hot_bytes,
         fits_hot_budget: estimated_hot_bytes <= hot_budget_bytes,
     }
+}
+
+fn default_schema_record_bytes() -> usize {
+    16
 }
 
 fn eval_next_token(
@@ -1215,6 +1357,55 @@ fn expand_query_terms(tokens: &[String]) -> BTreeSet<String> {
 fn phase_for(input: &str) -> u16 {
     let digest = Sha256::digest(input.as_bytes());
     u16::from_le_bytes([digest[0], digest[1]])
+}
+
+fn hash32(input: &str) -> u32 {
+    let digest = Sha256::digest(input.as_bytes());
+    u32::from_le_bytes([digest[0], digest[1], digest[2], digest[3]])
+}
+
+fn chunk_hash64(hash: &str) -> u64 {
+    u64::from_str_radix(hash.get(..16).unwrap_or(hash), 16).unwrap_or_else(|_| {
+        let digest = Sha256::digest(hash.as_bytes());
+        u64::from_le_bytes([
+            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+        ])
+    })
+}
+
+fn hot_header_bytes() -> usize {
+    32
+}
+
+fn write_hot_header(writer: &mut impl Write, counts: &HotPackRecordCounts) -> Result<()> {
+    writer.write_all(b"LLMWBHOT")?;
+    write_u32(writer, 1)?;
+    write_u32(writer, WAVE_DIM as u32)?;
+    write_u32(writer, counts.tokens as u32)?;
+    write_u32(writer, counts.transitions as u32)?;
+    write_u32(writer, counts.chunks as u32)?;
+    write_u32(writer, counts.schema_hints as u32)?;
+    Ok(())
+}
+
+fn write_u16(writer: &mut impl Write, value: u16) -> Result<()> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+fn write_i16(writer: &mut impl Write, value: i16) -> Result<()> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+fn write_u32(writer: &mut impl Write, value: u32) -> Result<()> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+fn write_u64(writer: &mut impl Write, value: u64) -> Result<()> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
 }
 
 fn short_hash(bytes: &[u8]) -> String {

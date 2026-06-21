@@ -797,6 +797,13 @@ artifact, not a broad chat model.
 tracks answer accuracy, false positives, and false negatives. A chunk-only peak
 is review evidence, not answer permission; safe answers require a focused
 schema peak.
+`nanda-llmwave-big pack-hot` converts a training artifact JSON into a compact
+binary hot Active Core pack. The pack stores fixed-size numeric records only:
+token hashes, transition hashes, chunk hashes, phases, counts, and schema
+hints. It excludes cold strings and JSON from the hot pack and reports actual
+file bytes against the hot budget. Its successful verdict is
+`HOT_PACK_READY_NOT_CACHE_ONLY_PROOF`: compact binary storage is real, but
+cache-only execution and broad chat readiness remain unproven.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

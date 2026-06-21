@@ -36,7 +36,9 @@ use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
 use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
-use super::training::{ArtifactAskEvalReport, ArtifactAskReport, TrainingCompileReport};
+use super::training::{
+    ArtifactAskEvalReport, ArtifactAskReport, HotPackReport, TrainingCompileReport,
+};
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
@@ -580,6 +582,45 @@ pub(crate) fn print_artifact_ask_eval_report(
         OutputFormat::Md => print_artifact_ask_eval_md(report),
     }
     Ok(())
+}
+
+pub(crate) fn print_hot_pack_report(report: &HotPackReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_hot_pack_text(report),
+        OutputFormat::Md => print_hot_pack_md(report),
+    }
+    Ok(())
+}
+
+fn print_hot_pack_text(report: &HotPackReport) {
+    println!("LLMWave-Big Hot Pack");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("artifact: {}", report.artifact);
+    println!("out: {}", report.out);
+    println!("actual_file_bytes: {}", report.bytes.actual_file_bytes);
+    println!("hot_budget_bytes: {}", report.bytes.hot_budget_bytes);
+    println!("fits_hot_budget: {}", report.bytes.fits_hot_budget);
+    println!(
+        "records: tokens={} transitions={} chunks={} schema_hints={}",
+        report.record_counts.tokens,
+        report.record_counts.transitions,
+        report.record_counts.chunks,
+        report.record_counts.schema_hints
+    );
+}
+
+fn print_hot_pack_md(report: &HotPackReport) {
+    println!("# LLMWave-Big Hot Pack");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- artifact: `{}`", report.artifact);
+    println!("- out: `{}`", report.out);
+    println!("- actual file bytes: `{}`", report.bytes.actual_file_bytes);
+    println!("- hot budget bytes: `{}`", report.bytes.hot_budget_bytes);
+    println!("- fits hot budget: `{}`", report.bytes.fits_hot_budget);
 }
 
 fn print_contract_text(report: &LlmwaveBigReport) {

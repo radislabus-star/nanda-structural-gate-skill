@@ -292,6 +292,10 @@ cat > "$tmp_big_train/ask-eval.json" <<'EOF'
 EOF
 big_ask_eval_json="$("$llmwave_big" ask-eval --artifact "$tmp_big_train/artifact.json" --suite "$tmp_big_train/ask-eval.json" --top-k 3 --format json)"
 jq -e '.version == "llmwave-big-v1903-artifact-ask-eval" and .verdict == "ARTIFACT_ASK_EVAL_PASS_NOT_GENERAL_LLM" and .metrics.false_positive_rate == 0' <<<"$big_ask_eval_json" >/dev/null
+big_hot_pack_json="$("$llmwave_big" pack-hot --artifact "$tmp_big_train/artifact.json" --out "$tmp_big_train/artifact.hot.bin" --format json)"
+jq -e '.version == "llmwave-big-v1904-hot-pack" and .verdict == "HOT_PACK_READY_NOT_CACHE_ONLY_PROOF" and .bytes.fits_hot_budget == true' <<<"$big_hot_pack_json" >/dev/null
+jq -e '.claim_boundary.binary_hot_pack_written == true and .claim_boundary.strings_excluded_from_hot_pack == true and .claim_boundary.json_excluded_from_hot_pack == true and .claim_boundary.cache_only_execution_proven == false' <<<"$big_hot_pack_json" >/dev/null
+test -s "$tmp_big_train/artifact.hot.bin"
 rm -rf "$tmp_big_train"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null

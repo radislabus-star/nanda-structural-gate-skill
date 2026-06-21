@@ -562,6 +562,12 @@ answering, not broad chat readiness.
 `nanda-llmwave-big ask-eval` runs artifact-grounded QA suites and reports
 answer accuracy, false-positive rate, and false-negative rate. Treat chunk-only
 retrieval as review evidence; answer permission requires a focused schema peak.
+`nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
+hot pack with numeric fixed-size records only. It is the command to use when
+checking whether the actual hot artifact fits the budget rather than trusting a
+JSON artifact size or a rough estimate. Treat
+`HOT_PACK_READY_NOT_CACHE_ONLY_PROOF` as binary hot storage readiness, not
+cache-only execution proof or broad chat readiness.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

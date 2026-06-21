@@ -166,6 +166,9 @@ enum LlmwaveBigCommand {
     /// Evaluate ask behavior over a compiled training artifact.
     #[command(name = "ask-eval")]
     AskEval(LlmwaveBigAskEvalArgs),
+    /// Pack a training artifact into a binary hot Active Core file.
+    #[command(name = "pack-hot")]
+    PackHot(LlmwaveBigPackHotArgs),
 }
 
 #[derive(Parser)]
@@ -490,6 +493,16 @@ struct LlmwaveBigTrainArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigPackHotArgs {
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long)]
+    out: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigAskArgs {
     #[arg(long)]
     artifact: PathBuf,
@@ -783,6 +796,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::AskEval(args) => {
             let report = training::eval_training_artifact(&args.artifact, &args.suite, args.top_k)?;
             report::print_artifact_ask_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::PackHot(args) => {
+            let report = training::pack_hot_artifact(&args.artifact, &args.out)?;
+            report::print_hot_pack_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
