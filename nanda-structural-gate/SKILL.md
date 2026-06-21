@@ -193,6 +193,7 @@ scripts/nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-sur
 scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
 scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
 scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
+scripts/nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples --out .nanda/llmwave-big-training/project-artifact.json --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -540,6 +541,12 @@ v1421-v1900 add the applied field-core runtime loop. Use `feedback-memory`,
 `memory-consolidate`, `run`, and `core-eval` to verify that feedback changes the
 next field pass. Treat `CORE_RUNTIME_READY_FIXTURE` as fixture runtime
 readiness, not full LLM/chat readiness or nonlinear-memory proof.
+`nanda-llmwave-big train` starts the post-fixture real-corpus training path. It
+loads UTF-8 files/directories, deduplicates files/chunks, compiles compact
+token, transition, chunk, and schema-hint records, writes a Wave Atlas training
+artifact, and runs held-out next-token resonance eval. Treat
+`TRAINING_ARTIFACT_READY_NOT_LLM` as a real corpus compiler result, not chat
+readiness, nonlinear-memory proof, or cache-only proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

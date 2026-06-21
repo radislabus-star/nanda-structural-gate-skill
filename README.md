@@ -337,6 +337,7 @@ nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-cor
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
+nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples --out .nanda/llmwave-big-training/project-artifact.json --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -772,6 +773,14 @@ daemon contract, skill integration command, editor typing mode, code-review and
 business-graph modes, memory import/export, personal/domain Atlas, contested
 field safety, explainability fields, performance target, 1M-fact load-test
 contract, release-candidate checklist, and v1-candidate criteria.
+`nanda-llmwave-big train` starts the real-corpus training path after the
+fixture-era core work. It recursively loads UTF-8 corpus files, deduplicates
+files and chunks, builds compact token/transition/chunk/schema-hint records,
+writes a Wave Atlas training artifact, and runs a held-out next-token resonance
+check. The command keeps cold text and JSON outside the hot Active Core and
+reports the estimated hot record budget. Its successful verdict is
+`TRAINING_ARTIFACT_READY_NOT_LLM`: the corpus path is real, but broad chat,
+nonlinear memory proof, and cache-only execution remain explicitly unproven.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

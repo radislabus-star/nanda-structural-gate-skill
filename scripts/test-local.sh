@@ -270,6 +270,17 @@ jq -e '.roadmap_block == "v331-v360" and .corpus.source == "russian_derived_suff
 jq -e '.corpus.suffix_inventory_source == "derived_from_raw_forms" and .derived_suffix_inventory.enabled == true and .metrics.manual_suffix_count == 0 and .metrics.derived_suffix_count >= 8' <<<"$big_surface_raw_derived_json" >/dev/null
 jq -e '.metrics.induced_family_count == 9 and .metrics.expected_root_recall == 1 and .metrics.held_out_exact_match_rate == 1 and .metrics.noise_reject_rate == 1 and .metrics.false_family_rate == 0' <<<"$big_surface_raw_derived_json" >/dev/null
 jq -e '([.induced_families[].root] | index("деклараци") and index("инструкци") and index("счет")) and ([.rejected_collision_roots[].root] | index("счетчик") and index("маршрутизатор")) and .metrics.state == "DERIVED_SUFFIX_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF"' <<<"$big_surface_raw_derived_json" >/dev/null
+tmp_big_train="$(mktemp -d)"
+cat > "$tmp_big_train/corpus.txt" <<'EOF'
+Honglu issues invoice. invoice requires payment.
+Payment supports customs declaration. declaration requires evidence.
+Honglu issues invoice. evidence blocks unsupported answer.
+EOF
+big_train_json="$("$llmwave_big" train "$tmp_big_train/corpus.txt" --out "$tmp_big_train/artifact.json" --vocab-cap 128 --transition-cap 256 --active-chunk-cap 64 --chunk-tokens 8 --extensions txt --format json)"
+jq -e '.version == "llmwave-big-v1901-corpus-training" and .verdict == "TRAINING_ARTIFACT_READY_NOT_LLM" and .claim_boundary.real_corpus_loaded == true and .claim_boundary.chat_llm_ready == false' <<<"$big_train_json" >/dev/null
+jq -e '.field_budget.fits_hot_budget == true and .field_budget.transition_records > 0 and .eval.state == "HELD_OUT_EVAL_RAN"' <<<"$big_train_json" >/dev/null
+test -s "$tmp_big_train/artifact.json"
+rm -rf "$tmp_big_train"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null

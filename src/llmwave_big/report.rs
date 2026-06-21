@@ -36,6 +36,7 @@ use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
 use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
+use super::training::TrainingCompileReport;
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
@@ -541,6 +542,18 @@ pub(crate) fn print_runtime_product_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_runtime_product_text(report),
         OutputFormat::Md => print_runtime_product_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_training_compile_report(
+    report: &TrainingCompileReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_training_compile_text(report),
+        OutputFormat::Md => print_training_compile_md(report),
     }
     Ok(())
 }
@@ -1094,6 +1107,30 @@ fn print_runtime_product_text(report: &RuntimeProductReport) {
         report.performance.target_hot_query_ms
     );
     println!("llm_ready: {}", report.claim_boundary.llm_ready);
+}
+
+fn print_training_compile_text(report: &TrainingCompileReport) {
+    println!("LLMWave-Big Training");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "files: {}/{}",
+        report.corpus.files_used, report.corpus.files_seen
+    );
+    println!("tokens_seen: {}", report.corpus.tokens_seen);
+    println!("unique_tokens: {}", report.corpus.unique_tokens);
+    println!("transitions: {}", report.field_budget.transition_records);
+    println!("chunks: {}", report.field_budget.chunk_records);
+    println!(
+        "estimated_hot_bytes: {}",
+        report.field_budget.estimated_hot_bytes
+    );
+    println!("fits_hot_budget: {}", report.field_budget.fits_hot_budget);
+    println!("held_out_accuracy: {:.4}", report.eval.next_token_accuracy);
+    if let Some(path) = &report.output.artifact_path {
+        println!("artifact: {path}");
+    }
+    println!("chat_llm_ready: {}", report.claim_boundary.chat_llm_ready);
 }
 
 fn print_contract_md(report: &LlmwaveBigReport) {
@@ -1920,6 +1957,43 @@ fn print_runtime_product_md(report: &RuntimeProductReport) {
         report.performance.target_hot_query_ms
     );
     println!("- LLM ready: `{}`", report.claim_boundary.llm_ready);
+}
+
+fn print_training_compile_md(report: &TrainingCompileReport) {
+    println!("# LLMWave-Big Training");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- files: `{}/{}`",
+        report.corpus.files_used, report.corpus.files_seen
+    );
+    println!("- tokens seen: `{}`", report.corpus.tokens_seen);
+    println!("- unique tokens: `{}`", report.corpus.unique_tokens);
+    println!(
+        "- transitions: `{}`",
+        report.field_budget.transition_records
+    );
+    println!("- chunks: `{}`", report.field_budget.chunk_records);
+    println!(
+        "- estimated hot bytes: `{}`",
+        report.field_budget.estimated_hot_bytes
+    );
+    println!(
+        "- fits hot budget: `{}`",
+        report.field_budget.fits_hot_budget
+    );
+    println!(
+        "- held-out accuracy: `{:.4}`",
+        report.eval.next_token_accuracy
+    );
+    println!(
+        "- chat LLM ready: `{}`",
+        report.claim_boundary.chat_llm_ready
+    );
+    if let Some(path) = &report.output.artifact_path {
+        println!("- artifact: `{path}`");
+    }
 }
 
 fn print_mini_chat_eval_text(report: &MiniChatEvalReport) {

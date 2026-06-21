@@ -42,6 +42,7 @@ pub mod surface_production;
 pub mod surface_raw_induce;
 pub mod surface_reconstruct;
 pub mod symbols;
+pub mod training;
 pub mod write;
 
 mod claims;
@@ -158,6 +159,8 @@ enum LlmwaveBigCommand {
     Eval(LlmwaveBigEvalArgs),
     /// Run the v231-v245 runtime product query surface.
     Query(LlmwaveBigQueryArgs),
+    /// Compile a real corpus into LLMWave-Big training records.
+    Train(LlmwaveBigTrainArgs),
 }
 
 #[derive(Parser)]
@@ -457,6 +460,30 @@ struct LlmwaveBigQueryArgs {
     format: OutputFormat,
 }
 
+#[derive(Parser)]
+struct LlmwaveBigTrainArgs {
+    #[arg(required = true)]
+    inputs: Vec<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 65536)]
+    vocab_cap: usize,
+    #[arg(long, default_value_t = 262144)]
+    transition_cap: usize,
+    #[arg(long, default_value_t = 32768)]
+    active_chunk_cap: usize,
+    #[arg(long, default_value_t = 64)]
+    chunk_tokens: usize,
+    #[arg(long, default_value_t = 6 * 1024 * 1024)]
+    hot_budget_bytes: usize,
+    #[arg(long, default_value_t = 4 * 1024 * 1024)]
+    max_file_bytes: usize,
+    #[arg(long, default_value_t = training::default_extensions_csv())]
+    extensions: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
 #[derive(Serialize, Clone)]
 pub(crate) struct LlmwaveBigReport {
     pub command: &'static str,
@@ -704,6 +731,21 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             report::print_runtime_product_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::Train(args) => {
+            let report = training::compile_training_corpus(training::TrainingConfig {
+                inputs: args.inputs,
+                out: args.out,
+                vocab_cap: args.vocab_cap,
+                transition_cap: args.transition_cap,
+                active_chunk_cap: args.active_chunk_cap,
+                chunk_tokens: args.chunk_tokens,
+                hot_budget_bytes: args.hot_budget_bytes,
+                max_file_bytes: args.max_file_bytes,
+                extensions: training::parse_extensions(&args.extensions),
+            })?;
+            report::print_training_compile_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
     }
 }
 
@@ -756,6 +798,8 @@ fn build_contract_report() -> LlmwaveBigReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn big_contract_keeps_claims_unproven() {
@@ -2069,6 +2113,50 @@ mod tests {
         assert!(report.v1_criteria.small_active_core);
         assert!(!report.claim_boundary.llm_ready);
         assert!(!report.claim_boundary.cache_only_execution_proven);
+    }
+
+    #[test]
+    fn training_compiles_real_text_into_field_records() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("llmwave-big-train-{nonce}"));
+        fs::create_dir_all(&dir).unwrap();
+        let corpus = dir.join("corpus.txt");
+        let out = dir.join("artifact.json");
+        fs::write(
+            &corpus,
+            "Honglu issues invoice. invoice requires payment. \
+             payment supports customs declaration. Honglu issues invoice. \
+             declaration requires evidence. evidence blocks unsupported answer.",
+        )
+        .unwrap();
+
+        let report = training::compile_training_corpus(training::TrainingConfig {
+            inputs: vec![corpus],
+            out: Some(out.clone()),
+            vocab_cap: 128,
+            transition_cap: 256,
+            active_chunk_cap: 64,
+            chunk_tokens: 8,
+            hot_budget_bytes: 64 * 1024,
+            max_file_bytes: 1024 * 1024,
+            extensions: training::parse_extensions("txt"),
+        })
+        .unwrap();
+
+        assert_eq!(report.verdict, "TRAINING_ARTIFACT_READY_NOT_LLM");
+        assert!(report.corpus.tokens_seen > 20);
+        assert!(report.field_budget.transition_records > 0);
+        assert!(report.field_budget.fits_hot_budget);
+        assert!(report.output.artifact_written);
+        assert!(!report.claim_boundary.chat_llm_ready);
+        let artifact = training::load_training_artifact(&out).unwrap();
+        assert!(!artifact.records.tokens.is_empty());
+        assert!(!artifact.records.transitions.is_empty());
+        assert_eq!(artifact.version, training::TRAINING_VERSION);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
