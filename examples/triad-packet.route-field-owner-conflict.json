@@ -1,0 +1,63 @@
+{
+  "task_id": "route-field-owner-conflict",
+  "domain": "code",
+  "query": "adapter must not become decision owner",
+  "triads": [
+    {
+      "id": "s1",
+      "subject": "core-correction-owner",
+      "relation": "decides",
+      "object": "correction decision",
+      "evidence": "src/core/correction.rs:42",
+      "confidence": 0.95,
+      "subject_role": "owner",
+      "object_role": "decision",
+      "route": "correction",
+      "group": "correction-core",
+      "layer": "core",
+      "owner": "core-correction-owner",
+      "entrypoint": "CorrectionRequest",
+      "output": "CorrectionDecision",
+      "evidence_path": "src/core/correction.rs:42",
+      "scope": "production"
+    },
+    {
+      "id": "s2",
+      "subject": "input-adapter",
+      "relation": "calls",
+      "object": "CorrectionRequest",
+      "evidence": "src/adapters/input.rs:18",
+      "confidence": 0.9,
+      "subject_role": "adapter",
+      "object_role": "request",
+      "route": "correction",
+      "group": "correction-adapter",
+      "layer": "adapter",
+      "owner": "core-correction-owner",
+      "entrypoint": "CorrectionRequest",
+      "output": "CorrectionDecision",
+      "evidence_path": "src/adapters/input.rs:18",
+      "scope": "production"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "c1",
+      "subject": "input-adapter",
+      "relation": "decides",
+      "object": "correction decision",
+      "evidence": "candidate_answer",
+      "confidence": 0.82,
+      "subject_role": "adapter",
+      "object_role": "decision",
+      "route": "correction",
+      "group": "candidate-correction-adapter",
+      "layer": "adapter",
+      "owner": "input-adapter",
+      "entrypoint": "handle_input",
+      "output": "CorrectionDecision",
+      "evidence_path": "src/adapters/input.rs:24",
+      "scope": "production"
+    }
+  ]
+}

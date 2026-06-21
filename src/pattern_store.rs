@@ -4050,6 +4050,12 @@ fn parse_arrow_triads(raw: &str, task_id: &str, domain: &str) -> Vec<Triad> {
             object_role: "object".to_string(),
             route,
             group,
+            layer: "adapter".to_string(),
+            owner: "raw-pattern-parser".to_string(),
+            entrypoint: "pattern-store raw".to_string(),
+            output: "pattern-triads".to_string(),
+            evidence_path: String::new(),
+            scope: "raw-pattern".to_string(),
         });
     }
     normalize_ids(triads, "raw")
@@ -4225,6 +4231,12 @@ fn cleanup_memory_report(decode: &Value, packet: &Packet) -> Value {
                 .to_string(),
             route: pattern["route"].as_str().unwrap_or("").to_string(),
             group: pattern["group"].as_str().unwrap_or("").to_string(),
+            layer: "runtime".to_string(),
+            owner: "cleanup-memory".to_string(),
+            entrypoint: "pattern-bank".to_string(),
+            output: "cleanup-candidate".to_string(),
+            evidence_path: String::new(),
+            scope: "cleanup".to_string(),
         });
         for triad in &packet.triads {
             let score = cosine(&p_wave, &triad_wave(triad));

@@ -996,6 +996,12 @@ fn pattern_to_query_triad(pattern: &Value, step: usize) -> Triad {
         object_role: pattern["object_role"].as_str().unwrap_or("").to_string(),
         route: pattern["route"].as_str().unwrap_or("").to_string(),
         group: "decoded-context".to_string(),
+        layer: "runtime".to_string(),
+        owner: "nanda-decode".to_string(),
+        entrypoint: "decode-loop".to_string(),
+        output: "decoded-context".to_string(),
+        evidence_path: String::new(),
+        scope: "decode".to_string(),
     }
 }
 

@@ -74,6 +74,12 @@ pub(crate) fn init_task(args: InitTaskArgs) -> Result<u8> {
             object_role: String::new(),
             route: String::new(),
             group: String::new(),
+            layer: String::new(),
+            owner: String::new(),
+            entrypoint: String::new(),
+            output: String::new(),
+            evidence_path: String::new(),
+            scope: String::new(),
         }],
         candidate_triads: vec![],
         candidate_answer: String::new(),
@@ -140,6 +146,12 @@ pub(crate) fn parse_arrow_triad(line: &str) -> Option<Triad> {
             .unwrap_or_else(|| "object".to_string()),
         route: attrs.get("route").cloned().unwrap_or_default(),
         group: attrs.get("group").cloned().unwrap_or_default(),
+        layer: attrs.get("layer").cloned().unwrap_or_default(),
+        owner: attrs.get("owner").cloned().unwrap_or_default(),
+        entrypoint: attrs.get("entrypoint").cloned().unwrap_or_default(),
+        output: attrs.get("output").cloned().unwrap_or_default(),
+        evidence_path: attrs.get("evidence_path").cloned().unwrap_or_default(),
+        scope: attrs.get("scope").cloned().unwrap_or_default(),
     })
 }
 
@@ -207,6 +219,12 @@ pub(crate) fn parse_markdown_tables(text: &str, normalize_paths: bool) -> (Vec<T
             object_role: row.get("object_role").unwrap_or(&"object").to_string(),
             route: row.get("route").unwrap_or(&"").to_string(),
             group: row.get("group").unwrap_or(&"").to_string(),
+            layer: row.get("layer").unwrap_or(&"").to_string(),
+            owner: row.get("owner").unwrap_or(&"").to_string(),
+            entrypoint: row.get("entrypoint").unwrap_or(&"").to_string(),
+            output: row.get("output").unwrap_or(&"").to_string(),
+            evidence_path: row.get("evidence_path").unwrap_or(&"").to_string(),
+            scope: row.get("scope").unwrap_or(&"").to_string(),
         };
         if normalize_paths {
             triad.subject = normalize_code_entity(&triad.subject);

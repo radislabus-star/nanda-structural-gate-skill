@@ -244,6 +244,12 @@ pub(crate) fn auto_query_triads(query_text: &str) -> Vec<Triad> {
         object_role: "topic".to_string(),
         route: String::new(),
         group: "auto-query".to_string(),
+        layer: "adapter".to_string(),
+        owner: "auto-query".to_string(),
+        entrypoint: "nanda-search --query".to_string(),
+        output: "query-triads".to_string(),
+        evidence_path: String::new(),
+        scope: "query".to_string(),
     }];
     if tokens.len() >= 2 {
         triads.push(Triad {
@@ -257,6 +263,12 @@ pub(crate) fn auto_query_triads(query_text: &str) -> Vec<Triad> {
             object_role: "query_term".to_string(),
             route: String::new(),
             group: "auto-query".to_string(),
+            layer: "adapter".to_string(),
+            owner: "auto-query".to_string(),
+            entrypoint: "nanda-search --query".to_string(),
+            output: "query-triads".to_string(),
+            evidence_path: String::new(),
+            scope: "query".to_string(),
         });
     }
     if tokens.len() >= 3 {
@@ -271,6 +283,12 @@ pub(crate) fn auto_query_triads(query_text: &str) -> Vec<Triad> {
             object_role: "query_term".to_string(),
             route: String::new(),
             group: "auto-query".to_string(),
+            layer: "adapter".to_string(),
+            owner: "auto-query".to_string(),
+            entrypoint: "nanda-search --query".to_string(),
+            output: "query-triads".to_string(),
+            evidence_path: String::new(),
+            scope: "query".to_string(),
         });
     }
     triads

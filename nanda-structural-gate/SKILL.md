@@ -773,16 +773,24 @@ scripts/nanda-split-md code-flow.md --by linked-group --normalize-paths --out-di
 
 Inspect JSON fields:
 
+- `route_field`;
+- `owner_gravity`;
+- `structural_energy`;
+- `negative_routes`;
 - `mixed_candidate_groups`;
 - `foreign_pull`;
 - `group_centroids`;
 - `route_memory`;
 - `candidate_superposition`;
-- `repair_tasks`.
+- `repair_tasks`;
+- `repair_queue`.
 
 If `foreign_pull` is non-empty, do not finalize as PASS. Explain which
 `candidate_triad` pulls the candidate group toward a different source route and
 repair or split that group first.
+If `owner_gravity.conflicts` or `negative_routes.hits` are non-empty, also do
+not finalize as PASS. Explain who owns the decision, which adapter/UI/test/helper
+crossed the boundary, and use `repair_queue` as the minimal repair list.
 
 Recommended repository workflow:
 
@@ -817,6 +825,8 @@ Interpret the result as:
 
 - global map clean + global gate size stop = split, not failure;
 - global `foreign_pull` non-empty = repair before PASS;
+- `owner_gravity.conflicts` or `negative_routes.hits` non-empty = repair before
+  PASS;
 - linked split files should contain both source and candidate triads;
 - route-level PASS across split files is the practical acceptance condition.
 - `nanda-hgate` is the direct large-packet acceptance command:

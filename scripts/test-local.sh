@@ -1097,6 +1097,21 @@ code_map_json="$("$code_mapper" "$root/src/main.rs" --format json)"
 jq -e '.mode == "code-map"' <<<"$code_map_json" >/dev/null
 jq -e '.clusters | length > 0' <<<"$code_map_json" >/dev/null
 jq -e '.clusters[] | select(.cluster == "cli-router")' <<<"$code_map_json" >/dev/null
+route_field_json="$("$mapper" "$root/examples/triad-packet.route-field-owner-conflict.json" --input-format json --format json)"
+jq -e '.route_field.routes.correction.owners | index("core-correction-owner")' <<<"$route_field_json" >/dev/null
+jq -e '.owner_gravity.conflicts[] | select(.kind == "duplicate_decision_owner" and .route == "correction")' <<<"$route_field_json" >/dev/null
+jq -e '.negative_routes.hits[] | select(.rule == "adapter_or_ui_must_not_decide" and .triad == "c1")' <<<"$route_field_json" >/dev/null
+jq -e '.structural_energy.owner_conflict == 1 and .structural_energy.adapter_leak_risk == 1 and (.repair_queue | length) >= 2' <<<"$route_field_json" >/dev/null
+set +e
+route_field_dogfood="$("$dogfood" "$root/examples/triad-packet.route-field-owner-conflict.json" --format json)"
+route_field_dogfood_status=$?
+set -e
+if [[ "$route_field_dogfood_status" -ne 1 ]]; then
+  echo "expected route-field owner conflict dogfood to VETO" >&2
+  echo "$route_field_dogfood" >&2
+  exit 1
+fi
+jq -e '.agent_decision.action == "REPAIR_REQUIRED" and .agent_decision.owner_conflict == 1 and .agent_decision.negative_route_hits == 1' <<<"$route_field_dogfood" >/dev/null
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null

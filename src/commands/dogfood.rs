@@ -115,6 +115,16 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value) -> Value {
         .count();
     let foreign_pull = summary["foreign_pull"].as_u64().unwrap_or(0);
     let invariant_violation = summary["invariant_violation"].as_u64().unwrap_or(0);
+    let field_tension = tree["map"]["structural_energy"]["field_tension"]
+        .as_u64()
+        .unwrap_or(0);
+    let owner_conflict = tree["map"]["structural_energy"]["owner_conflict"]
+        .as_u64()
+        .unwrap_or(0);
+    let negative_route_hits = tree["map"]["negative_routes"]["hits"]
+        .as_array()
+        .map(|items| items.len() as u64)
+        .unwrap_or(0);
     let root_stop = tree["stop_reasons"]
         .as_array()
         .map(|items| {
@@ -131,10 +141,15 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value) -> Value {
             .map(|items| items.is_empty())
             .unwrap_or(true);
 
-    let (action, next) = if foreign_pull > 0 || invariant_violation > 0 || local_veto > 0 {
+    let (action, next) = if foreign_pull > 0
+        || invariant_violation > 0
+        || local_veto > 0
+        || owner_conflict > 0
+        || negative_route_hits > 0
+    {
         (
             "REPAIR_REQUIRED",
-            "Repair foreign pull, invariant drift, or vetoed branch before editing.",
+            "Repair foreign pull, owner conflict, anti-route hit, invariant drift, or vetoed branch before editing.",
         )
     } else if child_count > 0
         && local_pass == child_count
@@ -173,6 +188,10 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value) -> Value {
         "local_veto": local_veto,
         "foreign_pull": foreign_pull,
         "invariant_violation": invariant_violation,
+        "field_tension": field_tension,
+        "owner_conflict": owner_conflict,
+        "negative_route_hits": negative_route_hits,
+        "repair_queue": tree["map"]["repair_queue"],
         "next": next
     })
 }
@@ -198,8 +217,10 @@ pub(crate) fn print_dogfood_text(out: &Value) {
         }
     );
     println!(
-        "STRUCTURE: foreign_pull={} invariant_violation={}",
+        "STRUCTURE: foreign_pull={} owner_conflict={} negative_route_hits={} invariant_violation={}",
         decision["foreign_pull"].as_u64().unwrap_or(0),
+        decision["owner_conflict"].as_u64().unwrap_or(0),
+        decision["negative_route_hits"].as_u64().unwrap_or(0),
         decision["invariant_violation"].as_u64().unwrap_or(0)
     );
     println!(
@@ -236,6 +257,11 @@ pub(crate) fn print_dogfood_md(out: &Value) {
         decision["local_branches"].as_u64().unwrap_or(0)
     );
     println!("- foreign_pull: `{}`", decision["foreign_pull"]);
+    println!("- owner_conflict: `{}`", decision["owner_conflict"]);
+    println!(
+        "- negative_route_hits: `{}`",
+        decision["negative_route_hits"]
+    );
     println!(
         "- invariant_violation: `{}`",
         decision["invariant_violation"]

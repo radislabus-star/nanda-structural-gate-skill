@@ -2046,6 +2046,12 @@ pub(crate) fn template_text(
                 "runtime",
                 "deploy",
                 "source-runtime",
+                "core",
+                "source module",
+                "public export",
+                "runtime module",
+                "README.md:1",
+                "production",
             ),
             (
                 "t2",
@@ -2057,6 +2063,12 @@ pub(crate) fn template_text(
                 "cli",
                 "deploy",
                 "source-runtime",
+                "runtime",
+                "runtime module",
+                "runtime module",
+                "CLI command",
+                "README.md:2",
+                "production",
             ),
             (
                 "t3",
@@ -2068,6 +2080,12 @@ pub(crate) fn template_text(
                 "core",
                 "execution",
                 "source-runtime",
+                "adapter",
+                "checker core",
+                "CLI command",
+                "checker core",
+                "README.md:3",
+                "production",
             ),
         ],
         TemplateKind::Skill => vec![
@@ -2081,6 +2099,12 @@ pub(crate) fn template_text(
                 "runtime",
                 "deploy",
                 "skill-flow",
+                "install",
+                "source skill",
+                "scripts/install-local.sh",
+                "runtime skill",
+                "scripts/install-local.sh:10",
+                "production",
             ),
             (
                 "t2",
@@ -2092,6 +2116,12 @@ pub(crate) fn template_text(
                 "trigger",
                 "agent",
                 "skill-flow",
+                "runtime",
+                "runtime skill",
+                "SKILL.md",
+                "trigger rule",
+                "SKILL.md:2",
+                "agent",
             ),
             (
                 "t3",
@@ -2103,6 +2133,12 @@ pub(crate) fn template_text(
                 "verdict",
                 "execution",
                 "skill-flow",
+                "adapter",
+                "gate core",
+                "CLI command",
+                "gate verdict",
+                "scripts/nanda-check:1",
+                "production",
             ),
         ],
         TemplateKind::Project => vec![
@@ -2116,6 +2152,12 @@ pub(crate) fn template_text(
                 "source",
                 "project",
                 "project-flow",
+                "source",
+                "repository",
+                "repository root",
+                "source files",
+                "README.md:1",
+                "project",
             ),
             (
                 "t2",
@@ -2127,6 +2169,12 @@ pub(crate) fn template_text(
                 "docs",
                 "project",
                 "project-flow",
+                "source",
+                "repository",
+                "README.md",
+                "architecture",
+                "ARCHITECTURE.md:1",
+                "project",
             ),
             (
                 "t3",
@@ -2138,24 +2186,46 @@ pub(crate) fn template_text(
                 "runtime",
                 "validation",
                 "project-flow",
+                "test",
+                "test suite",
+                "scripts/test-local.sh",
+                "runtime behavior",
+                "scripts/test-local.sh:1",
+                "test",
             ),
         ],
-        TemplateKind::Generic => vec![("t1", "", "", "", "", "", "", "", "")],
+        TemplateKind::Generic => {
+            vec![("t1", "", "", "", "", "", "", "", "", "", "", "", "", "", "")]
+        }
     };
     let mut out = format!(
         "# NANDA Triad Worksheet\n\ntask_id: {task_id}\ndomain: {domain}\nquery: {query}\n\n"
     );
-    out.push_str("## triads\n\n| id | subject | relation | object | evidence | confidence | subject_role | object_role | route | group |\n|----|---------|----------|--------|----------|------------|--------------|-------------|-------|-------|\n");
+    out.push_str("## triads\n\n| id | subject | relation | object | evidence | confidence | subject_role | object_role | route | group | layer | owner | entrypoint | output | evidence_path | scope |\n|----|---------|----------|--------|----------|------------|--------------|-------------|-------|-------|-------|-------|------------|--------|---------------|-------|\n");
     for row in &rows {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | 0.9 | {} | {} | {} | {} |\n",
-            row.0, row.1, row.2, row.3, row.4, row.5, row.6, row.7, row.8
+            "| {} | {} | {} | {} | {} | 0.9 | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            row.0,
+            row.1,
+            row.2,
+            row.3,
+            row.4,
+            row.5,
+            row.6,
+            row.7,
+            row.8,
+            row.9,
+            row.10,
+            row.11,
+            row.12,
+            row.13,
+            row.14
         ));
     }
-    out.push_str("\n## candidate_triads\n\n| id | subject | relation | object | evidence | confidence | subject_role | object_role | route | group |\n|----|---------|----------|--------|----------|------------|--------------|-------------|-------|-------|\n");
+    out.push_str("\n## candidate_triads\n\n| id | subject | relation | object | evidence | confidence | subject_role | object_role | route | group | layer | owner | entrypoint | output | evidence_path | scope |\n|----|---------|----------|--------|----------|------------|--------------|-------------|-------|-------|-------|-------|------------|--------|---------------|-------|\n");
     for row in rows {
         out.push_str(&format!(
-            "| c{} | {} | {} | {} | candidate_answer | 0.9 | {} | {} | {} | candidate-{} |\n",
+            "| c{} | {} | {} | {} | candidate_answer | 0.9 | {} | {} | {} | candidate-{} | {} | {} | {} | {} | candidate_answer | {} |\n",
             &row.0[1..],
             row.1,
             row.2,
@@ -2163,10 +2233,16 @@ pub(crate) fn template_text(
             row.5,
             row.6,
             row.7,
-            row.8
+            row.8,
+            row.9,
+            row.10,
+            row.11,
+            row.12,
+            row.14
         ));
     }
     out.push_str("\n## notes\n\n- Fill `triads` from source evidence.\n- Fill `candidate_triads` from the answer being checked.\n- Keep one coherent `group` per route, case, or local structure.\n");
+    out.push_str("- Use `layer`, `owner`, `entrypoint`, `output`, `evidence_path`, and `scope` when checking architecture ownership.\n");
     out
 }
 
@@ -2346,6 +2422,12 @@ pub(crate) fn triad(
         object_role: object_role.to_string(),
         route: route.to_string(),
         group: group.to_string(),
+        layer: String::new(),
+        owner: String::new(),
+        entrypoint: String::new(),
+        output: String::new(),
+        evidence_path: String::new(),
+        scope: String::new(),
     }
 }
 
@@ -2447,6 +2529,18 @@ pub(crate) struct Triad {
     pub(crate) route: String,
     #[serde(default)]
     pub(crate) group: String,
+    #[serde(default)]
+    pub(crate) layer: String,
+    #[serde(default)]
+    pub(crate) owner: String,
+    #[serde(default)]
+    pub(crate) entrypoint: String,
+    #[serde(default)]
+    pub(crate) output: String,
+    #[serde(default)]
+    pub(crate) evidence_path: String,
+    #[serde(default)]
+    pub(crate) scope: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

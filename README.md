@@ -415,13 +415,18 @@ structural verdict plus code-boundary recommendations in one packet.
 `nanda-report` is agent-first: it returns a JSON decision packet by default.
 Use `--format md` only when a human-facing report is explicitly needed.
 `nanda-map` exposes the core structural map: source/candidate group sizes,
-interference matrix, dominant source group, mixed candidate groups, and repair
-tasks.
+interference matrix, dominant source group, mixed candidate groups, route
+field, owner gravity, negative route hits, structural energy, and repair tasks.
+Use `route_field` to see route/layer/owner/entrypoint/output/evidence/scope
+coordinates. Use `owner_gravity.conflicts` to catch two owners pulling one
+decision. Use `negative_routes.hits` to catch anti-modes such as adapter/UI
+decision ownership, test-only paths leaking into runtime, helpers owning
+decisions, or experiments affecting stable routes.
 `nanda-hgate` is the hierarchical gate for large packets. It runs one
 global map/check, splits by linked group, runs local gates, and returns
 `STRUCTURALLY_ACCEPTED` only when the global `WATCH` is size-only and every
-local branch is `PASS`. If `foreign_pull`, conflicts, or any local `VETO`
-exist, it returns `REPAIR_REQUIRED`.
+local branch is `PASS`. If `foreign_pull`, owner conflicts, negative route
+hits, conflicts, or any local `VETO` exist, it returns `REPAIR_REQUIRED`.
 `nanda-extract` converts simple arrow text into a triad packet. The supported
 line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
@@ -1028,6 +1033,12 @@ routes/groups by weighted and polarized interference, then interpret, record,
 test, and smoke-check the top peaks.
 If `foreign_pull` is non-empty, strict gate output is not `PASS`; repair the
 named candidate triads or split the route first.
+If `owner_gravity.conflicts` or `negative_routes.hits` are non-empty, treat the
+map the same way: no PASS until the decision owner is singular and adapters,
+UI, tests, helpers, and experiments are back behind their allowed boundaries.
+`structural_energy.field_tension` is the compact numeric signal for how much
+route pressure remains; `repair_queue` is the machine-readable list of minimum
+repairs.
 
 Interference search output:
 

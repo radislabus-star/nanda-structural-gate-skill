@@ -813,6 +813,12 @@ pub(crate) fn doctor_triad(
         object_role: object_role.to_string(),
         route: route.to_string(),
         group: group.to_string(),
+        layer: "core".to_string(),
+        owner: "builtin-doctor".to_string(),
+        entrypoint: "nanda-doctor".to_string(),
+        output: "doctor-report".to_string(),
+        evidence_path: String::new(),
+        scope: "self-check".to_string(),
     }
 }
 

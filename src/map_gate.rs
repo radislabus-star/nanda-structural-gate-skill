@@ -216,9 +216,29 @@ pub(crate) fn structural_map(source: &[Triad], candidates: &[Triad]) -> Value {
         }
     }
 
+    let route_field = route_field(source, candidates);
+    let owner_gravity = owner_gravity(source, candidates);
+    let negative_routes = negative_route_hits(source, candidates);
+    let structural_energy = structural_energy(
+        &route_field,
+        &owner_gravity,
+        &foreign_pull,
+        &negative_routes,
+    );
+    let repair_queue = repair_queue(
+        &repair_tasks,
+        &foreign_pull,
+        &owner_gravity,
+        &negative_routes,
+    );
+
     json!({
         "core_version": CORE_VERSION,
         "wave_dim": nanda_6m::WAVE_DIM,
+        "route_field": route_field,
+        "owner_gravity": owner_gravity,
+        "negative_routes": negative_routes,
+        "structural_energy": structural_energy,
         "source_group_sizes": source_group_sizes,
         "candidate_group_sizes": candidate_group_sizes,
         "group_centroids": {
@@ -237,8 +257,396 @@ pub(crate) fn structural_map(source: &[Triad], candidates: &[Triad]) -> Value {
         "stable_groups": stable_groups.into_iter().collect::<Vec<_>>(),
         "mixed_candidate_groups": mixed_candidate_groups,
         "foreign_pull": foreign_pull,
-        "repair_tasks": repair_tasks
+        "repair_tasks": repair_tasks,
+        "repair_queue": repair_queue
     })
+}
+
+fn route_field(source: &[Triad], candidates: &[Triad]) -> Value {
+    let mut routes = BTreeMap::<String, Vec<&Triad>>::new();
+    for triad in source.iter().chain(candidates) {
+        routes
+            .entry(route_name(triad, "unrouted"))
+            .or_default()
+            .push(triad);
+    }
+    let mut rows = serde_json::Map::new();
+    for (route, triads) in routes {
+        let mut layers = BTreeSet::new();
+        let mut owners = BTreeSet::new();
+        let mut entrypoints = BTreeSet::new();
+        let mut outputs = BTreeSet::new();
+        let mut evidence_paths = BTreeSet::new();
+        let mut scopes = BTreeSet::new();
+        let mut source_count = 0usize;
+        let mut candidate_count = 0usize;
+        let mut confidence_sum = 0.0;
+        for triad in &triads {
+            if triad.id.starts_with('c') {
+                candidate_count += 1;
+            } else {
+                source_count += 1;
+            }
+            confidence_sum += triad.confidence;
+            insert_nonempty(&mut layers, &layer_name(triad));
+            insert_nonempty(&mut owners, &owner_name(triad));
+            insert_nonempty(&mut entrypoints, &triad.entrypoint);
+            insert_nonempty(&mut outputs, &triad.output);
+            insert_nonempty(&mut evidence_paths, &evidence_path(triad));
+            insert_nonempty(&mut scopes, &scope_name(triad));
+        }
+        let avg_confidence = if triads.is_empty() {
+            0.0
+        } else {
+            confidence_sum / triads.len() as f64
+        };
+        rows.insert(
+            route,
+            json!({
+                "triads": triads.len(),
+                "source_triads": source_count,
+                "candidate_triads": candidate_count,
+                "layers": layers.into_iter().collect::<Vec<_>>(),
+                "owners": owners.into_iter().collect::<Vec<_>>(),
+                "entrypoints": entrypoints.into_iter().collect::<Vec<_>>(),
+                "outputs": outputs.into_iter().collect::<Vec<_>>(),
+                "evidence_paths": evidence_paths.into_iter().collect::<Vec<_>>(),
+                "scopes": scopes.into_iter().collect::<Vec<_>>(),
+                "avg_confidence": round4(avg_confidence)
+            }),
+        );
+    }
+    json!({
+        "routes": rows,
+        "read_as": "Route field coordinates describe causal ownership: route, layer, owner, entrypoint, output, evidence_path, and scope."
+    })
+}
+
+fn owner_gravity(source: &[Triad], candidates: &[Triad]) -> Value {
+    let mut by_route = BTreeMap::<String, BTreeMap<String, usize>>::new();
+    let mut by_group = BTreeMap::<String, BTreeMap<String, usize>>::new();
+    let mut decision_owner = BTreeMap::<(String, String), BTreeMap<String, Vec<String>>>::new();
+    for triad in source.iter().chain(candidates) {
+        let owner = owner_name(triad);
+        by_route
+            .entry(route_name(triad, "unrouted"))
+            .or_default()
+            .entry(owner.clone())
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
+        by_group
+            .entry(group_name(triad, "ungrouped"))
+            .or_default()
+            .entry(owner.clone())
+            .and_modify(|count| *count += 1)
+            .or_insert(1);
+        if is_decision_relation(triad) {
+            decision_owner
+                .entry((route_name(triad, "unrouted"), norm(&triad.object)))
+                .or_default()
+                .entry(owner)
+                .or_default()
+                .push(triad.id.clone());
+        }
+    }
+
+    let mut route_centers = serde_json::Map::new();
+    for (route, owners) in &by_route {
+        route_centers.insert(route.clone(), owner_center(owners));
+    }
+    let mut group_centers = serde_json::Map::new();
+    let mut conflicts = vec![];
+    for (group, owners) in &by_group {
+        let center = owner_center(owners);
+        let distinct = owners.keys().filter(|owner| !owner.is_empty()).count();
+        if distinct > 1 {
+            conflicts.push(json!({
+                "kind": "owner_conflict",
+                "group": group,
+                "owners": owners.keys().cloned().collect::<Vec<_>>(),
+                "center": center["owner"],
+                "risk": "helper or candidate group is attracted to more than one decision owner",
+                "repair": "Split the group by owner or move decision logic behind one public entrypoint."
+            }));
+        }
+        group_centers.insert(group.clone(), center);
+    }
+    for ((route, object), owners) in decision_owner {
+        if owners.len() > 1 {
+            conflicts.push(json!({
+                "kind": "duplicate_decision_owner",
+                "route": route,
+                "decision_object": object,
+                "owners": owners,
+                "risk": "two owners appear to decide the same route object",
+                "repair": "Pick one decision owner and demote the other path to adapter/helper."
+            }));
+        }
+    }
+    json!({
+        "route_centers": route_centers,
+        "group_centers": group_centers,
+        "conflicts": conflicts
+    })
+}
+
+fn negative_route_hits(source: &[Triad], candidates: &[Triad]) -> Value {
+    let mut hits = vec![];
+    for triad in source.iter().chain(candidates) {
+        let layer = layer_name(triad);
+        let relation = norm(&triad.relation);
+        let subject_role = norm(&triad.subject_role);
+        let object_role = norm(&triad.object_role);
+        let scope = scope_name(triad);
+        let hit = if matches!(layer.as_str(), "adapter" | "ui")
+            && (is_decision_relation(triad) || relation.contains("source_of_truth"))
+        {
+            Some((
+                "adapter_or_ui_must_not_decide",
+                "Adapter/UI layer is taking a decision or source-of-truth role.",
+                "Move decision to core owner and keep this layer as input/display adapter.",
+            ))
+        } else if layer == "test"
+            && (relation.contains("executes") || relation.contains("calls"))
+            && scope != "test"
+        {
+            Some((
+                "test_helper_must_not_be_runtime",
+                "Test layer appears to drive a non-test route.",
+                "Mark the path test-only or move reusable behavior into a production owner.",
+            ))
+        } else if layer == "experiment"
+            && (relation.contains("affects")
+                || relation.contains("controls")
+                || relation.contains("writes")
+                || relation.contains("executes"))
+        {
+            Some((
+                "experiment_must_not_affect_stable_path",
+                "Experimental layer still affects a stable route.",
+                "Isolate the experiment behind an explicit feature gate or remove runtime wiring.",
+            ))
+        } else if (subject_role.contains("helper") || object_role.contains("helper"))
+            && is_decision_relation(triad)
+        {
+            Some((
+                "helper_must_not_own_decision",
+                "Helper role is taking an ownership/decision relation.",
+                "Make the helper private and route decisions through the owner entrypoint.",
+            ))
+        } else {
+            None
+        };
+        if let Some((rule, reason, repair)) = hit {
+            hits.push(json!({
+                "rule": rule,
+                "triad": triad.id,
+                "route": route_name(triad, "unrouted"),
+                "group": group_name(triad, "ungrouped"),
+                "layer": layer,
+                "owner": owner_name(triad),
+                "relation": triad.relation,
+                "subject": triad.subject,
+                "object": triad.object,
+                "reason": reason,
+                "repair": repair,
+                "evidence": evidence_path(triad)
+            }));
+        }
+    }
+    json!({
+        "anti_modes": [
+            "adapter must not decide",
+            "UI must not be source of truth",
+            "test helper must not become runtime route",
+            "experiment must not affect stable path",
+            "one decision owner only"
+        ],
+        "hits": hits
+    })
+}
+
+fn structural_energy(
+    route_field: &Value,
+    owner_gravity: &Value,
+    foreign_pull: &[Value],
+    negative_routes: &Value,
+) -> Value {
+    let route_count = route_field["routes"]
+        .as_object()
+        .map(|v| v.len())
+        .unwrap_or(0);
+    let mut route_confidence = 0.0;
+    if let Some(routes) = route_field["routes"].as_object() {
+        for route in routes.values() {
+            route_confidence += route["avg_confidence"].as_f64().unwrap_or(0.0);
+        }
+    }
+    let route_coherence = if route_count == 0 {
+        0.0
+    } else {
+        route_confidence / route_count as f64
+    };
+    let owner_conflict = owner_gravity["conflicts"]
+        .as_array()
+        .map(|items| items.len())
+        .unwrap_or(0);
+    let negative_hits = negative_routes["hits"]
+        .as_array()
+        .map(|items| items.len())
+        .unwrap_or(0);
+    json!({
+        "route_coherence": round4(route_coherence),
+        "owner_conflict": owner_conflict,
+        "foreign_pull_energy": foreign_pull.len(),
+        "duplicate_decision_risk": owner_gravity["conflicts"].as_array().map(|items| {
+            items.iter().filter(|item| item["kind"].as_str() == Some("duplicate_decision_owner")).count()
+        }).unwrap_or(0),
+        "adapter_leak_risk": negative_routes["hits"].as_array().map(|items| {
+            items.iter().filter(|item| item["rule"].as_str() == Some("adapter_or_ui_must_not_decide")).count()
+        }).unwrap_or(0),
+        "stale_experiment_risk": negative_routes["hits"].as_array().map(|items| {
+            items.iter().filter(|item| item["rule"].as_str() == Some("experiment_must_not_affect_stable_path")).count()
+        }).unwrap_or(0),
+        "ui_runtime_mismatch_risk": negative_hits,
+        "field_tension": owner_conflict + foreign_pull.len() + negative_hits
+    })
+}
+
+fn repair_queue(
+    repair_tasks: &[Value],
+    foreign_pull: &[Value],
+    owner_gravity: &Value,
+    negative_routes: &Value,
+) -> Value {
+    let mut queue = vec![];
+    for task in repair_tasks {
+        queue.push(json!({
+            "kind": "coherence_repair",
+            "priority": "medium",
+            "target": task["candidate_group"],
+            "reason": task["reason"],
+            "repair": task["suggested_fix"]
+        }));
+    }
+    for pull in foreign_pull {
+        queue.push(json!({
+            "kind": "foreign_pull_repair",
+            "priority": "high",
+            "target": pull["candidate_triad"],
+            "reason": "candidate triad pulls toward a foreign source route",
+            "repair": pull["repair"],
+            "owner_should_review": pull["triad_best_source_group"]
+        }));
+    }
+    if let Some(conflicts) = owner_gravity["conflicts"].as_array() {
+        for conflict in conflicts {
+            queue.push(json!({
+                "kind": conflict["kind"],
+                "priority": "high",
+                "target": conflict["group"].as_str().unwrap_or(conflict["route"].as_str().unwrap_or("owner-conflict")),
+                "reason": conflict["risk"],
+                "repair": conflict["repair"]
+            }));
+        }
+    }
+    if let Some(hits) = negative_routes["hits"].as_array() {
+        for hit in hits {
+            queue.push(json!({
+                "kind": hit["rule"],
+                "priority": "high",
+                "target": hit["triad"],
+                "reason": hit["reason"],
+                "repair": hit["repair"]
+            }));
+        }
+    }
+    json!(queue)
+}
+
+fn owner_center(owners: &BTreeMap<String, usize>) -> Value {
+    let mut best_owner = "";
+    let mut best_count = 0usize;
+    let total: usize = owners.values().sum();
+    for (owner, count) in owners {
+        if *count > best_count {
+            best_owner = owner;
+            best_count = *count;
+        }
+    }
+    json!({
+        "owner": best_owner,
+        "support": best_count,
+        "total": total,
+        "gravity": if total == 0 { 0.0 } else { round4(best_count as f64 / total as f64) },
+        "owners": owners
+    })
+}
+
+fn insert_nonempty(values: &mut BTreeSet<String>, value: &str) {
+    if !value.trim().is_empty() {
+        values.insert(norm(value));
+    }
+}
+
+fn layer_name(triad: &Triad) -> String {
+    if !triad.layer.trim().is_empty() {
+        return norm(&triad.layer);
+    }
+    let relation = norm(&triad.relation);
+    let subject_role = norm(&triad.subject_role);
+    let object_role = norm(&triad.object_role);
+    if subject_role.contains("ui") || object_role.contains("ui") {
+        "ui".to_string()
+    } else if subject_role.contains("test") || object_role.contains("test") {
+        "test".to_string()
+    } else if subject_role.contains("wrapper") || relation.contains("executes") {
+        "runtime".to_string()
+    } else if subject_role.contains("adapter") || object_role.contains("adapter") {
+        "adapter".to_string()
+    } else {
+        "core".to_string()
+    }
+}
+
+fn owner_name(triad: &Triad) -> String {
+    if !triad.owner.trim().is_empty() {
+        return norm(&triad.owner);
+    }
+    if norm(&triad.subject_role).contains("owner") {
+        return norm(&triad.subject);
+    }
+    if norm(&triad.object_role).contains("owner") {
+        return norm(&triad.object);
+    }
+    group_name(triad, "unowned")
+}
+
+fn scope_name(triad: &Triad) -> String {
+    if triad.scope.trim().is_empty() {
+        route_name(triad, "unscoped")
+    } else {
+        norm(&triad.scope)
+    }
+}
+
+fn evidence_path(triad: &Triad) -> String {
+    if triad.evidence_path.trim().is_empty() {
+        triad.evidence.clone()
+    } else {
+        triad.evidence_path.clone()
+    }
+}
+
+fn is_decision_relation(triad: &Triad) -> bool {
+    let relation = norm(&triad.relation);
+    relation.contains("decides")
+        || relation.contains("owns")
+        || relation.contains("controls")
+        || relation.contains("selects")
+        || relation.contains("writes")
+        || relation.contains("mutates")
+        || relation.contains("source_of_truth")
 }
 
 pub(crate) fn group_name(triad: &Triad, fallback: &str) -> String {

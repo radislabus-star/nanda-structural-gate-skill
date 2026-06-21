@@ -156,6 +156,12 @@ fn encoded_triad(
         object_role: "token".to_string(),
         route: format!("{task_id}:encoded"),
         group: format!("pattern-window-{}", idx / 4),
+        layer: "adapter".to_string(),
+        owner: "nanda-encode".to_string(),
+        entrypoint: "encode".to_string(),
+        output: "query-packet".to_string(),
+        evidence_path: String::new(),
+        scope: "generated-query".to_string(),
     }
 }
 
