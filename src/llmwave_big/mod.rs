@@ -15,6 +15,7 @@ pub mod loader;
 pub mod operators;
 pub mod residuals;
 pub mod schemas;
+pub mod surface_bank_build;
 pub mod surface_corpus_eval;
 pub mod surface_production;
 pub mod surface_reconstruct;
@@ -52,6 +53,8 @@ enum LlmwaveBigCommand {
     SurfaceReconstruct(LlmwaveBigSurfaceReconstructArgs),
     /// Run the v271-v280 corpus surface-density candidate eval.
     SurfaceCorpusEval(LlmwaveBigSurfaceCorpusEvalArgs),
+    /// Build the v281-v290 observed surface-family bank.
+    SurfaceBankBuild(LlmwaveBigSurfaceBankBuildArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
@@ -106,6 +109,12 @@ struct LlmwaveBigSurfaceReconstructArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigSurfaceCorpusEvalArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSurfaceBankBuildArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -202,6 +211,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SurfaceCorpusEval(args) => {
             let report = surface_corpus_eval::build_surface_corpus_eval_report();
             report::print_surface_corpus_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SurfaceBankBuild(args) => {
+            let report = surface_bank_build::build_surface_bank_build_report();
+            report::print_surface_bank_build_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Write(args) => {
@@ -545,6 +559,36 @@ mod tests {
             .sample_cases
             .iter()
             .any(|case| case.held_out && case.exact_match));
+    }
+
+    #[test]
+    fn surface_bank_build_promotes_observed_families() {
+        let report = surface_bank_build::build_surface_bank_build_report();
+        assert_eq!(report.roadmap_block, "v281-v290");
+        assert_eq!(report.verdict, "SURFACE_BANK_BUILD_READY_NOT_REAL_TRAINING");
+        assert_eq!(report.accepted_families.len(), 3);
+        assert_eq!(report.eval.held_out_exact_match_rate, 1.0);
+        assert!(report.accepted_families.iter().any(|family| family
+            .held_out_reconstructions
+            .contains(&"routing".to_string())));
+        assert!(report
+            .rejected_fragments
+            .iter()
+            .any(|fragment| fragment.path == "evidence_copy_span"));
+    }
+
+    #[test]
+    fn surface_bank_build_keeps_claims_honest() {
+        let report = surface_bank_build::build_surface_bank_build_report();
+        assert_eq!(
+            report.eval.state,
+            "OBSERVED_BANK_BUILD_PASS_NOT_DENSITY_PROOF"
+        );
+        assert!(report.claim_boundary.useful_density_candidate);
+        assert!(!report.claim_boundary.real_corpus_trained);
+        assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
+        assert!(!report.claim_boundary.free_form_spelling_proven);
+        assert!(!report.bank_summary.hot_core_contains_utf8);
     }
 
     #[test]

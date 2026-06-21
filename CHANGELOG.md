@@ -37,6 +37,10 @@
   surface-memory eval with `SurfaceFamily32` and `SurfaceBinding8`, comparing
   direct lookup, per-form programs, byte-only fallback, and family-template
   reuse while keeping nonlinear surface memory unproven.
+- v281-v290 add `nanda-llmwave-big surface-bank-build`: an observed surface-bank
+  builder over an embedded business-form corpus, promoting suffix families,
+  rejecting copy/provisional fragments, and checking held-out reconstructions
+  without claiming real broad corpus training.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split

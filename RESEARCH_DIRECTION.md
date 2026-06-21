@@ -77,6 +77,16 @@ is still narrow: synthetic family reuse is visible, but nonlinear surface memory
 is not proven until a real corpus beats direct lookup and per-form program
 baselines under exact-match and false-surface constraints.
 
+The first observed-form bank builder is:
+
+```bash
+nanda-llmwave-big surface-bank-build --format json
+```
+
+It promotes suffix families from a small embedded corpus and rejects fragments
+that require copy or provisional handling. This is the bridge from synthetic
+capacity arithmetic toward real corpus fixtures.
+
 ### Holographic Reduced Representations
 
 Sources:

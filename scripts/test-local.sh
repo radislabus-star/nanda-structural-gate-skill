@@ -101,6 +101,11 @@ jq -e '.roadmap_block == "v271-v280" and .verdict == "SURFACE_DENSITY_CANDIDATE_
 jq -e '.corpus.productive_forms == 512 and .reconstruction.exact_match_rate == 1 and .reconstruction.held_out_exact_match_rate == 1' <<<"$big_surface_corpus_json" >/dev/null
 jq -e '.baselines.family_template_bytes < .baselines.direct_lookup_bytes and .baselines.family_template_bytes < .baselines.per_form_program_bytes and .baselines.family_vs_direct_saving_ratio > 0' <<<"$big_surface_corpus_json" >/dev/null
 jq -e '.family_reuse.state == "FAMILY_REUSE_VISIBLE" and .verdict_boundary.useful_density_candidate == true and .verdict_boundary.nonlinear_surface_memory_proven == false and .verdict_boundary.real_corpus_trained == false' <<<"$big_surface_corpus_json" >/dev/null
+big_surface_bank_json="$("$llmwave_big" surface-bank-build --format json)"
+jq -e '.roadmap_block == "v281-v290" and .verdict == "SURFACE_BANK_BUILD_READY_NOT_REAL_TRAINING"' <<<"$big_surface_bank_json" >/dev/null
+jq -e '.bank_summary.accepted_family_count == 3 and .eval.held_out_exact_match_rate == 1 and .eval.state == "OBSERVED_BANK_BUILD_PASS_NOT_DENSITY_PROOF"' <<<"$big_surface_bank_json" >/dev/null
+jq -e '([.accepted_families[].held_out_reconstructions[]] | index("invoicing") and index("customing") and index("routing"))' <<<"$big_surface_bank_json" >/dev/null
+jq -e '([.rejected_fragments[].path] | index("evidence_copy_span")) and .claim_boundary.useful_density_candidate == true and .claim_boundary.real_corpus_trained == false and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_bank_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null

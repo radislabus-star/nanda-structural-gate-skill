@@ -161,6 +161,7 @@ scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
 scripts/nanda-llmwave-big surface-corpus-eval --format json
+scripts/nanda-llmwave-big surface-bank-build --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -446,7 +447,11 @@ memory claim. v271-v280 add `nanda-llmwave-big surface-corpus-eval`: a
 synthetic corpus-scale surface-memory eval with `SurfaceFamily32` and
 `SurfaceBinding8`, comparing direct lookup, per-form programs, byte-only
 fallback, and family-template reuse. Treat
-`SURFACE_DENSITY_CANDIDATE_NOT_PROVEN` as progress, not proof.
+`SURFACE_DENSITY_CANDIDATE_NOT_PROVEN` as progress, not proof. v281-v290 add
+`nanda-llmwave-big surface-bank-build`: an observed-form bank builder that
+promotes suffix families from an embedded corpus, rejects copy/provisional
+fragments, and checks held-out reconstruction while keeping broad training and
+nonlinear proof false.
 v191-v205 add `nanda-llmwave-big write` and
 `nanda-bench6m --mode write-density`: write decomposition, reconstructability
 score, residual V1, centroid update, anti-residual, schema promotion/split

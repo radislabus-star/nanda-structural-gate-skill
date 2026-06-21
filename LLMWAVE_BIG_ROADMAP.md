@@ -1266,6 +1266,29 @@ held-out template exact match -> morphology check, not intelligence
 nonlinear_surface_memory_proven remains false
 ```
 
+v281-v290: implemented as nanda-llmwave-big surface-bank-build
+
+## Phase 12: Observed Surface Bank Build, v281-v290
+
+Goal:
+
+```text
+observed surface forms
+  -> suffix-family extraction
+  -> SurfaceFamily32 promotion
+  -> SurfaceBinding8 virtual forms
+  -> held-out reconstruction check
+```
+
+Stop rules:
+
+```text
+embedded corpus -> not real broad training
+family promotion -> density candidate only
+rare identifiers -> copy span, not family
+nonlinear_surface_memory_proven remains false
+```
+
 ## Summary
 
 ```text

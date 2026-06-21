@@ -284,6 +284,7 @@ src/llmwave_big/lexical_birth.rs
 src/llmwave_big/surface_production.rs
 src/llmwave_big/surface_reconstruct.rs
 src/llmwave_big/surface_corpus_eval.rs
+src/llmwave_big/surface_bank_build.rs
 ```
 
 The current inspection commands are:
@@ -293,6 +294,7 @@ nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
 nanda-llmwave-big surface-corpus-eval --format json
+nanda-llmwave-big surface-bank-build --format json
 ```
 
 The implemented records are:
@@ -333,6 +335,11 @@ lookup, per-form programs, byte-only fallback, and family-template reuse. The
 new records `SurfaceFamily32` and `SurfaceBinding8` model productive families:
 shared roots and suffixes can create many virtual forms. This is still a
 synthetic suite, so `nonlinear_surface_memory_proven` remains false.
+
+`surface-bank-build` is the first observed-form builder. It promotes suffix
+families from a small embedded corpus, rejects non-family fragments to copy or
+provisional paths, and checks held-out reconstructions. Its state remains
+`OBSERVED_BANK_BUILD_PASS_NOT_DENSITY_PROOF`.
 
 ## Claim Boundary
 

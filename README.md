@@ -305,6 +305,7 @@ nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
 nanda-llmwave-big surface-corpus-eval --format json
+nanda-llmwave-big surface-bank-build --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -567,6 +568,14 @@ memory: shared roots and suffixes can generate many virtual forms. Its verdict
 is deliberately `SURFACE_DENSITY_CANDIDATE_NOT_PROVEN`: useful density is
 visible on the synthetic suite, but real corpus training and nonlinear surface
 memory proof remain false.
+
+`nanda-llmwave-big surface-bank-build` adds the v281-v290 observed surface-bank
+builder. It takes a small embedded business-form corpus, promotes observed
+suffix families into `SurfaceFamily32` records, emits `SurfaceBinding8` virtual
+forms, rejects non-family fragments into copy/provisional paths, and tests
+held-out reconstructions such as `invoicing`, `customing`, and `routing`. Its
+state remains `OBSERVED_BANK_BUILD_PASS_NOT_DENSITY_PROOF`: this is bank
+construction evidence, not real broad corpus training.
 
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual

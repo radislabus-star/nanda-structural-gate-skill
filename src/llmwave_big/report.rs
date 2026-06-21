@@ -7,6 +7,7 @@ use super::eval::BigEvalReport;
 use super::l2_word_field::L2WordFieldReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
+use super::surface_bank_build::SurfaceBankBuildReport;
 use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
@@ -103,6 +104,18 @@ pub(crate) fn print_surface_corpus_eval_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_surface_corpus_eval_text(report),
         OutputFormat::Md => print_surface_corpus_eval_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_surface_bank_build_report(
+    report: &SurfaceBankBuildReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_surface_bank_build_text(report),
+        OutputFormat::Md => print_surface_bank_build_md(report),
     }
     Ok(())
 }
@@ -332,6 +345,31 @@ fn print_surface_corpus_eval_text(report: &SurfaceCorpusEvalReport) {
     println!(
         "nonlinear_surface_memory_proven: {}",
         report.verdict_boundary.nonlinear_surface_memory_proven
+    );
+}
+
+fn print_surface_bank_build_text(report: &SurfaceBankBuildReport) {
+    println!("LLMWave-Big Surface Bank Build");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("observed_forms: {}", report.corpus.observed_forms);
+    println!(
+        "accepted_families: {}",
+        report.bank_summary.accepted_family_count
+    );
+    println!(
+        "rejected_fragments: {}",
+        report.bank_summary.rejected_fragment_count
+    );
+    println!("total_bank_bytes: {}", report.bank_summary.total_bank_bytes);
+    println!(
+        "held_out_exact_match_rate: {:.3}",
+        report.eval.held_out_exact_match_rate
+    );
+    println!(
+        "nonlinear_surface_memory_proven: {}",
+        report.claim_boundary.nonlinear_surface_memory_proven
     );
 }
 
@@ -688,6 +726,52 @@ fn print_surface_corpus_eval_md(report: &SurfaceCorpusEvalReport) {
     println!(
         "- real corpus trained: `{}`",
         report.verdict_boundary.real_corpus_trained
+    );
+}
+
+fn print_surface_bank_build_md(report: &SurfaceBankBuildReport) {
+    println!("# LLMWave-Big Surface Bank Build");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- read as: {}", report.read_as);
+    println!();
+    println!("## Build");
+    println!();
+    println!("- observed forms: `{}`", report.corpus.observed_forms);
+    println!("- held-out forms: `{}`", report.corpus.held_out_forms);
+    println!(
+        "- accepted families: `{}`",
+        report.bank_summary.accepted_family_count
+    );
+    println!(
+        "- rejected fragments: `{}`",
+        report.bank_summary.rejected_fragment_count
+    );
+    println!(
+        "- total bank bytes: `{}`",
+        report.bank_summary.total_bank_bytes
+    );
+    println!(
+        "- direct lookup bytes: `{}`",
+        report.bank_summary.direct_lookup_baseline_bytes
+    );
+    println!("- saving ratio: `{:.3}`", report.bank_summary.saving_ratio);
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- useful density candidate: `{}`",
+        report.claim_boundary.useful_density_candidate
+    );
+    println!(
+        "- nonlinear surface memory proven: `{}`",
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+    println!(
+        "- real corpus trained: `{}`",
+        report.claim_boundary.real_corpus_trained
     );
 }
 
