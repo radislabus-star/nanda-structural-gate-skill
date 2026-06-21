@@ -307,6 +307,7 @@ nanda-llmwave-big surface-reconstruct --format json
 nanda-llmwave-big surface-corpus-eval --format json
 nanda-llmwave-big surface-bank-build --format json
 nanda-llmwave-big surface-bank-validate --format json
+nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus.json --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -584,6 +585,13 @@ that bank. It checks positive held-out forms, negative controls such as
 state remains `VALIDATION_PASS_NOT_GENERAL_PROOF`: this catches known false
 families in the embedded suite, but does not prove real corpus training,
 free-form spelling, or nonlinear surface memory.
+
+`nanda-llmwave-big surface-bank-fixture` adds the v301-v310 external corpus
+fixture loader. It reads `examples/llmwave-big-surface-corpus.json`, validates
+surface families, held-out reconstructions, false-family controls, and rare
+copy-span paths from JSON instead of Rust constants. Its state remains
+`EXTERNAL_FIXTURE_PASS_NOT_GENERAL_PROOF`: fixture IO works, but real corpus
+training and nonlinear surface memory are still false.
 
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual

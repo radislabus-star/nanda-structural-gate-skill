@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde::Serialize;
+use std::path::PathBuf;
 
 use super::{nanda_6m, OutputFormat, CORE_VERSION, EXIT_PASS, WAVE_DIM};
 
@@ -16,6 +17,7 @@ pub mod operators;
 pub mod residuals;
 pub mod schemas;
 pub mod surface_bank_build;
+pub mod surface_bank_fixture;
 pub mod surface_bank_validate;
 pub mod surface_corpus_eval;
 pub mod surface_production;
@@ -58,6 +60,8 @@ enum LlmwaveBigCommand {
     SurfaceBankBuild(LlmwaveBigSurfaceBankBuildArgs),
     /// Validate the v291-v300 surface bank with negative controls.
     SurfaceBankValidate(LlmwaveBigSurfaceBankValidateArgs),
+    /// Load and validate the v301-v310 external surface corpus fixture.
+    SurfaceBankFixture(LlmwaveBigSurfaceBankFixtureArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
@@ -124,6 +128,14 @@ struct LlmwaveBigSurfaceBankBuildArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigSurfaceBankValidateArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSurfaceBankFixtureArgs {
+    #[arg(long, default_value = "examples/llmwave-big-surface-corpus.json")]
+    corpus: PathBuf,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -230,6 +242,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SurfaceBankValidate(args) => {
             let report = surface_bank_validate::build_surface_bank_validate_report();
             report::print_surface_bank_validate_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SurfaceBankFixture(args) => {
+            let report = surface_bank_fixture::build_surface_bank_fixture_report(&args.corpus)?;
+            report::print_surface_bank_fixture_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Write(args) => {
@@ -640,6 +657,41 @@ mod tests {
         assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
         assert!(!report.claim_boundary.free_form_spelling_proven);
         assert!(!report.claim_boundary.order_invariance_proven);
+    }
+
+    #[test]
+    fn surface_bank_fixture_loads_external_corpus() {
+        let report = surface_bank_fixture::build_surface_bank_fixture_report(std::path::Path::new(
+            "examples/llmwave-big-surface-corpus.json",
+        ))
+        .expect("fixture report");
+        assert_eq!(report.roadmap_block, "v301-v310");
+        assert_eq!(
+            report.verdict,
+            "SURFACE_BANK_FIXTURE_READY_NOT_REAL_TRAINING"
+        );
+        assert_eq!(report.corpus.family_count, 6);
+        assert!(report.metrics.fixture_loaded);
+        assert_eq!(report.metrics.positive_exact_match_rate, 1.0);
+        assert_eq!(report.metrics.negative_reject_rate, 1.0);
+        assert_eq!(report.metrics.rare_copy_span_rate, 1.0);
+    }
+
+    #[test]
+    fn surface_bank_fixture_keeps_claims_honest() {
+        let report = surface_bank_fixture::build_surface_bank_fixture_report(std::path::Path::new(
+            "examples/llmwave-big-surface-corpus.json",
+        ))
+        .expect("fixture report");
+        assert_eq!(
+            report.metrics.state,
+            "EXTERNAL_FIXTURE_PASS_NOT_GENERAL_PROOF"
+        );
+        assert!(report.claim_boundary.external_fixture_loaded);
+        assert!(!report.claim_boundary.real_corpus_trained);
+        assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
+        assert!(!report.claim_boundary.free_form_spelling_proven);
+        assert!(report.baselines.total_bank_bytes > 0);
     }
 
     #[test]

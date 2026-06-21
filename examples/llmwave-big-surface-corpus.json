@@ -1,0 +1,53 @@
+{
+  "version": "llmwave_big_surface_fixture_v1",
+  "source": "business_surface_fixture_v1",
+  "families": [
+    {
+      "family_id": 72001,
+      "root": "invoic",
+      "observed_suffixes": ["e", "es", "ed"],
+      "held_out": [{"suffix": "ing", "surface": "invoicing"}],
+      "negative": [{"root": "invoice", "suffix": "ing", "surface": "invoiceing"}]
+    },
+    {
+      "family_id": 72002,
+      "root": "custom",
+      "observed_suffixes": ["", "s", "ed"],
+      "held_out": [{"suffix": "ing", "surface": "customing"}],
+      "negative": [{"root": "cust", "suffix": "oming", "surface": "customing"}]
+    },
+    {
+      "family_id": 72003,
+      "root": "rout",
+      "observed_suffixes": ["e", "es", "ed"],
+      "held_out": [{"suffix": "ing", "surface": "routing"}],
+      "negative": [{"root": "route", "suffix": "ing", "surface": "routeing"}]
+    },
+    {
+      "family_id": 72004,
+      "root": "payment",
+      "observed_suffixes": ["", "s"],
+      "held_out": [{"suffix": "ed", "surface": "paymented"}],
+      "negative": [{"root": "pay", "suffix": "ment", "surface": "payment"}]
+    },
+    {
+      "family_id": 72005,
+      "root": "certificat",
+      "observed_suffixes": ["e", "es", "ed"],
+      "held_out": [{"suffix": "ing", "surface": "certificating"}],
+      "negative": [{"root": "certificate", "suffix": "ing", "surface": "certificateing"}]
+    },
+    {
+      "family_id": 72006,
+      "root": "declar",
+      "observed_suffixes": ["e", "es", "ed"],
+      "held_out": [{"suffix": "ing", "surface": "declaring"}],
+      "negative": [{"root": "declaration", "suffix": "s", "surface": "declarations"}]
+    }
+  ],
+  "rare_forms": [
+    "PI-HL-RLTG-GZ-20260611-03",
+    "HS6404199000",
+    "TR-TS-021-2011"
+  ]
+}

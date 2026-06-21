@@ -1312,6 +1312,30 @@ validation pass -> not real corpus training
 nonlinear_surface_memory_proven remains false
 ```
 
+v301-v310: implemented as nanda-llmwave-big surface-bank-fixture
+
+## Phase 14: External Surface Corpus Fixture, v301-v310
+
+Goal:
+
+```text
+external JSON corpus fixture
+  -> load surface families from disk
+  -> validate held-out reconstructions
+  -> validate false-family negative controls
+  -> validate rare copy-span handling
+  -> compare bank bytes against direct lookup
+```
+
+Stop rules:
+
+```text
+fixture pass -> not broad training
+small fixture savings can be zero
+external JSON IO -> not hot-core execution
+nonlinear_surface_memory_proven remains false
+```
+
 ## Summary
 
 ```text

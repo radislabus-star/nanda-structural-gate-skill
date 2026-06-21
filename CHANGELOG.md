@@ -45,6 +45,10 @@
   order-shuffle stability for the embedded surface bank, including false-family
   traps such as `invoiceing`, `routeing`, rare-code suffixing, and short-root
   promotion.
+- v301-v310 add `nanda-llmwave-big surface-bank-fixture`: an external JSON
+  surface-corpus fixture loader with family validation, held-out exact-match
+  checks, negative controls, rare copy-span checks, and explicit no-proof
+  claim boundaries.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split

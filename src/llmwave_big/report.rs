@@ -8,6 +8,7 @@ use super::l2_word_field::L2WordFieldReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
+use super::surface_bank_fixture::SurfaceBankFixtureReport;
 use super::surface_bank_validate::SurfaceBankValidateReport;
 use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
@@ -129,6 +130,18 @@ pub(crate) fn print_surface_bank_validate_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_surface_bank_validate_text(report),
         OutputFormat::Md => print_surface_bank_validate_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_surface_bank_fixture_report(
+    report: &SurfaceBankFixtureReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_surface_bank_fixture_text(report),
+        OutputFormat::Md => print_surface_bank_fixture_md(report),
     }
     Ok(())
 }
@@ -404,6 +417,30 @@ fn print_surface_bank_validate_text(report: &SurfaceBankValidateReport) {
         report.metrics.shuffle_stability_rate
     );
     println!("false_family_rate: {:.3}", report.metrics.false_family_rate);
+    println!(
+        "nonlinear_surface_memory_proven: {}",
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+}
+
+fn print_surface_bank_fixture_text(report: &SurfaceBankFixtureReport) {
+    println!("LLMWave-Big Surface Bank Fixture");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("corpus_path: {}", report.corpus_path);
+    println!("families: {}", report.corpus.family_count);
+    println!("observed_forms: {}", report.corpus.observed_forms);
+    println!("held_out_forms: {}", report.corpus.held_out_forms);
+    println!(
+        "positive_exact_match_rate: {:.3}",
+        report.metrics.positive_exact_match_rate
+    );
+    println!(
+        "negative_reject_rate: {:.3}",
+        report.metrics.negative_reject_rate
+    );
+    println!("total_bank_bytes: {}", report.baselines.total_bank_bytes);
     println!(
         "nonlinear_surface_memory_proven: {}",
         report.claim_boundary.nonlinear_surface_memory_proven
@@ -841,6 +878,62 @@ fn print_surface_bank_validate_md(report: &SurfaceBankValidateReport) {
     println!(
         "- validation passed: `{}`",
         report.claim_boundary.validation_passed
+    );
+    println!(
+        "- nonlinear surface memory proven: `{}`",
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+    println!(
+        "- real corpus trained: `{}`",
+        report.claim_boundary.real_corpus_trained
+    );
+}
+
+fn print_surface_bank_fixture_md(report: &SurfaceBankFixtureReport) {
+    println!("# LLMWave-Big Surface Bank Fixture");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- corpus: `{}`", report.corpus_path);
+    println!("- read as: {}", report.read_as);
+    println!();
+    println!("## Fixture");
+    println!();
+    println!("- families: `{}`", report.corpus.family_count);
+    println!("- observed forms: `{}`", report.corpus.observed_forms);
+    println!("- held-out forms: `{}`", report.corpus.held_out_forms);
+    println!("- negative controls: `{}`", report.corpus.negative_controls);
+    println!("- rare forms: `{}`", report.corpus.rare_forms);
+    println!();
+    println!("## Metrics");
+    println!();
+    println!(
+        "- positive exact match rate: `{:.3}`",
+        report.metrics.positive_exact_match_rate
+    );
+    println!(
+        "- negative reject rate: `{:.3}`",
+        report.metrics.negative_reject_rate
+    );
+    println!(
+        "- rare copy-span rate: `{:.3}`",
+        report.metrics.rare_copy_span_rate
+    );
+    println!(
+        "- total bank bytes: `{}`",
+        report.baselines.total_bank_bytes
+    );
+    println!(
+        "- direct lookup bytes: `{}`",
+        report.baselines.direct_lookup_baseline_bytes
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- external fixture loaded: `{}`",
+        report.claim_boundary.external_fixture_loaded
     );
     println!(
         "- nonlinear surface memory proven: `{}`",

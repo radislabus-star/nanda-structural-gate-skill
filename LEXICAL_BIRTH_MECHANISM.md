@@ -347,6 +347,11 @@ identifiers on the copy-span path, and checks that the embedded bank result is
 stable under three corpus-order variants. Its state remains
 `VALIDATION_PASS_NOT_GENERAL_PROOF`.
 
+`surface-bank-fixture` is the first external corpus-fixture loader for this
+surface path. It reads JSON, validates family records, held-out forms, negative
+controls, and rare copy-span forms outside the Rust constants. Its state
+remains `EXTERNAL_FIXTURE_PASS_NOT_GENERAL_PROOF`.
+
 ## Claim Boundary
 
 Allowed claim:
