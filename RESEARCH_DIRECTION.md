@@ -143,6 +143,12 @@ selects one coherent route instead of stitching pieces from different routes.
 The rejected `Honglu pays invoice` case is the key research check here: every
 surface can be supported somewhere, but the whole route has no owning schema.
 
+`nanda-llmwave-big schema-grow` starts L3 memory growth. Instead of keeping only
+hand-written schemas, it promotes repeated observed route facts into compact
+`LearnedSchema32` records and rejects a one-off schema trap. This is still an
+embedded fixture, but it establishes the promotion gate that a real Atlas
+loader must later feed.
+
 ### Holographic Reduced Representations
 
 Sources:

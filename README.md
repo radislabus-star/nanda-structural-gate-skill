@@ -306,6 +306,7 @@ nanda-llmwave-big schema-bind --format json
 nanda-llmwave-big l2-l3-couple --format json
 nanda-llmwave-big decode-loop --format json
 nanda-llmwave-big multi-schema --format json
+nanda-llmwave-big schema-grow --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -578,6 +579,11 @@ coherent `supplier-docs` route for `Honglu issues invoice`, and rejects the
 route splice `Honglu pays invoice`: every piece exists somewhere, but no single
 schema owns the whole route. This is fixture-level route competition, not broad
 reasoning.
+`nanda-llmwave-big schema-grow` adds the v561-v620 schema-memory growth layer.
+It scans a small embedded observation corpus, promotes repeated route forms into
+fixed `LearnedSchema32` records, and rejects the one-off `warehouse signs
+invoice` trap. This is the first growth step for L3 memory, but the corpus is
+still embedded and the report keeps chat readiness and nonlinear proof false.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

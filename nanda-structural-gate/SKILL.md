@@ -162,6 +162,7 @@ scripts/nanda-llmwave-big schema-bind --format json
 scripts/nanda-llmwave-big l2-l3-couple --format json
 scripts/nanda-llmwave-big decode-loop --format json
 scripts/nanda-llmwave-big multi-schema --format json
+scripts/nanda-llmwave-big schema-grow --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -466,6 +467,10 @@ for a decoded sequence. Treat `MULTI_SCHEMA_COMPETITION_READY_NOT_CHAT` as a
 fixture-level route-selection result: it can reject a route splice whose pieces
 are individually plausible, but it is not broad reasoning or nonlinear-memory
 proof.
+v561-v620 add `nanda-llmwave-big schema-grow`: repeated observed route facts
+promote compact `LearnedSchema32` records and one-off traps stay rejected.
+Treat `SCHEMA_MEMORY_GROWTH_READY_NOT_CHAT` as an embedded growth fixture, not
+real corpus training, chat readiness, or nonlinear-memory proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

@@ -38,6 +38,9 @@
 - v521-v560 add `nanda-llmwave-big multi-schema`: four active schemas compete,
   the coherent `supplier-docs` route wins for `Honglu issues invoice`, and the
   route splice `Honglu pays invoice` is rejected.
+- v561-v620 add `nanda-llmwave-big schema-grow`: repeated observed route facts
+  promote fixed `LearnedSchema32` records while one-off schema traps stay
+  rejected.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

@@ -108,6 +108,13 @@ jq -e '.decode_bridge_state == "COUPLED_DECODE_LOOP_READY_NOT_CHAT" and .metrics
 jq -e '.selected_route.sequence == ["Honglu","issues","invoice"] and .metrics.top_margin > 0 and .metrics.schema_selection_error_rate == 0' <<<"$big_multi_schema_json" >/dev/null
 jq -e '.route_splice_trap.trap == "route_splice_honglu_pays_invoice" and .route_splice_trap.individually_plausible == true and .route_splice_trap.selected_as_whole_route == false and .route_splice_trap.rejected == true' <<<"$big_multi_schema_json" >/dev/null
 jq -e '.claim_boundary.fixed_peak_records == true and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_multi_schema_json" >/dev/null
+big_schema_grow_json="$("$llmwave_big" schema-grow --format json)"
+jq -e '.roadmap_block == "v561-v620" and .verdict == "SCHEMA_MEMORY_GROWTH_READY_NOT_CHAT"' <<<"$big_schema_grow_json" >/dev/null
+jq -e '.competition_bridge_state == "MULTI_SCHEMA_COMPETITION_READY_NOT_CHAT" and .observed_fact_count == 11 and .memory_metrics.promoted_count == 3' <<<"$big_schema_grow_json" >/dev/null
+jq -e '.promoted_schemas[] | select(.route == "supplier-docs" and .support_count == 3)' <<<"$big_schema_grow_json" >/dev/null
+jq -e '.promoted_schemas[] | select(.route == "buyer-payment" and .support_count == 3)' <<<"$big_schema_grow_json" >/dev/null
+jq -e '.promoted_schemas[] | select(.route == "customs-check" and .support_count == 3)' <<<"$big_schema_grow_json" >/dev/null
+jq -e '.negative_control.proposed_form == "warehouse signs invoice" and .negative_control.rejected == true and .memory_metrics.false_promotion_rate == 0 and .claim_boundary.fixed_learned_schema_records == true and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_schema_grow_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

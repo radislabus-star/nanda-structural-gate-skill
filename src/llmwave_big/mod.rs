@@ -20,6 +20,7 @@ pub mod loader;
 pub mod multi_schema_competition;
 pub mod operators;
 pub mod residuals;
+pub mod schema_memory_growth;
 pub mod schemas;
 pub mod surface_bank_build;
 pub mod surface_bank_fixture;
@@ -65,6 +66,8 @@ enum LlmwaveBigCommand {
     DecodeLoop(LlmwaveBigDecodeLoopArgs),
     /// Run the v521-v560 multi-schema competition core.
     MultiSchema(LlmwaveBigMultiSchemaArgs),
+    /// Run the v561-v620 schema memory growth core.
+    SchemaGrow(LlmwaveBigSchemaGrowArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -141,6 +144,12 @@ struct LlmwaveBigDecodeLoopArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigMultiSchemaArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSchemaGrowArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -297,6 +306,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::MultiSchema(args) => {
             let report = multi_schema_competition::build_multi_schema_competition_report();
             report::print_multi_schema_competition_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SchemaGrow(args) => {
+            let report = schema_memory_growth::build_schema_memory_growth_report();
+            report::print_schema_memory_growth_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -709,6 +723,60 @@ mod tests {
             vec!["Honglu", "pays", "invoice"]
         );
         assert_eq!(report.metrics.route_splice_reject_rate, 1.0);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn schema_memory_growth_promotes_repeated_routes() {
+        let report = schema_memory_growth::build_schema_memory_growth_report();
+        assert_eq!(report.roadmap_block, "v561-v620");
+        assert_eq!(report.verdict, "SCHEMA_MEMORY_GROWTH_READY_NOT_CHAT");
+        assert_eq!(
+            report.competition_bridge_state,
+            "MULTI_SCHEMA_COMPETITION_READY_NOT_CHAT"
+        );
+        assert_eq!(report.observed_fact_count, 11);
+        assert_eq!(report.memory_metrics.promoted_count, 3);
+        assert!(report
+            .promoted_schemas
+            .iter()
+            .any(|schema| schema.route == "supplier-docs" && schema.support_count == 3));
+        assert!(report
+            .promoted_schemas
+            .iter()
+            .any(|schema| schema.route == "buyer-payment" && schema.support_count == 3));
+        assert!(report
+            .promoted_schemas
+            .iter()
+            .any(|schema| schema.route == "customs-check" && schema.support_count == 3));
+        assert_eq!(
+            core::mem::size_of::<schema_memory_growth::LearnedSchema32>(),
+            32
+        );
+        assert!(report.claim_boundary.fixed_learned_schema_records);
+    }
+
+    #[test]
+    fn schema_memory_growth_rejects_one_off_trap() {
+        let report = schema_memory_growth::build_schema_memory_growth_report();
+        assert!(report.negative_control.rejected);
+        assert_eq!(
+            report.negative_control.trap,
+            "single_observation_should_not_promote_schema"
+        );
+        assert_eq!(
+            report.negative_control.proposed_form,
+            "warehouse signs invoice"
+        );
+        assert!(!report.negative_control.promoted);
+        assert_eq!(report.memory_metrics.false_promotion_rate, 0.0);
+        assert_eq!(report.memory_metrics.role_error_rate, 0.0);
+        assert!(report.rejected_candidates.iter().any(|candidate| {
+            candidate.route == "warehouse-noise"
+                && candidate.reason == "insufficient_repeated_evidence"
+        }));
+        assert!(!report.claim_boundary.external_corpus_loaded);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }

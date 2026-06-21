@@ -12,6 +12,7 @@ use super::l3_schema_bind::L3SchemaBindReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
+use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
 use super::surface_bank_fixture::SurfaceBankFixtureReport;
 use super::surface_bank_validate::SurfaceBankValidateReport;
@@ -124,6 +125,18 @@ pub(crate) fn print_multi_schema_competition_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_multi_schema_competition_text(report),
         OutputFormat::Md => print_multi_schema_competition_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_schema_memory_growth_report(
+    report: &SchemaMemoryGrowthReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_schema_memory_growth_text(report),
+        OutputFormat::Md => print_schema_memory_growth_md(report),
     }
     Ok(())
 }
@@ -460,6 +473,32 @@ fn print_multi_schema_competition_text(report: &MultiSchemaCompetitionReport) {
     println!(
         "route_splice_reject_rate: {:.3}",
         report.metrics.route_splice_reject_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_schema_memory_growth_text(report: &SchemaMemoryGrowthReport) {
+    println!("LLMWave-Big Schema Memory Growth");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "competition_bridge_state: {}",
+        report.competition_bridge_state
+    );
+    println!("observed_fact_count: {}", report.observed_fact_count);
+    println!("promoted_count: {}", report.memory_metrics.promoted_count);
+    println!("rejected_count: {}", report.memory_metrics.rejected_count);
+    println!(
+        "schema_reuse_ratio: {:.3}",
+        report.memory_metrics.schema_reuse_ratio
+    );
+    println!(
+        "false_promotion_rate: {:.3}",
+        report.memory_metrics.false_promotion_rate
     );
     println!(
         "nonlinear_memory_proven: {}",
@@ -994,6 +1033,33 @@ fn print_multi_schema_competition_md(report: &MultiSchemaCompetitionReport) {
     println!(
         "- `{}` rejected: `{}`",
         report.route_splice_trap.trap, report.route_splice_trap.rejected
+    );
+}
+
+fn print_schema_memory_growth_md(report: &SchemaMemoryGrowthReport) {
+    println!("# LLMWave-Big Schema Memory Growth");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- observed facts: `{}`", report.observed_fact_count);
+    println!("- promoted: `{}`", report.memory_metrics.promoted_count);
+    println!("- rejected: `{}`", report.memory_metrics.rejected_count);
+    println!();
+    println!("## Promoted Schemas");
+    println!();
+    for schema in &report.promoted_schemas {
+        println!(
+            "- `{}` `{}` support `{}` strength `{}`",
+            schema.route, schema.form, schema.support_count, schema.strength
+        );
+    }
+    println!();
+    println!("## Negative Control");
+    println!();
+    println!(
+        "- `{}` rejected: `{}`",
+        report.negative_control.proposed_form, report.negative_control.rejected
     );
 }
 

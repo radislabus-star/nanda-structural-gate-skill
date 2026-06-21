@@ -834,6 +834,48 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v561-v620: implemented as nanda-llmwave-big schema-grow
+
+## Phase 24: Schema Memory Growth, v561-v620
+
+Goal:
+
+```text
+observed route facts
+  -> repeated role/operator/object patterns
+  -> promote LearnedSchema32
+  -> reject one-off schema traps
+  -> feed future multi-schema competition
+```
+
+Current embedded observation corpus:
+
+```text
+supplier-docs:  Honglu/factory issues invoice/PI
+buyer-payment:  Rustrade/client pays invoice/PI
+customs-check:  customs checks declaration/invoice/packing
+warehouse-noise: warehouse signs invoice
+```
+
+Current promoted schemas:
+
+```text
+supplier issues business_document
+buyer pays business_document
+authority checks business_document
+```
+
+Stop rules:
+
+```text
+embedded observation corpus -> not real training
+schema promotion -> not broad reasoning
+LearnedSchema32 fixed record -> packed-boundary proof, not speed proof
+negative one-off rejection -> local false-promotion evidence only
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition
