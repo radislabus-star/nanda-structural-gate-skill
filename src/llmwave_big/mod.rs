@@ -14,6 +14,7 @@ pub mod dialogue_state;
 pub mod eval;
 pub mod evidence_proof;
 pub mod field_feedback;
+pub mod field_runtime;
 pub mod hrr_binding;
 pub mod l2_l3_coupling;
 pub mod l2_word_field;
@@ -109,6 +110,30 @@ enum LlmwaveBigCommand {
     /// Run the v1351-v1420 local field feedback layer.
     #[command(name = "field-feedback")]
     FieldFeedback(LlmwaveBigFieldFeedbackArgs),
+    /// Run the v1421-v1480 applied feedback memory packet.
+    #[command(name = "feedback-memory")]
+    FeedbackMemory(LlmwaveBigFeedbackMemoryArgs),
+    /// Run the v1481-v1540 feedback-aware field pass.
+    #[command(name = "feedback-aware-field")]
+    FeedbackAwareField(LlmwaveBigFeedbackAwareFieldArgs),
+    /// Run the v1541-v1600 applied anti-memory check.
+    #[command(name = "applied-anti-memory")]
+    AppliedAntiMemory(LlmwaveBigAppliedAntiMemoryArgs),
+    /// Run the v1601-v1660 persistent memory store.
+    #[command(name = "memory-store")]
+    MemoryStore(LlmwaveBigMemoryStoreArgs),
+    /// Run the v1661-v1720 before/after learning eval.
+    #[command(name = "learning-eval")]
+    LearningEval(LlmwaveBigLearningEvalArgs),
+    /// Run the v1721-v1780 memory consolidation eval.
+    #[command(name = "memory-consolidate")]
+    MemoryConsolidate(LlmwaveBigMemoryConsolidateArgs),
+    /// Run the v1781-v1840 full runtime pipeline.
+    #[command(name = "run")]
+    Run(LlmwaveBigRunArgs),
+    /// Run the v1841-v1900 core readiness gate.
+    #[command(name = "core-eval")]
+    CoreEval(LlmwaveBigCoreEvalArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -279,6 +304,74 @@ struct LlmwaveBigFieldFeedbackArgs {
     evidence_mode: String,
     #[arg(long, default_value = "accept")]
     decision: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigFeedbackMemoryArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, default_value = "release-confirmed")]
+    evidence_mode: String,
+    #[arg(long, default_value = "accept")]
+    decision: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigFeedbackAwareFieldArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, default_value = "accept")]
+    memory_mode: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigAppliedAntiMemoryArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigMemoryStoreArgs {
+    #[arg(long, default_value = ".nanda/llmwave-big-memory.json")]
+    path: PathBuf,
+    #[arg(long, default_value = "apply")]
+    action: String,
+    #[arg(long, default_value = "accept")]
+    decision: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLearningEvalArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigMemoryConsolidateArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigRunArgs {
+    #[arg(long, default_value = "release-confirmed")]
+    evidence_mode: String,
+    #[arg(long, default_value = "accept")]
+    decision: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreEvalArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -499,6 +592,56 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 args.decision,
             );
             report::print_field_feedback_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::FeedbackMemory(args) => {
+            let report = field_runtime::build_applied_feedback_memory_report(
+                args.text,
+                args.evidence_mode,
+                args.decision,
+            );
+            report::print_applied_feedback_memory_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::FeedbackAwareField(args) => {
+            let report =
+                field_runtime::build_feedback_aware_field_report(args.text, args.memory_mode);
+            report::print_feedback_aware_field_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::AppliedAntiMemory(args) => {
+            let report = field_runtime::build_applied_anti_memory_report();
+            report::print_applied_anti_memory_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::MemoryStore(args) => {
+            let report = field_runtime::build_persistent_memory_store_report(
+                &args.path,
+                args.action,
+                args.decision,
+            )?;
+            report::print_persistent_memory_store_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LearningEval(args) => {
+            let report = field_runtime::build_learning_eval_report();
+            report::print_learning_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::MemoryConsolidate(args) => {
+            let report = field_runtime::build_memory_consolidate_report();
+            report::print_memory_consolidate_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::Run(args) => {
+            let report =
+                field_runtime::build_runtime_pipeline_report(args.evidence_mode, args.decision);
+            report::print_runtime_pipeline_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreEval(args) => {
+            let report = field_runtime::build_core_eval_report();
+            report::print_core_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -1353,6 +1496,115 @@ mod tests {
         assert_eq!(report.metrics.reject_suppression_rate, 1.0);
         assert!(!report.claim_boundary.persistent_training_done);
         assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn applied_feedback_memory_can_feed_next_field_pass() {
+        let report = field_runtime::build_applied_feedback_memory_report(
+            "Has customs cleared the goods?".to_string(),
+            "release-confirmed".to_string(),
+            "accept".to_string(),
+        );
+        assert_eq!(report.roadmap_block, "v1421-v1480");
+        assert_eq!(report.verdict, "FEEDBACK_MEMORY_READY");
+        assert_eq!(report.metrics.record_count, 1);
+        assert_eq!(report.metrics.reinforce_count, 1);
+        assert!(report.claim_boundary.can_feed_next_field_pass);
+        assert_eq!(
+            core::mem::size_of::<field_runtime::AppliedMemoryRecord32>(),
+            32
+        );
+    }
+
+    #[test]
+    fn feedback_aware_field_changes_next_pass_scores() {
+        let reinforced = field_runtime::build_feedback_aware_field_report(
+            "Has customs cleared the goods?".to_string(),
+            "accept".to_string(),
+        );
+        let suppressed = field_runtime::build_feedback_aware_field_report(
+            "Has customs cleared the goods?".to_string(),
+            "reject".to_string(),
+        );
+        assert_eq!(reinforced.roadmap_block, "v1481-v1540");
+        assert!(reinforced.metrics.adjusted_top_score > reinforced.metrics.baseline_top_score);
+        assert!(suppressed.metrics.adjusted_top_score < suppressed.metrics.baseline_top_score);
+        assert_eq!(suppressed.metrics.unsafe_answer_rate, 0.0);
+        assert!(!reinforced.claim_boundary.persistent_training_done);
+    }
+
+    #[test]
+    fn applied_anti_memory_suppresses_false_route_and_preserves_true_route() {
+        let report = field_runtime::build_applied_anti_memory_report();
+        assert_eq!(report.roadmap_block, "v1541-v1600");
+        assert_eq!(report.verdict, "APPLIED_ANTI_MEMORY_READY");
+        assert!(report.claim_boundary.suppresses_false_route);
+        assert!(report.claim_boundary.preserves_true_route);
+        assert!(!report.claim_boundary.global_memory_deleted);
+    }
+
+    #[test]
+    fn persistent_memory_store_writes_reusable_packet() {
+        let path = std::env::temp_dir().join("llmwave-big-memory-test.json");
+        let report = field_runtime::build_persistent_memory_store_report(
+            &path,
+            "apply".to_string(),
+            "accept".to_string(),
+        )
+        .expect("memory store writes");
+        assert_eq!(report.roadmap_block, "v1601-v1660");
+        assert_eq!(report.verdict, "PERSISTENT_MEMORY_STORE_READY");
+        assert_eq!(report.store.record_count, 1);
+        assert!(report.claim_boundary.reusable_across_process);
+        assert!(path.exists());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn learning_eval_proves_feedback_changes_fixture_field() {
+        let report = field_runtime::build_learning_eval_report();
+        assert_eq!(report.roadmap_block, "v1661-v1720");
+        assert_eq!(report.verdict, "LEARNING_EVAL_PASS_FIXTURE");
+        assert!(report.metrics.accepted_route_lift > 0);
+        assert!(report.metrics.rejected_route_suppression > 0);
+        assert_eq!(report.metrics.regression_rate, 0.0);
+        assert!(!report.claim_boundary.broad_learning_proven);
+    }
+
+    #[test]
+    fn memory_consolidation_controls_duplicate_growth() {
+        let report = field_runtime::build_memory_consolidate_report();
+        assert_eq!(report.roadmap_block, "v1721-v1780");
+        assert!(report.records_after < report.records_before);
+        assert!(report.memory_bytes_after < report.memory_bytes_before);
+        assert!(report.claim_boundary.duplicate_growth_controlled);
+        assert!(!report.claim_boundary.conflict_auto_resolved);
+    }
+
+    #[test]
+    fn runtime_pipeline_runs_full_fixture_chain() {
+        let report = field_runtime::build_runtime_pipeline_report(
+            "release-confirmed".to_string(),
+            "accept".to_string(),
+        );
+        assert_eq!(report.roadmap_block, "v1781-v1840");
+        assert_eq!(report.verdict, "RUNTIME_PIPELINE_READY_FIXTURE");
+        assert_eq!(report.final_state, "LOCAL_EVIDENCE_BOUND_PIPELINE");
+        assert!(report.claim_boundary.full_pipeline_implemented);
+        assert!(!report.claim_boundary.free_form_generation);
+    }
+
+    #[test]
+    fn core_eval_reaches_runtime_ready_fixture_without_llm_claims() {
+        let report = field_runtime::build_core_eval_report();
+        assert_eq!(report.roadmap_block, "v1841-v1900");
+        assert_eq!(report.verdict, "CORE_RUNTIME_READY_FIXTURE");
+        assert!(report.criteria.feedback_applied_to_next_run);
+        assert!(report.criteria.anti_memory_suppresses_rejected_shortcut);
+        assert!(report.criteria.memory_persists_across_process_restart);
+        assert!(report.claim_boundary.core_runtime_ready);
+        assert!(!report.claim_boundary.full_llm_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }
 

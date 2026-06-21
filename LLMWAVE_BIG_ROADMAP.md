@@ -1278,6 +1278,142 @@ chat_ready remains false
 nonlinear_memory_proven remains false
 ```
 
+v1421-v1900: implemented as applied LLMWave-Big field-core runtime loop
+
+## Phase 36: Applied Feedback Memory, v1421-v1480
+
+Goal:
+
+```text
+field feedback
+  -> fixed AppliedMemoryRecord32 packet
+  -> reinforce or anti lane
+  -> packet can feed the next field pass
+```
+
+Stop rules:
+
+```text
+feedback memory packet -> not persistent training by itself
+chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
+## Phase 37: Feedback-Aware Field, v1481-v1540
+
+Goal:
+
+```text
+query field + applied memory
+  -> adjusted route score
+  -> accepted route lifted
+  -> rejected route suppressed
+```
+
+Stop rules:
+
+```text
+field changed -> fixture learning signal only
+safe_to_answer remains controlled by evidence/answer gates
+```
+
+## Phase 38: Applied Anti-Memory, v1541-v1600
+
+Goal:
+
+```text
+reject feedback
+  -> false route suppressed
+  -> true route preserved
+  -> no global memory deletion
+```
+
+## Phase 39: Persistent Memory Store, v1601-v1660
+
+Goal:
+
+```text
+applied memory packet
+  -> .nanda/llmwave-big-memory.json
+  -> schema hash
+  -> record counts
+  -> checksum
+  -> reusable across process runs
+```
+
+Stop rules:
+
+```text
+JSON store -> cold/runtime boundary only
+binary hot store remains future work
+```
+
+## Phase 40: Before/After Learning Eval, v1661-v1720
+
+Goal:
+
+```text
+baseline field
+  -> apply feedback
+  -> rerun field
+  -> accepted_route_lift > 0
+  -> rejected_route_suppression > 0
+  -> unrelated route unchanged
+```
+
+## Phase 41: Memory Consolidation, v1721-v1780
+
+Goal:
+
+```text
+duplicate feedback records -> merge
+weak records -> decay
+conflicts -> WATCH, not auto-resolve
+memory bytes after < before
+```
+
+## Phase 42: Full Runtime Pipeline, v1781-v1840
+
+Goal:
+
+```text
+query wave
+  -> raw field
+  -> lens scan
+  -> anti-wave
+  -> evidence proof
+  -> answer surface
+  -> feedback memory
+  -> final fixture state
+```
+
+## Phase 43: Core Readiness Gate, v1841-v1900
+
+Goal:
+
+```text
+feedback applied to next run
+anti-memory suppresses rejected shortcut
+reinforcement lifts accepted route
+memory persists across process restart
+consolidation reduces duplicates
+unsafe_answer_rate == 0
+```
+
+Verdict:
+
+```text
+CORE_RUNTIME_READY_FIXTURE
+```
+
+Stop rules:
+
+```text
+full_llm_ready remains false
+multi_turn_chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

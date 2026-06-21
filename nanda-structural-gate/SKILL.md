@@ -174,6 +174,14 @@ scripts/nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods
 scripts/nanda-llmwave-big evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
 scripts/nanda-llmwave-big answer-surface --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
 scripts/nanda-llmwave-big field-feedback --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json
+scripts/nanda-llmwave-big feedback-memory --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json
+scripts/nanda-llmwave-big feedback-aware-field --text "Has customs cleared the goods?" --memory-mode accept --format json
+scripts/nanda-llmwave-big applied-anti-memory --format json
+scripts/nanda-llmwave-big memory-store --path .nanda/llmwave-big-memory.json --action apply --decision accept --format json
+scripts/nanda-llmwave-big learning-eval --format json
+scripts/nanda-llmwave-big memory-consolidate --format json
+scripts/nanda-llmwave-big run --evidence-mode release-confirmed --decision accept --format json
+scripts/nanda-llmwave-big core-eval --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -527,6 +535,11 @@ evidence-bound text, not free-form generation.
 v1351-v1420 add `nanda-llmwave-big field-feedback`: accept/reject decisions over
 constrained answer surfaces emit local reinforcement or anti-memory records.
 Treat this as local feedback, not persistent model training.
+v1421-v1900 add the applied field-core runtime loop. Use `feedback-memory`,
+`feedback-aware-field`, `applied-anti-memory`, `memory-store`, `learning-eval`,
+`memory-consolidate`, `run`, and `core-eval` to verify that feedback changes the
+next field pass. Treat `CORE_RUNTIME_READY_FIXTURE` as fixture runtime
+readiness, not full LLM/chat readiness or nonlinear-memory proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

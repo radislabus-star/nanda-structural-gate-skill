@@ -77,6 +77,11 @@
 - v1351-v1420 add `nanda-llmwave-big field-feedback`: constrained answer
   surfaces can emit fixed `FieldFeedbackRecord32` reinforcement or local
   anti-memory records without claiming persistent training.
+- v1421-v1900 close the applied LLMWave-Big field-core loop: feedback memory
+  packets, feedback-aware field scoring, applied anti-memory, persistent JSON
+  memory store, before/after learning eval, consolidation, full runtime
+  pipeline, and `core-eval` readiness gate. The verdict is fixture runtime
+  readiness, not full LLM or nonlinear-memory proof.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

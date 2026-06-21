@@ -186,6 +186,32 @@ big_feedback_reject_json="$("$llmwave_big" field-feedback --text "Has customs cl
 jq -e '.roadmap_block == "v1351-v1420" and .verdict == "FIELD_FEEDBACK_SUPPRESSED"' <<<"$big_feedback_reject_json" >/dev/null
 jq -e '.feedback_state == "FEEDBACK_REJECTED" and .memory_effect == "write_local_anti_memory"' <<<"$big_feedback_reject_json" >/dev/null
 jq -e '.metrics.reject_suppression_rate == 1 and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_feedback_reject_json" >/dev/null
+big_feedback_memory_json="$("$llmwave_big" feedback-memory --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json)"
+jq -e '.roadmap_block == "v1421-v1480" and .verdict == "FEEDBACK_MEMORY_READY" and .metrics.record_count == 1' <<<"$big_feedback_memory_json" >/dev/null
+jq -e '.claim_boundary.fixed_applied_memory_records == true and .claim_boundary.can_feed_next_field_pass == true and .claim_boundary.persistent_training_done == false' <<<"$big_feedback_memory_json" >/dev/null
+big_feedback_field_json="$("$llmwave_big" feedback-aware-field --text "Has customs cleared the goods?" --memory-mode accept --format json)"
+jq -e '.roadmap_block == "v1481-v1540" and .verdict == "FEEDBACK_AWARE_FIELD_REINFORCED"' <<<"$big_feedback_field_json" >/dev/null
+jq -e '.metrics.adjusted_top_score > .metrics.baseline_top_score and .claim_boundary.feedback_applied_to_field == true and .claim_boundary.safe_to_answer == false' <<<"$big_feedback_field_json" >/dev/null
+big_anti_memory_json="$("$llmwave_big" applied-anti-memory --format json)"
+jq -e '.roadmap_block == "v1541-v1600" and .verdict == "APPLIED_ANTI_MEMORY_READY"' <<<"$big_anti_memory_json" >/dev/null
+jq -e '.claim_boundary.suppresses_false_route == true and .claim_boundary.preserves_true_route == true and .claim_boundary.global_memory_deleted == false' <<<"$big_anti_memory_json" >/dev/null
+tmp_big_memory="$(mktemp)"
+big_memory_store_json="$("$llmwave_big" memory-store --path "$tmp_big_memory" --action apply --decision accept --format json)"
+jq -e '.roadmap_block == "v1601-v1660" and .verdict == "PERSISTENT_MEMORY_STORE_READY" and .store.record_count == 1' <<<"$big_memory_store_json" >/dev/null
+jq empty "$tmp_big_memory"
+rm -f "$tmp_big_memory"
+big_learning_eval_json="$("$llmwave_big" learning-eval --format json)"
+jq -e '.roadmap_block == "v1661-v1720" and .verdict == "LEARNING_EVAL_PASS_FIXTURE"' <<<"$big_learning_eval_json" >/dev/null
+jq -e '.metrics.accepted_route_lift > 0 and .metrics.rejected_route_suppression > 0 and .metrics.regression_rate == 0' <<<"$big_learning_eval_json" >/dev/null
+big_memory_consolidate_json="$("$llmwave_big" memory-consolidate --format json)"
+jq -e '.roadmap_block == "v1721-v1780" and .verdict == "MEMORY_CONSOLIDATION_READY"' <<<"$big_memory_consolidate_json" >/dev/null
+jq -e '.records_after < .records_before and .memory_bytes_after < .memory_bytes_before and .claim_boundary.duplicate_growth_controlled == true' <<<"$big_memory_consolidate_json" >/dev/null
+big_runtime_json="$("$llmwave_big" run --evidence-mode release-confirmed --decision accept --format json)"
+jq -e '.roadmap_block == "v1781-v1840" and .verdict == "RUNTIME_PIPELINE_READY_FIXTURE" and .final_state == "LOCAL_EVIDENCE_BOUND_PIPELINE"' <<<"$big_runtime_json" >/dev/null
+jq -e '.claim_boundary.full_pipeline_implemented == true and .claim_boundary.free_form_generation == false and .claim_boundary.chat_ready == false' <<<"$big_runtime_json" >/dev/null
+big_core_eval_json="$("$llmwave_big" core-eval --format json)"
+jq -e '.roadmap_block == "v1841-v1900" and .verdict == "CORE_RUNTIME_READY_FIXTURE"' <<<"$big_core_eval_json" >/dev/null
+jq -e '.criteria.feedback_applied_to_next_run == true and .criteria.memory_persists_across_process_restart == true and .claim_boundary.core_runtime_ready == true and .claim_boundary.full_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_core_eval_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

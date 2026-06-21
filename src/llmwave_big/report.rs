@@ -9,6 +9,11 @@ use super::dialogue_state::DialogueStateReport;
 use super::eval::BigEvalReport;
 use super::evidence_proof::EvidenceProofReport;
 use super::field_feedback::FieldFeedbackReport;
+use super::field_runtime::{
+    AppliedAntiMemoryReport, AppliedFeedbackMemoryReport, CoreEvalReport, FeedbackAwareFieldReport,
+    LearningEvalReport, MemoryConsolidateReport, PersistentMemoryStoreReport,
+    RuntimePipelineReport,
+};
 use super::hrr_binding::HrrBindingReport;
 use super::l2_l3_coupling::L2L3CouplingReport;
 use super::l2_word_field::L2WordFieldReport;
@@ -281,6 +286,115 @@ pub(crate) fn print_field_feedback_report(
     Ok(())
 }
 
+pub(crate) fn print_applied_feedback_memory_report(
+    report: &AppliedFeedbackMemoryReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
+        OutputFormat::Md => print_runtime_md(
+            "Applied Feedback Memory",
+            report.roadmap_block,
+            report.verdict,
+        ),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_feedback_aware_field_report(
+    report: &FeedbackAwareFieldReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
+        OutputFormat::Md => {
+            print_runtime_md("Feedback-Aware Field", report.roadmap_block, report.verdict)
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_applied_anti_memory_report(
+    report: &AppliedAntiMemoryReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
+        OutputFormat::Md => {
+            print_runtime_md("Applied Anti-Memory", report.roadmap_block, report.verdict)
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_persistent_memory_store_report(
+    report: &PersistentMemoryStoreReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
+        OutputFormat::Md => print_runtime_md(
+            "Persistent Memory Store",
+            report.roadmap_block,
+            report.verdict,
+        ),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_learning_eval_report(
+    report: &LearningEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
+        OutputFormat::Md => print_runtime_md("Learning Eval", report.roadmap_block, report.verdict),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_memory_consolidate_report(
+    report: &MemoryConsolidateReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
+        OutputFormat::Md => {
+            print_runtime_md("Memory Consolidate", report.roadmap_block, report.verdict)
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_runtime_pipeline_report(
+    report: &RuntimePipelineReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
+        OutputFormat::Md => {
+            print_runtime_md("Runtime Pipeline", report.roadmap_block, report.verdict)
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_eval_report(report: &CoreEvalReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
+        OutputFormat::Md => print_runtime_md("Core Eval", report.roadmap_block, report.verdict),
+    }
+    Ok(())
+}
+
 pub(crate) fn print_lexical_birth_report(
     report: &LexicalBirthReport,
     format: &OutputFormat,
@@ -291,6 +405,18 @@ pub(crate) fn print_lexical_birth_report(
         OutputFormat::Md => print_lexical_birth_md(report),
     }
     Ok(())
+}
+
+fn print_runtime_line(roadmap_block: &str, verdict: &str) {
+    println!("roadmap_block: {}", roadmap_block);
+    println!("verdict: {}", verdict);
+}
+
+fn print_runtime_md(title: &str, roadmap_block: &str, verdict: &str) {
+    println!("# LLMWave-Big {}", title);
+    println!();
+    println!("- roadmap_block: `{}`", roadmap_block);
+    println!("- verdict: `{}`", verdict);
 }
 
 pub(crate) fn print_surface_production_report(

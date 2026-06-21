@@ -318,6 +318,14 @@ nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods?" --for
 nanda-llmwave-big evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
 nanda-llmwave-big answer-surface --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
 nanda-llmwave-big field-feedback --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json
+nanda-llmwave-big feedback-memory --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json
+nanda-llmwave-big feedback-aware-field --text "Has customs cleared the goods?" --memory-mode accept --format json
+nanda-llmwave-big applied-anti-memory --format json
+nanda-llmwave-big memory-store --path .nanda/llmwave-big-memory.json --action apply --decision accept --format json
+nanda-llmwave-big learning-eval --format json
+nanda-llmwave-big memory-consolidate --format json
+nanda-llmwave-big run --evidence-mode release-confirmed --decision accept --format json
+nanda-llmwave-big core-eval --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -652,6 +660,15 @@ ref. This is constrained answer text, not free-form generation.
 decisions over constrained answer surfaces into fixed `FieldFeedbackRecord32`
 records: accept reinforces the evidence-bound route, reject writes local
 anti-memory. This is local feedback, not persistent training.
+v1421-v1900 closes the first applied field-core loop. `feedback-memory` turns
+feedback into fixed `AppliedMemoryRecord32` packets, `feedback-aware-field`
+applies those packets to the next field pass, `applied-anti-memory` proves the
+reject lane suppresses the false route while preserving the true route,
+`memory-store` writes a reusable JSON memory packet, `learning-eval` measures
+before/after route lift and suppression, `memory-consolidate` controls duplicate
+growth, `run` executes the full fixture pipeline, and `core-eval` reports
+`CORE_RUNTIME_READY_FIXTURE`. This is now an applied fixture runtime core, still
+not a full LLM and still not nonlinear-memory proof.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor
