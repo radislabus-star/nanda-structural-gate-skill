@@ -104,7 +104,7 @@ fn write_auto_dogfood_packet(repo: &Path) -> Result<PathBuf> {
     let mut files = vec![];
     collect_repo_files(repo, repo, &mut files)?;
     files.sort();
-    files.truncate(64);
+    files = select_auto_field_files(files, 64);
     let mut triads = vec![];
     let mut candidates = vec![];
     for (idx, rel) in files.iter().enumerate() {
@@ -221,6 +221,31 @@ fn collect_repo_files(root: &Path, dir: &Path, out: &mut Vec<String>) -> Result<
     Ok(())
 }
 
+fn select_auto_field_files(files: Vec<String>, cap: usize) -> Vec<String> {
+    let mut selected = vec![];
+    let mut seen_routes = BTreeSet::<String>::new();
+    for file in &files {
+        let route = auto_route_for_path(file);
+        if seen_routes.insert(route) {
+            selected.push(file.clone());
+            if selected.len() >= cap {
+                return selected;
+            }
+        }
+    }
+    for file in files {
+        if selected.iter().any(|item| item == &file) {
+            continue;
+        }
+        selected.push(file);
+        if selected.len() >= cap {
+            break;
+        }
+    }
+    selected.sort();
+    selected
+}
+
 fn is_architecture_file(path: &Path) -> bool {
     let name = path
         .file_name()
@@ -254,13 +279,6 @@ fn auto_route_for_path(path: &str) -> String {
         || lower.contains("fsm")
     {
         "manual-trigger-flow".to_string()
-    } else if lower.contains("ibus")
-        || lower.contains("ime")
-        || lower.contains("preedit")
-        || lower.contains("composition")
-        || lower.contains("candidate")
-    {
-        "ime-display-flow".to_string()
     } else if lower.contains("space")
         || lower.contains("autocorrect")
         || lower.contains("correction")
@@ -277,6 +295,13 @@ fn auto_route_for_path(path: &str) -> String {
         "nanda-field-flow".to_string()
     } else if lower.contains("runtime") || lower.contains("daemon") || lower.contains("server") {
         "runtime-flow".to_string()
+    } else if lower.contains("ibus")
+        || lower.contains("ime")
+        || lower.contains("preedit")
+        || lower.contains("composition")
+        || lower.contains("candidate")
+    {
+        "ime-display-flow".to_string()
     } else if lower.contains("ui") || lower.contains("status") || lower.contains("tray") {
         "ui-status-flow".to_string()
     } else if lower.contains("config") || lower.ends_with(".toml") || lower.ends_with(".json") {

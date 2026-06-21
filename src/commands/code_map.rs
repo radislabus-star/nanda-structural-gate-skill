@@ -36,7 +36,11 @@ struct ClusterStats {
 }
 
 pub(crate) fn cmd(args: MapCodeArgs) -> Result<u8> {
-    let out = report(&args.input, args.min_cluster_functions, args.max_functions)?;
+    let out = if args.input.is_dir() {
+        repo_report(&args.input, args.min_cluster_functions, args.max_functions)?
+    } else {
+        report(&args.input, args.min_cluster_functions, args.max_functions)?
+    };
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
         OutputFormat::Text => print_text(&out),
@@ -95,12 +99,24 @@ pub(crate) fn report(
             .first()
             .map(|function| function.suggested_file.as_str())
             .unwrap_or("src/main.rs");
-        let risk = if stats.deps.len() <= 2 {
+        let route_critical = is_route_critical_file(input) || is_route_critical_cluster(&cluster);
+        let risk = if route_critical {
+            "HIGH"
+        } else if stats.deps.len() <= 2 {
             "LOW"
         } else if stats.deps.len() <= 6 {
             "MEDIUM"
         } else {
             "HIGH"
+        };
+        let risk_reason = if route_critical {
+            "ROUTE_CRITICAL state-machine or runtime route boundary"
+        } else if risk == "HIGH" {
+            "many cross-cluster dependencies"
+        } else if risk == "MEDIUM" {
+            "some cross-cluster dependencies"
+        } else {
+            "bounded cross-cluster dependencies"
         };
         let functions = stats
             .functions
@@ -120,6 +136,7 @@ pub(crate) fn report(
             "line_count": line_count,
             "suggested_file": suggested_file,
             "risk": risk,
+            "risk_reason": risk_reason,
             "external_deps": stats.deps.iter().cloned().collect::<Vec<_>>(),
             "sample_functions": functions
         }));
@@ -264,7 +281,11 @@ fn collect_rust_files(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result
 
 fn risk_file_rank(path: &Path) -> usize {
     let lower = path.to_string_lossy().to_ascii_lowercase();
-    if lower.contains("dogfood") || lower.contains("map_gate") || lower.contains("report") {
+    if is_route_critical_path(&lower)
+        || lower.contains("dogfood")
+        || lower.contains("map_gate")
+        || lower.contains("report")
+    {
         0
     } else if lower.ends_with("main.rs") || lower.contains("/bin/") {
         1
@@ -275,6 +296,24 @@ fn risk_file_rank(path: &Path) -> usize {
     } else {
         4
     }
+}
+
+fn is_route_critical_file(path: &Path) -> bool {
+    is_route_critical_path(&path.to_string_lossy().to_ascii_lowercase())
+}
+
+fn is_route_critical_path(lower: &str) -> bool {
+    lower.contains("event")
+        || lower.contains("fsm")
+        || lower.contains("manual_trigger")
+        || lower.contains("double_shift")
+        || lower.contains("hotkey")
+        || lower.contains("key_event")
+        || lower.contains("state_machine")
+}
+
+fn is_route_critical_cluster(cluster: &str) -> bool {
+    matches!(cluster, "state-machine" | "manual-trigger")
 }
 
 fn max_cluster_risk(clusters: &Value) -> &'static str {
@@ -386,6 +425,17 @@ fn classify_cluster(name: &str) -> String {
     let lower = name.to_ascii_lowercase();
     let cluster = if matches!(name, "main" | "run" | "run_check") {
         "cli-router"
+    } else if lower.contains("manual_trigger")
+        || lower.contains("double_shift")
+        || lower.contains("hotkey")
+    {
+        "manual-trigger"
+    } else if lower.contains("event")
+        || lower.contains("fsm")
+        || lower.contains("state")
+        || lower.contains("transition")
+    {
+        "state-machine"
     } else if lower.contains("dogfood") {
         "commands/dogfood"
     } else if lower.contains("pack6m")
@@ -447,6 +497,8 @@ fn classify_cluster(name: &str) -> String {
 
 fn suggested_file(cluster: &str) -> &str {
     match cluster {
+        "manual-trigger" => "src/runtime/manual_trigger.rs",
+        "state-machine" => "src/runtime/state_machine.rs",
         "commands/dogfood" => "src/commands/dogfood.rs",
         "pack6m" => "src/pack6m.rs",
         "search" => "src/search.rs",

@@ -247,15 +247,21 @@ returns a global verdict plus linked local branches. Treat
 `STRUCTURALLY_ACCEPTED` as "global WATCH is size-only and all local branches
 PASS"; treat `REPAIR_REQUIRED` as a hard stop; treat `SPLIT_REQUIRED` as
 unresolved.
-Use `nanda-dogfood .` inside a repository that has
-`examples/self-dogfood.nanda.json` when you need a compact agent readiness
-check. It accepts root `WATCH` only when it is size-only and all linked branches
-pass.
-Use `nanda-map-code` before or during Rust refactors when a large file needs
-module boundaries. It clusters functions, reports cross-cluster dependencies,
-suggests target files, and marks extraction risk. Use
-`nanda-dogfood . --refactor-plan` when you want the structural dogfood verdict
-and code-boundary recommendations in one JSON packet.
+Use `nanda-dogfood .` when you need a compact agent readiness check. If the
+repository has `examples/self-dogfood.nanda.json`, dogfood uses that curated
+packet. If no curated packet exists, it builds a low-confidence repo auto-field
+from source, config, script, UI/status, runtime, and test files. Auto-field is
+review-only until the agent provides a precise `action_id`, evidence, and
+route-specific verification.
+Use `nanda-dogfood . --refactor-plan --format json` before repository
+refactors. It returns top-level `agent_decision`, `codex_failure_field`,
+`repair_queue`, route map, linked branch checks, and a repo-level
+`repo-code-map` with `risk_files`.
+Use `nanda-map-code` before or during Rust refactors. On a file, it clusters
+functions, reports cross-cluster dependencies, suggests target files, and marks
+extraction risk. On a directory, it returns a repo-level `repo-code-map`.
+Hotkey/FSM/event/state-machine code is route-critical even when dependency
+count is small.
 Use `nanda-index` to build a reusable memory packet from triad packets or
 worksheets.
 Use `nanda-extract` when the input is simple notes rather than JSON/Markdown
@@ -773,6 +779,7 @@ scripts/nanda-split-md code-flow.md --by linked-group --normalize-paths --out-di
 
 Inspect JSON fields:
 
+- `agent_decision`;
 - `route_field`;
 - `owner_gravity`;
 - `structural_energy`;
@@ -786,23 +793,30 @@ Inspect JSON fields:
 - `repair_tasks`;
 - `repair_queue`.
 
+Treat top-level `agent_decision.safe_to_edit=false` as a stop for code edits.
 If `foreign_pull` is non-empty, do not finalize as PASS. Explain which
 `candidate_triad` pulls the candidate group toward a different source route and
 repair or split that group first.
 If `owner_gravity.conflicts` or `negative_routes.hits` are non-empty, also do
 not finalize as PASS. Explain who owns the decision, which adapter/UI/test/helper
-crossed the boundary, and use `repair_queue` as the minimal repair list.
+crossed the boundary, and use top-level `repair_queue` as the minimal repair
+list.
 When the task is a risky Codex edit, add a packet `failure_contract` with:
 `enabled`, `symptom`, `evidence`, `selected_action_id`, `actions`,
 `runtime_snapshot`, `namespace_terms`, `verification`,
 `checkpoint_before_risky_change`, and `hypothesis_proven`. Inspect
-`codex_failure_field.verdict`: `HARD_STOP` means no tools/code/restart,
-`VETO` means action/evidence/route mismatch, and `ANALYSIS_INSUFFICIENT` means
-the agent has not named a precise enough action or proof route yet.
+top-level `codex_failure_field.verdict`: `HARD_STOP` means no tools, no code,
+no restart, no install, and no runtime mutation; `VETO` means repair the
+action/evidence/route mismatch first; `ANALYSIS_INSUFFICIENT` means the agent
+has not named a precise enough action, evidence, namespace, or verification
+route yet. Failure-field repairs are placed first in top-level `repair_queue`,
+before generic structural coherence repairs.
 
 Recommended repository workflow:
 
 ```bash
+scripts/nanda-dogfood . --refactor-plan --format json
+scripts/nanda-map-code . --format json
 scripts/nanda-dogfood . --out-dir .nanda/
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index code-flow.json --input-format json --out .nanda/index.json

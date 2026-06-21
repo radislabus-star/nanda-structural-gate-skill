@@ -1098,6 +1098,8 @@ code_map_json="$("$code_mapper" "$root/src/main.rs" --format json)"
 jq -e '.mode == "code-map"' <<<"$code_map_json" >/dev/null
 jq -e '.clusters | length > 0' <<<"$code_map_json" >/dev/null
 jq -e '.clusters[] | select(.cluster == "cli-router")' <<<"$code_map_json" >/dev/null
+code_map_repo_json="$("$code_mapper" "$root" --format json)"
+jq -e '.mode == "repo-code-map" and (.risk_files | length) > 0' <<<"$code_map_repo_json" >/dev/null
 route_field_json="$("$mapper" "$root/examples/triad-packet.route-field-owner-conflict.json" --input-format json --format json)"
 jq -e '.route_field.routes.correction.owners | index("core-correction-owner")' <<<"$route_field_json" >/dev/null
 jq -e '.owner_gravity.conflicts[] | select(.kind == "duplicate_decision_owner" and .route == "correction")' <<<"$route_field_json" >/dev/null
@@ -1160,8 +1162,10 @@ test "$auto_dogfood_refactor_status" -eq 3
 jq -e '.refactor_plan.mode == "repo-code-map" and (.refactor_plan.files | length) >= 1 and (.refactor_plan.risk_files | length) >= 0' <<<"$auto_dogfood_refactor_json" >/dev/null
 rm -rf "$tmp_auto_repo"
 tmp_owner_repo="$(mktemp -d)"
-mkdir -p "$tmp_owner_repo/src/bin"
+mkdir -p "$tmp_owner_repo/src/bin/lay_daemon" "$tmp_owner_repo/src/runtime"
 printf 'fn main() {}' >"$tmp_owner_repo/src/bin/lay_daemon.rs"
+printf 'fn ime_candidate_event() {}' >"$tmp_owner_repo/src/bin/lay_daemon/ime_candidate.rs"
+printf 'fn handle_manual_trigger_runtime() {}' >"$tmp_owner_repo/src/runtime/manual_trigger_runtime.rs"
 set +e
 owner_auto_json="$("$dogfood" "$tmp_owner_repo" --format json)"
 owner_auto_status=$?
@@ -1173,7 +1177,21 @@ if [[ "$owner_auto_status" -ne 3 ]]; then
 fi
 jq -e '.comb_tree.map.route_field.routes["runtime-flow"].owners | index("src::bin::lay_daemon")' <<<"$owner_auto_json" >/dev/null
 jq -e '(.comb_tree.map.route_field.routes["runtime-flow"].owners | index("src::bin::lay_daemon.rs")) == null' <<<"$owner_auto_json" >/dev/null
+jq -e '.comb_tree.map.route_field.routes["runtime-flow"].evidence_paths | index("src/bin/lay_daemon/ime_candidate.rs")' <<<"$owner_auto_json" >/dev/null
+jq -e '.comb_tree.map.route_field.routes["manual-trigger-flow"].evidence_paths | index("src/runtime/manual_trigger_runtime.rs")' <<<"$owner_auto_json" >/dev/null
 rm -rf "$tmp_owner_repo"
+tmp_state_repo="$(mktemp -d)"
+mkdir -p "$tmp_state_repo/src"
+cat >"$tmp_state_repo/src/event.rs" <<'EOF_EVENT'
+fn handle_double_shift_event() {
+    transition_manual_trigger_state();
+}
+
+fn transition_manual_trigger_state() {}
+EOF_EVENT
+state_code_json="$("$code_mapper" "$tmp_state_repo/src/event.rs" --format json --min-cluster-functions 1)"
+jq -e '.clusters[] | select(.cluster == "manual-trigger" and .risk == "HIGH" and (.risk_reason | contains("ROUTE_CRITICAL")))' <<<"$state_code_json" >/dev/null
+rm -rf "$tmp_state_repo"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null
