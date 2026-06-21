@@ -8,6 +8,7 @@ use super::l2_word_field::L2WordFieldReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
+use super::surface_bank_validate::SurfaceBankValidateReport;
 use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
@@ -116,6 +117,18 @@ pub(crate) fn print_surface_bank_build_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_surface_bank_build_text(report),
         OutputFormat::Md => print_surface_bank_build_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_surface_bank_validate_report(
+    report: &SurfaceBankValidateReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_surface_bank_validate_text(report),
+        OutputFormat::Md => print_surface_bank_validate_md(report),
     }
     Ok(())
 }
@@ -367,6 +380,30 @@ fn print_surface_bank_build_text(report: &SurfaceBankBuildReport) {
         "held_out_exact_match_rate: {:.3}",
         report.eval.held_out_exact_match_rate
     );
+    println!(
+        "nonlinear_surface_memory_proven: {}",
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+}
+
+fn print_surface_bank_validate_text(report: &SurfaceBankValidateReport) {
+    println!("LLMWave-Big Surface Bank Validate");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "positive_accept_rate: {:.3}",
+        report.metrics.positive_accept_rate
+    );
+    println!(
+        "negative_reject_rate: {:.3}",
+        report.metrics.negative_reject_rate
+    );
+    println!(
+        "shuffle_stability_rate: {:.3}",
+        report.metrics.shuffle_stability_rate
+    );
+    println!("false_family_rate: {:.3}", report.metrics.false_family_rate);
     println!(
         "nonlinear_surface_memory_proven: {}",
         report.claim_boundary.nonlinear_surface_memory_proven
@@ -764,6 +801,46 @@ fn print_surface_bank_build_md(report: &SurfaceBankBuildReport) {
     println!(
         "- useful density candidate: `{}`",
         report.claim_boundary.useful_density_candidate
+    );
+    println!(
+        "- nonlinear surface memory proven: `{}`",
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+    println!(
+        "- real corpus trained: `{}`",
+        report.claim_boundary.real_corpus_trained
+    );
+}
+
+fn print_surface_bank_validate_md(report: &SurfaceBankValidateReport) {
+    println!("# LLMWave-Big Surface Bank Validate");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- read as: {}", report.read_as);
+    println!();
+    println!("## Controls");
+    println!();
+    println!(
+        "- positive accept rate: `{:.3}`",
+        report.metrics.positive_accept_rate
+    );
+    println!(
+        "- negative reject rate: `{:.3}`",
+        report.metrics.negative_reject_rate
+    );
+    println!(
+        "- false family rate: `{:.3}`",
+        report.metrics.false_family_rate
+    );
+    println!("- shuffle stability: `{}`", report.shuffle_stability.state);
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- validation passed: `{}`",
+        report.claim_boundary.validation_passed
     );
     println!(
         "- nonlinear surface memory proven: `{}`",

@@ -16,6 +16,7 @@ pub mod operators;
 pub mod residuals;
 pub mod schemas;
 pub mod surface_bank_build;
+pub mod surface_bank_validate;
 pub mod surface_corpus_eval;
 pub mod surface_production;
 pub mod surface_reconstruct;
@@ -55,6 +56,8 @@ enum LlmwaveBigCommand {
     SurfaceCorpusEval(LlmwaveBigSurfaceCorpusEvalArgs),
     /// Build the v281-v290 observed surface-family bank.
     SurfaceBankBuild(LlmwaveBigSurfaceBankBuildArgs),
+    /// Validate the v291-v300 surface bank with negative controls.
+    SurfaceBankValidate(LlmwaveBigSurfaceBankValidateArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
@@ -115,6 +118,12 @@ struct LlmwaveBigSurfaceCorpusEvalArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigSurfaceBankBuildArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSurfaceBankValidateArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -216,6 +225,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SurfaceBankBuild(args) => {
             let report = surface_bank_build::build_surface_bank_build_report();
             report::print_surface_bank_build_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SurfaceBankValidate(args) => {
+            let report = surface_bank_validate::build_surface_bank_validate_report();
+            report::print_surface_bank_validate_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Write(args) => {
@@ -589,6 +603,43 @@ mod tests {
         assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
         assert!(!report.claim_boundary.free_form_spelling_proven);
         assert!(!report.bank_summary.hot_core_contains_utf8);
+    }
+
+    #[test]
+    fn surface_bank_validate_rejects_false_families() {
+        let report = surface_bank_validate::build_surface_bank_validate_report();
+        assert_eq!(report.roadmap_block, "v291-v300");
+        assert_eq!(
+            report.verdict,
+            "SURFACE_BANK_VALIDATE_READY_NOT_REAL_TRAINING"
+        );
+        assert_eq!(report.metrics.positive_accept_rate, 1.0);
+        assert_eq!(report.metrics.negative_reject_rate, 1.0);
+        assert_eq!(report.metrics.false_family_rate, 0.0);
+        assert!(report
+            .negative_controls
+            .iter()
+            .any(|control| { control.case_id == "invoiceing_trap" && !control.accepted }));
+        assert!(report
+            .negative_controls
+            .iter()
+            .any(|control| { control.case_id == "rare_code_family_trap" && !control.accepted }));
+    }
+
+    #[test]
+    fn surface_bank_validate_keeps_order_and_claims_honest() {
+        let report = surface_bank_validate::build_surface_bank_validate_report();
+        assert_eq!(
+            report.shuffle_stability.state,
+            "ORDER_STABLE_ON_EMBEDDED_CORPUS"
+        );
+        assert_eq!(report.shuffle_stability.stability_rate, 1.0);
+        assert_eq!(report.shuffle_stability.unstable_family_count, 0);
+        assert!(report.claim_boundary.validation_passed);
+        assert!(!report.claim_boundary.real_corpus_trained);
+        assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
+        assert!(!report.claim_boundary.free_form_spelling_proven);
+        assert!(!report.claim_boundary.order_invariance_proven);
     }
 
     #[test]

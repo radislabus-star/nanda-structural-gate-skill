@@ -81,11 +81,14 @@ The first observed-form bank builder is:
 
 ```bash
 nanda-llmwave-big surface-bank-build --format json
+nanda-llmwave-big surface-bank-validate --format json
 ```
 
 It promotes suffix families from a small embedded corpus and rejects fragments
-that require copy or provisional handling. This is the bridge from synthetic
-capacity arithmetic toward real corpus fixtures.
+that require copy or provisional handling. The validator then applies positive
+held-out controls, false-family traps, rare-code traps, and order-shuffle
+stability checks. This is the bridge from synthetic capacity arithmetic toward
+real corpus fixtures.
 
 ### Holographic Reduced Representations
 

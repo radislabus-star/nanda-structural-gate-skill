@@ -306,6 +306,7 @@ nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
 nanda-llmwave-big surface-corpus-eval --format json
 nanda-llmwave-big surface-bank-build --format json
+nanda-llmwave-big surface-bank-validate --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -576,6 +577,13 @@ forms, rejects non-family fragments into copy/provisional paths, and tests
 held-out reconstructions such as `invoicing`, `customing`, and `routing`. Its
 state remains `OBSERVED_BANK_BUILD_PASS_NOT_DENSITY_PROOF`: this is bank
 construction evidence, not real broad corpus training.
+
+`nanda-llmwave-big surface-bank-validate` adds the v291-v300 validator around
+that bank. It checks positive held-out forms, negative controls such as
+`invoiceing` and rare identifier family traps, and order-shuffle stability. Its
+state remains `VALIDATION_PASS_NOT_GENERAL_PROOF`: this catches known false
+families in the embedded suite, but does not prove real corpus training,
+free-form spelling, or nonlinear surface memory.
 
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual

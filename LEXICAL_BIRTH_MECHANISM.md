@@ -341,6 +341,12 @@ families from a small embedded corpus, rejects non-family fragments to copy or
 provisional paths, and checks held-out reconstructions. Its state remains
 `OBSERVED_BANK_BUILD_PASS_NOT_DENSITY_PROOF`.
 
+`surface-bank-validate` is the first negative-control layer around that bank.
+It rejects known false families such as `invoiceing` and `routeing`, keeps rare
+identifiers on the copy-span path, and checks that the embedded bank result is
+stable under three corpus-order variants. Its state remains
+`VALIDATION_PASS_NOT_GENERAL_PROOF`.
+
 ## Claim Boundary
 
 Allowed claim:

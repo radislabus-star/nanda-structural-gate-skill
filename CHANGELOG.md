@@ -41,6 +41,10 @@
   builder over an embedded business-form corpus, promoting suffix families,
   rejecting copy/provisional fragments, and checking held-out reconstructions
   without claiming real broad corpus training.
+- v291-v300 add `nanda-llmwave-big surface-bank-validate`: negative controls and
+  order-shuffle stability for the embedded surface bank, including false-family
+  traps such as `invoiceing`, `routeing`, rare-code suffixing, and short-root
+  promotion.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split

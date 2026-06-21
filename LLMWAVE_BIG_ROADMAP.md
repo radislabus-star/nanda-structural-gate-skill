@@ -1289,6 +1289,29 @@ rare identifiers -> copy span, not family
 nonlinear_surface_memory_proven remains false
 ```
 
+v291-v300: implemented as nanda-llmwave-big surface-bank-validate
+
+## Phase 13: Surface Bank Negative Controls, v291-v300
+
+Goal:
+
+```text
+observed surface bank
+  -> positive held-out controls
+  -> false-family negative controls
+  -> rare identifier copy-span traps
+  -> corpus-order stability check
+```
+
+Stop rules:
+
+```text
+embedded negative controls -> not arbitrary morphology
+order stability on 3 variants -> not general order invariance
+validation pass -> not real corpus training
+nonlinear_surface_memory_proven remains false
+```
+
 ## Summary
 
 ```text

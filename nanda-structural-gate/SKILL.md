@@ -162,6 +162,7 @@ scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
 scripts/nanda-llmwave-big surface-corpus-eval --format json
 scripts/nanda-llmwave-big surface-bank-build --format json
+scripts/nanda-llmwave-big surface-bank-validate --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -452,6 +453,9 @@ fallback, and family-template reuse. Treat
 promotes suffix families from an embedded corpus, rejects copy/provisional
 fragments, and checks held-out reconstruction while keeping broad training and
 nonlinear proof false.
+`nanda-llmwave-big surface-bank-validate`: a negative-control validator for
+that bank; it checks false-family traps, rare identifier traps, and order
+shuffle stability while keeping broad training and nonlinear proof false.
 v191-v205 add `nanda-llmwave-big write` and
 `nanda-bench6m --mode write-density`: write decomposition, reconstructability
 score, residual V1, centroid update, anti-residual, schema promotion/split

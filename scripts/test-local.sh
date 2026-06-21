@@ -106,6 +106,11 @@ jq -e '.roadmap_block == "v281-v290" and .verdict == "SURFACE_BANK_BUILD_READY_N
 jq -e '.bank_summary.accepted_family_count == 3 and .eval.held_out_exact_match_rate == 1 and .eval.state == "OBSERVED_BANK_BUILD_PASS_NOT_DENSITY_PROOF"' <<<"$big_surface_bank_json" >/dev/null
 jq -e '([.accepted_families[].held_out_reconstructions[]] | index("invoicing") and index("customing") and index("routing"))' <<<"$big_surface_bank_json" >/dev/null
 jq -e '([.rejected_fragments[].path] | index("evidence_copy_span")) and .claim_boundary.useful_density_candidate == true and .claim_boundary.real_corpus_trained == false and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_bank_json" >/dev/null
+big_surface_bank_validate_json="$("$llmwave_big" surface-bank-validate --format json)"
+jq -e '.roadmap_block == "v291-v300" and .verdict == "SURFACE_BANK_VALIDATE_READY_NOT_REAL_TRAINING"' <<<"$big_surface_bank_validate_json" >/dev/null
+jq -e '.metrics.positive_accept_rate == 1 and .metrics.negative_reject_rate == 1 and .metrics.shuffle_stability_rate == 1 and .metrics.false_family_rate == 0' <<<"$big_surface_bank_validate_json" >/dev/null
+jq -e '([.negative_controls[] | select(.accepted == false) | .case_id] | index("invoiceing_trap") and index("rare_code_family_trap") and index("short_root_trap"))' <<<"$big_surface_bank_validate_json" >/dev/null
+jq -e '.shuffle_stability.state == "ORDER_STABLE_ON_EMBEDDED_CORPUS" and .claim_boundary.validation_passed == true and .claim_boundary.real_corpus_trained == false and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_bank_validate_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
