@@ -151,6 +151,12 @@ jq -e '.query_wave_state == "QUERY_WAVE_READY_NOT_FIELD_MATURE" and .field_state
 jq -e '.metrics.stable_peak_accuracy == 1 and .metrics.contested_detection_rate == 1 and .metrics.no_answer_detection_rate == 1 and .metrics.route_leakage_reject_rate == 1' <<<"$big_multi_peak_json" >/dev/null
 jq -e '([.eval_cases[].expected_state] | index("STABLE_PEAK") and index("CONTESTED") and index("NO_ANSWER") and index("REJECTED"))' <<<"$big_multi_peak_json" >/dev/null
 jq -e '.claim_boundary.fixed_peak_records == true and .claim_boundary.safe_to_answer == false and .claim_boundary.full_field_mature == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_multi_peak_json" >/dev/null
+big_lens_scan_json="$("$llmwave_big" lens-scan --text "Has customs cleared the goods?" --format json)"
+jq -e '.roadmap_block == "v1061-v1140" and .verdict == "LENS_SCAN_READY_NOT_ANSWER"' <<<"$big_lens_scan_json" >/dev/null
+jq -e '.field_bridge_state == "STABLE_PEAK" and .top_route == "customs-clearance-status" and .answer_decision == "ANSWER_BLOCKED_BY_LENSES"' <<<"$big_lens_scan_json" >/dev/null
+jq -e '.metrics.role_lens_pass_rate == 1 and .metrics.evidence_block_rate == 1 and .metrics.answer_block_rate == 1 and .metrics.lens_agreement_rate > 0.5' <<<"$big_lens_scan_json" >/dev/null
+jq -e '([.lenses[].lens] | index("role") and index("evidence") and index("temporal") and index("causal") and index("contradiction") and index("surface") and index("answer"))' <<<"$big_lens_scan_json" >/dev/null
+jq -e '.claim_boundary.fixed_lens_records == true and .claim_boundary.safe_to_answer == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_lens_scan_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

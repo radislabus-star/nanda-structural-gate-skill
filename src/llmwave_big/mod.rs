@@ -16,6 +16,7 @@ pub mod l2_l3_coupling;
 pub mod l2_word_field;
 pub mod l3_schema_bind;
 pub mod l3_schema_field;
+pub mod lens_scan;
 pub mod lexical_birth;
 pub mod loader;
 pub mod mini_chat_eval;
@@ -89,6 +90,9 @@ enum LlmwaveBigCommand {
     /// Run the v1001-v1060 multi-peak field core.
     #[command(name = "multi-peak-field", alias = "field-peaks")]
     MultiPeakField(LlmwaveBigMultiPeakFieldArgs),
+    /// Run the v1061-v1140 field lens scan.
+    #[command(name = "lens-scan")]
+    LensScan(LlmwaveBigLensScanArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -209,6 +213,14 @@ struct LlmwaveBigQueryWaveArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigMultiPeakFieldArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLensScanArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, value_enum, default_value = "json")]
@@ -402,6 +414,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::MultiPeakField(args) => {
             let report = multi_peak_field::build_multi_peak_field_report(args.text);
             report::print_multi_peak_field_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LensScan(args) => {
+            let report = lens_scan::build_lens_scan_report(args.text);
+            report::print_lens_scan_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -1082,6 +1099,35 @@ mod tests {
         assert_eq!(report.metrics.no_answer_detection_rate, 1.0);
         assert_eq!(report.metrics.route_leakage_reject_rate, 1.0);
         assert!(report.eval_cases.iter().all(|case| case.passed));
+        assert!(!report.claim_boundary.safe_to_answer);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn lens_scan_blocks_answer_when_evidence_lens_fails() {
+        let report =
+            lens_scan::build_lens_scan_report("Has customs cleared the goods?".to_string());
+        assert_eq!(report.roadmap_block, "v1061-v1140");
+        assert_eq!(report.verdict, "LENS_SCAN_READY_NOT_ANSWER");
+        assert_eq!(report.field_bridge_state, "STABLE_PEAK");
+        assert_eq!(report.answer_decision, "ANSWER_BLOCKED_BY_LENSES");
+        assert!(report
+            .lenses
+            .iter()
+            .any(|lens| lens.lens == "evidence" && lens.state == "WATCH"));
+        assert_eq!(core::mem::size_of::<lens_scan::LensRecord32>(), 32);
+    }
+
+    #[test]
+    fn lens_scan_reports_agreement_without_chat_claim() {
+        let report =
+            lens_scan::build_lens_scan_report("Has customs cleared the goods?".to_string());
+        assert_eq!(report.metrics.role_lens_pass_rate, 1.0);
+        assert_eq!(report.metrics.evidence_block_rate, 1.0);
+        assert_eq!(report.metrics.answer_block_rate, 1.0);
+        assert!(report.metrics.lens_agreement_rate > 0.5);
+        assert!(report.claim_boundary.fixed_lens_records);
         assert!(!report.claim_boundary.safe_to_answer);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);

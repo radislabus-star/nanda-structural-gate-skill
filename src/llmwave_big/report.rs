@@ -10,6 +10,7 @@ use super::hrr_binding::HrrBindingReport;
 use super::l2_l3_coupling::L2L3CouplingReport;
 use super::l2_word_field::L2WordFieldReport;
 use super::l3_schema_bind::L3SchemaBindReport;
+use super::lens_scan::LensScanReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::mini_chat_eval::MiniChatEvalReport;
@@ -215,6 +216,15 @@ pub(crate) fn print_multi_peak_field_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_multi_peak_field_text(report),
         OutputFormat::Md => print_multi_peak_field_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_lens_scan_report(report: &LensScanReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_lens_scan_text(report),
+        OutputFormat::Md => print_lens_scan_md(report),
     }
     Ok(())
 }
@@ -1877,6 +1887,52 @@ fn print_multi_peak_field_md(report: &MultiPeakFieldReport) {
         "- full field mature: `{}`",
         report.claim_boundary.full_field_mature
     );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_lens_scan_text(report: &LensScanReport) {
+    println!("LLMWave-Big Lens Scan");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("field_bridge_state: {}", report.field_bridge_state);
+    println!("answer_decision: {}", report.answer_decision);
+    println!(
+        "lens_agreement_rate: {:.3}",
+        report.metrics.lens_agreement_rate
+    );
+}
+
+fn print_lens_scan_md(report: &LensScanReport) {
+    println!("# LLMWave-Big Lens Scan");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- field bridge: `{}`", report.field_bridge_state);
+    println!("- answer decision: `{}`", report.answer_decision);
+    println!();
+    println!("## Metrics");
+    println!();
+    println!("- lenses: `{}`", report.metrics.lens_count);
+    println!("- pass: `{}`", report.metrics.pass_count);
+    println!("- watch: `{}`", report.metrics.watch_count);
+    println!("- block: `{}`", report.metrics.block_count);
+    println!(
+        "- lens agreement: `{:.3}`",
+        report.metrics.lens_agreement_rate
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- safe to answer: `{}`",
+        report.claim_boundary.safe_to_answer
+    );
+    println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
     println!(
         "- nonlinear memory proven: `{}`",
         report.claim_boundary.nonlinear_memory_proven

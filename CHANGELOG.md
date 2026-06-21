@@ -62,6 +62,9 @@
   competing `FieldPeakRecord32` peaks with margin/leakage state classification
   across stable, contested, no-answer, and rejected field cases while answer
   permission remains false.
+- v1061-v1140 add `nanda-llmwave-big lens-scan`: stable raw peaks are scanned
+  through role/evidence/temporal/causal/contradiction/surface/answer lenses
+  with fixed `LensRecord32`; missing evidence blocks answer permission.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

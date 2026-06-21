@@ -313,6 +313,7 @@ nanda-llmwave-big dialogue-state --format json
 nanda-llmwave-big mini-chat-eval --format json
 nanda-llmwave-big query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big multi-peak-field --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big lens-scan --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -625,6 +626,11 @@ and excites competing schema peaks, computes energy/margin/leakage, and
 classifies the field as `STABLE_PEAK`, `CONTESTED`, `NO_ANSWER`, or
 `REJECTED`. It deliberately keeps `safe_to_answer=false`: answer permission is
 a later lens decision, not a property of a raw peak.
+`nanda-llmwave-big lens-scan` adds v1061-v1140. It scans the same raw field
+through role, evidence, temporal, causal, contradiction, surface, and answer
+lenses. A stable customs-clearance peak is still blocked when the evidence and
+answer lenses do not permit a claim. This is the first mature-field lens layer,
+not chat readiness.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor
