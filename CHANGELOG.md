@@ -35,6 +35,9 @@
 - v481-v520 add `nanda-llmwave-big decode-loop`: a recurrent tiny L2/L3 role
   cursor accepts `Honglu issues invoice`, updates L2/L3 field state per step,
   and stops the role-breaking continuation `invoice issues Honglu`.
+- v521-v560 add `nanda-llmwave-big multi-schema`: four active schemas compete,
+  the coherent `supplier-docs` route wins for `Honglu issues invoice`, and the
+  route splice `Honglu pays invoice` is rejected.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

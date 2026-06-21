@@ -305,6 +305,7 @@ nanda-llmwave-big hrr --format json
 nanda-llmwave-big schema-bind --format json
 nanda-llmwave-big l2-l3-couple --format json
 nanda-llmwave-big decode-loop --format json
+nanda-llmwave-big multi-schema --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -570,6 +571,13 @@ accepts `Honglu issues invoice`, updates L2 context energy and L3 schema phase
 after each accepted step, and stops the bad continuation `invoice issues
 Honglu`. This is the first tiny schema-shaped generation loop, still not broad
 chat or nonlinear-memory proof.
+`nanda-llmwave-big multi-schema` adds the v521-v560 competition layer. It keeps
+four active schemas in the field (`supplier issues invoice`, `buyer pays
+invoice`, `customs checks declaration`, `lab issues protocol`), selects the
+coherent `supplier-docs` route for `Honglu issues invoice`, and rejects the
+route splice `Honglu pays invoice`: every piece exists somewhere, but no single
+schema owns the whole route. This is fixture-level route competition, not broad
+reasoning.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

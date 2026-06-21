@@ -790,6 +790,50 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v521-v560: implemented as nanda-llmwave-big multi-schema
+
+## Phase 23: Multi-Schema Competition, v521-v560
+
+Goal:
+
+```text
+multiple active L3 schemas
+  -> one L2/L3 decoded sequence
+  -> schema peak competition
+  -> coherent route selection
+  -> route-splice rejection
+```
+
+Current active schemas:
+
+```text
+101 supplier-docs     Honglu   issues invoice
+102 buyer-payment     Rustrade pays   invoice
+103 customs-check     customs  checks declaration
+104 lab-protocol      lab      issues protocol
+```
+
+Current sample:
+
+```text
+query sequence = Honglu issues invoice
+selected route = supplier-docs
+
+splice trap = Honglu pays invoice
+reason = pieces exist in competing schemas,
+         but no single schema owns the whole route
+```
+
+Stop rules:
+
+```text
+multi-schema fixture -> not broad reasoning
+route-splice rejection -> local structural evidence only
+SchemaPeak32 fixed record -> packed-boundary proof, not speed proof
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

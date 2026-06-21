@@ -102,6 +102,12 @@ jq -e '.bridge_state == "L2_L3_COUPLED_READY_NOT_CHAT" and .final_sequence == ["
 jq -e '.metrics.completed_steps == 3 and .metrics.sequence_exact == true and .metrics.role_error_rate == 0 and .metrics.bad_continuation_reject_rate == 1' <<<"$big_decode_loop_json" >/dev/null
 jq -e '.accepted_steps[0].raw_top == "invoice" and .accepted_steps[0].accepted == "Honglu" and .accepted_steps[2].raw_top == "inventory" and .accepted_steps[2].accepted == "invoice"' <<<"$big_decode_loop_json" >/dev/null
 jq -e '.bad_continuation_trap.trap == "invoice_issues_honglu_role_break" and .bad_continuation_trap.rejected == true and .claim_boundary.fixed_step_records == true and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_decode_loop_json" >/dev/null
+big_multi_schema_json="$("$llmwave_big" multi-schema --format json)"
+jq -e '.roadmap_block == "v521-v560" and .verdict == "MULTI_SCHEMA_COMPETITION_READY_NOT_CHAT"' <<<"$big_multi_schema_json" >/dev/null
+jq -e '.decode_bridge_state == "COUPLED_DECODE_LOOP_READY_NOT_CHAT" and .metrics.active_schema_count == 4 and .metrics.selected_schema_id == 101 and .selected_route.route == "supplier-docs"' <<<"$big_multi_schema_json" >/dev/null
+jq -e '.selected_route.sequence == ["Honglu","issues","invoice"] and .metrics.top_margin > 0 and .metrics.schema_selection_error_rate == 0' <<<"$big_multi_schema_json" >/dev/null
+jq -e '.route_splice_trap.trap == "route_splice_honglu_pays_invoice" and .route_splice_trap.individually_plausible == true and .route_splice_trap.selected_as_whole_route == false and .route_splice_trap.rejected == true' <<<"$big_multi_schema_json" >/dev/null
+jq -e '.claim_boundary.fixed_peak_records == true and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_multi_schema_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

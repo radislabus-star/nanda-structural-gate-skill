@@ -17,6 +17,7 @@ pub mod l3_schema_bind;
 pub mod l3_schema_field;
 pub mod lexical_birth;
 pub mod loader;
+pub mod multi_schema_competition;
 pub mod operators;
 pub mod residuals;
 pub mod schemas;
@@ -62,6 +63,8 @@ enum LlmwaveBigCommand {
     L2L3Couple(LlmwaveBigL2L3CoupleArgs),
     /// Run the v481-v520 recurrent L2/L3 decode loop.
     DecodeLoop(LlmwaveBigDecodeLoopArgs),
+    /// Run the v521-v560 multi-schema competition core.
+    MultiSchema(LlmwaveBigMultiSchemaArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -132,6 +135,12 @@ struct LlmwaveBigL2L3CoupleArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigDecodeLoopArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigMultiSchemaArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -283,6 +292,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::DecodeLoop(args) => {
             let report = coupled_decode_loop::build_coupled_decode_loop_report();
             report::print_coupled_decode_loop_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::MultiSchema(args) => {
+            let report = multi_schema_competition::build_multi_schema_competition_report();
+            report::print_multi_schema_competition_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -651,6 +665,50 @@ mod tests {
         );
         assert_eq!(report.bad_continuation_trap.rejected_surface, "invoice");
         assert_eq!(report.metrics.bad_continuation_reject_rate, 1.0);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn multi_schema_competition_selects_coherent_route() {
+        let report = multi_schema_competition::build_multi_schema_competition_report();
+        assert_eq!(report.roadmap_block, "v521-v560");
+        assert_eq!(report.verdict, "MULTI_SCHEMA_COMPETITION_READY_NOT_CHAT");
+        assert_eq!(
+            report.decode_bridge_state,
+            "COUPLED_DECODE_LOOP_READY_NOT_CHAT"
+        );
+        assert_eq!(report.active_schemas.len(), 4);
+        assert_eq!(report.metrics.selected_schema_id, 101);
+        assert_eq!(report.selected_route.route, "supplier-docs");
+        assert_eq!(
+            report.selected_route.sequence,
+            vec!["Honglu", "issues", "invoice"]
+        );
+        assert!(report.metrics.top_margin > 0);
+        assert_eq!(report.metrics.schema_selection_error_rate, 0.0);
+        assert_eq!(
+            core::mem::size_of::<multi_schema_competition::SchemaPeak32>(),
+            32
+        );
+        assert!(report.claim_boundary.fixed_peak_records);
+    }
+
+    #[test]
+    fn multi_schema_competition_rejects_route_splice() {
+        let report = multi_schema_competition::build_multi_schema_competition_report();
+        assert!(report.route_splice_trap.individually_plausible);
+        assert!(!report.route_splice_trap.selected_as_whole_route);
+        assert!(report.route_splice_trap.rejected);
+        assert_eq!(
+            report.route_splice_trap.trap,
+            "route_splice_honglu_pays_invoice"
+        );
+        assert_eq!(
+            report.route_splice_trap.proposed_sequence,
+            vec!["Honglu", "pays", "invoice"]
+        );
+        assert_eq!(report.metrics.route_splice_reject_rate, 1.0);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }

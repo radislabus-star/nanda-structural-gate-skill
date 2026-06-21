@@ -161,6 +161,7 @@ scripts/nanda-llmwave-big hrr --format json
 scripts/nanda-llmwave-big schema-bind --format json
 scripts/nanda-llmwave-big l2-l3-couple --format json
 scripts/nanda-llmwave-big decode-loop --format json
+scripts/nanda-llmwave-big multi-schema --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -460,6 +461,11 @@ cursor accepts `Honglu issues invoice`, updates field state per accepted step,
 and rejects `invoice issues Honglu`. Treat
 `COUPLED_DECODE_LOOP_READY_NOT_CHAT` as a fixture-level generation loop, not a
 broad chat model or nonlinear-memory proof.
+v521-v560 add `nanda-llmwave-big multi-schema`: multiple active schemas compete
+for a decoded sequence. Treat `MULTI_SCHEMA_COMPETITION_READY_NOT_CHAT` as a
+fixture-level route-selection result: it can reject a route splice whose pieces
+are individually plausible, but it is not broad reasoning or nonlinear-memory
+proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

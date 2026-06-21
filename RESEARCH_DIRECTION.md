@@ -137,6 +137,12 @@ accepted surface back into L2 context energy plus L3 schema phase. This is the
 first local "word birth into sequence" fixture: still hand-sized and not a
 chat model, but no longer only a single candidate rerank.
 
+`nanda-llmwave-big multi-schema` adds competition between active schema fields.
+The first fixture keeps four plausible routes alive and asks whether the field
+selects one coherent route instead of stitching pieces from different routes.
+The rejected `Honglu pays invoice` case is the key research check here: every
+surface can be supported somewhere, but the whole route has no owning schema.
+
 ### Holographic Reduced Representations
 
 Sources:

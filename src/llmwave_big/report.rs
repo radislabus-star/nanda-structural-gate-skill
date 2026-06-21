@@ -11,6 +11,7 @@ use super::l2_word_field::L2WordFieldReport;
 use super::l3_schema_bind::L3SchemaBindReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
+use super::multi_schema_competition::MultiSchemaCompetitionReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
 use super::surface_bank_fixture::SurfaceBankFixtureReport;
 use super::surface_bank_validate::SurfaceBankValidateReport;
@@ -111,6 +112,18 @@ pub(crate) fn print_coupled_decode_loop_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_coupled_decode_loop_text(report),
         OutputFormat::Md => print_coupled_decode_loop_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_multi_schema_competition_report(
+    report: &MultiSchemaCompetitionReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_multi_schema_competition_text(report),
+        OutputFormat::Md => print_multi_schema_competition_md(report),
     }
     Ok(())
 }
@@ -428,6 +441,25 @@ fn print_coupled_decode_loop_text(report: &CoupledDecodeLoopReport) {
     println!(
         "bad_continuation_reject_rate: {:.3}",
         report.metrics.bad_continuation_reject_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_multi_schema_competition_text(report: &MultiSchemaCompetitionReport) {
+    println!("LLMWave-Big Multi-Schema Competition");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("decode_bridge_state: {}", report.decode_bridge_state);
+    println!("selected_schema_id: {}", report.metrics.selected_schema_id);
+    println!("selected_route: {}", report.selected_route.route);
+    println!("top_margin: {}", report.metrics.top_margin);
+    println!(
+        "route_splice_reject_rate: {:.3}",
+        report.metrics.route_splice_reject_rate
     );
     println!(
         "nonlinear_memory_proven: {}",
@@ -936,6 +968,32 @@ fn print_coupled_decode_loop_md(report: &CoupledDecodeLoopReport) {
     println!(
         "- `{}` rejected: `{}`",
         report.bad_continuation_trap.trap, report.bad_continuation_trap.rejected
+    );
+}
+
+fn print_multi_schema_competition_md(report: &MultiSchemaCompetitionReport) {
+    println!("# LLMWave-Big Multi-Schema Competition");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- selected route: `{}`", report.selected_route.route);
+    println!("- top margin: `{}`", report.metrics.top_margin);
+    println!();
+    println!("## Peaks");
+    println!();
+    for peak in &report.peaks {
+        println!(
+            "- schema `{}` `{}` final `{}` margin `{}`",
+            peak.schema_id, peak.route, peak.final_score, peak.margin
+        );
+    }
+    println!();
+    println!("## Trap");
+    println!();
+    println!(
+        "- `{}` rejected: `{}`",
+        report.route_splice_trap.trap, report.route_splice_trap.rejected
     );
 }
 
