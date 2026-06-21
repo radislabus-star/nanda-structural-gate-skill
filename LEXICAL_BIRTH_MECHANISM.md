@@ -352,6 +352,11 @@ surface path. It reads JSON, validates family records, held-out forms, negative
 controls, and rare copy-span forms outside the Rust constants. Its state
 remains `EXTERNAL_FIXTURE_PASS_NOT_GENERAL_PROOF`.
 
+`surface-raw-induce` is the first raw-form induction layer. It receives a flat
+list of Russian word forms, scans a suffix inventory, groups candidate roots,
+and evaluates held-out forms without giving the inducer explicit family roots.
+Its state remains `RAW_INDUCTION_PASS_NOT_GENERAL_PROOF`.
+
 ## Claim Boundary
 
 Allowed claim:

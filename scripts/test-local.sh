@@ -120,6 +120,10 @@ big_surface_bank_ru_json="$("$llmwave_big" surface-bank-fixture --corpus "$root/
 jq -e '.roadmap_block == "v301-v310" and .verdict == "SURFACE_BANK_FIXTURE_READY_NOT_REAL_TRAINING"' <<<"$big_surface_bank_ru_json" >/dev/null
 jq -e '.corpus.source == "russian_business_surface_fixture_v1" and .corpus.family_count == 6 and .corpus.rare_forms == 3' <<<"$big_surface_bank_ru_json" >/dev/null
 jq -e '.metrics.positive_exact_match_rate == 1 and .metrics.negative_reject_rate == 1 and .metrics.rare_copy_span_rate == 1 and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_bank_ru_json" >/dev/null
+big_surface_raw_ru_json="$("$llmwave_big" surface-raw-induce --corpus "$root/examples/llmwave-big-raw-surface-corpus-ru.json" --format json)"
+jq -e '.roadmap_block == "v311-v320" and .verdict == "SURFACE_RAW_INDUCE_READY_NOT_REAL_TRAINING"' <<<"$big_surface_raw_ru_json" >/dev/null
+jq -e '.corpus.source == "russian_raw_business_surface_fixture_v1" and .metrics.induced_family_count == 6 and .claim_boundary.roots_given_to_inducer == false' <<<"$big_surface_raw_ru_json" >/dev/null
+jq -e '.metrics.expected_root_recall == 1 and .metrics.held_out_exact_match_rate == 1 and .metrics.negative_reject_rate == 1 and .metrics.false_family_rate == 0' <<<"$big_surface_raw_ru_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
@@ -168,6 +172,7 @@ jq empty "$root/examples/triad-packet.canonical-alias-veto.json"
 jq empty "$root/examples/triad-packet.canonical-alias-conflict.json"
 jq empty "$root/examples/llmwave-big-surface-corpus.json"
 jq empty "$root/examples/llmwave-big-surface-corpus-ru.json"
+jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"

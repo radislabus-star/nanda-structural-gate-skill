@@ -12,6 +12,7 @@ use super::surface_bank_fixture::SurfaceBankFixtureReport;
 use super::surface_bank_validate::SurfaceBankValidateReport;
 use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
+use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
@@ -142,6 +143,18 @@ pub(crate) fn print_surface_bank_fixture_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_surface_bank_fixture_text(report),
         OutputFormat::Md => print_surface_bank_fixture_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_surface_raw_induce_report(
+    report: &SurfaceRawInduceReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_surface_raw_induce_text(report),
+        OutputFormat::Md => print_surface_raw_induce_md(report),
     }
     Ok(())
 }
@@ -441,6 +454,35 @@ fn print_surface_bank_fixture_text(report: &SurfaceBankFixtureReport) {
         report.metrics.negative_reject_rate
     );
     println!("total_bank_bytes: {}", report.baselines.total_bank_bytes);
+    println!(
+        "nonlinear_surface_memory_proven: {}",
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+}
+
+fn print_surface_raw_induce_text(report: &SurfaceRawInduceReport) {
+    println!("LLMWave-Big Surface Raw Induce");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("corpus_path: {}", report.corpus_path);
+    println!("raw_forms: {}", report.corpus.raw_forms);
+    println!(
+        "induced_family_count: {}",
+        report.metrics.induced_family_count
+    );
+    println!(
+        "expected_root_recall: {:.3}",
+        report.metrics.expected_root_recall
+    );
+    println!(
+        "held_out_exact_match_rate: {:.3}",
+        report.metrics.held_out_exact_match_rate
+    );
+    println!(
+        "negative_reject_rate: {:.3}",
+        report.metrics.negative_reject_rate
+    );
     println!(
         "nonlinear_surface_memory_proven: {}",
         report.claim_boundary.nonlinear_surface_memory_proven
@@ -934,6 +976,52 @@ fn print_surface_bank_fixture_md(report: &SurfaceBankFixtureReport) {
     println!(
         "- external fixture loaded: `{}`",
         report.claim_boundary.external_fixture_loaded
+    );
+    println!(
+        "- nonlinear surface memory proven: `{}`",
+        report.claim_boundary.nonlinear_surface_memory_proven
+    );
+    println!(
+        "- real corpus trained: `{}`",
+        report.claim_boundary.real_corpus_trained
+    );
+}
+
+fn print_surface_raw_induce_md(report: &SurfaceRawInduceReport) {
+    println!("# LLMWave-Big Surface Raw Induce");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- corpus: `{}`", report.corpus_path);
+    println!("- read as: {}", report.read_as);
+    println!();
+    println!("## Raw Forms");
+    println!();
+    println!("- raw forms: `{}`", report.corpus.raw_forms);
+    println!("- suffix inventory: `{}`", report.corpus.suffix_inventory);
+    println!(
+        "- induced families: `{}`",
+        report.metrics.induced_family_count
+    );
+    println!(
+        "- expected root recall: `{:.3}`",
+        report.metrics.expected_root_recall
+    );
+    println!(
+        "- held-out exact match rate: `{:.3}`",
+        report.metrics.held_out_exact_match_rate
+    );
+    println!(
+        "- negative reject rate: `{:.3}`",
+        report.metrics.negative_reject_rate
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- roots given to inducer: `{}`",
+        report.claim_boundary.roots_given_to_inducer
     );
     println!(
         "- nonlinear surface memory proven: `{}`",

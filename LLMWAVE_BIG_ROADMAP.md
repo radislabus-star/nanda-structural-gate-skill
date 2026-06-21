@@ -1336,6 +1336,31 @@ external JSON IO -> not hot-core execution
 nonlinear_surface_memory_proven remains false
 ```
 
+v311-v320: implemented as nanda-llmwave-big surface-raw-induce
+
+## Phase 15: Raw Surface Induction, v311-v320
+
+Goal:
+
+```text
+raw surface forms
+  -> suffix inventory scan
+  -> root candidate grouping
+  -> accepted induced families
+  -> held-out reconstruction
+  -> negative-control rejection
+  -> rare exact copy-span split
+```
+
+Stop rules:
+
+```text
+expected roots are eval labels, not induction input
+suffix inventory is still supplied -> not open morphology
+raw fixture pass -> not broad training
+nonlinear_surface_memory_proven remains false
+```
+
 ## Summary
 
 ```text

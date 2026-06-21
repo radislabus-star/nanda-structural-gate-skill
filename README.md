@@ -309,6 +309,7 @@ nanda-llmwave-big surface-bank-build --format json
 nanda-llmwave-big surface-bank-validate --format json
 nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus.json --format json
 nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus-ru.json --format json
+nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -597,6 +598,13 @@ The companion Russian fixture,
 `examples/llmwave-big-surface-corpus-ru.json`, checks the same path on Cyrillic
 business forms such as `счет`, `договор`, `декларация`, `сертификат`,
 `платеж`, and `маршрут`, with rare exact forms like `ТР ТС 021/2011`.
+
+`nanda-llmwave-big surface-raw-induce` adds the v311-v320 raw-form induction
+step. It reads `examples/llmwave-big-raw-surface-corpus-ru.json`, where the
+input is a flat list of Russian word forms plus a suffix inventory; roots are
+not provided to the inducer. The current fixture induces six Cyrillic families
+and reconstructs held-out forms, but still reports
+`RAW_INDUCTION_PASS_NOT_GENERAL_PROOF`.
 
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual

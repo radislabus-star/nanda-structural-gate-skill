@@ -52,6 +52,9 @@
 - Add `examples/llmwave-big-surface-corpus-ru.json`, a Russian Cyrillic
   business surface fixture covering счет, договор, декларация, сертификат,
   платеж, маршрут, and rare exact regulatory/customs identifiers.
+- v311-v320 add `nanda-llmwave-big surface-raw-induce`: raw Russian surface
+  forms are grouped into induced families without root/suffix family fields in
+  the input, with held-out, negative-control, and rare copy-span checks.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split

@@ -84,6 +84,7 @@ nanda-llmwave-big surface-bank-build --format json
 nanda-llmwave-big surface-bank-validate --format json
 nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus.json --format json
 nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus-ru.json --format json
+nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
 ```
 
 It promotes suffix families from a small embedded corpus and rejects fragments
@@ -93,6 +94,8 @@ stability checks. The fixture command moves those checks into an external JSON
 corpus file. The Russian fixture adds Cyrillic business forms and exact
 regulatory identifiers, which is the first multilingual pressure test for this
 surface-memory path.
+`surface-raw-induce` removes explicit root fields from the input and asks the
+engine to induce the family roots from raw Cyrillic forms plus suffix inventory.
 
 ### Holographic Reduced Representations
 

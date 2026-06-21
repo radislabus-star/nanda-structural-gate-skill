@@ -21,6 +21,7 @@ pub mod surface_bank_fixture;
 pub mod surface_bank_validate;
 pub mod surface_corpus_eval;
 pub mod surface_production;
+pub mod surface_raw_induce;
 pub mod surface_reconstruct;
 pub mod symbols;
 pub mod write;
@@ -62,6 +63,8 @@ enum LlmwaveBigCommand {
     SurfaceBankValidate(LlmwaveBigSurfaceBankValidateArgs),
     /// Load and validate the v301-v310 external surface corpus fixture.
     SurfaceBankFixture(LlmwaveBigSurfaceBankFixtureArgs),
+    /// Induce v311-v320 surface families from raw forms.
+    SurfaceRawInduce(LlmwaveBigSurfaceRawInduceArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
     /// Print the v206-v218 consolidation/sleep contract.
@@ -135,6 +138,17 @@ struct LlmwaveBigSurfaceBankValidateArgs {
 #[derive(Parser)]
 struct LlmwaveBigSurfaceBankFixtureArgs {
     #[arg(long, default_value = "examples/llmwave-big-surface-corpus.json")]
+    corpus: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSurfaceRawInduceArgs {
+    #[arg(
+        long,
+        default_value = "examples/llmwave-big-raw-surface-corpus-ru.json"
+    )]
     corpus: PathBuf,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
@@ -247,6 +261,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SurfaceBankFixture(args) => {
             let report = surface_bank_fixture::build_surface_bank_fixture_report(&args.corpus)?;
             report::print_surface_bank_fixture_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SurfaceRawInduce(args) => {
+            let report = surface_raw_induce::build_surface_raw_induce_report(&args.corpus)?;
+            report::print_surface_raw_induce_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Write(args) => {
@@ -692,6 +711,38 @@ mod tests {
         assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
         assert!(!report.claim_boundary.free_form_spelling_proven);
         assert!(report.baselines.total_bank_bytes > 0);
+    }
+
+    #[test]
+    fn surface_raw_induce_finds_russian_families_from_forms() {
+        let report = surface_raw_induce::build_surface_raw_induce_report(std::path::Path::new(
+            "examples/llmwave-big-raw-surface-corpus-ru.json",
+        ))
+        .expect("raw induce report");
+        assert_eq!(report.roadmap_block, "v311-v320");
+        assert_eq!(report.verdict, "SURFACE_RAW_INDUCE_READY_NOT_REAL_TRAINING");
+        assert_eq!(report.metrics.induced_family_count, 6);
+        assert_eq!(report.metrics.expected_root_recall, 1.0);
+        assert_eq!(report.metrics.held_out_exact_match_rate, 1.0);
+        assert!(report
+            .induced_families
+            .iter()
+            .any(|family| family.root == "декларац"));
+    }
+
+    #[test]
+    fn surface_raw_induce_keeps_claims_honest() {
+        let report = surface_raw_induce::build_surface_raw_induce_report(std::path::Path::new(
+            "examples/llmwave-big-raw-surface-corpus-ru.json",
+        ))
+        .expect("raw induce report");
+        assert_eq!(report.metrics.negative_reject_rate, 1.0);
+        assert_eq!(report.metrics.false_family_rate, 0.0);
+        assert_eq!(report.metrics.state, "RAW_INDUCTION_PASS_NOT_GENERAL_PROOF");
+        assert!(report.claim_boundary.raw_forms_used);
+        assert!(!report.claim_boundary.roots_given_to_inducer);
+        assert!(!report.claim_boundary.real_corpus_trained);
+        assert!(!report.claim_boundary.nonlinear_surface_memory_proven);
     }
 
     #[test]
