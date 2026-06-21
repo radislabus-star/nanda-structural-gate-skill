@@ -165,6 +165,179 @@ pub(crate) fn report(
     }))
 }
 
+pub(crate) fn repo_report(
+    repo_root: &Path,
+    min_cluster_functions: usize,
+    max_functions: usize,
+) -> Result<Value> {
+    let mut files = vec![];
+    collect_rust_files(repo_root, repo_root, &mut files)?;
+    files.sort_by(|left, right| {
+        risk_file_rank(left)
+            .cmp(&risk_file_rank(right))
+            .then_with(|| left.cmp(right))
+    });
+    files.truncate(12);
+
+    let mut file_reports = vec![];
+    let mut clusters = vec![];
+    let mut next_refactors = vec![];
+    for rel in files {
+        let path = repo_root.join(&rel);
+        let report = match report(&path, min_cluster_functions, max_functions) {
+            Ok(report) => report,
+            Err(_) => continue,
+        };
+        let cluster_count = report["clusters"].as_array().map(Vec::len).unwrap_or(0);
+        let max_risk = max_cluster_risk(&report["clusters"]);
+        if cluster_count > 0 {
+            if let Some(items) = report["clusters"].as_array() {
+                for item in items {
+                    let mut item = item.clone();
+                    item["input_file"] = json!(rel.display().to_string());
+                    clusters.push(item);
+                }
+            }
+            if let Some(items) = report["next_refactors"].as_array() {
+                for item in items {
+                    let mut item = item.clone();
+                    item["input_file"] = json!(rel.display().to_string());
+                    next_refactors.push(item);
+                }
+            }
+        }
+        file_reports.push(json!({
+            "file": rel.display().to_string(),
+            "clusters": cluster_count,
+            "max_risk": max_risk,
+            "rank": risk_file_rank(&rel)
+        }));
+    }
+
+    clusters.sort_by(|left, right| {
+        risk_sort_key(right["risk"].as_str().unwrap_or("LOW"))
+            .cmp(&risk_sort_key(left["risk"].as_str().unwrap_or("LOW")))
+            .then_with(|| {
+                right["line_count"]
+                    .as_u64()
+                    .cmp(&left["line_count"].as_u64())
+            })
+    });
+    next_refactors.truncate(8);
+
+    Ok(json!({
+        "mode": "repo-code-map",
+        "root": repo_root.display().to_string(),
+        "files": file_reports,
+        "clusters": clusters,
+        "next_refactors": next_refactors,
+        "risk_files": repo_risk_files(&clusters),
+        "read_as": "Repo-level code map: inspect risk_files first, then run nanda-map-code on each target file before editing."
+    }))
+}
+
+fn collect_rust_files(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(()),
+    };
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with(".git")
+            || name == "target"
+            || name == "node_modules"
+            || name == ".nanda"
+            || name == "__pycache__"
+        {
+            continue;
+        }
+        if path.is_dir() {
+            collect_rust_files(root, &path, out)?;
+        } else if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+            out.push(path.strip_prefix(root).unwrap_or(&path).to_path_buf());
+        }
+    }
+    Ok(())
+}
+
+fn risk_file_rank(path: &Path) -> usize {
+    let lower = path.to_string_lossy().to_ascii_lowercase();
+    if lower.contains("dogfood") || lower.contains("map_gate") || lower.contains("report") {
+        0
+    } else if lower.ends_with("main.rs") || lower.contains("/bin/") {
+        1
+    } else if lower.contains("commands") || lower.contains("runtime") || lower.contains("daemon") {
+        2
+    } else if lower.contains("model") {
+        3
+    } else {
+        4
+    }
+}
+
+fn max_cluster_risk(clusters: &Value) -> &'static str {
+    let mut max = 0usize;
+    if let Some(items) = clusters.as_array() {
+        for item in items {
+            max = max.max(risk_sort_key(item["risk"].as_str().unwrap_or("LOW")));
+        }
+    }
+    match max {
+        2 => "HIGH",
+        1 => "MEDIUM",
+        _ => "LOW",
+    }
+}
+
+fn risk_sort_key(risk: &str) -> usize {
+    match risk {
+        "HIGH" => 2,
+        "MEDIUM" => 1,
+        _ => 0,
+    }
+}
+
+fn repo_risk_files(clusters: &[Value]) -> Value {
+    let mut files = BTreeMap::<String, (usize, usize)>::new();
+    for cluster in clusters {
+        let file = cluster["input_file"].as_str().unwrap_or("").to_string();
+        if file.is_empty() {
+            continue;
+        }
+        let risk = risk_sort_key(cluster["risk"].as_str().unwrap_or("LOW"));
+        let lines = cluster["line_count"].as_u64().unwrap_or(0) as usize;
+        let entry = files.entry(file).or_insert((0, 0));
+        entry.0 = entry.0.max(risk);
+        entry.1 += lines;
+    }
+    let mut rows = files
+        .into_iter()
+        .map(|(file, (risk, lines))| {
+            json!({
+                "file": file,
+                "max_risk": match risk {
+                    2 => "HIGH",
+                    1 => "MEDIUM",
+                    _ => "LOW"
+                },
+                "cluster_lines": lines
+            })
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| {
+        risk_sort_key(right["max_risk"].as_str().unwrap_or("LOW"))
+            .cmp(&risk_sort_key(left["max_risk"].as_str().unwrap_or("LOW")))
+            .then_with(|| {
+                right["cluster_lines"]
+                    .as_u64()
+                    .cmp(&left["cluster_lines"].as_u64())
+            })
+    });
+    json!(rows)
+}
+
 fn parse_functions(source: &str) -> Vec<FunctionSymbol> {
     let lines = source.lines().collect::<Vec<_>>();
     let mut starts = vec![];

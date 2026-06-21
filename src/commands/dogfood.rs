@@ -26,12 +26,7 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
                 .map(Path::to_path_buf)
                 .unwrap_or_else(|| PathBuf::from("."))
         };
-        let main_rs = repo_root.join("src/main.rs");
-        if main_rs.is_file() {
-            Some(commands::code_map::report(&main_rs, 2, 12)?)
-        } else {
-            None
-        }
+        Some(commands::code_map::repo_report(&repo_root, 2, 12)?)
     } else {
         None
     };
@@ -253,14 +248,41 @@ fn auto_route_for_path(path: &str) -> String {
         "test-flow".to_string()
     } else if lower.contains("install") || lower.contains("deploy") || lower.contains("script") {
         "install-flow".to_string()
+    } else if lower.contains("double_shift")
+        || lower.contains("manual_trigger")
+        || lower.contains("hotkey")
+        || lower.contains("fsm")
+    {
+        "manual-trigger-flow".to_string()
+    } else if lower.contains("ibus")
+        || lower.contains("ime")
+        || lower.contains("preedit")
+        || lower.contains("composition")
+        || lower.contains("candidate")
+    {
+        "ime-display-flow".to_string()
+    } else if lower.contains("space")
+        || lower.contains("autocorrect")
+        || lower.contains("correction")
+        || lower.contains("replacement")
+        || lower.contains("word_buffer")
+    {
+        "space-autocorrect-flow".to_string()
+    } else if lower.contains("nanda")
+        || lower.contains("llmwave")
+        || lower.contains("wave")
+        || lower.contains("l2")
+        || lower.contains("l3")
+    {
+        "nanda-field-flow".to_string()
+    } else if lower.contains("runtime") || lower.contains("daemon") || lower.contains("server") {
+        "runtime-flow".to_string()
     } else if lower.contains("ui") || lower.contains("status") || lower.contains("tray") {
         "ui-status-flow".to_string()
     } else if lower.contains("config") || lower.ends_with(".toml") || lower.ends_with(".json") {
         "config-flow".to_string()
     } else if lower.contains("bin/") || lower.contains("main.") || lower.contains("cli") {
         "cli-flow".to_string()
-    } else if lower.contains("runtime") || lower.contains("daemon") || lower.contains("server") {
-        "runtime-flow".to_string()
     } else {
         "source-flow".to_string()
     }
@@ -270,6 +292,10 @@ fn auto_layer_for_path(path: &str) -> String {
     match auto_route_for_path(path).as_str() {
         "test-flow" => "test",
         "install-flow" => "install",
+        "manual-trigger-flow" => "runtime/input/fsm",
+        "ime-display-flow" => "adapter/display",
+        "space-autocorrect-flow" => "runtime/correction",
+        "nanda-field-flow" => "core/field",
         "ui-status-flow" => "ui",
         "config-flow" => "config",
         "cli-flow" => "adapter",
@@ -386,6 +412,8 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value, failure_field: &Va
         )
     };
 
+    let repair_queue = merge_repair_queues(failure_field, &tree["map"]["repair_queue"]);
+
     json!({
         "action": action,
         "root_verdict": root_verdict,
@@ -400,7 +428,7 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value, failure_field: &Va
         "field_tension": field_tension,
         "owner_conflict": owner_conflict,
         "negative_route_hits": negative_route_hits,
-        "repair_queue": tree["map"]["repair_queue"],
+        "repair_queue": repair_queue,
         "codex_failure_verdict": failure_verdict,
         "codex_failure_reasons": failure_field["reason_codes"],
         "next": next

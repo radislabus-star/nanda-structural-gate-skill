@@ -77,6 +77,95 @@ pub(crate) fn normalize_owner_label(value: &str) -> String {
     out.trim_matches(':').to_string()
 }
 
+pub(crate) fn failure_repair_queue(failure_field: &Value) -> Vec<Value> {
+    let verdict = failure_field["verdict"].as_str().unwrap_or("NOT_ENABLED");
+    if verdict == "NOT_ENABLED" || verdict == "PASS" {
+        return vec![];
+    }
+
+    let target = failure_field["selected_action_id"]
+        .as_str()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| failure_field["symptom"].as_str())
+        .unwrap_or("codex-failure-field");
+    let priority = if verdict == "HARD_STOP" {
+        "critical"
+    } else if verdict == "VETO" {
+        "high"
+    } else {
+        "medium"
+    };
+
+    let mut out = vec![];
+    if verdict == "HARD_STOP" {
+        out.push(json!({
+            "kind": "hard_stop",
+            "priority": priority,
+            "target": target,
+            "reason": "user stop signal is active",
+            "repair": "Stop all tool, code, restart, install, and runtime mutation operations."
+        }));
+        return out;
+    }
+
+    if let Some(diagnostics) = failure_field["diagnostics"].as_array() {
+        for item in diagnostics {
+            out.push(json!({
+                "kind": item["kind"].as_str().unwrap_or("codex_failure_repair"),
+                "priority": priority,
+                "target": target,
+                "reason": item["risk"].as_str().unwrap_or("Codex Failure Field blocked this edit route."),
+                "repair": item["repair"].as_str().unwrap_or("Repair action/evidence/route before editing.")
+            }));
+        }
+    }
+
+    if out.is_empty() {
+        if let Some(reasons) = failure_field["reason_codes"].as_array() {
+            for reason in reasons {
+                let reason = reason.as_str().unwrap_or("codex_failure");
+                out.push(json!({
+                    "kind": reason,
+                    "priority": priority,
+                    "target": target,
+                    "reason": reason,
+                    "repair": repair_for_failure_reason(reason)
+                }));
+            }
+        }
+    }
+    out
+}
+
+pub(crate) fn merge_repair_queues(failure_field: &Value, structural_queue: &Value) -> Value {
+    let mut out = failure_repair_queue(failure_field);
+    if let Some(items) = structural_queue.as_array() {
+        out.extend(items.iter().cloned());
+    }
+    json!(out)
+}
+
+fn repair_for_failure_reason(reason: &str) -> &'static str {
+    match reason {
+        "symptom_action_mismatch" | "runtime_blindness" => {
+            "Run or repair the runtime route first; do not edit unrelated code."
+        }
+        "fake_verification" => {
+            "Replace generic verification with the route-specific runtime/test contract."
+        }
+        "namespace_confusion" => {
+            "Namespace ambiguous entities before accepting or editing this route."
+        }
+        "action_id_missing_or_too_generic" | "action_id_not_found" => {
+            "Choose a concrete action_id with owner, input, output, and allowed routes."
+        }
+        "side_effect_creep" => "Split the patch so only the selected action route is touched.",
+        "evidence_missing" => "Attach concrete evidence before selecting an action.",
+        "unproven_hypothesis" => "Prove the hypothesis with evidence or mark it as WATCH.",
+        _ => "Repair action/evidence/route before editing.",
+    }
+}
+
 pub(crate) fn structural_key(triad: &Triad) -> (String, String, String) {
     (
         norm(&triad.subject),

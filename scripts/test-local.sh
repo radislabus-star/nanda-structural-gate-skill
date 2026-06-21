@@ -1091,8 +1091,9 @@ dogfood_text="$("$dogfood" "$root")"
 grep -q 'ACTION: SAFE_TO_EDIT' <<<"$dogfood_text"
 grep -q 'BRANCHES: 14/14 PASS' <<<"$dogfood_text"
 dogfood_refactor_json="$("$dogfood" "$root" --refactor-plan --format json)"
-jq -e '.refactor_plan.mode == "code-map"' <<<"$dogfood_refactor_json" >/dev/null
+jq -e '.refactor_plan.mode == "repo-code-map"' <<<"$dogfood_refactor_json" >/dev/null
 jq -e '.refactor_plan.clusters | length > 0' <<<"$dogfood_refactor_json" >/dev/null
+jq -e '.refactor_plan.risk_files | length > 0' <<<"$dogfood_refactor_json" >/dev/null
 code_map_json="$("$code_mapper" "$root/src/main.rs" --format json)"
 jq -e '.mode == "code-map"' <<<"$code_map_json" >/dev/null
 jq -e '.clusters | length > 0' <<<"$code_map_json" >/dev/null
@@ -1124,6 +1125,7 @@ if [[ "$failure_runtime_gate_status" -ne 1 ]]; then
   exit 1
 fi
 jq -e '.verdict == "VETO" and .agent_decision.action == "REPAIR_REQUIRED" and .codex_failure_field.verdict == "VETO" and (.agent_decision.codex_failure_reasons | index("symptom_action_mismatch"))' <<<"$failure_runtime_gate_json" >/dev/null
+jq -e '.repair_queue[0].kind == "symptom_action_mismatch" and (.repair_queue[0].repair | contains("runtime route first"))' <<<"$failure_runtime_gate_json" >/dev/null
 set +e
 failure_stop_json="$("$dogfood" "$root/examples/triad-packet.codex-failure-hard-stop.json" --format json)"
 failure_stop_status=$?
@@ -1155,7 +1157,7 @@ auto_dogfood_refactor_json="$("$dogfood" "$tmp_auto_repo" --refactor-plan --form
 auto_dogfood_refactor_status=$?
 set -e
 test "$auto_dogfood_refactor_status" -eq 3
-jq -e '.refactor_plan.mode == "code-map" and (.refactor_plan.input | endswith("src/main.rs"))' <<<"$auto_dogfood_refactor_json" >/dev/null
+jq -e '.refactor_plan.mode == "repo-code-map" and (.refactor_plan.files | length) >= 1 and (.refactor_plan.risk_files | length) >= 0' <<<"$auto_dogfood_refactor_json" >/dev/null
 rm -rf "$tmp_auto_repo"
 tmp_owner_repo="$(mktemp -d)"
 mkdir -p "$tmp_owner_repo/src/bin"
@@ -1169,8 +1171,8 @@ if [[ "$owner_auto_status" -ne 3 ]]; then
   echo "$owner_auto_json" >&2
   exit 1
 fi
-jq -e '.comb_tree.map.route_field.routes["cli-flow"].owners | index("src::bin::lay_daemon")' <<<"$owner_auto_json" >/dev/null
-jq -e '(.comb_tree.map.route_field.routes["cli-flow"].owners | index("src::bin::lay_daemon.rs")) == null' <<<"$owner_auto_json" >/dev/null
+jq -e '.comb_tree.map.route_field.routes["runtime-flow"].owners | index("src::bin::lay_daemon")' <<<"$owner_auto_json" >/dev/null
+jq -e '(.comb_tree.map.route_field.routes["runtime-flow"].owners | index("src::bin::lay_daemon.rs")) == null' <<<"$owner_auto_json" >/dev/null
 rm -rf "$tmp_owner_repo"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null

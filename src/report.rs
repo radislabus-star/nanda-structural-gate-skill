@@ -19,7 +19,7 @@ pub(crate) fn make_report(
     let routes = route_coherence(source, candidates);
     let structural_map = structural_map(source, candidates);
     let codex_failure_field = codex_failure_field(packet, source, candidates);
-    let repair_queue = structural_map["repair_queue"].clone();
+    let repair_queue = merge_repair_queues(&codex_failure_field, &structural_map["repair_queue"]);
     let baselines = baseline_summary(source, candidates);
 
     let has_foreign_pull = structural_map["foreign_pull"]

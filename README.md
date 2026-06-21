@@ -411,7 +411,9 @@ and every linked branch is `PASS`.
 `nanda-map-code` is the refactor planning pass for large Rust files. It clusters
 functions, reports cross-cluster dependencies, suggests target files, and marks
 extraction risk. Use `nanda-dogfood . --refactor-plan` when you want the normal
-structural verdict plus code-boundary recommendations in one packet.
+structural verdict plus repository-level code-boundary recommendations in one
+packet. The dogfood refactor plan scans multiple Rust files and reports
+`risk_files`; it should not treat `src/main.rs` as the whole repository.
 `nanda-report` is agent-first: it returns a JSON decision packet by default.
 Use `--format md` only when a human-facing report is explicitly needed.
 `nanda-map` exposes the core structural map: source/candidate group sizes,
@@ -429,6 +431,10 @@ route-specific verification. It returns `PASS`, `ANALYSIS_INSUFFICIENT`,
 `VETO`, or `HARD_STOP`. Use it to catch symptom/action mismatch, scope creep,
 namespace confusion, runtime blindness, fake verification, unproven
 hypotheses, example-specific patches, and missing checkpoints before editing.
+When enabled, failure-field repairs are placed first in top-level
+`repair_queue`, before generic structural coherence repairs. For example,
+runtime evidence plus a code-edit action should first say to repair the runtime
+route and not edit candidate generation.
 `nanda-hgate` is the hierarchical gate for large packets. It runs one
 global map/check, splits by linked group, runs local gates, and returns
 `STRUCTURALLY_ACCEPTED` only when the global `WATCH` is size-only and every
@@ -1049,7 +1055,8 @@ map the same way: no PASS until the decision owner is singular and adapters,
 UI, tests, helpers, and experiments are back behind their allowed boundaries.
 `structural_energy.field_tension` is the compact numeric signal for how much
 route pressure remains; `repair_queue` is the machine-readable list of minimum
-repairs.
+repairs. Failure-field repairs are failure-first: a blocked action/evidence
+mismatch should appear before lower-priority coherence repair.
 If `codex_failure_field.verdict` is `HARD_STOP`, do no tools, no code, no
 restart. If it is `VETO`, repair the action/evidence/route mismatch first. If
 it is `ANALYSIS_INSUFFICIENT`, choose a more precise `action_id`, add evidence,
