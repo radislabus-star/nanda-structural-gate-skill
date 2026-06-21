@@ -13,6 +13,7 @@ pub mod coupled_decode_loop;
 pub mod dialogue_state;
 pub mod eval;
 pub mod evidence_proof;
+pub mod field_feedback;
 pub mod hrr_binding;
 pub mod l2_l3_coupling;
 pub mod l2_word_field;
@@ -105,6 +106,9 @@ enum LlmwaveBigCommand {
     /// Run the v1281-v1350 constrained answer surface.
     #[command(name = "answer-surface")]
     AnswerSurface(LlmwaveBigAnswerSurfaceArgs),
+    /// Run the v1351-v1420 local field feedback layer.
+    #[command(name = "field-feedback")]
+    FieldFeedback(LlmwaveBigFieldFeedbackArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -263,6 +267,18 @@ struct LlmwaveBigAnswerSurfaceArgs {
     text: String,
     #[arg(long, default_value = "missing")]
     evidence_mode: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigFieldFeedbackArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, default_value = "release-confirmed")]
+    evidence_mode: String,
+    #[arg(long, default_value = "accept")]
+    decision: String,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -474,6 +490,15 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::AnswerSurface(args) => {
             let report = answer_surface::build_answer_surface_report(args.text, args.evidence_mode);
             report::print_answer_surface_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::FieldFeedback(args) => {
+            let report = field_feedback::build_field_feedback_report(
+                args.text,
+                args.evidence_mode,
+                args.decision,
+            );
+            report::print_field_feedback_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -1293,6 +1318,40 @@ mod tests {
         assert_eq!(report.metrics.constrained_template_rate, 1.0);
         assert_eq!(report.metrics.evidence_ref_copy_rate, 1.0);
         assert!(!report.claim_boundary.free_form_generation);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn field_feedback_reinforces_accepted_evidence_bound_surface() {
+        let report = field_feedback::build_field_feedback_report(
+            "Has customs cleared the goods?".to_string(),
+            "release-confirmed".to_string(),
+            "accept".to_string(),
+        );
+        assert_eq!(report.roadmap_block, "v1351-v1420");
+        assert_eq!(report.verdict, "FIELD_FEEDBACK_REINFORCED");
+        assert_eq!(report.feedback_state, "FEEDBACK_ACCEPTED");
+        assert_eq!(report.memory_effect, "reinforce_evidence_bound_route");
+        assert_eq!(report.metrics.accept_reinforcement_rate, 1.0);
+        assert_eq!(
+            core::mem::size_of::<field_feedback::FieldFeedbackRecord32>(),
+            32
+        );
+    }
+
+    #[test]
+    fn field_feedback_rejected_surface_writes_local_anti_memory() {
+        let report = field_feedback::build_field_feedback_report(
+            "Has customs cleared the goods?".to_string(),
+            "release-confirmed".to_string(),
+            "reject".to_string(),
+        );
+        assert_eq!(report.verdict, "FIELD_FEEDBACK_SUPPRESSED");
+        assert_eq!(report.feedback_state, "FEEDBACK_REJECTED");
+        assert_eq!(report.memory_effect, "write_local_anti_memory");
+        assert_eq!(report.metrics.reject_suppression_rate, 1.0);
+        assert!(!report.claim_boundary.persistent_training_done);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }

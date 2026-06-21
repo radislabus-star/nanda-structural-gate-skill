@@ -317,6 +317,7 @@ nanda-llmwave-big lens-scan --text "Has customs cleared the goods?" --format jso
 nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
 nanda-llmwave-big answer-surface --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
+nanda-llmwave-big field-feedback --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -647,6 +648,10 @@ chat readiness or nonlinear-memory proof.
 state through fixed answer templates: missing evidence becomes a `Not proven`
 surface, and bound evidence becomes a local confirmation that copies the evidence
 ref. This is constrained answer text, not free-form generation.
+`nanda-llmwave-big field-feedback` adds v1351-v1420. It converts accept/reject
+decisions over constrained answer surfaces into fixed `FieldFeedbackRecord32`
+records: accept reinforces the evidence-bound route, reject writes local
+anti-memory. This is local feedback, not persistent training.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

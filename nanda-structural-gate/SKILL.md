@@ -173,6 +173,7 @@ scripts/nanda-llmwave-big lens-scan --text "Has customs cleared the goods?" --fo
 scripts/nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
 scripts/nanda-llmwave-big answer-surface --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
+scripts/nanda-llmwave-big field-feedback --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -523,6 +524,9 @@ not broad chat readiness or nonlinear-memory proof.
 v1281-v1350 add `nanda-llmwave-big answer-surface`: evidence proof materializes
 only constrained templates. Treat `ANSWER_SURFACE_LOCAL_CANDIDATE` as local
 evidence-bound text, not free-form generation.
+v1351-v1420 add `nanda-llmwave-big field-feedback`: accept/reject decisions over
+constrained answer surfaces emit local reinforcement or anti-memory records.
+Treat this as local feedback, not persistent model training.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

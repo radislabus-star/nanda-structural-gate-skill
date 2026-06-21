@@ -74,6 +74,9 @@
 - v1281-v1350 add `nanda-llmwave-big answer-surface`: evidence proof now
   materializes constrained answer templates with fixed `AnswerSurfaceRecord32`
   records, preserving not-proven behavior and avoiding free-form generation.
+- v1351-v1420 add `nanda-llmwave-big field-feedback`: constrained answer
+  surfaces can emit fixed `FieldFeedbackRecord32` reinforcement or local
+  anti-memory records without claiming persistent training.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

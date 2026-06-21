@@ -8,6 +8,7 @@ use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::dialogue_state::DialogueStateReport;
 use super::eval::BigEvalReport;
 use super::evidence_proof::EvidenceProofReport;
+use super::field_feedback::FieldFeedbackReport;
 use super::hrr_binding::HrrBindingReport;
 use super::l2_l3_coupling::L2L3CouplingReport;
 use super::l2_word_field::L2WordFieldReport;
@@ -264,6 +265,18 @@ pub(crate) fn print_answer_surface_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_answer_surface_text(report),
         OutputFormat::Md => print_answer_surface_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_field_feedback_report(
+    report: &FieldFeedbackReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_field_feedback_text(report),
+        OutputFormat::Md => print_field_feedback_md(report),
     }
     Ok(())
 }
@@ -2125,6 +2138,47 @@ fn print_answer_surface_md(report: &AnswerSurfaceReport) {
     println!(
         "- local answer surface: `{}`",
         report.claim_boundary.local_answer_surface
+    );
+    println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_field_feedback_text(report: &FieldFeedbackReport) {
+    println!("LLMWave-Big Field Feedback");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("decision: {}", report.decision);
+    println!("feedback_state: {}", report.feedback_state);
+    println!("memory_effect: {}", report.memory_effect);
+    println!(
+        "persistent_training_done: {}",
+        report.claim_boundary.persistent_training_done
+    );
+}
+
+fn print_field_feedback_md(report: &FieldFeedbackReport) {
+    println!("# LLMWave-Big Field Feedback");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- decision: `{}`", report.decision);
+    println!("- feedback state: `{}`", report.feedback_state);
+    println!("- memory effect: `{}`", report.memory_effect);
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- local memory update: `{}`",
+        report.claim_boundary.local_memory_update
+    );
+    println!(
+        "- persistent training done: `{}`",
+        report.claim_boundary.persistent_training_done
     );
     println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
     println!(

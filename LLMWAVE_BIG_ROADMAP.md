@@ -1245,6 +1245,39 @@ chat_ready remains false
 nonlinear_memory_proven remains false
 ```
 
+v1351-v1420: implemented as nanda-llmwave-big field-feedback
+
+## Phase 35: Local Field Feedback, v1351-v1420
+
+Goal:
+
+```text
+constrained answer surface
+  -> accept/reject/watch decision
+  -> reinforcement record for accepted evidence-bound route
+  -> local anti-memory record for rejected surface
+  -> no persistent training claim
+```
+
+Current controls:
+
+```text
+accept release-confirmed answer -> reinforce_evidence_bound_route
+reject release-confirmed answer -> write_local_anti_memory
+watch or unsupported state      -> hold_for_review
+```
+
+Stop rules:
+
+```text
+local feedback -> not persistent training
+FieldFeedbackRecord32 fixed record -> packed-boundary proof, not speed proof
+persistent_training_done remains false
+full_field_mature remains false
+chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

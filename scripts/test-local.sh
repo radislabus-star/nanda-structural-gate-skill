@@ -178,6 +178,14 @@ big_answer_bound_json="$("$llmwave_big" answer-surface --text "Has customs clear
 jq -e '.roadmap_block == "v1281-v1350" and .verdict == "ANSWER_SURFACE_LOCAL_CANDIDATE"' <<<"$big_answer_bound_json" >/dev/null
 jq -e '.answer_state == "LOCAL_EVIDENCE_BOUND_ANSWER" and (.answer_text | contains("evidence ref 7001"))' <<<"$big_answer_bound_json" >/dev/null
 jq -e '.metrics.constrained_template_rate == 1 and .metrics.unsupported_confirmation_rate == 0 and .claim_boundary.free_form_generation == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_answer_bound_json" >/dev/null
+big_feedback_accept_json="$("$llmwave_big" field-feedback --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json)"
+jq -e '.roadmap_block == "v1351-v1420" and .verdict == "FIELD_FEEDBACK_REINFORCED"' <<<"$big_feedback_accept_json" >/dev/null
+jq -e '.feedback_state == "FEEDBACK_ACCEPTED" and .memory_effect == "reinforce_evidence_bound_route"' <<<"$big_feedback_accept_json" >/dev/null
+jq -e '.claim_boundary.fixed_field_feedback_records == true and .claim_boundary.local_memory_update == true and .claim_boundary.persistent_training_done == false' <<<"$big_feedback_accept_json" >/dev/null
+big_feedback_reject_json="$("$llmwave_big" field-feedback --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision reject --format json)"
+jq -e '.roadmap_block == "v1351-v1420" and .verdict == "FIELD_FEEDBACK_SUPPRESSED"' <<<"$big_feedback_reject_json" >/dev/null
+jq -e '.feedback_state == "FEEDBACK_REJECTED" and .memory_effect == "write_local_anti_memory"' <<<"$big_feedback_reject_json" >/dev/null
+jq -e '.metrics.reject_suppression_rate == 1 and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_feedback_reject_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null
