@@ -315,6 +315,16 @@ jq -e '.version == "llmwave-big-v1906-hot-learning-memory" and .verdict == "HOT_
 big_ask_hot_after_learn_json="$("$llmwave_big" ask-hot --hot-pack "$tmp_big_train/artifact.hot.bin" --artifact "$tmp_big_train/artifact.json" --memory "$tmp_big_train/hot-memory.json" --text "supplier requires customs" --top-k 3 --format json)"
 jq -e '.version == "llmwave-big-v1905-hot-ask" and .verdict == "HOT_FIELD_ANSWER_READY_NOT_GENERAL_LLM" and .answer.safe_to_answer == true and .learning.memory_loaded == true and .learning.learned_records == 1' <<<"$big_ask_hot_after_learn_json" >/dev/null
 jq -e '.field.top_hot_schema_peaks[0].learned == true and .field.top_hot_schema_peaks[0].source == "hot_memory:user-batch" and .field.top_hot_schema_peaks[0].subject == "supplier" and .field.top_hot_schema_peaks[0].object == "customs"' <<<"$big_ask_hot_after_learn_json" >/dev/null
+cat > "$tmp_big_train/chat.script" <<'EOF'
+ask broker requires invoice
+learn accept: broker | requires | invoice
+ask broker requires invoice
+exit
+EOF
+big_chat_hot_json="$("$llmwave_big" chat-hot --hot-pack "$tmp_big_train/artifact.hot.bin" --artifact "$tmp_big_train/artifact.json" --memory "$tmp_big_train/chat-memory.json" --script "$tmp_big_train/chat.script" --top-k 3 --format json)"
+jq -e '.version == "llmwave-big-v1907-hot-chat" and .verdict == "HOT_CHAT_SESSION_READY_NOT_GENERAL_LLM" and (.turns | length) == 4' <<<"$big_chat_hot_json" >/dev/null
+jq -e '.turns[0].kind == "ask" and .turns[0].safe_to_answer == false and .turns[1].kind == "learn" and .turns[1].state == "HOT_MEMORY_UPDATED" and .turns[2].kind == "ask" and .turns[2].safe_to_answer == true' <<<"$big_chat_hot_json" >/dev/null
+test -s "$tmp_big_train/chat-memory.json"
 rm -rf "$tmp_big_train"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null

@@ -818,6 +818,12 @@ learned records on the next field pass, so accepted corrections can become
 learned schema peaks without hand-entering one fact at a time. Treat
 `HOT_LEARNING_MEMORY_WRITTEN_NOT_GRADIENT_TRAINING` as real persistent feedback
 learning for the hot retrieval layer, not transformer-style training.
+`nanda-llmwave-big chat-hot` is the no-hand-JSON shell over `ask-hot` and
+`learn-hot`. Use `ask <text>` for queries and
+`learn accept: subject | relation | object` or
+`learn reject: subject | relation | object` for corrections. In scripted mode
+with `--script`, it is regression-testable; in stdin mode, it is the first
+usable conversation loop over the hot memory.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

@@ -577,6 +577,10 @@ answer, `OBJECT_FOREIGN_PULL` is review-only, and `REVERSED` is a hard stop.
 persistent hot-memory overlay. Use `ask-hot --memory memory.json` to verify
 that learned records change the next hot field pass. Treat this as hot
 retrieval feedback learning, not gradient training or broad chat readiness.
+`nanda-llmwave-big chat-hot` is the operator-friendly shell over hot retrieval
+and hot learning. It accepts `ask <text>`, `learn accept: subject | relation |
+object`, and `learn reject: subject | relation | object`; use `--script` for
+repeatable tests and stdin for interactive use.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

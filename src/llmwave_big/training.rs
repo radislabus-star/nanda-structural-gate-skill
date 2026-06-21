@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
-use std::io::{BufWriter, Cursor, Read, Write};
+use std::io::{self, BufRead, BufWriter, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
@@ -392,6 +392,33 @@ pub(crate) struct HotLearnReport {
     pub out: String,
     pub memory: HotLearnMemorySummary,
     pub claim_boundary: HotLearnClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotChatReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub turns: Vec<HotChatTurn>,
+    pub memory_path: String,
+    pub claim_boundary: HotChatClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotChatTurn {
+    pub input: String,
+    pub kind: &'static str,
+    pub state: String,
+    pub safe_to_answer: bool,
+    pub text: String,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotChatClaimBoundary {
+    pub interactive_shell: bool,
+    pub batch_script_supported: bool,
+    pub corrections_write_hot_memory: bool,
+    pub broad_chat_llm_ready: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -868,7 +895,9 @@ pub(crate) fn ask_hot_pack(
     let margin = round4(top_score - second_score);
     let focused_schema = schema_peaks.first().is_some_and(|peak| {
         peak.subject_matched
-            && peak.matched_terms >= 2
+            && peak.relation_matched
+            && peak.object_matched
+            && peak.matched_terms >= 3
             && peak.score >= 2.0
             && margin >= 0.1
             && !peak.polarization.hard_stop
@@ -1033,6 +1062,87 @@ pub(crate) fn learn_hot_memory(feedback_path: &Path, out: &Path) -> Result<HotLe
             persistent_hot_memory_written: true,
             can_change_next_hot_ask: !records.is_empty(),
             online_gradient_training: false,
+            broad_chat_llm_ready: false,
+        },
+    })
+}
+
+pub(crate) fn chat_hot_session(
+    hot_pack_path: &Path,
+    artifact_path: &Path,
+    memory_path: &Path,
+    script_path: Option<&Path>,
+    top_k: usize,
+) -> Result<HotChatReport> {
+    if let Some(parent) = memory_path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("create hot chat memory directory {}", parent.display()))?;
+    }
+    let mut turns = Vec::new();
+    let lines = read_chat_lines(script_path)?;
+    let interactive = script_path.is_none();
+    if interactive {
+        println!("LLMWave-Big chat-hot");
+        println!("commands: ask <text> | learn accept: s | r | o | learn reject: s | r | o | exit");
+    }
+    for line in lines {
+        let input = line.trim();
+        if input.is_empty() {
+            continue;
+        }
+        if matches!(input, "exit" | "quit" | ":q") {
+            turns.push(HotChatTurn {
+                input: input.to_string(),
+                kind: "control",
+                state: "EXIT".to_string(),
+                safe_to_answer: false,
+                text: "chat-hot session closed".to_string(),
+            });
+            break;
+        }
+        if let Some(event) = parse_chat_learning_event(input)? {
+            append_hot_feedback_memory(memory_path, event)?;
+            let text = format!("learned memory event written to {}", memory_path.display());
+            if interactive {
+                println!("model> {text}");
+            }
+            turns.push(HotChatTurn {
+                input: input.to_string(),
+                kind: "learn",
+                state: "HOT_MEMORY_UPDATED".to_string(),
+                safe_to_answer: false,
+                text,
+            });
+            continue;
+        }
+        let query = input.strip_prefix("ask ").unwrap_or(input).to_string();
+        let memory = memory_path.exists().then_some(memory_path);
+        let report = ask_hot_pack(hot_pack_path, artifact_path, query.clone(), top_k, memory)?;
+        if interactive {
+            println!("model> {}", report.answer.text);
+            println!(
+                "state={} safe={} memory={}",
+                report.field.state, report.answer.safe_to_answer, report.learning.memory_loaded
+            );
+        }
+        turns.push(HotChatTurn {
+            input: input.to_string(),
+            kind: "ask",
+            state: report.field.state.to_string(),
+            safe_to_answer: report.answer.safe_to_answer,
+            text: report.answer.text,
+        });
+    }
+    Ok(HotChatReport {
+        mode: "llmwave-big-chat-hot",
+        version: "llmwave-big-v1907-hot-chat",
+        verdict: "HOT_CHAT_SESSION_READY_NOT_GENERAL_LLM",
+        turns,
+        memory_path: memory_path.display().to_string(),
+        claim_boundary: HotChatClaimBoundary {
+            interactive_shell: true,
+            batch_script_supported: true,
+            corrections_write_hot_memory: true,
             broad_chat_llm_ready: false,
         },
     })
@@ -1679,6 +1789,88 @@ fn hot_learning_summary(
         accepted_records,
         rejected_records,
     }
+}
+
+fn read_chat_lines(script_path: Option<&Path>) -> Result<Vec<String>> {
+    if let Some(path) = script_path {
+        let raw = fs::read_to_string(path)
+            .with_context(|| format!("read chat script {}", path.display()))?;
+        return Ok(raw.lines().map(ToOwned::to_owned).collect());
+    }
+    let stdin = io::stdin();
+    stdin
+        .lock()
+        .lines()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .context("read chat-hot stdin")
+}
+
+fn parse_chat_learning_event(input: &str) -> Result<Option<HotFeedbackEvent>> {
+    let Some(rest) = input.strip_prefix("learn ") else {
+        return Ok(None);
+    };
+    let (decision, payload) = rest.split_once(':').with_context(|| {
+        "learn command must look like: learn accept: subject | relation | object"
+    })?;
+    let parts = payload
+        .split('|')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    if parts.len() != 3 {
+        bail!("learn command must provide exactly subject | relation | object");
+    }
+    Ok(Some(HotFeedbackEvent {
+        decision: normalize_decision(decision)?,
+        subject: parts[0].to_string(),
+        relation: parts[1].to_string(),
+        object: parts[2].to_string(),
+        authority: 1.0,
+        source: "chat-hot".to_string(),
+    }))
+}
+
+fn append_hot_feedback_memory(memory_path: &Path, event: HotFeedbackEvent) -> Result<()> {
+    let mut records = if memory_path.exists() {
+        load_hot_memory(memory_path)?.records
+    } else {
+        Vec::new()
+    };
+    let decision = normalize_decision(&event.decision)?;
+    let subject = normalize_feedback_text(&event.subject);
+    let relation = normalize_feedback_text(&event.relation);
+    let object = normalize_feedback_text(&event.object);
+    if let Some(record) = records.iter_mut().find(|record| {
+        record.subject == subject
+            && record.relation == relation
+            && record.object == object
+            && record.decision == decision
+    }) {
+        record.authority = record.authority.max(event.authority.clamp(0.0, 1.0));
+        if decision == "accept" {
+            record.accepted_count += 1;
+        } else {
+            record.rejected_count += 1;
+        }
+    } else {
+        records.push(HotMemoryRecord {
+            subject,
+            relation,
+            object,
+            decision: decision.clone(),
+            authority: event.authority.clamp(0.0, 1.0),
+            accepted_count: u32::from(decision == "accept"),
+            rejected_count: u32::from(decision == "reject"),
+            source: event.source,
+        });
+    }
+    let memory = HotMemoryFile {
+        mode: "llmwave-big-hot-memory".to_string(),
+        version: "llmwave-big-v1906-hot-learning-memory".to_string(),
+        records,
+    };
+    fs::write(memory_path, serde_json::to_string_pretty(&memory)? + "\n")
+        .with_context(|| format!("write hot memory {}", memory_path.display()))
 }
 
 fn load_hot_memory(path: &Path) -> Result<HotMemoryFile> {

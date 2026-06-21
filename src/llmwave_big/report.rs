@@ -37,8 +37,8 @@ use super::surface_production::SurfaceProductionReport;
 use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
 use super::training::{
-    ArtifactAskEvalReport, ArtifactAskReport, HotAskReport, HotLearnReport, HotPackReport,
-    TrainingCompileReport,
+    ArtifactAskEvalReport, ArtifactAskReport, HotAskReport, HotChatReport, HotLearnReport,
+    HotPackReport, TrainingCompileReport,
 };
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
@@ -610,6 +610,42 @@ pub(crate) fn print_hot_learn_report(report: &HotLearnReport, format: &OutputFor
         OutputFormat::Md => print_hot_learn_md(report),
     }
     Ok(())
+}
+
+pub(crate) fn print_hot_chat_report(report: &HotChatReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_hot_chat_text(report),
+        OutputFormat::Md => print_hot_chat_md(report),
+    }
+    Ok(())
+}
+
+fn print_hot_chat_text(report: &HotChatReport) {
+    println!("LLMWave-Big Hot Chat");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("memory: {}", report.memory_path);
+    for turn in &report.turns {
+        println!(
+            "[{}] state={} safe={} input={} answer={}",
+            turn.kind, turn.state, turn.safe_to_answer, turn.input, turn.text
+        );
+    }
+}
+
+fn print_hot_chat_md(report: &HotChatReport) {
+    println!("# LLMWave-Big Hot Chat");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- memory: `{}`", report.memory_path);
+    for turn in &report.turns {
+        println!(
+            "- `{}` `{}` safe=`{}`: {}",
+            turn.kind, turn.state, turn.safe_to_answer, turn.text
+        );
+    }
 }
 
 fn print_hot_learn_text(report: &HotLearnReport) {

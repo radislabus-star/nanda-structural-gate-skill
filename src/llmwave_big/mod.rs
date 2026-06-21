@@ -175,6 +175,9 @@ enum LlmwaveBigCommand {
     /// Convert batch feedback into persistent hot-memory overlay records.
     #[command(name = "learn-hot")]
     LearnHot(LlmwaveBigLearnHotArgs),
+    /// Interactive/scripted shell over ask-hot plus learn-hot memory.
+    #[command(name = "chat-hot")]
+    ChatHot(LlmwaveBigChatHotArgs),
 }
 
 #[derive(Parser)]
@@ -535,6 +538,22 @@ struct LlmwaveBigLearnHotArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigChatHotArgs {
+    #[arg(long)]
+    hot_pack: PathBuf,
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long)]
+    memory: PathBuf,
+    #[arg(long)]
+    script: Option<PathBuf>,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigAskArgs {
     #[arg(long)]
     artifact: PathBuf,
@@ -849,6 +868,17 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::LearnHot(args) => {
             let report = training::learn_hot_memory(&args.feedback, &args.out)?;
             report::print_hot_learn_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatHot(args) => {
+            let report = training::chat_hot_session(
+                &args.hot_pack,
+                &args.artifact,
+                &args.memory,
+                args.script.as_deref(),
+                args.top_k,
+            )?;
+            report::print_hot_chat_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
