@@ -356,6 +356,9 @@ remains `EXTERNAL_FIXTURE_PASS_NOT_GENERAL_PROOF`.
 list of Russian word forms, scans a suffix inventory, groups candidate roots,
 and evaluates held-out forms without giving the inducer explicit family roots.
 Its state remains `RAW_INDUCTION_PASS_NOT_GENERAL_PROOF`.
+The noisy raw fixture adds near-root collisions and reports
+`NOISY_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF` only when those collision roots are
+rejected instead of promoted.
 
 ## Claim Boundary
 

@@ -166,6 +166,7 @@ scripts/nanda-llmwave-big surface-bank-validate --format json
 scripts/nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus.json --format json
 scripts/nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus-ru.json --format json
 scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
+scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -468,6 +469,8 @@ path on Russian Cyrillic business forms and exact regulatory identifiers.
 `nanda-llmwave-big surface-raw-induce`: a raw Russian surface-form induction
 step. It groups candidate roots from a flat word-form list plus suffix
 inventory; expected roots are eval labels, not induction input.
+Use the noisy raw fixture to verify near-root collisions stay rejected until
+they have enough independent form evidence.
 v191-v205 add `nanda-llmwave-big write` and
 `nanda-bench6m --mode write-density`: write decomposition, reconstructability
 score, residual V1, centroid update, anti-residual, schema promotion/split

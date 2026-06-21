@@ -1361,6 +1361,29 @@ raw fixture pass -> not broad training
 nonlinear_surface_memory_proven remains false
 ```
 
+v321-v330: implemented as noisy nanda-llmwave-big surface-raw-induce fixture
+
+## Phase 16: Noisy Raw Surface Induction, v321-v330
+
+Goal:
+
+```text
+raw surface forms + near-root collisions
+  -> induce stable expected roots
+  -> reject under-supported collision roots
+  -> preserve held-out reconstruction
+  -> keep rare exact identifiers on copy-span path
+```
+
+Stop rules:
+
+```text
+near-root rejected -> safety signal, not language mastery
+noise_reject_rate must be reported
+false_family_rate must stay zero on the fixture
+nonlinear_surface_memory_proven remains false
+```
+
 ## Summary
 
 ```text

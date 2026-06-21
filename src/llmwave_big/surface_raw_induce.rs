@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use super::surface_corpus_eval::{SurfaceBinding8, SurfaceFamily32};
 use super::surface_production::{EvidenceCopySpan24, SurfaceAtom16};
 
-pub(crate) const SURFACE_RAW_INDUCE_VERSION: &str = "llmwave-big-v320-surface-raw-induce";
+pub(crate) const SURFACE_RAW_INDUCE_VERSION: &str = "llmwave-big-v330-surface-raw-induce";
 
 #[derive(Serialize, Clone)]
 pub(crate) struct SurfaceRawInduceReport {
@@ -22,6 +22,7 @@ pub(crate) struct SurfaceRawInduceReport {
     pub corpus_path: String,
     pub corpus: SurfaceRawCorpusSummary,
     pub induced_families: Vec<InducedSurfaceFamily>,
+    pub rejected_collision_roots: Vec<RejectedCollisionRoot>,
     pub rare_copy_spans: Vec<RawRareSurface>,
     pub held_out: Vec<RawHeldOutEval>,
     pub negative_controls: Vec<RawNegativeEval>,
@@ -40,6 +41,7 @@ pub(crate) struct SurfaceRawCorpusSummary {
     pub held_out_forms: usize,
     pub negative_controls: usize,
     pub expected_roots: usize,
+    pub noise_roots: usize,
     pub min_family_forms: usize,
     pub min_root_chars: usize,
 }
@@ -58,6 +60,14 @@ pub(crate) struct InducedSurfaceFamily {
 pub(crate) struct RawRareSurface {
     pub surface: String,
     pub path: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct RejectedCollisionRoot {
+    pub root: String,
+    pub observed_forms: Vec<String>,
+    pub form_count: usize,
+    pub reason: &'static str,
 }
 
 #[derive(Serialize, Clone)]
@@ -85,6 +95,7 @@ pub(crate) struct SurfaceRawInduceMetrics {
     pub held_out_exact_match_rate: f32,
     pub negative_reject_rate: f32,
     pub rare_copy_span_rate: f32,
+    pub noise_reject_rate: f32,
     pub false_family_rate: f32,
     pub state: &'static str,
 }
@@ -123,6 +134,8 @@ struct RawSurfaceFixture {
     held_out: Vec<RawHeldOut>,
     negative: Vec<RawNegative>,
     expected_roots: Vec<String>,
+    #[serde(default)]
+    noise_roots: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -138,6 +151,7 @@ struct RawNegative {
     surface: String,
 }
 
+#[derive(Clone)]
 struct CandidateFamily {
     root: String,
     forms: BTreeSet<String>,
@@ -152,7 +166,10 @@ pub(crate) fn build_surface_raw_induce_report(
     let fixture: RawSurfaceFixture = serde_json::from_str(&raw)
         .with_context(|| format!("parse raw surface corpus {}", corpus_path.display()))?;
 
-    let induced_families = induce_families(&fixture);
+    let candidates = collect_candidates(&fixture);
+    let induced_families = induce_families(&fixture, &candidates);
+    let rejected_collision_roots =
+        build_rejected_collision_roots(&fixture, &candidates, &induced_families);
     let rare_copy_spans = build_rare_copy_spans(&fixture, &induced_families);
     let held_out = eval_held_out(&fixture, &induced_families);
     let negative_controls = eval_negative(&fixture, &induced_families);
@@ -168,7 +185,11 @@ pub(crate) fn build_surface_raw_induce_report(
     Ok(SurfaceRawInduceReport {
         mode: "llmwave-big-surface-raw-induce",
         version: SURFACE_RAW_INDUCE_VERSION,
-        roadmap_block: "v311-v320",
+        roadmap_block: if fixture.noise_roots.is_empty() {
+            "v311-v320"
+        } else {
+            "v321-v330"
+        },
         verdict: "SURFACE_RAW_INDUCE_READY_NOT_REAL_TRAINING",
         read_as:
             "raw surface forms are grouped into candidate families without root/suffix fields in the input",
@@ -181,10 +202,12 @@ pub(crate) fn build_surface_raw_induce_report(
             held_out_forms: fixture.held_out.len(),
             negative_controls: fixture.negative.len(),
             expected_roots: fixture.expected_roots.len(),
+            noise_roots: fixture.noise_roots.len(),
             min_family_forms: fixture.min_family_forms,
             min_root_chars: fixture.min_root_chars,
         },
         induced_families,
+        rejected_collision_roots,
         rare_copy_spans,
         held_out,
         negative_controls,
@@ -208,6 +231,7 @@ pub(crate) fn build_surface_raw_induce_report(
         next_engine_steps: vec![
             "derive suffix inventory from corpus statistics",
             "add noisy unrelated forms and near-root collisions",
+            "promote rejected collision roots only after more evidence arrives",
             "scale raw induction to hundreds and thousands of forms",
             "feed induced families into L2 prefix candidate cache",
             "compare induced-bank answers against direct lexical lookup",
@@ -215,7 +239,7 @@ pub(crate) fn build_surface_raw_induce_report(
     })
 }
 
-fn induce_families(fixture: &RawSurfaceFixture) -> Vec<InducedSurfaceFamily> {
+fn collect_candidates(fixture: &RawSurfaceFixture) -> BTreeMap<String, CandidateFamily> {
     let mut candidates = BTreeMap::<String, CandidateFamily>::new();
     for form in &fixture.raw_forms {
         for suffix in &fixture.suffix_inventory {
@@ -235,10 +259,17 @@ fn induce_families(fixture: &RawSurfaceFixture) -> Vec<InducedSurfaceFamily> {
             }
         }
     }
-
     candidates
-        .into_values()
+}
+
+fn induce_families(
+    fixture: &RawSurfaceFixture,
+    candidates: &BTreeMap<String, CandidateFamily>,
+) -> Vec<InducedSurfaceFamily> {
+    candidates
+        .values()
         .filter(|candidate| candidate.forms.len() >= fixture.min_family_forms)
+        .cloned()
         .enumerate()
         .map(|(index, candidate)| {
             let family_id = 74_001 + index as u32;
@@ -262,6 +293,40 @@ fn induce_families(fixture: &RawSurfaceFixture) -> Vec<InducedSurfaceFamily> {
                 },
                 forms,
                 suffixes,
+            }
+        })
+        .collect()
+}
+
+fn build_rejected_collision_roots(
+    fixture: &RawSurfaceFixture,
+    candidates: &BTreeMap<String, CandidateFamily>,
+    induced_families: &[InducedSurfaceFamily],
+) -> Vec<RejectedCollisionRoot> {
+    let induced_roots = induced_families
+        .iter()
+        .map(|family| family.root.as_str())
+        .collect::<BTreeSet<_>>();
+    fixture
+        .noise_roots
+        .iter()
+        .filter(|root| !induced_roots.contains(root.as_str()))
+        .map(|root| {
+            if let Some(candidate) = candidates.get(root) {
+                let observed_forms = candidate.forms.iter().cloned().collect::<Vec<_>>();
+                RejectedCollisionRoot {
+                    root: root.clone(),
+                    form_count: observed_forms.len(),
+                    observed_forms,
+                    reason: "below_min_family_forms_or_not_supported_by_suffix_inventory",
+                }
+            } else {
+                RejectedCollisionRoot {
+                    root: root.clone(),
+                    observed_forms: Vec::new(),
+                    form_count: 0,
+                    reason: "no_supported_candidate_forms",
+                }
             }
         })
         .collect()
@@ -361,6 +426,11 @@ fn build_metrics(
         .iter()
         .filter(|item| !item.accepted)
         .count();
+    let noise_rejects = fixture
+        .noise_roots
+        .iter()
+        .filter(|root| !induced_roots.contains(root.as_str()))
+        .count();
 
     SurfaceRawInduceMetrics {
         induced_family_count: families.len(),
@@ -368,11 +438,16 @@ fn build_metrics(
         held_out_exact_match_rate: ratio(held_out_hits, held_out.len()),
         negative_reject_rate: ratio(negative_rejects, negative_controls.len()),
         rare_copy_span_rate: ratio(rare_copy_spans.len(), rare_copy_spans.len()),
+        noise_reject_rate: ratio(noise_rejects, fixture.noise_roots.len()),
         false_family_rate: ratio(
             negative_controls.len().saturating_sub(negative_rejects),
             negative_controls.len(),
         ),
-        state: "RAW_INDUCTION_PASS_NOT_GENERAL_PROOF",
+        state: if fixture.noise_roots.is_empty() {
+            "RAW_INDUCTION_PASS_NOT_GENERAL_PROOF"
+        } else {
+            "NOISY_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF"
+        },
     }
 }
 

@@ -55,6 +55,9 @@
 - v311-v320 add `nanda-llmwave-big surface-raw-induce`: raw Russian surface
   forms are grouped into induced families without root/suffix family fields in
   the input, with held-out, negative-control, and rare copy-span checks.
+- v321-v330 add noisy raw induction fixture coverage: near-root Cyrillic
+  collisions such as счетчик, маршрутизатор, and сертификатор must remain
+  rejected collision roots instead of promoted families.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split

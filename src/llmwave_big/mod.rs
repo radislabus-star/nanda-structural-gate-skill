@@ -746,6 +746,35 @@ mod tests {
     }
 
     #[test]
+    fn surface_raw_induce_rejects_near_root_noise() {
+        let report = surface_raw_induce::build_surface_raw_induce_report(std::path::Path::new(
+            "examples/llmwave-big-raw-surface-corpus-ru-noisy.json",
+        ))
+        .expect("noisy raw induce report");
+        assert_eq!(report.roadmap_block, "v321-v330");
+        assert_eq!(report.metrics.induced_family_count, 6);
+        assert_eq!(report.metrics.expected_root_recall, 1.0);
+        assert_eq!(report.metrics.noise_reject_rate, 1.0);
+        assert_eq!(report.metrics.false_family_rate, 0.0);
+        assert_eq!(
+            report.metrics.state,
+            "NOISY_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF"
+        );
+        assert!(report
+            .rejected_collision_roots
+            .iter()
+            .any(|root| root.root == "счетчик"));
+        assert!(report
+            .rejected_collision_roots
+            .iter()
+            .any(|root| root.root == "договоренност"));
+        assert!(!report
+            .induced_families
+            .iter()
+            .any(|family| family.root == "счетчик"));
+    }
+
+    #[test]
     fn write_report_keeps_nonlinear_claim_unproven() {
         let report = write::build_write_report();
         assert_eq!(report.roadmap_block, "v191-v205");

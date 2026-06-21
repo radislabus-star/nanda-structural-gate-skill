@@ -124,6 +124,10 @@ big_surface_raw_ru_json="$("$llmwave_big" surface-raw-induce --corpus "$root/exa
 jq -e '.roadmap_block == "v311-v320" and .verdict == "SURFACE_RAW_INDUCE_READY_NOT_REAL_TRAINING"' <<<"$big_surface_raw_ru_json" >/dev/null
 jq -e '.corpus.source == "russian_raw_business_surface_fixture_v1" and .metrics.induced_family_count == 6 and .claim_boundary.roots_given_to_inducer == false' <<<"$big_surface_raw_ru_json" >/dev/null
 jq -e '.metrics.expected_root_recall == 1 and .metrics.held_out_exact_match_rate == 1 and .metrics.negative_reject_rate == 1 and .metrics.false_family_rate == 0' <<<"$big_surface_raw_ru_json" >/dev/null
+big_surface_raw_noisy_json="$("$llmwave_big" surface-raw-induce --corpus "$root/examples/llmwave-big-raw-surface-corpus-ru-noisy.json" --format json)"
+jq -e '.roadmap_block == "v321-v330" and .corpus.source == "russian_noisy_raw_business_surface_fixture_v1"' <<<"$big_surface_raw_noisy_json" >/dev/null
+jq -e '.metrics.induced_family_count == 6 and .metrics.expected_root_recall == 1 and .metrics.noise_reject_rate == 1 and .metrics.false_family_rate == 0' <<<"$big_surface_raw_noisy_json" >/dev/null
+jq -e '([.rejected_collision_roots[].root] | index("счетчик") and index("договоренност") and index("маршрутизатор") and index("сертификатор")) and .metrics.state == "NOISY_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF"' <<<"$big_surface_raw_noisy_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
@@ -173,6 +177,7 @@ jq empty "$root/examples/triad-packet.canonical-alias-conflict.json"
 jq empty "$root/examples/llmwave-big-surface-corpus.json"
 jq empty "$root/examples/llmwave-big-surface-corpus-ru.json"
 jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru.json"
+jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru-noisy.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"

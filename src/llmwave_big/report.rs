@@ -483,6 +483,7 @@ fn print_surface_raw_induce_text(report: &SurfaceRawInduceReport) {
         "negative_reject_rate: {:.3}",
         report.metrics.negative_reject_rate
     );
+    println!("noise_reject_rate: {:.3}", report.metrics.noise_reject_rate);
     println!(
         "nonlinear_surface_memory_proven: {}",
         report.claim_boundary.nonlinear_surface_memory_proven
@@ -1015,6 +1016,14 @@ fn print_surface_raw_induce_md(report: &SurfaceRawInduceReport) {
     println!(
         "- negative reject rate: `{:.3}`",
         report.metrics.negative_reject_rate
+    );
+    println!(
+        "- noise reject rate: `{:.3}`",
+        report.metrics.noise_reject_rate
+    );
+    println!(
+        "- rejected collision roots: `{}`",
+        report.rejected_collision_roots.len()
     );
     println!();
     println!("## Claim Boundary");
