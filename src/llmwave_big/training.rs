@@ -1149,10 +1149,18 @@ fn build_artifact_answer(
     let safe_to_answer = field_state == "TRAINED_FIELD_FOCUSED"
         && (!chunk_peaks.is_empty() || !schema_peaks.is_empty());
     if !safe_to_answer {
+        let text = if let Some(chunk) = chunk_peaks.first() {
+            format!(
+                "Review evidence from chunk {}: {}",
+                chunk.chunk_id, chunk.text
+            )
+        } else {
+            "LLMWave-Big did not find a stable trained-artifact peak.".to_string()
+        };
         return ArtifactAnswer {
             state: "ANSWER_REVIEW",
             safe_to_answer: false,
-            text: "LLMWave-Big did not find a stable trained-artifact peak.".to_string(),
+            text,
             evidence_chunks: chunk_peaks.iter().map(|peak| peak.chunk_id).collect(),
             evidence_schemas: schema_peaks.iter().map(|peak| peak.schema_id).collect(),
         };
