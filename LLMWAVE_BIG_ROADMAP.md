@@ -675,6 +675,42 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v431-v455: implemented as nanda-llmwave-big schema-bind
+
+## Phase 20: L3 Schema Binding, v431-v455
+
+Goal:
+
+```text
+L3 SchemaRecord
+  -> bind subject role to filler
+  -> bind object role to filler
+  -> bind route and operator
+  -> recover role fillers through cleanup memory
+  -> reject subject/object role swap
+```
+
+Current sample:
+
+```text
+schema 101 = supplier issues invoice
+subject:supplier -> Honglu
+object:document -> invoice
+route -> business_docs
+operator -> issues
+trap: invoice issues Honglu
+```
+
+Stop rules:
+
+```text
+schema role recall on fixture -> not broad cognition
+role-swap rejection -> local safety evidence only
+uses L3 schema record, but not real corpus training
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

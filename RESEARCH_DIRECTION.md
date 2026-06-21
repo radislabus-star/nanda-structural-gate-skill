@@ -118,6 +118,11 @@ bipolar VSA elementwise binding because the naive circular-convolution fixture
 was not stable enough; circular convolution/correlation remains a comparison
 target, not a current claim.
 
+`nanda-llmwave-big schema-bind` connects that binding layer to the L3 schema
+field. The first fixture uses SchemaRecord 101 (`supplier issues invoice`),
+recovers subject/object/route/operator fillers, and rejects the subject/object
+role-swap reading `invoice issues Honglu`.
+
 ### Holographic Reduced Representations
 
 Sources:

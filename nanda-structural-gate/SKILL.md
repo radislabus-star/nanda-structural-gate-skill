@@ -158,6 +158,7 @@ scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
 scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-llmwave-big hrr --format json
+scripts/nanda-llmwave-big schema-bind --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -442,6 +443,11 @@ core. It binds role/filler waves, superposes bound pairs into a schema field,
 unbinds by role, and runs cleanup memory with noise and collision controls.
 Treat `HRR_BINDING_READY_NOT_NONLINEAR_PROOF` as a fixture-level core result,
 not as nonlinear memory proof or LLM readiness.
+v431-v455 add `nanda-llmwave-big schema-bind`: L3 SchemaRecord 101 is bound to
+role/filler waves, recovered through cleanup memory, and checked against the
+subject/object role-swap trap `invoice issues Honglu`. Treat
+`L3_SCHEMA_BIND_READY_NOT_LLM` as fixture-level schema cognition, not broad
+understanding.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

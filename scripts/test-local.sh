@@ -84,6 +84,12 @@ jq -e '.metrics.role_recall == 1 and .metrics.cleanup_top1 == 1 and .metrics.noi
 jq -e '.bindings[] | select(.role == "supplier" and .filler == "Honglu" and .recovered == "Honglu" and .exact == true)' <<<"$big_hrr_json" >/dev/null
 jq -e '.collision_eval.trap_role == "supplier" and .collision_eval.expected_filler == "Honglu" and .collision_eval.rejected_filler == "Rustrade" and .collision_eval.rejected == true' <<<"$big_hrr_json" >/dev/null
 jq -e '.claim_boundary.hrr_binding_implemented == true and .claim_boundary.cleanup_memory_implemented == true and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_hrr_json" >/dev/null
+big_schema_bind_json="$("$llmwave_big" schema-bind --format json)"
+jq -e '.roadmap_block == "v431-v455" and .verdict == "L3_SCHEMA_BIND_READY_NOT_LLM"' <<<"$big_schema_bind_json" >/dev/null
+jq -e '.schema.schema_id == 101 and .schema.operator_id == 3 and .metrics.schema_role_recall == 1 and .metrics.role_error_rate == 0 and .metrics.role_swap_reject_rate == 1' <<<"$big_schema_bind_json" >/dev/null
+jq -e '.recovered_roles[] | select(.role == "subject:supplier" and .expected == "Honglu" and .recovered == "Honglu" and .exact == true)' <<<"$big_schema_bind_json" >/dev/null
+jq -e '.recovered_roles[] | select(.role == "object:document" and .expected == "invoice" and .recovered == "invoice" and .exact == true)' <<<"$big_schema_bind_json" >/dev/null
+jq -e '.role_swap_trap.wrong_claim == "invoice issues Honglu" and .role_swap_trap.rejected == true and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_schema_bind_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

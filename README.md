@@ -302,6 +302,7 @@ nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
 nanda-llmwave-big l2 --format json
 nanda-llmwave-big hrr --format json
+nanda-llmwave-big schema-bind --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -549,6 +550,12 @@ The first stable implementation uses bipolar VSA elementwise binding; naive
 circular convolution remains a planned comparison because it was not stable
 enough in the initial fixture. The report must keep
 `nonlinear_memory_proven=false` and `llm_ready=false`.
+`nanda-llmwave-big schema-bind` adds the v431-v455 L3 Schema Binding core. It
+connects schema record `101` (`supplier issues invoice`) to role/filler wave
+bindings, recovers `subject:supplier -> Honglu` and
+`object:document -> invoice`, and rejects the role-swap trap
+`invoice issues Honglu`. This is still fixture-level schema cognition, not LLM
+readiness or nonlinear memory proof.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

@@ -6,6 +6,7 @@ use super::consolidation::ConsolidationReport;
 use super::eval::BigEvalReport;
 use super::hrr_binding::HrrBindingReport;
 use super::l2_word_field::L2WordFieldReport;
+use super::l3_schema_bind::L3SchemaBindReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
@@ -72,6 +73,18 @@ pub(crate) fn print_hrr_binding_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_hrr_binding_text(report),
         OutputFormat::Md => print_hrr_binding_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_l3_schema_bind_report(
+    report: &L3SchemaBindReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_l3_schema_bind_text(report),
+        OutputFormat::Md => print_l3_schema_bind_md(report),
     }
     Ok(())
 }
@@ -329,6 +342,27 @@ fn print_hrr_binding_text(report: &HrrBindingReport) {
     println!(
         "collision_reject_rate: {:.3}",
         report.metrics.collision_reject_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_l3_schema_bind_text(report: &L3SchemaBindReport) {
+    println!("LLMWave-Big L3 Schema Bind");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("schema_id: {}", report.schema.schema_id);
+    println!(
+        "schema_role_recall: {:.3}",
+        report.metrics.schema_role_recall
+    );
+    println!("role_error_rate: {:.3}", report.metrics.role_error_rate);
+    println!(
+        "role_swap_reject_rate: {:.3}",
+        report.metrics.role_swap_reject_rate
     );
     println!(
         "nonlinear_memory_proven: {}",
@@ -755,6 +789,32 @@ fn print_hrr_binding_md(report: &HrrBindingReport) {
     println!(
         "- nonlinear memory proven: `{}`",
         report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_l3_schema_bind_md(report: &L3SchemaBindReport) {
+    println!("# LLMWave-Big L3 Schema Bind");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- schema id: `{}`", report.schema.schema_id);
+    println!("- form: `{}`", report.schema.form);
+    println!();
+    println!("## Recovered Roles");
+    println!();
+    for role in &report.recovered_roles {
+        println!(
+            "- `{}` -> expected `{}`, recovered `{}`, margin `{}`",
+            role.role, role.expected, role.recovered, role.margin
+        );
+    }
+    println!();
+    println!("## Trap");
+    println!();
+    println!(
+        "- `{}` rejected: `{}`",
+        report.role_swap_trap.wrong_claim, report.role_swap_trap.rejected
     );
 }
 

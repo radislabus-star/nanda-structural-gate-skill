@@ -11,6 +11,7 @@ pub mod consolidation;
 pub mod eval;
 pub mod hrr_binding;
 pub mod l2_word_field;
+pub mod l3_schema_bind;
 pub mod l3_schema_field;
 pub mod lexical_birth;
 pub mod loader;
@@ -52,6 +53,8 @@ enum LlmwaveBigCommand {
     L2(LlmwaveBigL2Args),
     /// Run the v391-v430 HRR/VSA role-filler binding core.
     Hrr(LlmwaveBigHrrArgs),
+    /// Run the v431-v455 L3 schema binding core.
+    SchemaBind(LlmwaveBigSchemaBindArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -104,6 +107,12 @@ struct LlmwaveBigL2Args {
 
 #[derive(Parser)]
 struct LlmwaveBigHrrArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSchemaBindArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -240,6 +249,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::Hrr(args) => {
             let report = hrr_binding::build_hrr_binding_report();
             report::print_hrr_binding_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SchemaBind(args) => {
+            let report = l3_schema_bind::build_l3_schema_bind_report();
+            report::print_l3_schema_bind_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -502,6 +516,37 @@ mod tests {
         assert_eq!(report.collision_eval.expected_filler, "Honglu");
         assert_eq!(report.collision_eval.rejected_filler, "Rustrade");
         assert!(report.collision_eval.expected_score > report.collision_eval.rejected_score);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(!report.claim_boundary.llm_ready);
+    }
+
+    #[test]
+    fn l3_schema_bind_recovers_schema_roles() {
+        let report = l3_schema_bind::build_l3_schema_bind_report();
+        assert_eq!(report.roadmap_block, "v431-v455");
+        assert_eq!(report.verdict, "L3_SCHEMA_BIND_READY_NOT_LLM");
+        assert_eq!(report.schema.schema_id, 101);
+        assert_eq!(report.schema.operator_id, 3);
+        assert_eq!(report.metrics.schema_role_recall, 1.0);
+        assert_eq!(report.metrics.role_error_rate, 0.0);
+        assert!(report
+            .recovered_roles
+            .iter()
+            .any(|role| role.role == "subject:supplier" && role.recovered == "Honglu"));
+        assert!(report
+            .recovered_roles
+            .iter()
+            .any(|role| role.role == "object:document" && role.recovered == "invoice"));
+    }
+
+    #[test]
+    fn l3_schema_bind_rejects_role_swap() {
+        let report = l3_schema_bind::build_l3_schema_bind_report();
+        assert!(report.role_swap_trap.rejected);
+        assert_eq!(report.role_swap_trap.wrong_claim, "invoice issues Honglu");
+        assert_eq!(report.role_swap_trap.recovered_subject, "Honglu");
+        assert_eq!(report.role_swap_trap.recovered_object, "invoice");
+        assert_eq!(report.metrics.role_swap_reject_rate, 1.0);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert!(!report.claim_boundary.llm_ready);
     }

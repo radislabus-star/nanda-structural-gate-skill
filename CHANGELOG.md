@@ -26,6 +26,9 @@
 - v391-v430 add `nanda-llmwave-big hrr`: a first HRR/VSA role-filler binding
   core with bipolar VSA bind/unbind, cleanup memory, small-noise recall,
   collision rejection, and `HRR_BINDING_READY_NOT_NONLINEAR_PROOF`.
+- v431-v455 add `nanda-llmwave-big schema-bind`: L3 schema record 101 is bound
+  to role/filler waves, recovered through cleanup memory, and checked against a
+  subject/object role-swap trap.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar
