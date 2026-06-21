@@ -1212,6 +1212,39 @@ chat_ready remains false
 nonlinear_memory_proven remains false
 ```
 
+v1281-v1350: implemented as nanda-llmwave-big answer-surface
+
+## Phase 34: Constrained Answer Surface, v1281-v1350
+
+Goal:
+
+```text
+evidence proof state
+  -> fixed answer template
+  -> not-proven surface for missing evidence
+  -> evidence-bound confirmation surface for bound evidence
+  -> no free-form generation
+```
+
+Current controls:
+
+```text
+missing evidence           -> Not proven surface
+release-confirmed evidence -> confirmation surface with copied evidence ref
+unsupported confirmation   -> rate 0.0
+```
+
+Stop rules:
+
+```text
+answer surface -> constrained template only
+AnswerSurfaceRecord32 fixed record -> packed-boundary proof, not speed proof
+free_form_generation remains false
+full_field_mature remains false
+chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

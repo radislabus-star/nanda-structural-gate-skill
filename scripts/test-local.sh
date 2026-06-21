@@ -170,6 +170,14 @@ big_evidence_bound_json="$("$llmwave_big" evidence-proof --text "Has customs cle
 jq -e '.roadmap_block == "v1211-v1280" and .verdict == "EVIDENCE_PROOF_LOCAL_ANSWER_CANDIDATE"' <<<"$big_evidence_bound_json" >/dev/null
 jq -e '.proof_state == "EVIDENCE_BOUND" and .answer_permission == "LOCAL_ANSWER_PERMISSION" and .negative_control.passed == true' <<<"$big_evidence_bound_json" >/dev/null
 jq -e '.claim_boundary.fixed_evidence_proof_records == true and .claim_boundary.local_answer_permission == true and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_evidence_bound_json" >/dev/null
+big_answer_missing_json="$("$llmwave_big" answer-surface --text "Has customs cleared the goods?" --evidence-mode missing --format json)"
+jq -e '.roadmap_block == "v1281-v1350" and .verdict == "ANSWER_SURFACE_NOT_PROVEN"' <<<"$big_answer_missing_json" >/dev/null
+jq -e '.answer_state == "NOT_PROVEN_ANSWER" and (.answer_text | contains("Not proven"))' <<<"$big_answer_missing_json" >/dev/null
+jq -e '.claim_boundary.fixed_answer_surface_records == true and .claim_boundary.free_form_generation == false and .claim_boundary.chat_ready == false' <<<"$big_answer_missing_json" >/dev/null
+big_answer_bound_json="$("$llmwave_big" answer-surface --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json)"
+jq -e '.roadmap_block == "v1281-v1350" and .verdict == "ANSWER_SURFACE_LOCAL_CANDIDATE"' <<<"$big_answer_bound_json" >/dev/null
+jq -e '.answer_state == "LOCAL_EVIDENCE_BOUND_ANSWER" and (.answer_text | contains("evidence ref 7001"))' <<<"$big_answer_bound_json" >/dev/null
+jq -e '.metrics.constrained_template_rate == 1 and .metrics.unsupported_confirmation_rate == 0 and .claim_boundary.free_form_generation == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_answer_bound_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

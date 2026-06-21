@@ -71,6 +71,9 @@
 - v1211-v1280 add `nanda-llmwave-big evidence-proof`: stable field peaks can
   bind to fixed `EvidenceProofRecord32` records; missing evidence stays blocked,
   while release-confirmed evidence grants local answer permission only.
+- v1281-v1350 add `nanda-llmwave-big answer-surface`: evidence proof now
+  materializes constrained answer templates with fixed `AnswerSurfaceRecord32`
+  records, preserving not-proven behavior and avoiding free-form generation.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

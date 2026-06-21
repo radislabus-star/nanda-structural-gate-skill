@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use super::{nanda_6m, OutputFormat, CORE_VERSION, EXIT_PASS, WAVE_DIM};
 
 pub mod active_core;
+pub mod answer_surface;
 pub mod atlas;
 pub mod consolidation;
 pub mod coupled_decode_loop;
@@ -101,6 +102,9 @@ enum LlmwaveBigCommand {
     /// Run the v1211-v1280 evidence proof gate.
     #[command(name = "evidence-proof")]
     EvidenceProof(LlmwaveBigEvidenceProofArgs),
+    /// Run the v1281-v1350 constrained answer surface.
+    #[command(name = "answer-surface")]
+    AnswerSurface(LlmwaveBigAnswerSurfaceArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -245,6 +249,16 @@ struct LlmwaveBigMatureAntiWaveArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigEvidenceProofArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, default_value = "missing")]
+    evidence_mode: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigAnswerSurfaceArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, default_value = "missing")]
@@ -455,6 +469,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::EvidenceProof(args) => {
             let report = evidence_proof::build_evidence_proof_report(args.text, args.evidence_mode);
             report::print_evidence_proof_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::AnswerSurface(args) => {
+            let report = answer_surface::build_answer_surface_report(args.text, args.evidence_mode);
+            report::print_answer_surface_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -1241,6 +1260,39 @@ mod tests {
         assert_eq!(report.metrics.unsafe_answer_rate, 0.0);
         assert!(report.negative_control.passed);
         assert!(report.claim_boundary.local_answer_permission);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn answer_surface_materializes_not_proven_when_evidence_is_missing() {
+        let report = answer_surface::build_answer_surface_report(
+            "Has customs cleared the goods?".to_string(),
+            "missing".to_string(),
+        );
+        assert_eq!(report.roadmap_block, "v1281-v1350");
+        assert_eq!(report.verdict, "ANSWER_SURFACE_NOT_PROVEN");
+        assert_eq!(report.answer_state, "NOT_PROVEN_ANSWER");
+        assert!(report.answer_text.contains("Not proven"));
+        assert_eq!(report.metrics.unsupported_confirmation_rate, 0.0);
+        assert_eq!(
+            core::mem::size_of::<answer_surface::AnswerSurfaceRecord32>(),
+            32
+        );
+    }
+
+    #[test]
+    fn answer_surface_uses_evidence_bound_template_without_chat_claim() {
+        let report = answer_surface::build_answer_surface_report(
+            "Has customs cleared the goods?".to_string(),
+            "release-confirmed".to_string(),
+        );
+        assert_eq!(report.verdict, "ANSWER_SURFACE_LOCAL_CANDIDATE");
+        assert_eq!(report.answer_state, "LOCAL_EVIDENCE_BOUND_ANSWER");
+        assert!(report.answer_text.contains("evidence ref 7001"));
+        assert_eq!(report.metrics.constrained_template_rate, 1.0);
+        assert_eq!(report.metrics.evidence_ref_copy_rate, 1.0);
+        assert!(!report.claim_boundary.free_form_generation);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }

@@ -1,6 +1,7 @@
 use anyhow::Result;
 
 use super::active_core::ActiveCoreReport;
+use super::answer_surface::AnswerSurfaceReport;
 use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
@@ -251,6 +252,18 @@ pub(crate) fn print_evidence_proof_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_evidence_proof_text(report),
         OutputFormat::Md => print_evidence_proof_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_answer_surface_report(
+    report: &AnswerSurfaceReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_answer_surface_text(report),
+        OutputFormat::Md => print_answer_surface_md(report),
     }
     Ok(())
 }
@@ -2071,6 +2084,47 @@ fn print_evidence_proof_md(report: &EvidenceProofReport) {
     println!(
         "- local answer permission: `{}`",
         report.claim_boundary.local_answer_permission
+    );
+    println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_answer_surface_text(report: &AnswerSurfaceReport) {
+    println!("LLMWave-Big Answer Surface");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("proof_bridge_verdict: {}", report.proof_bridge_verdict);
+    println!("answer_state: {}", report.answer_state);
+    println!("answer_text: {}", report.answer_text);
+    println!(
+        "free_form_generation: {}",
+        report.claim_boundary.free_form_generation
+    );
+}
+
+fn print_answer_surface_md(report: &AnswerSurfaceReport) {
+    println!("# LLMWave-Big Answer Surface");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- proof bridge: `{}`", report.proof_bridge_verdict);
+    println!("- answer state: `{}`", report.answer_state);
+    println!("- answer text: `{}`", report.answer_text);
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- free form generation: `{}`",
+        report.claim_boundary.free_form_generation
+    );
+    println!(
+        "- local answer surface: `{}`",
+        report.claim_boundary.local_answer_surface
     );
     println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
     println!(

@@ -316,6 +316,7 @@ nanda-llmwave-big multi-peak-field --text "Has customs cleared the goods?" --for
 nanda-llmwave-big lens-scan --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
+nanda-llmwave-big answer-surface --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -642,6 +643,10 @@ peak to a compact evidence proof record. Missing evidence keeps the answer
 blocked, while `--evidence-mode release-confirmed` grants only local answer
 permission for the fixture route. This is evidence-bound permission, not general
 chat readiness or nonlinear-memory proof.
+`nanda-llmwave-big answer-surface` adds v1281-v1350. It materializes the proof
+state through fixed answer templates: missing evidence becomes a `Not proven`
+surface, and bound evidence becomes a local confirmation that copies the evidence
+ref. This is constrained answer text, not free-form generation.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

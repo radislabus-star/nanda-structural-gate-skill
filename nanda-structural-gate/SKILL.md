@@ -172,6 +172,7 @@ scripts/nanda-llmwave-big multi-peak-field --text "Has customs cleared the goods
 scripts/nanda-llmwave-big lens-scan --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
+scripts/nanda-llmwave-big answer-surface --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -519,6 +520,9 @@ v1211-v1280 add `nanda-llmwave-big evidence-proof`: a stable route peak can bind
 to a compact evidence proof record. Treat
 `EVIDENCE_PROOF_LOCAL_ANSWER_CANDIDATE` as local fixture permission only; it is
 not broad chat readiness or nonlinear-memory proof.
+v1281-v1350 add `nanda-llmwave-big answer-surface`: evidence proof materializes
+only constrained templates. Treat `ANSWER_SURFACE_LOCAL_CANDIDATE` as local
+evidence-bound text, not free-form generation.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,
