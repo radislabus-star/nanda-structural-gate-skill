@@ -116,6 +116,10 @@ jq -e '.roadmap_block == "v301-v310" and .verdict == "SURFACE_BANK_FIXTURE_READY
 jq -e '.corpus.family_count == 6 and .corpus.held_out_forms == 6 and .corpus.negative_controls == 6 and .metrics.fixture_loaded == true' <<<"$big_surface_bank_fixture_json" >/dev/null
 jq -e '.metrics.positive_exact_match_rate == 1 and .metrics.negative_reject_rate == 1 and .metrics.rare_copy_span_rate == 1 and .metrics.false_family_rate == 0' <<<"$big_surface_bank_fixture_json" >/dev/null
 jq -e '.metrics.state == "EXTERNAL_FIXTURE_PASS_NOT_GENERAL_PROOF" and .claim_boundary.external_fixture_loaded == true and .claim_boundary.real_corpus_trained == false and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_bank_fixture_json" >/dev/null
+big_surface_bank_ru_json="$("$llmwave_big" surface-bank-fixture --corpus "$root/examples/llmwave-big-surface-corpus-ru.json" --format json)"
+jq -e '.roadmap_block == "v301-v310" and .verdict == "SURFACE_BANK_FIXTURE_READY_NOT_REAL_TRAINING"' <<<"$big_surface_bank_ru_json" >/dev/null
+jq -e '.corpus.source == "russian_business_surface_fixture_v1" and .corpus.family_count == 6 and .corpus.rare_forms == 3' <<<"$big_surface_bank_ru_json" >/dev/null
+jq -e '.metrics.positive_exact_match_rate == 1 and .metrics.negative_reject_rate == 1 and .metrics.rare_copy_span_rate == 1 and .claim_boundary.nonlinear_surface_memory_proven == false' <<<"$big_surface_bank_ru_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
@@ -163,6 +167,7 @@ jq empty "$root/examples/triad-packet.canonical-alias-pass.json"
 jq empty "$root/examples/triad-packet.canonical-alias-veto.json"
 jq empty "$root/examples/triad-packet.canonical-alias-conflict.json"
 jq empty "$root/examples/llmwave-big-surface-corpus.json"
+jq empty "$root/examples/llmwave-big-surface-corpus-ru.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"

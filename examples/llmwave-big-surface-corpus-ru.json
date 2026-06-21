@@ -1,0 +1,53 @@
+{
+  "version": "llmwave_big_surface_fixture_ru_v1",
+  "source": "russian_business_surface_fixture_v1",
+  "families": [
+    {
+      "family_id": 73001,
+      "root": "счет",
+      "observed_suffixes": ["", "а", "у", "ом"],
+      "held_out": [{"suffix": "е", "surface": "счете"}],
+      "negative": [{"root": "сче", "suffix": "т", "surface": "счет"}]
+    },
+    {
+      "family_id": 73002,
+      "root": "договор",
+      "observed_suffixes": ["", "а", "у", "ом"],
+      "held_out": [{"suffix": "е", "surface": "договоре"}],
+      "negative": [{"root": "дог", "suffix": "овор", "surface": "договор"}]
+    },
+    {
+      "family_id": 73003,
+      "root": "декларац",
+      "observed_suffixes": ["ия", "ии", "ию", "ией"],
+      "held_out": [{"suffix": "ии", "surface": "декларации"}],
+      "negative": [{"root": "декларация", "suffix": "и", "surface": "декларацияи"}]
+    },
+    {
+      "family_id": 73004,
+      "root": "сертификат",
+      "observed_suffixes": ["", "а", "у", "ом"],
+      "held_out": [{"suffix": "е", "surface": "сертификате"}],
+      "negative": [{"root": "сертиф", "suffix": "икат", "surface": "сертификат"}]
+    },
+    {
+      "family_id": 73005,
+      "root": "платеж",
+      "observed_suffixes": ["", "а", "у", "ом"],
+      "held_out": [{"suffix": "е", "surface": "платеже"}],
+      "negative": [{"root": "плат", "suffix": "еж", "surface": "платеж"}]
+    },
+    {
+      "family_id": 73006,
+      "root": "маршрут",
+      "observed_suffixes": ["", "а", "у", "ом"],
+      "held_out": [{"suffix": "е", "surface": "маршруте"}],
+      "negative": [{"root": "марш", "suffix": "рут", "surface": "маршрут"}]
+    }
+  ],
+  "rare_forms": [
+    "ТР ТС 021/2011",
+    "ДТ-10702070-260626-0000001",
+    "ИНН7700000000"
+  ]
+}

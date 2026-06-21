@@ -83,14 +83,16 @@ The first observed-form bank builder is:
 nanda-llmwave-big surface-bank-build --format json
 nanda-llmwave-big surface-bank-validate --format json
 nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus.json --format json
+nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus-ru.json --format json
 ```
 
 It promotes suffix families from a small embedded corpus and rejects fragments
 that require copy or provisional handling. The validator then applies positive
 held-out controls, false-family traps, rare-code traps, and order-shuffle
 stability checks. The fixture command moves those checks into an external JSON
-corpus file. This is the bridge from synthetic capacity arithmetic toward real
-corpus fixtures.
+corpus file. The Russian fixture adds Cyrillic business forms and exact
+regulatory identifiers, which is the first multilingual pressure test for this
+surface-memory path.
 
 ### Holographic Reduced Representations
 

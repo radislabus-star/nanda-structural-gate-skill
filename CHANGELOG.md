@@ -49,6 +49,9 @@
   surface-corpus fixture loader with family validation, held-out exact-match
   checks, negative controls, rare copy-span checks, and explicit no-proof
   claim boundaries.
+- Add `examples/llmwave-big-surface-corpus-ru.json`, a Russian Cyrillic
+  business surface fixture covering счет, договор, декларация, сертификат,
+  платеж, маршрут, and rare exact regulatory/customs identifiers.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split
