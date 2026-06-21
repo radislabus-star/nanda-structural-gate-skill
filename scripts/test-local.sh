@@ -303,6 +303,18 @@ jq -e '.claim_boundary.binary_hot_pack_loaded == true and .claim_boundary.hot_re
 big_ask_hot_reversed_json="$("$llmwave_big" ask-hot --hot-pack "$tmp_big_train/artifact.hot.bin" --artifact "$tmp_big_train/artifact.json" --text "payment requires invoice" --top-k 3 --format json)"
 jq -e '.version == "llmwave-big-v1905-hot-ask" and .verdict == "HOT_FIELD_REVIEW" and .field.state == "HOT_FIELD_POLARITY_REVERSED" and .answer.safe_to_answer == false' <<<"$big_ask_hot_reversed_json" >/dev/null
 jq -e '.field.polarity_state == "REVERSED" and .field.top_hot_schema_peaks[0].polarization.state == "REVERSED" and .field.top_hot_schema_peaks[0].polarization.hard_stop == true and .answer.state == "HOT_POLARITY_REVERSED_STOP"' <<<"$big_ask_hot_reversed_json" >/dev/null
+big_ask_hot_before_learn_json="$("$llmwave_big" ask-hot --hot-pack "$tmp_big_train/artifact.hot.bin" --artifact "$tmp_big_train/artifact.json" --text "supplier requires customs" --top-k 3 --format json)"
+jq -e '.version == "llmwave-big-v1905-hot-ask" and .answer.safe_to_answer == false and .learning.memory_loaded == false' <<<"$big_ask_hot_before_learn_json" >/dev/null
+cat > "$tmp_big_train/hot-feedback.json" <<'EOF'
+{"events":[
+  {"decision":"accept","subject":"supplier","relation":"requires","object":"customs","authority":1.0,"source":"user-batch"}
+]}
+EOF
+big_learn_hot_json="$("$llmwave_big" learn-hot --feedback "$tmp_big_train/hot-feedback.json" --out "$tmp_big_train/hot-memory.json" --format json)"
+jq -e '.version == "llmwave-big-v1906-hot-learning-memory" and .verdict == "HOT_LEARNING_MEMORY_WRITTEN_NOT_GRADIENT_TRAINING" and .memory.records_written == 1 and .claim_boundary.can_change_next_hot_ask == true' <<<"$big_learn_hot_json" >/dev/null
+big_ask_hot_after_learn_json="$("$llmwave_big" ask-hot --hot-pack "$tmp_big_train/artifact.hot.bin" --artifact "$tmp_big_train/artifact.json" --memory "$tmp_big_train/hot-memory.json" --text "supplier requires customs" --top-k 3 --format json)"
+jq -e '.version == "llmwave-big-v1905-hot-ask" and .verdict == "HOT_FIELD_ANSWER_READY_NOT_GENERAL_LLM" and .answer.safe_to_answer == true and .learning.memory_loaded == true and .learning.learned_records == 1' <<<"$big_ask_hot_after_learn_json" >/dev/null
+jq -e '.field.top_hot_schema_peaks[0].learned == true and .field.top_hot_schema_peaks[0].source == "hot_memory:user-batch" and .field.top_hot_schema_peaks[0].subject == "supplier" and .field.top_hot_schema_peaks[0].object == "customs"' <<<"$big_ask_hot_after_learn_json" >/dev/null
 rm -rf "$tmp_big_train"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null

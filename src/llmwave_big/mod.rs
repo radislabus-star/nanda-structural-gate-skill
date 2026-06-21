@@ -172,6 +172,9 @@ enum LlmwaveBigCommand {
     /// Ask through a binary hot Active Core pack, with cold labels for display.
     #[command(name = "ask-hot")]
     AskHot(LlmwaveBigAskHotArgs),
+    /// Convert batch feedback into persistent hot-memory overlay records.
+    #[command(name = "learn-hot")]
+    LearnHot(LlmwaveBigLearnHotArgs),
 }
 
 #[derive(Parser)]
@@ -512,9 +515,21 @@ struct LlmwaveBigAskHotArgs {
     #[arg(long)]
     artifact: PathBuf,
     #[arg(long)]
+    memory: Option<PathBuf>,
+    #[arg(long)]
     text: String,
     #[arg(long, default_value_t = 5)]
     top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLearnHotArgs {
+    #[arg(long)]
+    feedback: PathBuf,
+    #[arg(long)]
+    out: PathBuf,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -821,9 +836,19 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::AskHot(args) => {
-            let report =
-                training::ask_hot_pack(&args.hot_pack, &args.artifact, args.text, args.top_k)?;
+            let report = training::ask_hot_pack(
+                &args.hot_pack,
+                &args.artifact,
+                args.text,
+                args.top_k,
+                args.memory.as_deref(),
+            )?;
             report::print_hot_ask_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LearnHot(args) => {
+            let report = training::learn_hot_memory(&args.feedback, &args.out)?;
+            report::print_hot_learn_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }

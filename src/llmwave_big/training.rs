@@ -284,6 +284,7 @@ pub(crate) struct HotAskReport {
     pub verdict: &'static str,
     pub query: String,
     pub hot_pack: HotAskPackSummary,
+    pub learning: HotAskLearningSummary,
     pub field: HotAskField,
     pub answer: HotAskAnswer,
     pub claim_boundary: HotAskClaimBoundary,
@@ -298,6 +299,15 @@ pub(crate) struct HotAskPackSummary {
     pub transitions: usize,
     pub chunks: usize,
     pub schema_hints: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotAskLearningSummary {
+    pub memory_loaded: bool,
+    pub memory_path: Option<String>,
+    pub learned_records: usize,
+    pub accepted_records: usize,
+    pub rejected_records: usize,
 }
 
 #[derive(Serialize, Clone)]
@@ -325,6 +335,10 @@ pub(crate) struct HotSchemaPeak {
     pub relation: String,
     pub object: String,
     pub count: u32,
+    pub source: String,
+    pub learned: bool,
+    pub accepted_count: u32,
+    pub rejected_count: u32,
 }
 
 #[derive(Serialize, Clone)]
@@ -360,10 +374,77 @@ pub(crate) struct HotAskClaimBoundary {
     pub hot_records_scanned: bool,
     pub polarity_lens_applied: bool,
     pub reversed_polarity_hard_stop: bool,
+    pub hot_memory_loaded: bool,
+    pub learning_overlay_applied: bool,
     pub cold_artifact_used_for_labels: bool,
     pub json_used_in_hot_scan: bool,
+    pub online_gradient_training: bool,
     pub cache_only_execution_proven: bool,
     pub broad_chat_llm_ready: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotLearnReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub feedback: String,
+    pub out: String,
+    pub memory: HotLearnMemorySummary,
+    pub claim_boundary: HotLearnClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotLearnMemorySummary {
+    pub records_written: usize,
+    pub accepted_records: usize,
+    pub rejected_records: usize,
+    pub authority_avg: f32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotLearnClaimBoundary {
+    pub batch_feedback_ingested: bool,
+    pub persistent_hot_memory_written: bool,
+    pub can_change_next_hot_ask: bool,
+    pub online_gradient_training: bool,
+    pub broad_chat_llm_ready: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct HotMemoryFile {
+    mode: String,
+    version: String,
+    records: Vec<HotMemoryRecord>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct HotMemoryRecord {
+    subject: String,
+    relation: String,
+    object: String,
+    decision: String,
+    authority: f32,
+    accepted_count: u32,
+    rejected_count: u32,
+    source: String,
+}
+
+#[derive(Deserialize)]
+struct HotFeedbackBatch {
+    events: Vec<HotFeedbackEvent>,
+}
+
+#[derive(Deserialize)]
+struct HotFeedbackEvent {
+    decision: String,
+    subject: String,
+    relation: String,
+    object: String,
+    #[serde(default = "default_feedback_authority")]
+    authority: f32,
+    #[serde(default = "default_feedback_source")]
+    source: String,
 }
 
 struct HotPackImage {
@@ -736,11 +817,16 @@ pub(crate) fn ask_hot_pack(
     artifact_path: &Path,
     query: String,
     top_k: usize,
+    memory_path: Option<&Path>,
 ) -> Result<HotAskReport> {
     let hot_bytes = fs::read(hot_pack_path)
         .with_context(|| format!("read hot pack {}", hot_pack_path.display()))?;
     let hot = parse_hot_pack(&hot_bytes)?;
     let artifact = load_training_artifact(artifact_path)?;
+    let memory = match memory_path {
+        Some(path) => Some(load_hot_memory(path)?),
+        None => None,
+    };
     let query_tokens = tokenize(&query)
         .into_iter()
         .filter(|token| is_word_token(token))
@@ -752,7 +838,12 @@ pub(crate) fn ask_hot_pack(
     let query_hash_set = query_hashes.iter().copied().collect::<BTreeSet<_>>();
     let query_positions = build_query_hash_positions(&query_hashes);
     let top_k = top_k.max(1);
-    let schema_peaks = score_hot_schemas(&hot, &artifact, &query_positions, top_k);
+    let mut schema_peaks = score_hot_schemas(&hot, &artifact, &query_positions, top_k);
+    if let Some(memory) = &memory {
+        schema_peaks.extend(score_hot_memory_schemas(memory, &query_positions, top_k));
+        sort_hot_schema_peaks(&mut schema_peaks);
+        schema_peaks.truncate(top_k);
+    }
     let transition_peaks = score_hot_transitions(&hot, &artifact, &query_hash_set, top_k);
     let top_score = schema_peaks
         .first()
@@ -834,6 +925,7 @@ pub(crate) fn ask_hot_pack(
             chunks: hot.counts.chunks,
             schema_hints: hot.counts.schema_hints,
         },
+        learning: hot_learning_summary(memory_path, memory.as_ref()),
         field: HotAskField {
             state: field_state,
             query_hashes,
@@ -850,9 +942,97 @@ pub(crate) fn ask_hot_pack(
             hot_records_scanned: true,
             polarity_lens_applied: true,
             reversed_polarity_hard_stop: true,
+            hot_memory_loaded: memory.is_some(),
+            learning_overlay_applied: memory.is_some(),
             cold_artifact_used_for_labels: true,
             json_used_in_hot_scan: false,
+            online_gradient_training: false,
             cache_only_execution_proven: false,
+            broad_chat_llm_ready: false,
+        },
+    })
+}
+
+pub(crate) fn learn_hot_memory(feedback_path: &Path, out: &Path) -> Result<HotLearnReport> {
+    let raw = fs::read_to_string(feedback_path)
+        .with_context(|| format!("read hot feedback {}", feedback_path.display()))?;
+    let batch: HotFeedbackBatch = serde_json::from_str(&raw)
+        .with_context(|| format!("parse hot feedback {}", feedback_path.display()))?;
+    if let Some(parent) = out.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("create hot memory directory {}", parent.display()))?;
+    }
+    let mut merged = BTreeMap::<(String, String, String, String), HotMemoryRecord>::new();
+    for event in batch.events {
+        let decision = normalize_decision(&event.decision)?;
+        let subject = normalize_feedback_text(&event.subject);
+        let relation = normalize_feedback_text(&event.relation);
+        let object = normalize_feedback_text(&event.object);
+        let key = (
+            subject.clone(),
+            relation.clone(),
+            object.clone(),
+            decision.clone(),
+        );
+        let entry = merged.entry(key).or_insert_with(|| HotMemoryRecord {
+            subject,
+            relation,
+            object,
+            decision,
+            authority: event.authority.clamp(0.0, 1.0),
+            accepted_count: 0,
+            rejected_count: 0,
+            source: event.source,
+        });
+        entry.authority = entry.authority.max(event.authority.clamp(0.0, 1.0));
+        if entry.decision == "accept" {
+            entry.accepted_count += 1;
+        } else {
+            entry.rejected_count += 1;
+        }
+    }
+    let records = merged.into_values().collect::<Vec<_>>();
+    let memory = HotMemoryFile {
+        mode: "llmwave-big-hot-memory".to_string(),
+        version: "llmwave-big-v1906-hot-learning-memory".to_string(),
+        records: records.clone(),
+    };
+    fs::write(out, serde_json::to_string_pretty(&memory)? + "\n")
+        .with_context(|| format!("write hot memory {}", out.display()))?;
+    let accepted_records = records
+        .iter()
+        .filter(|record| record.decision == "accept")
+        .count();
+    let rejected_records = records
+        .iter()
+        .filter(|record| record.decision == "reject")
+        .count();
+    let authority_avg = if records.is_empty() {
+        0.0
+    } else {
+        round4(records.iter().map(|record| record.authority).sum::<f32>() / records.len() as f32)
+    };
+    Ok(HotLearnReport {
+        mode: "llmwave-big-learn-hot",
+        version: "llmwave-big-v1906-hot-learning-memory",
+        verdict: if records.is_empty() {
+            "HOT_LEARNING_MEMORY_EMPTY"
+        } else {
+            "HOT_LEARNING_MEMORY_WRITTEN_NOT_GRADIENT_TRAINING"
+        },
+        feedback: feedback_path.display().to_string(),
+        out: out.display().to_string(),
+        memory: HotLearnMemorySummary {
+            records_written: records.len(),
+            accepted_records,
+            rejected_records,
+            authority_avg,
+        },
+        claim_boundary: HotLearnClaimBoundary {
+            batch_feedback_ingested: true,
+            persistent_hot_memory_written: true,
+            can_change_next_hot_ask: !records.is_empty(),
+            online_gradient_training: false,
             broad_chat_llm_ready: false,
         },
     })
@@ -1469,6 +1649,68 @@ fn build_query_hash_positions(query_hashes: &[u32]) -> BTreeMap<u32, usize> {
     positions
 }
 
+fn hot_learning_summary(
+    memory_path: Option<&Path>,
+    memory: Option<&HotMemoryFile>,
+) -> HotAskLearningSummary {
+    let learned_records = memory.map(|memory| memory.records.len()).unwrap_or(0);
+    let accepted_records = memory
+        .map(|memory| {
+            memory
+                .records
+                .iter()
+                .filter(|record| record.decision == "accept")
+                .count()
+        })
+        .unwrap_or(0);
+    let rejected_records = memory
+        .map(|memory| {
+            memory
+                .records
+                .iter()
+                .filter(|record| record.decision == "reject")
+                .count()
+        })
+        .unwrap_or(0);
+    HotAskLearningSummary {
+        memory_loaded: memory.is_some(),
+        memory_path: memory_path.map(|path| path.display().to_string()),
+        learned_records,
+        accepted_records,
+        rejected_records,
+    }
+}
+
+fn load_hot_memory(path: &Path) -> Result<HotMemoryFile> {
+    let raw =
+        fs::read_to_string(path).with_context(|| format!("read hot memory {}", path.display()))?;
+    serde_json::from_str(&raw).with_context(|| format!("parse hot memory {}", path.display()))
+}
+
+fn normalize_decision(decision: &str) -> Result<String> {
+    match decision.trim().to_lowercase().as_str() {
+        "accept" | "accepted" | "reinforce" | "positive" => Ok("accept".to_string()),
+        "reject" | "rejected" | "suppress" | "negative" => Ok("reject".to_string()),
+        other => bail!("unsupported hot learning decision {other:?}"),
+    }
+}
+
+fn normalize_feedback_text(value: &str) -> String {
+    tokenize(value)
+        .into_iter()
+        .filter(|token| is_word_token(token))
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+fn default_feedback_authority() -> f32 {
+    1.0
+}
+
+fn default_feedback_source() -> String {
+    "batch".to_string()
+}
+
 fn hot_schema_polarization(
     record: &HotSchemaRecord,
     query_positions: &BTreeMap<u32, usize>,
@@ -1581,17 +1823,88 @@ fn score_hot_schemas(
                 relation: label.relation.clone(),
                 object: label.object.clone(),
                 count: record.count,
+                source: "hot_pack".to_string(),
+                learned: false,
+                accepted_count: 0,
+                rejected_count: 0,
             })
         })
         .collect::<Vec<_>>();
+    sort_hot_schema_peaks(&mut peaks);
+    peaks.truncate(top_k);
+    peaks
+}
+
+fn score_hot_memory_schemas(
+    memory: &HotMemoryFile,
+    query_positions: &BTreeMap<u32, usize>,
+    top_k: usize,
+) -> Vec<HotSchemaPeak> {
+    let mut peaks = memory
+        .records
+        .iter()
+        .filter_map(|record| {
+            let schema = HotSchemaRecord {
+                subject_hash: hash32(&record.subject),
+                relation_hash: hash32(&record.relation),
+                object_hash: hash32(&record.object),
+                count: record.accepted_count.max(record.rejected_count).max(1),
+            };
+            let matched_terms = [
+                schema.subject_hash,
+                schema.relation_hash,
+                schema.object_hash,
+            ]
+            .into_iter()
+            .filter(|hash| query_positions.contains_key(hash))
+            .count();
+            if matched_terms == 0 {
+                return None;
+            }
+            let subject_matched = query_positions.contains_key(&schema.subject_hash);
+            let relation_matched = query_positions.contains_key(&schema.relation_hash);
+            let object_matched = query_positions.contains_key(&schema.object_hash);
+            let polarization = hot_schema_polarization(&schema, query_positions);
+            let signed_memory = if record.decision == "accept" {
+                record.authority * (record.accepted_count.max(1) as f32) * 1.5
+            } else {
+                -(record.authority * (record.rejected_count.max(1) as f32) * 1.5)
+            };
+            let raw_score = round4(
+                matched_terms as f32 + if subject_matched { 0.75 } else { 0.0 } + signed_memory,
+            );
+            Some(HotSchemaPeak {
+                score: round4((raw_score - polarization.penalty).max(0.0)),
+                raw_score,
+                matched_terms,
+                subject_matched,
+                relation_matched,
+                object_matched,
+                polarization,
+                subject: record.subject.clone(),
+                relation: record.relation.clone(),
+                object: record.object.clone(),
+                count: record.accepted_count.max(record.rejected_count).max(1),
+                source: format!("hot_memory:{}", record.source),
+                learned: true,
+                accepted_count: record.accepted_count,
+                rejected_count: record.rejected_count,
+            })
+        })
+        .collect::<Vec<_>>();
+    sort_hot_schema_peaks(&mut peaks);
+    peaks.truncate(top_k);
+    peaks
+}
+
+fn sort_hot_schema_peaks(peaks: &mut [HotSchemaPeak]) {
     peaks.sort_by(|a, b| {
         b.score
             .total_cmp(&a.score)
+            .then_with(|| b.learned.cmp(&a.learned))
             .then_with(|| b.matched_terms.cmp(&a.matched_terms))
             .then_with(|| a.subject.cmp(&b.subject))
     });
-    peaks.truncate(top_k);
-    peaks
 }
 
 fn score_hot_transitions(

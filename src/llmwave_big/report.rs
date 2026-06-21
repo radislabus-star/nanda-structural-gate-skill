@@ -37,7 +37,8 @@ use super::surface_production::SurfaceProductionReport;
 use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
 use super::training::{
-    ArtifactAskEvalReport, ArtifactAskReport, HotAskReport, HotPackReport, TrainingCompileReport,
+    ArtifactAskEvalReport, ArtifactAskReport, HotAskReport, HotLearnReport, HotPackReport,
+    TrainingCompileReport,
 };
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
@@ -600,6 +601,36 @@ pub(crate) fn print_hot_ask_report(report: &HotAskReport, format: &OutputFormat)
         OutputFormat::Md => print_hot_ask_md(report),
     }
     Ok(())
+}
+
+pub(crate) fn print_hot_learn_report(report: &HotLearnReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_hot_learn_text(report),
+        OutputFormat::Md => print_hot_learn_md(report),
+    }
+    Ok(())
+}
+
+fn print_hot_learn_text(report: &HotLearnReport) {
+    println!("LLMWave-Big Hot Learn");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("records_written: {}", report.memory.records_written);
+    println!("accepted_records: {}", report.memory.accepted_records);
+    println!("rejected_records: {}", report.memory.rejected_records);
+    println!("out: {}", report.out);
+}
+
+fn print_hot_learn_md(report: &HotLearnReport) {
+    println!("# LLMWave-Big Hot Learn");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- records written: `{}`", report.memory.records_written);
+    println!("- accepted records: `{}`", report.memory.accepted_records);
+    println!("- rejected records: `{}`", report.memory.rejected_records);
+    println!("- out: `{}`", report.out);
 }
 
 fn print_hot_ask_text(report: &HotAskReport) {

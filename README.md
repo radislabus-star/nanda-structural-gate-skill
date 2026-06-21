@@ -812,6 +812,12 @@ answer, `OBJECT_FOREIGN_PULL` stays review-only, and reversed subject/object
 order is a hard stop. Its successful verdict is
 `HOT_FIELD_ANSWER_READY_NOT_GENERAL_LLM`, still not cache-only execution proof
 and still not broad chat readiness.
+`nanda-llmwave-big learn-hot` ingests batch feedback JSON and writes a
+persistent hot-memory overlay. `ask-hot --memory memory.json` applies those
+learned records on the next field pass, so accepted corrections can become
+learned schema peaks without hand-entering one fact at a time. Treat
+`HOT_LEARNING_MEMORY_WRITTEN_NOT_GRADIENT_TRAINING` as real persistent feedback
+learning for the hot retrieval layer, not transformer-style training.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

@@ -573,6 +573,10 @@ peaks. It may use the cold artifact only to decode labels for display. Treat
 `json_used_in_hot_scan=false` as a packed-scan claim, not full cache-only
 execution. The hot scan applies a subject/object polarity lens: `ALIGNED` can
 answer, `OBJECT_FOREIGN_PULL` is review-only, and `REVERSED` is a hard stop.
+`nanda-llmwave-big learn-hot` ingests batch feedback JSON and writes a
+persistent hot-memory overlay. Use `ask-hot --memory memory.json` to verify
+that learned records change the next hot field pass. Treat this as hot
+retrieval feedback learning, not gradient training or broad chat readiness.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,
