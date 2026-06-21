@@ -167,6 +167,7 @@ scripts/nanda-llmwave-big surface-generate --format json
 scripts/nanda-llmwave-big reason-field --format json
 scripts/nanda-llmwave-big dialogue-state --format json
 scripts/nanda-llmwave-big mini-chat-eval --format json
+scripts/nanda-llmwave-big query-wave --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -493,6 +494,11 @@ grounded answer, unsupported refusal, route-splice rejection, one-off schema
 noise rejection, and exact constrained surface generation. Treat
 `MINI_CHAT_EVAL_PASS_NOT_GENERAL_LLM` as a local eval pass only, not a general
 LLM, multi-turn chat readiness, or nonlinear-memory proof.
+v951-v1000 add `nanda-llmwave-big query-wave`: input text is normalized into a
+compact L2/L3 query wave with surface tokens, role hints, operator hints, and
+question/assertion polarity. Treat `QUERY_WAVE_READY_NOT_FIELD_MATURE` as the
+first mature-field input stage, not an answer, chat model, or nonlinear-memory
+proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

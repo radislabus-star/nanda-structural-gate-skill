@@ -1031,6 +1031,41 @@ general LLM remains false
 nonlinear_memory_proven remains false
 ```
 
+v951-v1000: implemented as nanda-llmwave-big query-wave
+
+## Phase 29: Query Wave Core, v951-v1000
+
+Goal:
+
+```text
+input text
+  -> normalized surface
+  -> L2 surface excitation
+  -> L3 role/operator hints
+  -> question/assertion polarity
+  -> compact QueryWaveRecord32
+```
+
+Current controls:
+
+```text
+Has customs cleared the goods?      -> customs-clearance-status question
+Is the cargo cleared by customs?    -> same route
+Товар выпущен таможней?             -> same route
+Customs cleared the goods.          -> assertion trap, not safe question
+```
+
+Stop rules:
+
+```text
+query wave focused -> input stage only
+QueryWaveRecord32 fixed record -> packed-boundary proof, not speed proof
+paraphrase route recall -> route-hint eval only
+full_field_mature remains false
+chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

@@ -54,6 +54,10 @@
   refusal, route-splice, schema-noise, and exact-surface controls pass through
   fixed `MiniChatEvalCase32` records while full LLM/chat/nonlinear claims stay
   false.
+- v951-v1000 add `nanda-llmwave-big query-wave`: input text now excites a
+  compact query wave with L2 surface signals, L3 role/operator hints,
+  question polarity, paraphrase eval, and fixed `QueryWaveRecord32` while
+  mature-field/chat/nonlinear claims stay false.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

@@ -22,6 +22,7 @@ pub mod mini_chat_eval;
 pub mod multi_schema_competition;
 pub mod open_surface_generation;
 pub mod operators;
+pub mod query_wave;
 pub mod reasoning_field;
 pub mod residuals;
 pub mod schema_memory_growth;
@@ -81,6 +82,9 @@ enum LlmwaveBigCommand {
     /// Run the v861-v950 mini chat eval boundary.
     #[command(name = "mini-chat-eval", alias = "chat-eval")]
     MiniChatEval(LlmwaveBigMiniChatEvalArgs),
+    /// Run the v951-v1000 query wave core.
+    #[command(name = "query-wave")]
+    QueryWave(LlmwaveBigQueryWaveArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -187,6 +191,14 @@ struct LlmwaveBigDialogueStateArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigMiniChatEvalArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigQueryWaveArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -368,6 +380,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::MiniChatEval(args) => {
             let report = mini_chat_eval::build_mini_chat_eval_report();
             report::print_mini_chat_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::QueryWave(args) => {
+            let report = query_wave::build_query_wave_report(args.text);
+            report::print_query_wave_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -984,6 +1001,40 @@ mod tests {
         assert!(!report.claim_boundary.multi_turn_chat_ready);
         assert!(!report.claim_boundary.external_corpus_loaded);
         assert!(!report.claim_boundary.broad_reasoning_proven);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn query_wave_extracts_roles_operator_and_polarity() {
+        let report =
+            query_wave::build_query_wave_report("Has customs cleared the goods?".to_string());
+        assert_eq!(report.roadmap_block, "v951-v1000");
+        assert_eq!(report.verdict, "QUERY_WAVE_READY_NOT_FIELD_MATURE");
+        assert_eq!(report.top_route_hint, "customs-clearance-status");
+        assert_eq!(report.question_polarity, "question_status");
+        assert!(report
+            .role_excitations
+            .iter()
+            .any(|role| role.role == "actor:customs" && role.energy > 0));
+        assert!(report
+            .operator_excitations
+            .iter()
+            .any(|operator| operator.operator == "clearance_status" && operator.energy > 0));
+        assert_eq!(core::mem::size_of::<query_wave::QueryWaveRecord32>(), 32);
+        assert!(report.claim_boundary.fixed_query_wave_records);
+    }
+
+    #[test]
+    fn query_wave_keeps_paraphrases_on_same_route() {
+        let report =
+            query_wave::build_query_wave_report("Has customs cleared the goods?".to_string());
+        assert_eq!(report.metrics.paraphrase_route_recall, 1.0);
+        assert_eq!(report.metrics.role_hint_accuracy, 1.0);
+        assert_eq!(report.metrics.operator_hint_accuracy, 1.0);
+        assert_eq!(report.metrics.assertion_reject_rate, 1.0);
+        assert!(report.paraphrase_eval.iter().all(|case| case.passed));
+        assert!(!report.claim_boundary.full_field_mature);
+        assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }
 

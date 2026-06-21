@@ -139,6 +139,12 @@ jq -e '.dialogue_bridge_state == "DIALOGUE_STATE_READY_NOT_CHAT" and .metrics.ca
 jq -e '.metrics.grounded_answer_rate == 1 and .metrics.unsupported_reject_rate == 1 and .metrics.route_splice_reject_rate == 1 and .metrics.surface_exact_rate == 1' <<<"$big_mini_chat_eval_json" >/dev/null
 jq -e '([.eval_cases[].case_id] | index("grounded_clearance_answer") and index("unsupported_clearance") and index("route_splice_surface") and index("one_off_schema_noise") and index("exact_constrained_surface"))' <<<"$big_mini_chat_eval_json" >/dev/null
 jq -e '.claim_boundary.fixed_eval_case_records == true and .claim_boundary.full_llm_ready == false and .claim_boundary.multi_turn_chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_mini_chat_eval_json" >/dev/null
+big_query_wave_json="$("$llmwave_big" query-wave --text "Has customs cleared the goods?" --format json)"
+jq -e '.roadmap_block == "v951-v1000" and .verdict == "QUERY_WAVE_READY_NOT_FIELD_MATURE"' <<<"$big_query_wave_json" >/dev/null
+jq -e '.top_route_hint == "customs-clearance-status" and .question_polarity == "question_status" and .record.l3_schema_hint_id == 203' <<<"$big_query_wave_json" >/dev/null
+jq -e '.metrics.paraphrase_route_recall == 1 and .metrics.role_hint_accuracy == 1 and .metrics.operator_hint_accuracy == 1 and .metrics.assertion_reject_rate == 1' <<<"$big_query_wave_json" >/dev/null
+jq -e '([.paraphrase_eval[].case_id] | index("en_has_cleared") and index("en_is_cleared") and index("ru_released") and index("assertion_trap"))' <<<"$big_query_wave_json" >/dev/null
+jq -e '.claim_boundary.fixed_query_wave_records == true and .claim_boundary.full_field_mature == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_query_wave_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

@@ -15,6 +15,7 @@ use super::loader::RuntimeProductReport;
 use super::mini_chat_eval::MiniChatEvalReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
 use super::open_surface_generation::OpenSurfaceGenerationReport;
+use super::query_wave::QueryWaveReport;
 use super::reasoning_field::ReasoningFieldReport;
 use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
@@ -189,6 +190,18 @@ pub(crate) fn print_mini_chat_eval_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_mini_chat_eval_text(report),
         OutputFormat::Md => print_mini_chat_eval_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_query_wave_report(
+    report: &QueryWaveReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_query_wave_text(report),
+        OutputFormat::Md => print_query_wave_md(report),
     }
     Ok(())
 }
@@ -1742,6 +1755,62 @@ fn print_mini_chat_eval_md(report: &MiniChatEvalReport) {
         "- full LLM ready: `{}`",
         report.claim_boundary.full_llm_ready
     );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_query_wave_text(report: &QueryWaveReport) {
+    println!("LLMWave-Big Query Wave");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("route: {}", report.top_route_hint);
+    println!("polarity: {}", report.question_polarity);
+    println!(
+        "fixed_query_wave_records: {}",
+        report.claim_boundary.fixed_query_wave_records
+    );
+}
+
+fn print_query_wave_md(report: &QueryWaveReport) {
+    println!("# LLMWave-Big Query Wave");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- route hint: `{}`", report.top_route_hint);
+    println!("- polarity: `{}`", report.question_polarity);
+    println!();
+    println!("## Metrics");
+    println!();
+    println!(
+        "- paraphrase route recall: `{:.3}`",
+        report.metrics.paraphrase_route_recall
+    );
+    println!(
+        "- role hint accuracy: `{:.3}`",
+        report.metrics.role_hint_accuracy
+    );
+    println!(
+        "- operator hint accuracy: `{:.3}`",
+        report.metrics.operator_hint_accuracy
+    );
+    println!(
+        "- assertion reject rate: `{:.3}`",
+        report.metrics.assertion_reject_rate
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- full field mature: `{}`",
+        report.claim_boundary.full_field_mature
+    );
+    println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
     println!(
         "- nonlinear memory proven: `{}`",
         report.claim_boundary.nonlinear_memory_proven

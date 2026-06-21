@@ -311,6 +311,7 @@ nanda-llmwave-big surface-generate --format json
 nanda-llmwave-big reason-field --format json
 nanda-llmwave-big dialogue-state --format json
 nanda-llmwave-big mini-chat-eval --format json
+nanda-llmwave-big query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -611,6 +612,13 @@ rejection, route-splice rejection, one-off schema-noise rejection, and exact
 constrained surface generation. Its passing verdict is a mini chat candidate
 for this fixture chain only, not a general LLM, not broad chat readiness, and
 not nonlinear-memory proof.
+`nanda-llmwave-big query-wave` starts the Mature Field Core path in v951-v1000.
+It converts input text into a compact query wave with L2 surface excitation,
+L3 role/operator hints, question/assertion polarity, and a fixed
+`QueryWaveRecord32`. Its eval checks that English and Russian paraphrases of a
+customs-clearance status question hit the same route while an assertion trap is
+not treated as a safe question. This is text-to-field excitation, not mature
+field selection and not chat readiness.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor
