@@ -1,0 +1,85 @@
+{
+  "task_id": "codex-failure-runtime-mismatch",
+  "domain": "code",
+  "query": "IME not visible while runtime state points to inactive engine",
+  "failure_contract": {
+    "enabled": true,
+    "symptom": "IME not visible",
+    "selected_action_id": "code.edit_candidate_generation",
+    "evidence": [
+      "ibus engine = xkb:ru::rus",
+      "lay-ibus-engine not running",
+      "config text_backend = ime"
+    ],
+    "runtime_snapshot": {
+      "systemd": {"lay-daemon": "active"},
+      "ibus_engine": "xkb:ru::rus",
+      "processes": ["lay-daemon"],
+      "config": {"text_backend": "ime"},
+      "version": "0.1.235"
+    },
+    "actions": [
+      {
+        "action_id": "runtime.activate_ibus_engine",
+        "owner": "LayIbusEngine",
+        "layer": "adapter/display",
+        "input": ["IBus runtime state", "text_backend config"],
+        "output": ["lay-ime engine active"],
+        "allowed_routes": ["ibus_preedit_display"],
+        "forbidden_routes": ["manual_trigger_fsm", "correction_decision", "nanda_candidate_generation"]
+      },
+      {
+        "action_id": "code.edit_candidate_generation",
+        "owner": "NandaCandidateCore",
+        "layer": "core",
+        "input": ["CandidateRequest"],
+        "output": ["CandidateList"],
+        "allowed_routes": ["nanda_candidate_generation"],
+        "forbidden_routes": ["ibus_preedit_display", "manual_trigger_fsm"]
+      }
+    ],
+    "verification": {
+      "ibus_preedit_display": ["ibus engine is lay-ime-*", "lay-ibus-engine process alive"]
+    },
+    "checkpoint_before_risky_change": true,
+    "hypothesis_proven": false
+  },
+  "triads": [
+    {
+      "id": "s1",
+      "subject": "ibus runtime",
+      "relation": "reports",
+      "object": "xkb:ru::rus",
+      "evidence": "runtime_snapshot",
+      "confidence": 0.9,
+      "subject_role": "runtime",
+      "object_role": "state",
+      "route": "ibus_preedit_display",
+      "group": "ime-runtime",
+      "layer": "runtime",
+      "owner": "LayIbusEngine",
+      "entrypoint": "ibus engine",
+      "output": "visible preedit",
+      "scope": "runtime"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "c1",
+      "subject": "NandaCandidateCore",
+      "relation": "writes",
+      "object": "CandidateList",
+      "evidence": "candidate_answer",
+      "confidence": 0.8,
+      "subject_role": "owner",
+      "object_role": "output",
+      "route": "nanda_candidate_generation",
+      "group": "candidate-code-change",
+      "layer": "core",
+      "owner": "NandaCandidateCore",
+      "entrypoint": "generate_candidates",
+      "output": "CandidateList",
+      "scope": "production"
+    }
+  ]
+}

@@ -777,6 +777,7 @@ Inspect JSON fields:
 - `owner_gravity`;
 - `structural_energy`;
 - `negative_routes`;
+- `codex_failure_field`;
 - `mixed_candidate_groups`;
 - `foreign_pull`;
 - `group_centroids`;
@@ -791,6 +792,13 @@ repair or split that group first.
 If `owner_gravity.conflicts` or `negative_routes.hits` are non-empty, also do
 not finalize as PASS. Explain who owns the decision, which adapter/UI/test/helper
 crossed the boundary, and use `repair_queue` as the minimal repair list.
+When the task is a risky Codex edit, add a packet `failure_contract` with:
+`enabled`, `symptom`, `evidence`, `selected_action_id`, `actions`,
+`runtime_snapshot`, `namespace_terms`, `verification`,
+`checkpoint_before_risky_change`, and `hypothesis_proven`. Inspect
+`codex_failure_field.verdict`: `HARD_STOP` means no tools/code/restart,
+`VETO` means action/evidence/route mismatch, and `ANALYSIS_INSUFFICIENT` means
+the agent has not named a precise enough action or proof route yet.
 
 Recommended repository workflow:
 
@@ -827,6 +835,8 @@ Interpret the result as:
 - global `foreign_pull` non-empty = repair before PASS;
 - `owner_gravity.conflicts` or `negative_routes.hits` non-empty = repair before
   PASS;
+- `codex_failure_field.verdict` of `HARD_STOP`, `VETO`, or
+  `ANALYSIS_INSUFFICIENT` = do not edit yet;
 - linked split files should contain both source and candidate triads;
 - route-level PASS across split files is the practical acceptance condition.
 - `nanda-hgate` is the direct large-packet acceptance command:

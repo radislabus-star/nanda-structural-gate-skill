@@ -422,6 +422,13 @@ coordinates. Use `owner_gravity.conflicts` to catch two owners pulling one
 decision. Use `negative_routes.hits` to catch anti-modes such as adapter/UI
 decision ownership, test-only paths leaking into runtime, helpers owning
 decisions, or experiments affecting stable routes.
+`codex_failure_field` is an opt-in edit firewall. Add
+`failure_contract.enabled=true` with a user symptom, evidence, selected
+`action_id`, allowed/forbidden routes, runtime snapshot, namespace terms, and
+route-specific verification. It returns `PASS`, `ANALYSIS_INSUFFICIENT`,
+`VETO`, or `HARD_STOP`. Use it to catch symptom/action mismatch, scope creep,
+namespace confusion, runtime blindness, fake verification, unproven
+hypotheses, example-specific patches, and missing checkpoints before editing.
 `nanda-hgate` is the hierarchical gate for large packets. It runs one
 global map/check, splits by linked group, runs local gates, and returns
 `STRUCTURALLY_ACCEPTED` only when the global `WATCH` is size-only and every
@@ -430,6 +437,10 @@ hits, conflicts, or any local `VETO` exist, it returns `REPAIR_REQUIRED`.
 `nanda-extract` converts simple arrow text into a triad packet. The supported
 line format is `subject -> relation -> object [route=x group=y ...]`, with
 `## triads` and `## candidate_triads` sections.
+If a repository has no curated `examples/self-dogfood.nanda.json`,
+`nanda-dogfood <repo>` builds a low-confidence auto route-field from source,
+config, script, UI/status, runtime, and test files. That fallback is deliberately
+review-only: it should help the agent see contours, not grant edit permission.
 `nanda-index` builds a reusable memory packet from one or more triad packets or
 Markdown worksheets.
 `nanda-search` is the memory-index retrieval surface. It treats `triads`
@@ -1039,6 +1050,11 @@ UI, tests, helpers, and experiments are back behind their allowed boundaries.
 `structural_energy.field_tension` is the compact numeric signal for how much
 route pressure remains; `repair_queue` is the machine-readable list of minimum
 repairs.
+If `codex_failure_field.verdict` is `HARD_STOP`, do no tools, no code, no
+restart. If it is `VETO`, repair the action/evidence/route mismatch first. If
+it is `ANALYSIS_INSUFFICIENT`, choose a more precise `action_id`, add evidence,
+namespace ambiguous terms, or attach route-specific verification before
+editing.
 
 Interference search output:
 

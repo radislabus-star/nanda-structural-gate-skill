@@ -798,6 +798,7 @@ pub(crate) fn hierarchical_decision(
     global_map: &Value,
     branches: &[Value],
     truncated: usize,
+    failure_field: &Value,
 ) -> Value {
     let branch_count = branches.len();
     let local_pass = branches
@@ -821,11 +822,27 @@ pub(crate) fn hierarchical_decision(
         && global_report.conflicts.is_empty()
         && global_report.evidence_gaps.is_empty()
         && global_foreign_pull == 0;
+    let failure_verdict = failure_field["verdict"].as_str().unwrap_or("NOT_ENABLED");
     let all_local_pass = branch_count > 0 && local_pass == branch_count && truncated == 0;
-    let (action, accepted, next) = if global_report.verdict == "VETO"
-        || global_foreign_pull > 0
-        || local_veto > 0
-    {
+    let (action, accepted, next) = if failure_verdict == "HARD_STOP" {
+        (
+            "HARD_STOP",
+            false,
+            "User stop signal is active: no tools, no code, no restart.",
+        )
+    } else if failure_verdict == "VETO" {
+        (
+            "REPAIR_REQUIRED",
+            false,
+            "Codex Failure Field vetoed the selected action before structural acceptance.",
+        )
+    } else if failure_verdict == "ANALYSIS_INSUFFICIENT" {
+        (
+            "SPLIT_REQUIRED",
+            false,
+            "Codex Failure Field says analysis is insufficient before accepting this route.",
+        )
+    } else if global_report.verdict == "VETO" || global_foreign_pull > 0 || local_veto > 0 {
         (
             "REPAIR_REQUIRED",
             false,
@@ -860,6 +877,8 @@ pub(crate) fn hierarchical_decision(
         "local_watch": local_watch,
         "local_veto": local_veto,
         "global_foreign_pull": global_foreign_pull,
+        "codex_failure_verdict": failure_verdict,
+        "codex_failure_reasons": failure_field["reason_codes"],
         "truncated_branches": truncated,
         "next": next
     })
@@ -1067,6 +1086,7 @@ pub(crate) fn extract_packet_from_text(
         positive_shortcuts: vec![],
         resonance_memory: vec![],
         continuation_memory: vec![],
+        failure_contract: Value::Null,
     }
 }
 
@@ -1935,6 +1955,7 @@ pub(crate) fn packet_from_markdown(
         positive_shortcuts: vec![],
         resonance_memory: vec![],
         continuation_memory: vec![],
+        failure_contract: Value::Null,
     })
 }
 
@@ -2284,6 +2305,7 @@ pub(crate) fn example_packet(swapped: bool) -> Packet {
         positive_shortcuts: vec![],
         resonance_memory: vec![],
         continuation_memory: vec![],
+        failure_contract: Value::Null,
     }
 }
 
@@ -2396,6 +2418,7 @@ pub(crate) fn synthetic_packet(idx: usize, kind: &str) -> Packet {
         positive_shortcuts: vec![],
         resonance_memory: vec![],
         continuation_memory: vec![],
+        failure_contract: Value::Null,
     }
 }
 
@@ -2569,6 +2592,8 @@ pub(crate) struct Packet {
     pub(crate) resonance_memory: Vec<ResonanceMemory>,
     #[serde(default)]
     pub(crate) continuation_memory: Vec<ContinuationMemory>,
+    #[serde(default)]
+    pub(crate) failure_contract: Value,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

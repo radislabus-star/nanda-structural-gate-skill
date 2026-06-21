@@ -1112,6 +1112,35 @@ if [[ "$route_field_dogfood_status" -ne 1 ]]; then
   exit 1
 fi
 jq -e '.agent_decision.action == "REPAIR_REQUIRED" and .agent_decision.owner_conflict == 1 and .agent_decision.negative_route_hits == 1' <<<"$route_field_dogfood" >/dev/null
+failure_runtime_json="$("$mapper" "$root/examples/triad-packet.codex-failure-runtime-mismatch.json" --input-format json --format json)"
+jq -e '.codex_failure_field.verdict == "VETO" and (.codex_failure_field.reason_codes | index("symptom_action_mismatch")) and (.codex_failure_field.reason_codes | index("runtime_blindness"))' <<<"$failure_runtime_json" >/dev/null
+set +e
+failure_stop_json="$("$dogfood" "$root/examples/triad-packet.codex-failure-hard-stop.json" --format json)"
+failure_stop_status=$?
+set -e
+if [[ "$failure_stop_status" -ne 1 ]]; then
+  echo "expected hard stop dogfood to VETO exit" >&2
+  echo "$failure_stop_json" >&2
+  exit 1
+fi
+jq -e '.agent_decision.action == "HARD_STOP" and .agent_decision.codex_failure_verdict == "HARD_STOP" and .agent_decision.safe_to_edit == false' <<<"$failure_stop_json" >/dev/null
+failure_namespace_json="$("$mapper" "$root/examples/triad-packet.codex-failure-namespace-watch.json" --input-format json --format json)"
+jq -e '.codex_failure_field.verdict == "ANALYSIS_INSUFFICIENT" and (.codex_failure_field.reason_codes | index("namespace_confusion"))' <<<"$failure_namespace_json" >/dev/null
+tmp_auto_repo="$(mktemp -d)"
+mkdir -p "$tmp_auto_repo/src" "$tmp_auto_repo/scripts"
+printf 'fn main() {}' >"$tmp_auto_repo/src/main.rs"
+printf 'echo install' >"$tmp_auto_repo/scripts/install.sh"
+set +e
+auto_dogfood_json="$("$dogfood" "$tmp_auto_repo" --format json)"
+auto_dogfood_status=$?
+set -e
+if [[ "$auto_dogfood_status" -ne 3 ]]; then
+  echo "expected auto dogfood to return WATCH/REVIEW" >&2
+  echo "$auto_dogfood_json" >&2
+  exit 1
+fi
+jq -e '.agent_decision.action == "REVIEW_REQUIRED" and .agent_decision.codex_failure_verdict == "ANALYSIS_INSUFFICIENT" and (.input | contains("repo-auto-dogfood"))' <<<"$auto_dogfood_json" >/dev/null
+rm -rf "$tmp_auto_repo"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null

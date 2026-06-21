@@ -3994,6 +3994,7 @@ fn packet_from_demo_text(
         positive_shortcuts: vec![],
         resonance_memory: vec![],
         continuation_memory: vec![],
+        failure_contract: Value::Null,
     };
     (
         packet,

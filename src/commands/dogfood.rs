@@ -42,7 +42,8 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
         &candidates,
     )?;
     let summary = comb_summary(&comb_tree);
-    let decision = dogfood_decision(&comb_tree, &summary);
+    let failure_field = codex_failure_field(&packet, &triads, &candidates);
+    let decision = dogfood_decision(&comb_tree, &summary, &failure_field);
     let out = json!({
         "core_version": CORE_VERSION,
         "wave_dim": WAVE_DIM,
@@ -54,6 +55,7 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
         "topology": topology,
         "comb_tree": comb_tree,
         "summary": summary,
+        "codex_failure_field": failure_field,
         "agent_decision": decision,
         "refactor_plan": refactor_plan
     });
@@ -72,7 +74,7 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
     match out["agent_decision"]["action"].as_str().unwrap_or("") {
         "SAFE_TO_EDIT" => Ok(EXIT_PASS),
         "SPLIT_REQUIRED" | "REVIEW_REQUIRED" => Ok(EXIT_WATCH),
-        "REPAIR_REQUIRED" => Ok(EXIT_VETO),
+        "REPAIR_REQUIRED" | "HARD_STOP" => Ok(EXIT_VETO),
         _ => Ok(EXIT_ERROR),
     }
 }
@@ -91,13 +93,197 @@ pub(crate) fn resolve_dogfood_input(input: &Path) -> Result<PathBuf> {
                 return Ok(candidate);
             }
         }
+        return write_auto_dogfood_packet(input);
     }
     Err(anyhow!(
         "dogfood input not found: pass a triad packet or a repo containing examples/self-dogfood.nanda.json"
     ))
 }
 
-pub(crate) fn dogfood_decision(tree: &Value, summary: &Value) -> Value {
+fn write_auto_dogfood_packet(repo: &Path) -> Result<PathBuf> {
+    let mut files = vec![];
+    collect_repo_files(repo, repo, &mut files)?;
+    files.sort();
+    files.truncate(64);
+    let mut triads = vec![];
+    let mut candidates = vec![];
+    for (idx, rel) in files.iter().enumerate() {
+        let route = auto_route_for_path(rel);
+        let layer = auto_layer_for_path(rel);
+        let owner = auto_owner_for_path(rel);
+        triads.push(Triad {
+            id: format!("s{}", idx + 1),
+            subject: rel.clone(),
+            relation: "belongs_to".to_string(),
+            object: route.clone(),
+            evidence: rel.clone(),
+            confidence: 0.55,
+            subject_role: "file".to_string(),
+            object_role: "route".to_string(),
+            route: route.clone(),
+            group: route.clone(),
+            layer: layer.clone(),
+            owner: owner.clone(),
+            entrypoint: rel.clone(),
+            output: route.clone(),
+            evidence_path: rel.clone(),
+            scope: "auto-scan-low-confidence".to_string(),
+        });
+        candidates.push(Triad {
+            id: format!("c{}", idx + 1),
+            subject: rel.clone(),
+            relation: "belongs_to".to_string(),
+            object: route.clone(),
+            evidence: "repo-auto-field".to_string(),
+            confidence: 0.55,
+            subject_role: "file".to_string(),
+            object_role: "route".to_string(),
+            route: route.clone(),
+            group: format!("candidate-{route}"),
+            layer,
+            owner,
+            entrypoint: rel.clone(),
+            output: route,
+            evidence_path: rel.clone(),
+            scope: "auto-scan-low-confidence".to_string(),
+        });
+    }
+    let evidence = files
+        .iter()
+        .take(12)
+        .cloned()
+        .map(Value::String)
+        .collect::<Vec<_>>();
+    let packet = Packet {
+        task_id: "repo-auto-dogfood".to_string(),
+        domain: "code".to_string(),
+        query: "Auto-generated repository route field; review required before risky edits."
+            .to_string(),
+        triads,
+        candidate_triads: candidates,
+        candidate_answer: String::new(),
+        aliases: vec![],
+        canonicalization: CanonicalizationReport::default(),
+        negative_shortcuts: vec![],
+        positive_shortcuts: vec![],
+        resonance_memory: vec![],
+        continuation_memory: vec![],
+        failure_contract: json!({
+            "enabled": true,
+            "symptom": "repo auto-field without curated self-dogfood packet",
+            "selected_action_id": "",
+            "evidence": evidence,
+            "actions": [],
+            "verification": {},
+            "checkpoint_before_risky_change": true,
+            "hypothesis_proven": false
+        }),
+    };
+    let out_dir = std::env::temp_dir().join("nanda-structural-gate");
+    fs::create_dir_all(&out_dir)?;
+    let stem = slug(&repo.display().to_string());
+    let out = out_dir.join(format!("repo-auto-dogfood-{stem}.json"));
+    fs::write(&out, serde_json::to_string_pretty(&packet)? + "\n")?;
+    Ok(out)
+}
+
+fn collect_repo_files(root: &Path, dir: &Path, out: &mut Vec<String>) -> Result<()> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(()),
+    };
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with(".git")
+            || name == "target"
+            || name == "node_modules"
+            || name == ".nanda"
+            || name == "__pycache__"
+        {
+            continue;
+        }
+        if path.is_dir() {
+            collect_repo_files(root, &path, out)?;
+            continue;
+        }
+        if !is_architecture_file(&path) {
+            continue;
+        }
+        let rel = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .to_string();
+        out.push(rel);
+    }
+    Ok(())
+}
+
+fn is_architecture_file(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    if matches!(
+        name,
+        "Cargo.toml" | "package.json" | "pyproject.toml" | "README.md" | "Makefile"
+    ) {
+        return true;
+    }
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| {
+            matches!(
+                ext,
+                "rs" | "py" | "js" | "ts" | "tsx" | "json" | "toml" | "sh"
+            )
+        })
+}
+
+fn auto_route_for_path(path: &str) -> String {
+    let lower = path.to_ascii_lowercase();
+    if lower.contains("test") || lower.contains("spec") {
+        "test-flow".to_string()
+    } else if lower.contains("install") || lower.contains("deploy") || lower.contains("script") {
+        "install-flow".to_string()
+    } else if lower.contains("ui") || lower.contains("status") || lower.contains("tray") {
+        "ui-status-flow".to_string()
+    } else if lower.contains("config") || lower.ends_with(".toml") || lower.ends_with(".json") {
+        "config-flow".to_string()
+    } else if lower.contains("bin/") || lower.contains("main.") || lower.contains("cli") {
+        "cli-flow".to_string()
+    } else if lower.contains("runtime") || lower.contains("daemon") || lower.contains("server") {
+        "runtime-flow".to_string()
+    } else {
+        "source-flow".to_string()
+    }
+}
+
+fn auto_layer_for_path(path: &str) -> String {
+    match auto_route_for_path(path).as_str() {
+        "test-flow" => "test",
+        "install-flow" => "install",
+        "ui-status-flow" => "ui",
+        "config-flow" => "config",
+        "cli-flow" => "adapter",
+        "runtime-flow" => "runtime",
+        _ => "source",
+    }
+    .to_string()
+}
+
+fn auto_owner_for_path(path: &str) -> String {
+    path.split('/')
+        .take(3)
+        .collect::<Vec<_>>()
+        .join("::")
+        .trim_end_matches("::")
+        .to_string()
+}
+
+pub(crate) fn dogfood_decision(tree: &Value, summary: &Value, failure_field: &Value) -> Value {
     let root_verdict = tree["verdict"].as_str().unwrap_or("WATCH");
     let children = tree["children"].as_array().cloned().unwrap_or_default();
     let child_count = children.len();
@@ -125,6 +311,7 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value) -> Value {
         .as_array()
         .map(|items| items.len() as u64)
         .unwrap_or(0);
+    let failure_verdict = failure_field["verdict"].as_str().unwrap_or("NOT_ENABLED");
     let root_stop = tree["stop_reasons"]
         .as_array()
         .map(|items| {
@@ -141,7 +328,22 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value) -> Value {
             .map(|items| items.is_empty())
             .unwrap_or(true);
 
-    let (action, next) = if foreign_pull > 0
+    let (action, next) = if failure_verdict == "HARD_STOP" {
+        (
+            "HARD_STOP",
+            "User stop signal is active: no tools, no code, no restart.",
+        )
+    } else if failure_verdict == "VETO" {
+        (
+            "REPAIR_REQUIRED",
+            "Codex Failure Field vetoed the selected action; repair action/evidence/route before editing.",
+        )
+    } else if failure_verdict == "ANALYSIS_INSUFFICIENT" {
+        (
+            "REVIEW_REQUIRED",
+            "Codex Failure Field says analysis is insufficient; choose a precise action_id and evidence before editing.",
+        )
+    } else if foreign_pull > 0
         || invariant_violation > 0
         || local_veto > 0
         || owner_conflict > 0
@@ -192,6 +394,8 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value) -> Value {
         "owner_conflict": owner_conflict,
         "negative_route_hits": negative_route_hits,
         "repair_queue": tree["map"]["repair_queue"],
+        "codex_failure_verdict": failure_verdict,
+        "codex_failure_reasons": failure_field["reason_codes"],
         "next": next
     })
 }
@@ -222,6 +426,12 @@ pub(crate) fn print_dogfood_text(out: &Value) {
         decision["owner_conflict"].as_u64().unwrap_or(0),
         decision["negative_route_hits"].as_u64().unwrap_or(0),
         decision["invariant_violation"].as_u64().unwrap_or(0)
+    );
+    println!(
+        "FAILURE_FIELD: {}",
+        decision["codex_failure_verdict"]
+            .as_str()
+            .unwrap_or("NOT_ENABLED")
     );
     println!(
         "BRANCHES: {}/{} PASS",
@@ -257,6 +467,10 @@ pub(crate) fn print_dogfood_md(out: &Value) {
         decision["local_branches"].as_u64().unwrap_or(0)
     );
     println!("- foreign_pull: `{}`", decision["foreign_pull"]);
+    println!(
+        "- codex_failure_verdict: `{}`",
+        decision["codex_failure_verdict"]
+    );
     println!("- owner_conflict: `{}`", decision["owner_conflict"]);
     println!(
         "- negative_route_hits: `{}`",

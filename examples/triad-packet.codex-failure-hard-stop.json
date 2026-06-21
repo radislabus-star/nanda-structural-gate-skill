@@ -1,0 +1,12 @@
+{
+  "task_id": "codex-failure-hard-stop",
+  "domain": "code",
+  "query": "СТОЙ ничего не делай",
+  "failure_contract": {
+    "enabled": true,
+    "hard_stop": true,
+    "symptom": "СТОЙ ничего не делай"
+  },
+  "triads": [],
+  "candidate_triads": []
+}

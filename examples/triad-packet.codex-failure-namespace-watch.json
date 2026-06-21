@@ -1,0 +1,75 @@
+{
+  "task_id": "codex-failure-namespace-watch",
+  "domain": "code",
+  "query": "tail handling route must be namespaced",
+  "failure_contract": {
+    "enabled": true,
+    "symptom": "tail mismatch",
+    "selected_action_id": "runtime.fix_tail_sync",
+    "namespace_terms": ["tail", "buffer"],
+    "evidence": ["two routes mention tail"],
+    "actions": [
+      {
+        "action_id": "runtime.fix_tail_sync",
+        "owner": "WordBufferOwner",
+        "layer": "runtime",
+        "input": ["tail"],
+        "output": ["tail"],
+        "allowed_routes": ["daemon_word_buffer", "ime_preedit_buffer"],
+        "forbidden_routes": ["nanda_candidate_generation"]
+      }
+    ],
+    "verification": {
+      "daemon_word_buffer": ["WordBuffer sync test"],
+      "ime_preedit_buffer": ["preedit smoke"]
+    },
+    "checkpoint_before_risky_change": true,
+    "hypothesis_proven": true
+  },
+  "triads": [
+    {
+      "id": "s1",
+      "subject": "tail",
+      "relation": "belongs_to",
+      "object": "WordBuffer",
+      "evidence": "src/daemon/word_buffer.rs:10",
+      "confidence": 0.9,
+      "subject_role": "state",
+      "object_role": "owner",
+      "route": "daemon_word_buffer",
+      "group": "daemon-buffer",
+      "layer": "runtime",
+      "owner": "WordBufferOwner"
+    },
+    {
+      "id": "s2",
+      "subject": "tail",
+      "relation": "belongs_to",
+      "object": "IBusPreedit",
+      "evidence": "src/ibus/preedit.rs:12",
+      "confidence": 0.9,
+      "subject_role": "state",
+      "object_role": "owner",
+      "route": "ime_preedit_buffer",
+      "group": "ime-buffer",
+      "layer": "adapter",
+      "owner": "IbusPreeditOwner"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "c1",
+      "subject": "tail",
+      "relation": "syncs_to",
+      "object": "buffer",
+      "evidence": "candidate_answer",
+      "confidence": 0.8,
+      "subject_role": "state",
+      "object_role": "state",
+      "route": "daemon_word_buffer",
+      "group": "candidate-tail-sync",
+      "layer": "runtime",
+      "owner": "WordBufferOwner"
+    }
+  ]
+}

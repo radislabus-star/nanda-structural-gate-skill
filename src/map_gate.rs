@@ -649,6 +649,291 @@ fn is_decision_relation(triad: &Triad) -> bool {
         || relation.contains("source_of_truth")
 }
 
+pub(crate) fn codex_failure_field(
+    packet: &Packet,
+    source: &[Triad],
+    candidates: &[Triad],
+) -> Value {
+    let contract = &packet.failure_contract;
+    if !contract["enabled"].as_bool().unwrap_or(false) {
+        return json!({
+            "enabled": false,
+            "verdict": "NOT_ENABLED",
+            "reason_codes": [],
+            "read_as": "Add failure_contract.enabled=true to turn on Codex Failure Field."
+        });
+    }
+
+    let symptom = contract["symptom"].as_str().unwrap_or(&packet.query);
+    let action_id = contract["selected_action_id"].as_str().unwrap_or("");
+    let runtime_snapshot = &contract["runtime_snapshot"];
+    let actions = contract["actions"].as_array().cloned().unwrap_or_default();
+    let verification = contract["verification"].as_object();
+    let mut reason_codes = Vec::<String>::new();
+    let mut blocked_operations = BTreeSet::<String>::new();
+    let mut allowed_operations = BTreeSet::<String>::new();
+    let mut diagnostics = vec![];
+
+    if is_hard_stop(symptom)
+        || contract["hard_stop"].as_bool().unwrap_or(false)
+        || is_hard_stop(&packet.candidate_answer)
+    {
+        return json!({
+            "enabled": true,
+            "verdict": "HARD_STOP",
+            "reason_codes": ["hard_stop_signal"],
+            "allowed_operations": [],
+            "blocked_operations": ["tools", "code", "restart", "install", "runtime_mutation"],
+            "message": "No tools, no code, no restart"
+        });
+    }
+
+    let selected_action = actions
+        .iter()
+        .find(|action| action["action_id"].as_str() == Some(action_id));
+    if action_id.trim().is_empty() || action_id.split('.').count() < 2 {
+        reason_codes.push("action_id_missing_or_too_generic".to_string());
+        diagnostics.push(json!({
+            "kind": "analysis_quality",
+            "risk": "Codex is about to fix a blurred action instead of a named route action.",
+            "repair": "Choose a concrete action_id such as domain.route.operation before editing."
+        }));
+    }
+    if selected_action.is_none() {
+        reason_codes.push("action_id_not_found".to_string());
+    }
+
+    if let Some(action) = selected_action {
+        for route in string_array(&action["allowed_routes"]) {
+            allowed_operations.insert(route);
+        }
+        for route in string_array(&action["forbidden_routes"]) {
+            blocked_operations.insert(route);
+        }
+        let owner = action["owner"].as_str().unwrap_or("");
+        if owner.trim().is_empty() {
+            reason_codes.push("action_owner_missing".to_string());
+        }
+        if string_array(&action["input"]).is_empty() || string_array(&action["output"]).is_empty() {
+            reason_codes.push("action_io_contract_missing".to_string());
+        }
+    }
+
+    let evidence_items = contract["evidence"].as_array().cloned().unwrap_or_default();
+    if evidence_items.is_empty() {
+        reason_codes.push("evidence_missing".to_string());
+    }
+    let runtime_evidence =
+        evidence_items.iter().any(is_runtime_evidence) || runtime_snapshot.is_object();
+    let code_action = selected_action.is_some_and(is_code_change_action);
+    if runtime_evidence && code_action {
+        reason_codes.push("symptom_action_mismatch".to_string());
+        diagnostics.push(json!({
+            "kind": "symptom_action_mismatch",
+            "risk": "Evidence points to runtime/config state, but selected action is a code-change route.",
+            "repair": "Run or repair the runtime route first; do not edit candidate generation or unrelated code."
+        }));
+    }
+
+    let namespace_terms = string_array(&contract["namespace_terms"]);
+    let ambiguous_terms = namespace_confusions(source, candidates, &namespace_terms);
+    if !ambiguous_terms.is_empty() {
+        reason_codes.push("namespace_confusion".to_string());
+        diagnostics.push(json!({
+            "kind": "namespace_confusion",
+            "terms": ambiguous_terms,
+            "risk": "Same surface term is used without namespace across multiple routes.",
+            "repair": "Use namespaced entities such as daemon.word_buffer.tail or ime.preedit_buffer."
+        }));
+    }
+
+    let allowed_routes = selected_action
+        .map(|action| string_array(&action["allowed_routes"]))
+        .unwrap_or_default();
+    let touched_routes = candidates
+        .iter()
+        .map(|triad| route_name(triad, "unrouted"))
+        .collect::<BTreeSet<_>>();
+    let side_effect_routes = touched_routes
+        .iter()
+        .filter(|route| !allowed_routes.is_empty() && !allowed_routes.contains(route))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !side_effect_routes.is_empty() {
+        reason_codes.push("side_effect_creep".to_string());
+        diagnostics.push(json!({
+            "kind": "side_effect_creep",
+            "touched_routes": side_effect_routes,
+            "allowed_routes": allowed_routes,
+            "risk": "Candidate diff touches routes outside the selected action.",
+            "repair": "Split the patch or justify the extra route with explicit evidence."
+        }));
+    }
+
+    if runtime_snapshot.is_object() && selected_action.is_some_and(is_code_change_action) {
+        reason_codes.push("runtime_blindness".to_string());
+    }
+    if verification.is_none_or(|items| items.is_empty()) {
+        reason_codes.push("verification_missing".to_string());
+    } else if !verification_matches_routes(verification.unwrap(), &allowed_routes) {
+        reason_codes.push("fake_verification".to_string());
+    }
+
+    if contract["checkpoint_before_risky_change"].as_bool() == Some(false) {
+        reason_codes.push("no_checkpoint_before_risky_change".to_string());
+    }
+    if contract["hypothesis_proven"].as_bool() == Some(false) {
+        reason_codes.push("unproven_hypothesis".to_string());
+    }
+    if contract["example_specific_patch"].as_bool() == Some(true) {
+        reason_codes.push("example_specific_patch".to_string());
+    }
+
+    reason_codes.sort();
+    reason_codes.dedup();
+    let verdict = if reason_codes.iter().any(|code| {
+        matches!(
+            code.as_str(),
+            "symptom_action_mismatch"
+                | "side_effect_creep"
+                | "runtime_blindness"
+                | "fake_verification"
+                | "no_checkpoint_before_risky_change"
+        )
+    }) {
+        "VETO"
+    } else if !reason_codes.is_empty() {
+        "ANALYSIS_INSUFFICIENT"
+    } else {
+        "PASS"
+    };
+
+    json!({
+        "enabled": true,
+        "verdict": verdict,
+        "symptom": symptom,
+        "selected_action_id": action_id,
+        "reason_codes": reason_codes,
+        "allowed_operations": allowed_operations.into_iter().collect::<Vec<_>>(),
+        "blocked_operations": blocked_operations.into_iter().collect::<Vec<_>>(),
+        "diagnostics": diagnostics,
+        "runtime_snapshot_present": runtime_snapshot.is_object(),
+        "evidence_count": evidence_items.len(),
+        "read_as": "Codex Failure Field checks whether the selected action is proven by evidence and confined to its allowed route before editing."
+    })
+}
+
+fn is_hard_stop(value: &str) -> bool {
+    let lower = value.to_lowercase();
+    [
+        "stop",
+        "стой",
+        "остановись",
+        "не трогай код",
+        "ничего не делай",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+fn string_array(value: &Value) -> Vec<String> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(norm)
+                .filter(|item| !item.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn is_runtime_evidence(value: &Value) -> bool {
+    let text = value
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| value.to_string())
+        .to_lowercase();
+    [
+        "systemd",
+        "process",
+        "running",
+        "not running",
+        "config",
+        "engine",
+        "runtime",
+        "version",
+        "service",
+    ]
+    .iter()
+    .any(|needle| text.contains(needle))
+}
+
+fn is_code_change_action(value: &Value) -> bool {
+    let text = value.to_string().to_lowercase();
+    [
+        "edit",
+        "code",
+        "refactor",
+        "patch",
+        "change source",
+        "candidate generation",
+    ]
+    .iter()
+    .any(|needle| text.contains(needle))
+}
+
+fn namespace_confusions(
+    source: &[Triad],
+    candidates: &[Triad],
+    namespace_terms: &[String],
+) -> Vec<Value> {
+    let mut by_term = BTreeMap::<String, BTreeSet<String>>::new();
+    for triad in source.iter().chain(candidates) {
+        for entity in [&triad.subject, &triad.object] {
+            let entity_norm = norm(entity);
+            let leaf = entity_norm
+                .rsplit(['.', ':', '/'])
+                .next()
+                .unwrap_or(&entity_norm)
+                .to_string();
+            if namespace_terms.contains(&leaf)
+                && !entity_norm.contains('.')
+                && !entity_norm.contains(':')
+            {
+                by_term
+                    .entry(leaf)
+                    .or_default()
+                    .insert(route_name(triad, "unrouted"));
+            }
+        }
+    }
+    by_term
+        .into_iter()
+        .filter(|(_, routes)| routes.len() > 1)
+        .map(|(term, routes)| {
+            json!({
+                "term": term,
+                "routes": routes.into_iter().collect::<Vec<_>>()
+            })
+        })
+        .collect()
+}
+
+fn verification_matches_routes(
+    verification: &serde_json::Map<String, Value>,
+    allowed_routes: &[String],
+) -> bool {
+    if allowed_routes.is_empty() {
+        return false;
+    }
+    allowed_routes.iter().all(|route| {
+        verification.contains_key(route) || verification.contains_key(&route.replace('-', "_"))
+    })
+}
+
 pub(crate) fn group_name(triad: &Triad, fallback: &str) -> String {
     if triad.group.trim().is_empty() {
         fallback.to_string()
@@ -832,6 +1117,7 @@ pub(crate) fn split_packet(args: SplitPacketArgs) -> Result<u8> {
                     positive_shortcuts: packet.positive_shortcuts.clone(),
                     resonance_memory: packet.resonance_memory.clone(),
                     continuation_memory: packet.continuation_memory.clone(),
+                    failure_contract: packet.failure_contract.clone(),
                 };
                 fs::write(&path, serde_json::to_string_pretty(&split_packet)? + "\n")?;
             }
@@ -1042,6 +1328,7 @@ pub(crate) fn map_cmd(args: MapArgs) -> Result<u8> {
     let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
     let mut map = structural_map(&source, &candidates);
     map["canonicalization"] = json!(packet.canonicalization);
+    map["codex_failure_field"] = codex_failure_field(&packet, &source, &candidates);
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&map)?),
         OutputFormat::Text => print_map_text(&map),
@@ -1063,6 +1350,7 @@ pub(crate) fn hgate_cmd(args: HgateArgs) -> Result<u8> {
     let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
     let global_report = make_report(&packet, &source, &candidates)?;
     let global_map = structural_map(&source, &candidates);
+    let global_failure_field = codex_failure_field(&packet, &source, &candidates);
     let splits = match args.by {
         SplitBy::LinkedGroup => linked_group_splits(&source, &candidates),
         SplitBy::Group | SplitBy::Route => raw_splits(&source, &candidates, &args.by),
@@ -1082,6 +1370,7 @@ pub(crate) fn hgate_cmd(args: HgateArgs) -> Result<u8> {
             positive_shortcuts: packet.positive_shortcuts.clone(),
             resonance_memory: packet.resonance_memory.clone(),
             continuation_memory: packet.continuation_memory.clone(),
+            failure_contract: packet.failure_contract.clone(),
         };
         let report = make_report(&branch_packet, &split.triads, &split.candidates)?;
         branches.push(json!({
@@ -1100,7 +1389,13 @@ pub(crate) fn hgate_cmd(args: HgateArgs) -> Result<u8> {
         }));
     }
     let truncated = splits.items.len().saturating_sub(branches.len());
-    let decision = hierarchical_decision(&global_report, &global_map, &branches, truncated);
+    let decision = hierarchical_decision(
+        &global_report,
+        &global_map,
+        &branches,
+        truncated,
+        &global_failure_field,
+    );
     let out = json!({
         "core_version": CORE_VERSION,
         "wave_dim": WAVE_DIM,
@@ -1117,6 +1412,7 @@ pub(crate) fn hgate_cmd(args: HgateArgs) -> Result<u8> {
             "foreign_pull": global_map["foreign_pull"],
             "mixed_candidate_groups": global_map["mixed_candidate_groups"],
             "repair_tasks": global_map["repair_tasks"],
+            "codex_failure_field": global_failure_field,
             "trace_path": global_report.trace_path
         },
         "canonicalization": packet.canonicalization,
@@ -1137,7 +1433,7 @@ pub(crate) fn hgate_cmd(args: HgateArgs) -> Result<u8> {
             .unwrap_or("REVIEW_REQUIRED")
         {
             "STRUCTURALLY_ACCEPTED" => EXIT_PASS,
-            "REPAIR_REQUIRED" => EXIT_VETO,
+            "REPAIR_REQUIRED" | "HARD_STOP" => EXIT_VETO,
             _ => EXIT_WATCH,
         },
     )
@@ -1439,6 +1735,7 @@ pub(crate) fn builtin_route_trap_packet(noisy: bool) -> Packet {
         positive_shortcuts: vec![],
         resonance_memory: vec![],
         continuation_memory: vec![],
+        failure_contract: Value::Null,
     }
 }
 
@@ -1585,6 +1882,7 @@ pub(crate) fn comb_node(
         positive_shortcuts: packet.positive_shortcuts.clone(),
         resonance_memory: packet.resonance_memory.clone(),
         continuation_memory: packet.continuation_memory.clone(),
+        failure_contract: packet.failure_contract.clone(),
     };
     let report = make_report(&local_packet, source, candidates)?;
     let map = structural_map(source, candidates);
