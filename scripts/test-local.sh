@@ -127,6 +127,12 @@ jq -e '.surface_bridge_state == "OPEN_SURFACE_GENERATION_READY_NOT_CHAT" and .pr
 jq -e '.metrics.hop_count == 3 and .metrics.chain_exact == true and .metrics.contradiction_rate == 0 and .metrics.missing_evidence_reject_rate == 1' <<<"$big_reason_field_json" >/dev/null
 jq -e '.inferred_state | index("payment_should_follow_invoice") and index("customs_check_needs_declaration_packet")' <<<"$big_reason_field_json" >/dev/null
 jq -e '.trap.proposed_inference == "customs cleared goods" and .trap.rejected == true and .claim_boundary.fixed_reasoning_hop_records == true and .claim_boundary.broad_reasoning_proven == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_reason_field_json" >/dev/null
+big_dialogue_state_json="$("$llmwave_big" dialogue-state --format json)"
+jq -e '.roadmap_block == "v781-v860" and .verdict == "DIALOGUE_STATE_READY_NOT_CHAT"' <<<"$big_dialogue_state_json" >/dev/null
+jq -e '.reasoning_bridge_state == "MULTI_STEP_REASONING_FIELD_READY_NOT_CHAT" and .answer_state == "WATCH_UNSUPPORTED_CLEARANCE"' <<<"$big_dialogue_state_json" >/dev/null
+jq -e '.constrained_answer | contains("Not proven") and contains("declaration evidence")' <<<"$big_dialogue_state_json" >/dev/null
+jq -e '.trap.unsafe_answer == "Yes, customs cleared the goods." and .trap.rejected == true and .metrics.unsupported_answer_reject_rate == 1' <<<"$big_dialogue_state_json" >/dev/null
+jq -e '.claim_boundary.fixed_dialogue_turn_records == true and .claim_boundary.multi_turn_chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_dialogue_state_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

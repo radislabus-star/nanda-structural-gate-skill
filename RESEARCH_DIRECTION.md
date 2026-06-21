@@ -160,6 +160,11 @@ surface. It can propagate a generated invoice premise into payment/customs
 expectations while refusing to infer customs clearance without evidence. This is
 the first reasoning-chain fixture; it is not broad reasoning.
 
+`nanda-llmwave-big dialogue-state` puts an answer boundary over the reasoning
+field. The first fixture answers a clearance question with a "not proven"
+stateful response instead of overclaiming. This is the first dialogue-state
+control layer, not multi-turn chat.
+
 ### Holographic Reduced Representations
 
 Sources:

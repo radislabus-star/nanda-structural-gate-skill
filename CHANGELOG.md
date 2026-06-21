@@ -47,6 +47,9 @@
 - v701-v780 add `nanda-llmwave-big reason-field`: a generated invoice premise
   propagates through three fixed `ReasoningHop32` records while the shortcut
   `customs cleared goods` is rejected.
+- v781-v860 add `nanda-llmwave-big dialogue-state`: a single constrained
+  question receives a `Not proven` answer while unsupported customs-clearance
+  certainty is rejected through fixed `DialogueTurn32`.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

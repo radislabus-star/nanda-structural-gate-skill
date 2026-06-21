@@ -9,6 +9,7 @@ pub mod active_core;
 pub mod atlas;
 pub mod consolidation;
 pub mod coupled_decode_loop;
+pub mod dialogue_state;
 pub mod eval;
 pub mod hrr_binding;
 pub mod l2_l3_coupling;
@@ -74,6 +75,8 @@ enum LlmwaveBigCommand {
     SurfaceGenerate(LlmwaveBigSurfaceGenerateArgs),
     /// Run the v701-v780 multi-step reasoning field.
     ReasonField(LlmwaveBigReasonFieldArgs),
+    /// Run the v781-v860 dialogue state core.
+    DialogueState(LlmwaveBigDialogueStateArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -168,6 +171,12 @@ struct LlmwaveBigSurfaceGenerateArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigReasonFieldArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigDialogueStateArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -339,6 +348,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::ReasonField(args) => {
             let report = reasoning_field::build_reasoning_field_report();
             report::print_reasoning_field_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::DialogueState(args) => {
+            let report = dialogue_state::build_dialogue_state_report();
+            report::print_dialogue_state_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -883,6 +897,36 @@ mod tests {
         assert!(!report.claim_boundary.external_corpus_loaded);
         assert!(!report.claim_boundary.broad_reasoning_proven);
         assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn dialogue_state_answers_with_not_proven_boundary() {
+        let report = dialogue_state::build_dialogue_state_report();
+        assert_eq!(report.roadmap_block, "v781-v860");
+        assert_eq!(report.verdict, "DIALOGUE_STATE_READY_NOT_CHAT");
+        assert_eq!(
+            report.reasoning_bridge_state,
+            "MULTI_STEP_REASONING_FIELD_READY_NOT_CHAT"
+        );
+        assert_eq!(report.answer_state, "WATCH_UNSUPPORTED_CLEARANCE");
+        assert!(report.constrained_answer.contains("Not proven"));
+        assert!(report.constrained_answer.contains("declaration evidence"));
+        assert_eq!(report.metrics.grounded_answer_rate, 1.0);
+        assert_eq!(report.metrics.context_retention_rate, 1.0);
+        assert_eq!(core::mem::size_of::<dialogue_state::DialogueTurn32>(), 32);
+        assert!(report.claim_boundary.fixed_dialogue_turn_records);
+    }
+
+    #[test]
+    fn dialogue_state_rejects_unsupported_clearance_answer() {
+        let report = dialogue_state::build_dialogue_state_report();
+        assert!(report.trap.rejected);
+        assert_eq!(report.trap.trap, "unsupported_clearance_answer");
+        assert_eq!(report.trap.unsafe_answer, "Yes, customs cleared the goods.");
+        assert_eq!(report.metrics.unsupported_answer_reject_rate, 1.0);
+        assert!(!report.claim_boundary.multi_turn_chat_ready);
+        assert!(!report.claim_boundary.broad_reasoning_proven);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }
 

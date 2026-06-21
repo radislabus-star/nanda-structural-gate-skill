@@ -165,6 +165,7 @@ scripts/nanda-llmwave-big multi-schema --format json
 scripts/nanda-llmwave-big schema-grow --format json
 scripts/nanda-llmwave-big surface-generate --format json
 scripts/nanda-llmwave-big reason-field --format json
+scripts/nanda-llmwave-big dialogue-state --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -482,6 +483,10 @@ v701-v780 add `nanda-llmwave-big reason-field`: a generated premise propagates
 through fixed `ReasoningHop32` route dependencies and rejects a missing-evidence
 shortcut. Treat `MULTI_STEP_REASONING_FIELD_READY_NOT_CHAT` as a constrained
 multi-hop fixture, not broad reasoning or chat readiness.
+v781-v860 add `nanda-llmwave-big dialogue-state`: a constrained question gets
+a stateful not-proven answer and unsupported certainty is rejected. Treat
+`DIALOGUE_STATE_READY_NOT_CHAT` as single-turn answer-state control, not
+multi-turn chat readiness.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

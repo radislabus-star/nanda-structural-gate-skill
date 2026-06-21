@@ -4,6 +4,7 @@ use super::active_core::ActiveCoreReport;
 use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
+use super::dialogue_state::DialogueStateReport;
 use super::eval::BigEvalReport;
 use super::hrr_binding::HrrBindingReport;
 use super::l2_l3_coupling::L2L3CouplingReport;
@@ -163,6 +164,18 @@ pub(crate) fn print_reasoning_field_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_reasoning_field_text(report),
         OutputFormat::Md => print_reasoning_field_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_dialogue_state_report(
+    report: &DialogueStateReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_dialogue_state_text(report),
+        OutputFormat::Md => print_dialogue_state_md(report),
     }
     Ok(())
 }
@@ -567,6 +580,25 @@ fn print_reasoning_field_text(report: &ReasoningFieldReport) {
     println!(
         "missing_evidence_reject_rate: {:.3}",
         report.metrics.missing_evidence_reject_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_dialogue_state_text(report: &DialogueStateReport) {
+    println!("LLMWave-Big Dialogue State");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("reasoning_bridge_state: {}", report.reasoning_bridge_state);
+    println!("question: {}", report.user_question);
+    println!("answer_state: {}", report.answer_state);
+    println!("answer: {}", report.constrained_answer);
+    println!(
+        "unsupported_answer_reject_rate: {:.3}",
+        report.metrics.unsupported_answer_reject_rate
     );
     println!(
         "nonlinear_memory_proven: {}",
@@ -1179,6 +1211,27 @@ fn print_reasoning_field_md(report: &ReasoningFieldReport) {
     println!(
         "- `{}` rejected: `{}`",
         report.trap.proposed_inference, report.trap.rejected
+    );
+}
+
+fn print_dialogue_state_md(report: &DialogueStateReport) {
+    println!("# LLMWave-Big Dialogue State");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- question: `{}`", report.user_question);
+    println!("- answer_state: `{}`", report.answer_state);
+    println!();
+    println!("## Answer");
+    println!();
+    println!("{}", report.constrained_answer);
+    println!();
+    println!("## Trap");
+    println!();
+    println!(
+        "- `{}` rejected: `{}`",
+        report.trap.unsafe_answer, report.trap.rejected
     );
 }
 

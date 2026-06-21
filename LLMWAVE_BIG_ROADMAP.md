@@ -960,6 +960,42 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v781-v860: implemented as nanda-llmwave-big dialogue-state
+
+## Phase 27: Dialogue State, v781-v860
+
+Goal:
+
+```text
+user question
+  -> reasoning field state
+  -> answer boundary
+  -> constrained response
+  -> reject unsupported certainty
+```
+
+Current sample:
+
+```text
+question = Has customs cleared the goods?
+answer_state = WATCH_UNSUPPORTED_CLEARANCE
+answer = Not proven. Invoice PI-03 exists, payment should follow invoice,
+         and customs check still needs declaration evidence.
+
+trap = Yes, customs cleared the goods.
+reason = reasoning field does not prove clearance
+```
+
+Stop rules:
+
+```text
+single dialogue turn -> not multi-turn chat
+not-proven response -> local answer-boundary evidence only
+DialogueTurn32 fixed record -> packed-boundary proof, not speed proof
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition
