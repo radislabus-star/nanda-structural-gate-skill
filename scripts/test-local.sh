@@ -96,6 +96,12 @@ jq -e '.l2_probe.raw_top == "inventory" and .l2_probe.coupled_top == "invoice" a
 jq -e '.metrics.l2_l3_agreement_rate == 1 and .metrics.role_error_rate == 0 and .metrics.disagreement_reject_rate == 1' <<<"$big_l2_l3_json" >/dev/null
 jq -e '.disagreement_trap.l2_preferred == "invoice" and .disagreement_trap.l3_expected_filler == "Honglu" and .disagreement_trap.rejected == true' <<<"$big_l2_l3_json" >/dev/null
 jq -e '.claim_boundary.l2_l3_storage_mixed == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_l2_l3_json" >/dev/null
+big_decode_loop_json="$("$llmwave_big" decode-loop --format json)"
+jq -e '.roadmap_block == "v481-v520" and .verdict == "COUPLED_DECODE_LOOP_READY_NOT_CHAT"' <<<"$big_decode_loop_json" >/dev/null
+jq -e '.bridge_state == "L2_L3_COUPLED_READY_NOT_CHAT" and .final_sequence == ["Honglu","issues","invoice"]' <<<"$big_decode_loop_json" >/dev/null
+jq -e '.metrics.completed_steps == 3 and .metrics.sequence_exact == true and .metrics.role_error_rate == 0 and .metrics.bad_continuation_reject_rate == 1' <<<"$big_decode_loop_json" >/dev/null
+jq -e '.accepted_steps[0].raw_top == "invoice" and .accepted_steps[0].accepted == "Honglu" and .accepted_steps[2].raw_top == "inventory" and .accepted_steps[2].accepted == "invoice"' <<<"$big_decode_loop_json" >/dev/null
+jq -e '.bad_continuation_trap.trap == "invoice_issues_honglu_role_break" and .bad_continuation_trap.rejected == true and .claim_boundary.fixed_step_records == true and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_decode_loop_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

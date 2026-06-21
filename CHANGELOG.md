@@ -32,6 +32,9 @@
 - v456-v480 add `nanda-llmwave-big l2-l3-couple`: L2 surface candidates are
   reranked by the active L3 schema role, raw prefix traps can be suppressed, and
   L2/L3 disagreement keeps chat and nonlinear-memory claims false.
+- v481-v520 add `nanda-llmwave-big decode-loop`: a recurrent tiny L2/L3 role
+  cursor accepts `Honglu issues invoice`, updates L2/L3 field state per step,
+  and stops the role-breaking continuation `invoice issues Honglu`.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

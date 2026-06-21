@@ -131,6 +131,12 @@ expects `subject:supplier -> Honglu`. This is the first local feedback loop
 where a word candidate is not just looked up, but accepted or suppressed by
 schema role resonance.
 
+`nanda-llmwave-big decode-loop` makes that feedback recurrent. The first tiny
+loop walks the L3 role cursor, accepts `Honglu issues invoice`, and feeds each
+accepted surface back into L2 context energy plus L3 schema phase. This is the
+first local "word birth into sequence" fixture: still hand-sized and not a
+chat model, but no longer only a single candidate rerank.
+
 ### Holographic Reduced Representations
 
 Sources:

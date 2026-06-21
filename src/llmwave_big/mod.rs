@@ -8,6 +8,7 @@ use super::{nanda_6m, OutputFormat, CORE_VERSION, EXIT_PASS, WAVE_DIM};
 pub mod active_core;
 pub mod atlas;
 pub mod consolidation;
+pub mod coupled_decode_loop;
 pub mod eval;
 pub mod hrr_binding;
 pub mod l2_l3_coupling;
@@ -59,6 +60,8 @@ enum LlmwaveBigCommand {
     /// Run the v456-v480 L2/L3 coupling core.
     #[command(name = "l2-l3-couple", alias = "l2l3-couple")]
     L2L3Couple(LlmwaveBigL2L3CoupleArgs),
+    /// Run the v481-v520 recurrent L2/L3 decode loop.
+    DecodeLoop(LlmwaveBigDecodeLoopArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -123,6 +126,12 @@ struct LlmwaveBigSchemaBindArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigL2L3CoupleArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigDecodeLoopArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -269,6 +278,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::L2L3Couple(args) => {
             let report = l2_l3_coupling::build_l2_l3_coupling_report();
             report::print_l2_l3_coupling_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::DecodeLoop(args) => {
+            let report = coupled_decode_loop::build_coupled_decode_loop_report();
+            report::print_coupled_decode_loop_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -597,6 +611,46 @@ mod tests {
         assert_eq!(report.disagreement_trap.l3_expected_filler, "Honglu");
         assert_eq!(report.metrics.disagreement_reject_rate, 1.0);
         assert!(!report.claim_boundary.l2_l3_storage_mixed);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn coupled_decode_loop_generates_schema_sequence() {
+        let report = coupled_decode_loop::build_coupled_decode_loop_report();
+        assert_eq!(report.roadmap_block, "v481-v520");
+        assert_eq!(report.verdict, "COUPLED_DECODE_LOOP_READY_NOT_CHAT");
+        assert_eq!(report.bridge_state, "L2_L3_COUPLED_READY_NOT_CHAT");
+        assert_eq!(report.final_sequence, vec!["Honglu", "issues", "invoice"]);
+        assert_eq!(report.metrics.completed_steps, 3);
+        assert!(report.metrics.sequence_exact);
+        assert_eq!(report.metrics.role_error_rate, 0.0);
+        assert_eq!(report.accepted_steps[0].raw_top, "invoice");
+        assert_eq!(report.accepted_steps[0].accepted, "Honglu");
+        assert_eq!(report.accepted_steps[2].raw_top, "inventory");
+        assert_eq!(report.accepted_steps[2].accepted, "invoice");
+        assert_eq!(
+            core::mem::size_of::<coupled_decode_loop::CoupledStep32>(),
+            32
+        );
+        assert!(report.claim_boundary.fixed_step_records);
+    }
+
+    #[test]
+    fn coupled_decode_loop_stops_bad_continuation() {
+        let report = coupled_decode_loop::build_coupled_decode_loop_report();
+        assert!(report.bad_continuation_trap.rejected);
+        assert_eq!(
+            report.bad_continuation_trap.trap,
+            "invoice_issues_honglu_role_break"
+        );
+        assert_eq!(report.bad_continuation_trap.stopped_at_step, 1);
+        assert_eq!(
+            report.bad_continuation_trap.expected_role,
+            "subject:supplier"
+        );
+        assert_eq!(report.bad_continuation_trap.rejected_surface, "invoice");
+        assert_eq!(report.metrics.bad_continuation_reject_rate, 1.0);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }

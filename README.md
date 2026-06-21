@@ -304,6 +304,7 @@ nanda-llmwave-big l2 --format json
 nanda-llmwave-big hrr --format json
 nanda-llmwave-big schema-bind --format json
 nanda-llmwave-big l2-l3-couple --format json
+nanda-llmwave-big decode-loop --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -563,6 +564,12 @@ a phase-bias/rerank layer. In the sample, raw L2 prefers `inventory` for prefix
 `in`, but the L3 `object:document` role lifts `invoice`; the disagreement trap
 rejects `invoice` when the active L3 slot expects `subject:supplier -> Honglu`.
 This is a local L2/L3 feedback loop, not chat readiness or nonlinear proof.
+`nanda-llmwave-big decode-loop` adds the v481-v520 recurrent L2/L3 loop. It
+walks a tiny role cursor `subject:supplier -> operator -> object:document`,
+accepts `Honglu issues invoice`, updates L2 context energy and L3 schema phase
+after each accepted step, and stops the bad continuation `invoice issues
+Honglu`. This is the first tiny schema-shaped generation loop, still not broad
+chat or nonlinear-memory proof.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

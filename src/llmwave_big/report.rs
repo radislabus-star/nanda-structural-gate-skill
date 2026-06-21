@@ -3,6 +3,7 @@ use anyhow::Result;
 use super::active_core::ActiveCoreReport;
 use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
+use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::eval::BigEvalReport;
 use super::hrr_binding::HrrBindingReport;
 use super::l2_l3_coupling::L2L3CouplingReport;
@@ -98,6 +99,18 @@ pub(crate) fn print_l2_l3_coupling_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_l2_l3_coupling_text(report),
         OutputFormat::Md => print_l2_l3_coupling_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_coupled_decode_loop_report(
+    report: &CoupledDecodeLoopReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_coupled_decode_loop_text(report),
+        OutputFormat::Md => print_coupled_decode_loop_md(report),
     }
     Ok(())
 }
@@ -396,6 +409,25 @@ fn print_l2_l3_coupling_text(report: &L2L3CouplingReport) {
     println!(
         "disagreement_reject_rate: {:.3}",
         report.metrics.disagreement_reject_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_coupled_decode_loop_text(report: &CoupledDecodeLoopReport) {
+    println!("LLMWave-Big Coupled Decode Loop");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("bridge_state: {}", report.bridge_state);
+    println!("final_sequence: {}", report.final_sequence.join(" "));
+    println!("completed_steps: {}", report.metrics.completed_steps);
+    println!("sequence_exact: {}", report.metrics.sequence_exact);
+    println!(
+        "bad_continuation_reject_rate: {:.3}",
+        report.metrics.bad_continuation_reject_rate
     );
     println!(
         "nonlinear_memory_proven: {}",
@@ -878,6 +910,32 @@ fn print_l2_l3_coupling_md(report: &L2L3CouplingReport) {
     println!(
         "- `{}` rejected: `{}`",
         report.disagreement_trap.rejected_surface, report.disagreement_trap.rejected
+    );
+}
+
+fn print_coupled_decode_loop_md(report: &CoupledDecodeLoopReport) {
+    println!("# LLMWave-Big Coupled Decode Loop");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- bridge_state: `{}`", report.bridge_state);
+    println!("- final sequence: `{}`", report.final_sequence.join(" "));
+    println!();
+    println!("## Steps");
+    println!();
+    for step in &report.accepted_steps {
+        println!(
+            "- step `{}` `{}` raw `{}` -> accepted `{}` margin `{}`",
+            step.step, step.role, step.raw_top, step.accepted, step.margin
+        );
+    }
+    println!();
+    println!("## Trap");
+    println!();
+    println!(
+        "- `{}` rejected: `{}`",
+        report.bad_continuation_trap.trap, report.bad_continuation_trap.rejected
     );
 }
 

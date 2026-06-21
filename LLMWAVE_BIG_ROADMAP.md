@@ -746,6 +746,50 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v481-v520: implemented as nanda-llmwave-big decode-loop
+
+## Phase 22: Coupled Decode Loop, v481-v520
+
+Goal:
+
+```text
+L2 candidate
+  -> L3 role check
+  -> L3 rerank/veto
+  -> accepted surface
+  -> update L2 context wave
+  -> advance L3 schema phase
+  -> next role cursor step
+```
+
+Current sample:
+
+```text
+role cursor:
+  subject:supplier -> operator -> object:document
+
+accepted sequence:
+  Honglu issues invoice
+
+raw traps:
+  subject step raw top = invoice
+  object step raw top = inventory
+
+bad continuation:
+  invoice issues Honglu
+  stops at subject:supplier
+```
+
+Stop rules:
+
+```text
+recurrent fixture sequence -> not broad language generation
+bad continuation stop -> local safety evidence only
+CoupledStep32 fixed record -> packed-boundary proof, not speed proof
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

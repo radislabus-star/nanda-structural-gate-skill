@@ -160,6 +160,7 @@ scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-llmwave-big hrr --format json
 scripts/nanda-llmwave-big schema-bind --format json
 scripts/nanda-llmwave-big l2-l3-couple --format json
+scripts/nanda-llmwave-big decode-loop --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -454,6 +455,11 @@ reranked by the active L3 schema role. Treat
 `L2_L3_COUPLED_READY_NOT_CHAT` as a local feedback-loop result: L3 can suppress
 an L2-valid but role-invalid surface candidate, but chat readiness and
 nonlinear-memory proof remain false.
+v481-v520 add `nanda-llmwave-big decode-loop`: a recurrent tiny L2/L3 role
+cursor accepts `Honglu issues invoice`, updates field state per accepted step,
+and rejects `invoice issues Honglu`. Treat
+`COUPLED_DECODE_LOOP_READY_NOT_CHAT` as a fixture-level generation loop, not a
+broad chat model or nonlinear-memory proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,
