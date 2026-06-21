@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
@@ -275,6 +275,96 @@ pub(crate) struct HotPackClaimBoundary {
     pub json_excluded_from_hot_pack: bool,
     pub cache_only_execution_proven: bool,
     pub broad_chat_llm_ready: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotAskReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub query: String,
+    pub hot_pack: HotAskPackSummary,
+    pub field: HotAskField,
+    pub answer: HotAskAnswer,
+    pub claim_boundary: HotAskClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotAskPackSummary {
+    pub path: String,
+    pub artifact_path: String,
+    pub bytes_scanned: usize,
+    pub tokens: usize,
+    pub transitions: usize,
+    pub chunks: usize,
+    pub schema_hints: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotAskField {
+    pub state: &'static str,
+    pub query_hashes: Vec<u32>,
+    pub top_hot_schema_peaks: Vec<HotSchemaPeak>,
+    pub top_hot_transition_peaks: Vec<HotTransitionPeak>,
+    pub margin: f32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotSchemaPeak {
+    pub score: f32,
+    pub matched_terms: usize,
+    pub subject_matched: bool,
+    pub relation_matched: bool,
+    pub object_matched: bool,
+    pub subject: String,
+    pub relation: String,
+    pub object: String,
+    pub count: u32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotTransitionPeak {
+    pub score: f32,
+    pub matched_terms: usize,
+    pub from: String,
+    pub to: String,
+    pub count: u32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotAskAnswer {
+    pub state: &'static str,
+    pub safe_to_answer: bool,
+    pub text: String,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotAskClaimBoundary {
+    pub binary_hot_pack_loaded: bool,
+    pub hot_records_scanned: bool,
+    pub cold_artifact_used_for_labels: bool,
+    pub json_used_in_hot_scan: bool,
+    pub cache_only_execution_proven: bool,
+    pub broad_chat_llm_ready: bool,
+}
+
+struct HotPackImage {
+    counts: HotPackRecordCounts,
+    transitions: Vec<HotTransitionRecord>,
+    schema_hints: Vec<HotSchemaRecord>,
+}
+
+struct HotTransitionRecord {
+    from_hash: u32,
+    to_hash: u32,
+    count: u32,
+}
+
+struct HotSchemaRecord {
+    subject_hash: u32,
+    relation_hash: u32,
+    object_hash: u32,
+    count: u32,
 }
 
 #[derive(Deserialize)]
@@ -617,6 +707,96 @@ pub(crate) fn pack_hot_artifact(artifact_path: &Path, out: &Path) -> Result<HotP
             binary_hot_pack_written: true,
             strings_excluded_from_hot_pack: true,
             json_excluded_from_hot_pack: true,
+            cache_only_execution_proven: false,
+            broad_chat_llm_ready: false,
+        },
+    })
+}
+
+pub(crate) fn ask_hot_pack(
+    hot_pack_path: &Path,
+    artifact_path: &Path,
+    query: String,
+    top_k: usize,
+) -> Result<HotAskReport> {
+    let hot_bytes = fs::read(hot_pack_path)
+        .with_context(|| format!("read hot pack {}", hot_pack_path.display()))?;
+    let hot = parse_hot_pack(&hot_bytes)?;
+    let artifact = load_training_artifact(artifact_path)?;
+    let query_tokens = tokenize(&query)
+        .into_iter()
+        .filter(|token| is_word_token(token))
+        .collect::<Vec<_>>();
+    let query_hashes = query_tokens
+        .iter()
+        .map(|token| hash32(token))
+        .collect::<Vec<_>>();
+    let query_hash_set = query_hashes.iter().copied().collect::<BTreeSet<_>>();
+    let top_k = top_k.max(1);
+    let schema_peaks = score_hot_schemas(&hot, &artifact, &query_hash_set, top_k);
+    let transition_peaks = score_hot_transitions(&hot, &artifact, &query_hash_set, top_k);
+    let top_score = schema_peaks
+        .first()
+        .map(|peak| peak.score)
+        .unwrap_or(0.0)
+        .max(
+            transition_peaks
+                .first()
+                .map(|peak| peak.score)
+                .unwrap_or(0.0),
+        );
+    let second_score = schema_peaks
+        .get(1)
+        .map(|peak| peak.score)
+        .unwrap_or(0.0)
+        .max(
+            transition_peaks
+                .get(1)
+                .map(|peak| peak.score)
+                .unwrap_or(0.0),
+        );
+    let margin = round4(top_score - second_score);
+    let field_state = if schema_peaks.first().is_some_and(|peak| {
+        peak.subject_matched && peak.matched_terms >= 2 && peak.score >= 2.0 && margin >= 0.1
+    }) {
+        "HOT_FIELD_SCHEMA_FOCUSED"
+    } else if top_score > 0.0 {
+        "HOT_FIELD_REVIEW"
+    } else {
+        "HOT_FIELD_NO_MATCH"
+    };
+    let answer = build_hot_answer(field_state, &schema_peaks, &transition_peaks);
+    Ok(HotAskReport {
+        mode: "llmwave-big-ask-hot",
+        version: "llmwave-big-v1905-hot-ask",
+        verdict: if answer.safe_to_answer {
+            "HOT_FIELD_ANSWER_READY_NOT_GENERAL_LLM"
+        } else {
+            "HOT_FIELD_REVIEW"
+        },
+        query,
+        hot_pack: HotAskPackSummary {
+            path: hot_pack_path.display().to_string(),
+            artifact_path: artifact_path.display().to_string(),
+            bytes_scanned: hot_bytes.len(),
+            tokens: hot.counts.tokens,
+            transitions: hot.counts.transitions,
+            chunks: hot.counts.chunks,
+            schema_hints: hot.counts.schema_hints,
+        },
+        field: HotAskField {
+            state: field_state,
+            query_hashes,
+            top_hot_schema_peaks: schema_peaks,
+            top_hot_transition_peaks: transition_peaks,
+            margin,
+        },
+        answer,
+        claim_boundary: HotAskClaimBoundary {
+            binary_hot_pack_loaded: true,
+            hot_records_scanned: true,
+            cold_artifact_used_for_labels: true,
+            json_used_in_hot_scan: false,
             cache_only_execution_proven: false,
             broad_chat_llm_ready: false,
         },
@@ -1165,6 +1345,153 @@ fn eval_next_token(
     }
 }
 
+fn build_hot_answer(
+    field_state: &'static str,
+    schema_peaks: &[HotSchemaPeak],
+    transition_peaks: &[HotTransitionPeak],
+) -> HotAskAnswer {
+    if field_state == "HOT_FIELD_SCHEMA_FOCUSED" {
+        let peak = &schema_peaks[0];
+        return HotAskAnswer {
+            state: "HOT_SCHEMA_BOUND_ANSWER",
+            safe_to_answer: true,
+            text: format!(
+                "{} {} {} | hot schema peak count {}",
+                peak.subject, peak.relation, peak.object, peak.count
+            ),
+        };
+    }
+    if let Some(peak) = transition_peaks.first() {
+        return HotAskAnswer {
+            state: "HOT_TRANSITION_REVIEW_ONLY",
+            safe_to_answer: false,
+            text: format!(
+                "Review hot transition: {} -> {} | count {}",
+                peak.from, peak.to, peak.count
+            ),
+        };
+    }
+    HotAskAnswer {
+        state: "HOT_NO_ANSWER",
+        safe_to_answer: false,
+        text: "No focused hot-pack peak.".to_string(),
+    }
+}
+
+fn score_hot_schemas(
+    hot: &HotPackImage,
+    artifact: &TrainingArtifact,
+    query_hashes: &BTreeSet<u32>,
+    top_k: usize,
+) -> Vec<HotSchemaPeak> {
+    let labels = artifact
+        .records
+        .schema_hints
+        .iter()
+        .map(|record| {
+            (
+                (
+                    hash32(&record.subject),
+                    hash32(&record.relation),
+                    hash32(&record.object),
+                ),
+                record,
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut peaks = hot
+        .schema_hints
+        .iter()
+        .filter_map(|record| {
+            let matched_terms = [
+                record.subject_hash,
+                record.relation_hash,
+                record.object_hash,
+            ]
+            .into_iter()
+            .filter(|hash| query_hashes.contains(hash))
+            .count();
+            if matched_terms == 0 {
+                return None;
+            }
+            let subject_matched = query_hashes.contains(&record.subject_hash);
+            let relation_matched = query_hashes.contains(&record.relation_hash);
+            let object_matched = query_hashes.contains(&record.object_hash);
+            let label = labels.get(&(
+                record.subject_hash,
+                record.relation_hash,
+                record.object_hash,
+            ))?;
+            Some(HotSchemaPeak {
+                score: round4(
+                    matched_terms as f32
+                        + if subject_matched { 0.75 } else { 0.0 }
+                        + (record.count as f32).ln_1p() * 0.2,
+                ),
+                matched_terms,
+                subject_matched,
+                relation_matched,
+                object_matched,
+                subject: label.subject.clone(),
+                relation: label.relation.clone(),
+                object: label.object.clone(),
+                count: record.count,
+            })
+        })
+        .collect::<Vec<_>>();
+    peaks.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| b.matched_terms.cmp(&a.matched_terms))
+            .then_with(|| a.subject.cmp(&b.subject))
+    });
+    peaks.truncate(top_k);
+    peaks
+}
+
+fn score_hot_transitions(
+    hot: &HotPackImage,
+    artifact: &TrainingArtifact,
+    query_hashes: &BTreeSet<u32>,
+    top_k: usize,
+) -> Vec<HotTransitionPeak> {
+    let labels = artifact
+        .records
+        .transitions
+        .iter()
+        .map(|record| ((hash32(&record.from), hash32(&record.to)), record))
+        .collect::<BTreeMap<_, _>>();
+    let mut peaks = hot
+        .transitions
+        .iter()
+        .filter_map(|record| {
+            let matched_terms = [record.from_hash, record.to_hash]
+                .into_iter()
+                .filter(|hash| query_hashes.contains(hash))
+                .count();
+            if matched_terms == 0 {
+                return None;
+            }
+            let label = labels.get(&(record.from_hash, record.to_hash))?;
+            Some(HotTransitionPeak {
+                score: round4(matched_terms as f32 + (record.count as f32).ln_1p() * 0.1),
+                matched_terms,
+                from: label.from.clone(),
+                to: label.to.clone(),
+                count: record.count,
+            })
+        })
+        .collect::<Vec<_>>();
+    peaks.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| b.matched_terms.cmp(&a.matched_terms))
+            .then_with(|| a.from.cmp(&b.from))
+    });
+    peaks.truncate(top_k);
+    peaks
+}
+
 fn score_chunks(
     artifact: &TrainingArtifact,
     query_set: &BTreeSet<String>,
@@ -1406,6 +1733,76 @@ fn write_u32(writer: &mut impl Write, value: u32) -> Result<()> {
 fn write_u64(writer: &mut impl Write, value: u64) -> Result<()> {
     writer.write_all(&value.to_le_bytes())?;
     Ok(())
+}
+
+fn parse_hot_pack(bytes: &[u8]) -> Result<HotPackImage> {
+    let mut cursor = Cursor::new(bytes);
+    let mut magic = [0u8; 8];
+    cursor.read_exact(&mut magic)?;
+    if &magic != b"LLMWBHOT" {
+        bail!("invalid hot pack magic");
+    }
+    let version = read_u32(&mut cursor)?;
+    if version != 1 {
+        bail!("unsupported hot pack version {version}");
+    }
+    let _wave_dim = read_u32(&mut cursor)?;
+    let counts = HotPackRecordCounts {
+        tokens: read_u32(&mut cursor)? as usize,
+        transitions: read_u32(&mut cursor)? as usize,
+        chunks: read_u32(&mut cursor)? as usize,
+        schema_hints: read_u32(&mut cursor)? as usize,
+    };
+    skip_bytes(&mut cursor, counts.tokens * 16)?;
+    let mut transitions = Vec::with_capacity(counts.transitions);
+    for _ in 0..counts.transitions {
+        let from_hash = read_u32(&mut cursor)?;
+        let to_hash = read_u32(&mut cursor)?;
+        let count = read_u32(&mut cursor)?;
+        let _phase_delta = read_i16(&mut cursor)?;
+        skip_bytes(&mut cursor, 2)?;
+        transitions.push(HotTransitionRecord {
+            from_hash,
+            to_hash,
+            count,
+        });
+    }
+    skip_bytes(&mut cursor, counts.chunks * 32)?;
+    let mut schema_hints = Vec::with_capacity(counts.schema_hints);
+    for _ in 0..counts.schema_hints {
+        schema_hints.push(HotSchemaRecord {
+            subject_hash: read_u32(&mut cursor)?,
+            relation_hash: read_u32(&mut cursor)?,
+            object_hash: read_u32(&mut cursor)?,
+            count: read_u32(&mut cursor)?,
+        });
+    }
+    Ok(HotPackImage {
+        counts,
+        transitions,
+        schema_hints,
+    })
+}
+
+fn skip_bytes(cursor: &mut Cursor<&[u8]>, count: usize) -> Result<()> {
+    let new_position = cursor.position() + count as u64;
+    if new_position > cursor.get_ref().len() as u64 {
+        bail!("truncated hot pack");
+    }
+    cursor.set_position(new_position);
+    Ok(())
+}
+
+fn read_u32(cursor: &mut Cursor<&[u8]>) -> Result<u32> {
+    let mut bytes = [0u8; 4];
+    cursor.read_exact(&mut bytes)?;
+    Ok(u32::from_le_bytes(bytes))
+}
+
+fn read_i16(cursor: &mut Cursor<&[u8]>) -> Result<i16> {
+    let mut bytes = [0u8; 2];
+    cursor.read_exact(&mut bytes)?;
+    Ok(i16::from_le_bytes(bytes))
 }
 
 fn short_hash(bytes: &[u8]) -> String {

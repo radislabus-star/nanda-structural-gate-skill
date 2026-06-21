@@ -568,6 +568,10 @@ checking whether the actual hot artifact fits the budget rather than trusting a
 JSON artifact size or a rough estimate. Treat
 `HOT_PACK_READY_NOT_CACHE_ONLY_PROOF` as binary hot storage readiness, not
 cache-only execution proof or broad chat readiness.
+`nanda-llmwave-big ask-hot` scans the binary hot pack for schema/transition
+peaks. It may use the cold artifact only to decode labels for display. Treat
+`json_used_in_hot_scan=false` as a packed-scan claim, not full cache-only
+execution.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

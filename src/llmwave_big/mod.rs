@@ -169,6 +169,9 @@ enum LlmwaveBigCommand {
     /// Pack a training artifact into a binary hot Active Core file.
     #[command(name = "pack-hot")]
     PackHot(LlmwaveBigPackHotArgs),
+    /// Ask through a binary hot Active Core pack, with cold labels for display.
+    #[command(name = "ask-hot")]
+    AskHot(LlmwaveBigAskHotArgs),
 }
 
 #[derive(Parser)]
@@ -503,6 +506,20 @@ struct LlmwaveBigPackHotArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigAskHotArgs {
+    #[arg(long)]
+    hot_pack: PathBuf,
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long)]
+    text: String,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigAskArgs {
     #[arg(long)]
     artifact: PathBuf,
@@ -801,6 +818,12 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::PackHot(args) => {
             let report = training::pack_hot_artifact(&args.artifact, &args.out)?;
             report::print_hot_pack_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::AskHot(args) => {
+            let report =
+                training::ask_hot_pack(&args.hot_pack, &args.artifact, args.text, args.top_k)?;
+            report::print_hot_ask_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }

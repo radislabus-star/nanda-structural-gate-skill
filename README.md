@@ -804,6 +804,11 @@ hints. It excludes cold strings and JSON from the hot pack and reports actual
 file bytes against the hot budget. Its successful verdict is
 `HOT_PACK_READY_NOT_CACHE_ONLY_PROOF`: compact binary storage is real, but
 cache-only execution and broad chat readiness remain unproven.
+`nanda-llmwave-big ask-hot` scans that binary hot pack for schema and
+transition peaks. It may use the cold artifact only to decode labels for human
+output, while reporting `json_used_in_hot_scan=false`. Its successful verdict is
+`HOT_FIELD_ANSWER_READY_NOT_GENERAL_LLM`, still not cache-only execution proof
+and still not broad chat readiness.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

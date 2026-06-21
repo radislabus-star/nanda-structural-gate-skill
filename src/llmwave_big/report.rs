@@ -37,7 +37,7 @@ use super::surface_production::SurfaceProductionReport;
 use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
 use super::training::{
-    ArtifactAskEvalReport, ArtifactAskReport, HotPackReport, TrainingCompileReport,
+    ArtifactAskEvalReport, ArtifactAskReport, HotAskReport, HotPackReport, TrainingCompileReport,
 };
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
@@ -591,6 +591,36 @@ pub(crate) fn print_hot_pack_report(report: &HotPackReport, format: &OutputForma
         OutputFormat::Md => print_hot_pack_md(report),
     }
     Ok(())
+}
+
+pub(crate) fn print_hot_ask_report(report: &HotAskReport, format: &OutputFormat) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_hot_ask_text(report),
+        OutputFormat::Md => print_hot_ask_md(report),
+    }
+    Ok(())
+}
+
+fn print_hot_ask_text(report: &HotAskReport) {
+    println!("LLMWave-Big Hot Ask");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("field_state: {}", report.field.state);
+    println!("safe_to_answer: {}", report.answer.safe_to_answer);
+    println!("answer: {}", report.answer.text);
+    println!("bytes_scanned: {}", report.hot_pack.bytes_scanned);
+}
+
+fn print_hot_ask_md(report: &HotAskReport) {
+    println!("# LLMWave-Big Hot Ask");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- field state: `{}`", report.field.state);
+    println!("- safe to answer: `{}`", report.answer.safe_to_answer);
+    println!("- answer: {}", report.answer.text);
+    println!("- bytes scanned: `{}`", report.hot_pack.bytes_scanned);
 }
 
 fn print_hot_pack_text(report: &HotPackReport) {
