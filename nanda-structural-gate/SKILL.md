@@ -168,6 +168,7 @@ scripts/nanda-llmwave-big reason-field --format json
 scripts/nanda-llmwave-big dialogue-state --format json
 scripts/nanda-llmwave-big mini-chat-eval --format json
 scripts/nanda-llmwave-big query-wave --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big multi-peak-field --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -499,6 +500,10 @@ compact L2/L3 query wave with surface tokens, role hints, operator hints, and
 question/assertion polarity. Treat `QUERY_WAVE_READY_NOT_FIELD_MATURE` as the
 first mature-field input stage, not an answer, chat model, or nonlinear-memory
 proof.
+v1001-v1060 add `nanda-llmwave-big multi-peak-field`: query waves excite
+competing field peaks and classify the raw field as stable, contested,
+no-answer, or rejected. Treat `MULTI_PEAK_FIELD_READY_NOT_ANSWER` as raw field
+selection only; do not answer until later lens/answer gates allow it.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

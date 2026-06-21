@@ -19,6 +19,7 @@ pub mod l3_schema_field;
 pub mod lexical_birth;
 pub mod loader;
 pub mod mini_chat_eval;
+pub mod multi_peak_field;
 pub mod multi_schema_competition;
 pub mod open_surface_generation;
 pub mod operators;
@@ -85,6 +86,9 @@ enum LlmwaveBigCommand {
     /// Run the v951-v1000 query wave core.
     #[command(name = "query-wave")]
     QueryWave(LlmwaveBigQueryWaveArgs),
+    /// Run the v1001-v1060 multi-peak field core.
+    #[command(name = "multi-peak-field", alias = "field-peaks")]
+    MultiPeakField(LlmwaveBigMultiPeakFieldArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -197,6 +201,14 @@ struct LlmwaveBigMiniChatEvalArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigQueryWaveArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigMultiPeakFieldArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, value_enum, default_value = "json")]
@@ -385,6 +397,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::QueryWave(args) => {
             let report = query_wave::build_query_wave_report(args.text);
             report::print_query_wave_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::MultiPeakField(args) => {
+            let report = multi_peak_field::build_multi_peak_field_report(args.text);
+            report::print_multi_peak_field_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -1034,6 +1051,38 @@ mod tests {
         assert_eq!(report.metrics.assertion_reject_rate, 1.0);
         assert!(report.paraphrase_eval.iter().all(|case| case.passed));
         assert!(!report.claim_boundary.full_field_mature);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn multi_peak_field_selects_stable_customs_peak() {
+        let report = multi_peak_field::build_multi_peak_field_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.roadmap_block, "v1001-v1060");
+        assert_eq!(report.verdict, "MULTI_PEAK_FIELD_READY_NOT_ANSWER");
+        assert_eq!(report.field_state, "STABLE_PEAK");
+        assert_eq!(report.top_peak.route, "customs-clearance-status");
+        assert!(report.metrics.peak_margin >= multi_peak_field::MIN_STABLE_MARGIN);
+        assert_eq!(
+            core::mem::size_of::<multi_peak_field::FieldPeakRecord32>(),
+            32
+        );
+        assert!(report.claim_boundary.fixed_peak_records);
+    }
+
+    #[test]
+    fn multi_peak_field_detects_contested_and_no_answer_states() {
+        let report = multi_peak_field::build_multi_peak_field_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.metrics.stable_peak_accuracy, 1.0);
+        assert_eq!(report.metrics.contested_detection_rate, 1.0);
+        assert_eq!(report.metrics.no_answer_detection_rate, 1.0);
+        assert_eq!(report.metrics.route_leakage_reject_rate, 1.0);
+        assert!(report.eval_cases.iter().all(|case| case.passed));
+        assert!(!report.claim_boundary.safe_to_answer);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }

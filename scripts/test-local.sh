@@ -145,6 +145,12 @@ jq -e '.top_route_hint == "customs-clearance-status" and .question_polarity == "
 jq -e '.metrics.paraphrase_route_recall == 1 and .metrics.role_hint_accuracy == 1 and .metrics.operator_hint_accuracy == 1 and .metrics.assertion_reject_rate == 1' <<<"$big_query_wave_json" >/dev/null
 jq -e '([.paraphrase_eval[].case_id] | index("en_has_cleared") and index("en_is_cleared") and index("ru_released") and index("assertion_trap"))' <<<"$big_query_wave_json" >/dev/null
 jq -e '.claim_boundary.fixed_query_wave_records == true and .claim_boundary.full_field_mature == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_query_wave_json" >/dev/null
+big_multi_peak_json="$("$llmwave_big" multi-peak-field --text "Has customs cleared the goods?" --format json)"
+jq -e '.roadmap_block == "v1001-v1060" and .verdict == "MULTI_PEAK_FIELD_READY_NOT_ANSWER"' <<<"$big_multi_peak_json" >/dev/null
+jq -e '.query_wave_state == "QUERY_WAVE_READY_NOT_FIELD_MATURE" and .field_state == "STABLE_PEAK" and .top_peak.route == "customs-clearance-status"' <<<"$big_multi_peak_json" >/dev/null
+jq -e '.metrics.stable_peak_accuracy == 1 and .metrics.contested_detection_rate == 1 and .metrics.no_answer_detection_rate == 1 and .metrics.route_leakage_reject_rate == 1' <<<"$big_multi_peak_json" >/dev/null
+jq -e '([.eval_cases[].expected_state] | index("STABLE_PEAK") and index("CONTESTED") and index("NO_ANSWER") and index("REJECTED"))' <<<"$big_multi_peak_json" >/dev/null
+jq -e '.claim_boundary.fixed_peak_records == true and .claim_boundary.safe_to_answer == false and .claim_boundary.full_field_mature == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_multi_peak_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

@@ -312,6 +312,7 @@ nanda-llmwave-big reason-field --format json
 nanda-llmwave-big dialogue-state --format json
 nanda-llmwave-big mini-chat-eval --format json
 nanda-llmwave-big query-wave --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big multi-peak-field --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -619,6 +620,11 @@ L3 role/operator hints, question/assertion polarity, and a fixed
 customs-clearance status question hit the same route while an assertion trap is
 not treated as a safe question. This is text-to-field excitation, not mature
 field selection and not chat readiness.
+`nanda-llmwave-big multi-peak-field` adds v1001-v1060. It takes the query wave
+and excites competing schema peaks, computes energy/margin/leakage, and
+classifies the field as `STABLE_PEAK`, `CONTESTED`, `NO_ANSWER`, or
+`REJECTED`. It deliberately keeps `safe_to_answer=false`: answer permission is
+a later lens decision, not a property of a raw peak.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

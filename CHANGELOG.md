@@ -58,6 +58,10 @@
   compact query wave with L2 surface signals, L3 role/operator hints,
   question polarity, paraphrase eval, and fixed `QueryWaveRecord32` while
   mature-field/chat/nonlinear claims stay false.
+- v1001-v1060 add `nanda-llmwave-big multi-peak-field`: query waves now excite
+  competing `FieldPeakRecord32` peaks with margin/leakage state classification
+  across stable, contested, no-answer, and rejected field cases while answer
+  permission remains false.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

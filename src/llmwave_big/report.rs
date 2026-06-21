@@ -13,6 +13,7 @@ use super::l3_schema_bind::L3SchemaBindReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::mini_chat_eval::MiniChatEvalReport;
+use super::multi_peak_field::MultiPeakFieldReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
 use super::open_surface_generation::OpenSurfaceGenerationReport;
 use super::query_wave::QueryWaveReport;
@@ -202,6 +203,18 @@ pub(crate) fn print_query_wave_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_query_wave_text(report),
         OutputFormat::Md => print_query_wave_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_multi_peak_field_report(
+    report: &MultiPeakFieldReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_multi_peak_field_text(report),
+        OutputFormat::Md => print_multi_peak_field_md(report),
     }
     Ok(())
 }
@@ -1811,6 +1824,59 @@ fn print_query_wave_md(report: &QueryWaveReport) {
         report.claim_boundary.full_field_mature
     );
     println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_multi_peak_field_text(report: &MultiPeakFieldReport) {
+    println!("LLMWave-Big Multi-Peak Field");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("field_state: {}", report.field_state);
+    println!("top_route: {}", report.top_peak.route);
+    println!("peak_margin: {}", report.metrics.peak_margin);
+    println!("safe_to_answer: {}", report.claim_boundary.safe_to_answer);
+}
+
+fn print_multi_peak_field_md(report: &MultiPeakFieldReport) {
+    println!("# LLMWave-Big Multi-Peak Field");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- field state: `{}`", report.field_state);
+    println!("- top route: `{}`", report.top_peak.route);
+    println!();
+    println!("## Metrics");
+    println!();
+    println!("- peaks: `{}`", report.metrics.peak_count);
+    println!("- peak margin: `{}`", report.metrics.peak_margin);
+    println!(
+        "- route boundary leakage: `{:.3}`",
+        report.metrics.route_boundary_leakage
+    );
+    println!(
+        "- contested detection: `{:.3}`",
+        report.metrics.contested_detection_rate
+    );
+    println!(
+        "- no-answer detection: `{:.3}`",
+        report.metrics.no_answer_detection_rate
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- safe to answer: `{}`",
+        report.claim_boundary.safe_to_answer
+    );
+    println!(
+        "- full field mature: `{}`",
+        report.claim_boundary.full_field_mature
+    );
     println!(
         "- nonlinear memory proven: `{}`",
         report.claim_boundary.nonlinear_memory_proven

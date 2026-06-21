@@ -1066,6 +1066,44 @@ chat_ready remains false
 nonlinear_memory_proven remains false
 ```
 
+v1001-v1060: implemented as nanda-llmwave-big multi-peak-field
+
+## Phase 30: Multi-Peak Field, v1001-v1060
+
+Goal:
+
+```text
+query wave
+  -> competing schema peaks
+  -> support/coherence/role/anti energy
+  -> peak margin
+  -> route boundary leakage
+  -> STABLE_PEAK / CONTESTED / NO_ANSWER / REJECTED
+```
+
+Current controls:
+
+```text
+Has customs cleared the goods? -> STABLE_PEAK customs-clearance-status
+invoice payment customs        -> CONTESTED
+banana weather                 -> NO_ANSWER
+Customs cleared the goods.     -> REJECTED assertion leakage
+```
+
+Stop rules:
+
+```text
+stable raw peak -> not answer permission
+FieldPeakRecord32 fixed record -> packed-boundary proof, not speed proof
+contested field -> no answer
+no-answer field -> no answer
+rejected field -> no answer
+safe_to_answer remains false until lens/answer gate
+full_field_mature remains false
+chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition
