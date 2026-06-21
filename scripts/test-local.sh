@@ -162,6 +162,14 @@ jq -e '.roadmap_block == "v1141-v1210" and .verdict == "MATURE_ANTI_WAVE_READY_N
 jq -e '.lens_bridge_verdict == "LENS_SCAN_READY_NOT_ANSWER" and .field_after_anti.anti_field_state == "SUPPRESSED_UNSUPPORTED_ANSWER"' <<<"$big_mature_anti_wave_json" >/dev/null
 jq -e '.metrics.lane_count == 3 and .metrics.evidence_lane_rate == 1 and .metrics.causal_lane_rate == 1 and .metrics.answer_lane_rate == 1' <<<"$big_mature_anti_wave_json" >/dev/null
 jq -e '.claim_boundary.fixed_anti_lane_records == true and .claim_boundary.local_suppression_only == true and .claim_boundary.safe_to_answer == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_mature_anti_wave_json" >/dev/null
+big_evidence_missing_json="$("$llmwave_big" evidence-proof --text "Has customs cleared the goods?" --evidence-mode missing --format json)"
+jq -e '.roadmap_block == "v1211-v1280" and .verdict == "EVIDENCE_PROOF_READY_NOT_ANSWER"' <<<"$big_evidence_missing_json" >/dev/null
+jq -e '.proof_state == "EVIDENCE_MISSING" and .answer_permission == "ANSWER_BLOCKED_BY_EVIDENCE"' <<<"$big_evidence_missing_json" >/dev/null
+jq -e '.claim_boundary.fixed_evidence_proof_records == true and .claim_boundary.local_answer_permission == false and .claim_boundary.safe_to_answer == false and .claim_boundary.chat_ready == false' <<<"$big_evidence_missing_json" >/dev/null
+big_evidence_bound_json="$("$llmwave_big" evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json)"
+jq -e '.roadmap_block == "v1211-v1280" and .verdict == "EVIDENCE_PROOF_LOCAL_ANSWER_CANDIDATE"' <<<"$big_evidence_bound_json" >/dev/null
+jq -e '.proof_state == "EVIDENCE_BOUND" and .answer_permission == "LOCAL_ANSWER_PERMISSION" and .negative_control.passed == true' <<<"$big_evidence_bound_json" >/dev/null
+jq -e '.claim_boundary.fixed_evidence_proof_records == true and .claim_boundary.local_answer_permission == true and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_evidence_bound_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

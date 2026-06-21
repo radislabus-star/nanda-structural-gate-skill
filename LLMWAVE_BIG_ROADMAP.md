@@ -1179,6 +1179,39 @@ chat_ready remains false
 nonlinear_memory_proven remains false
 ```
 
+v1211-v1280: implemented as nanda-llmwave-big evidence-proof
+
+## Phase 33: Evidence Proof Gate, v1211-v1280
+
+Goal:
+
+```text
+stable route peak
+  -> compact evidence proof record
+  -> missing evidence remains blocked
+  -> matching release evidence grants local answer permission
+  -> negative control proves missing evidence cannot pass
+```
+
+Current controls:
+
+```text
+evidence-mode missing           -> ANSWER_BLOCKED_BY_EVIDENCE
+evidence-mode release-confirmed -> LOCAL_ANSWER_PERMISSION
+missing evidence negative       -> passed
+```
+
+Stop rules:
+
+```text
+local answer permission -> fixture permission only
+EvidenceProofRecord32 fixed record -> packed-boundary proof, not speed proof
+safe_to_answer true here means local evidence-bound answer candidate only
+full_field_mature remains false
+chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

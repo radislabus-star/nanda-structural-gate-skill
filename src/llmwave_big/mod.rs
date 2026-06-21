@@ -11,6 +11,7 @@ pub mod consolidation;
 pub mod coupled_decode_loop;
 pub mod dialogue_state;
 pub mod eval;
+pub mod evidence_proof;
 pub mod hrr_binding;
 pub mod l2_l3_coupling;
 pub mod l2_word_field;
@@ -97,6 +98,9 @@ enum LlmwaveBigCommand {
     /// Run the v1141-v1210 mature anti-wave layer.
     #[command(name = "mature-anti-wave", alias = "anti-wave")]
     MatureAntiWave(LlmwaveBigMatureAntiWaveArgs),
+    /// Run the v1211-v1280 evidence proof gate.
+    #[command(name = "evidence-proof")]
+    EvidenceProof(LlmwaveBigEvidenceProofArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -235,6 +239,16 @@ struct LlmwaveBigLensScanArgs {
 struct LlmwaveBigMatureAntiWaveArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigEvidenceProofArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, default_value = "missing")]
+    evidence_mode: String,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -436,6 +450,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::MatureAntiWave(args) => {
             let report = mature_anti_wave::build_mature_anti_wave_report(args.text);
             report::print_mature_anti_wave_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::EvidenceProof(args) => {
+            let report = evidence_proof::build_evidence_proof_report(args.text, args.evidence_mode);
+            report::print_evidence_proof_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -1185,6 +1204,43 @@ mod tests {
         assert!(report.claim_boundary.fixed_anti_lane_records);
         assert!(report.claim_boundary.local_suppression_only);
         assert!(!report.claim_boundary.safe_to_answer);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn evidence_proof_blocks_missing_evidence() {
+        let report = evidence_proof::build_evidence_proof_report(
+            "Has customs cleared the goods?".to_string(),
+            "missing".to_string(),
+        );
+        assert_eq!(report.roadmap_block, "v1211-v1280");
+        assert_eq!(report.verdict, "EVIDENCE_PROOF_READY_NOT_ANSWER");
+        assert_eq!(report.proof_state, "EVIDENCE_MISSING");
+        assert_eq!(report.answer_permission, "ANSWER_BLOCKED_BY_EVIDENCE");
+        assert_eq!(report.metrics.missing_evidence_block_rate, 1.0);
+        assert_eq!(
+            core::mem::size_of::<evidence_proof::EvidenceProofRecord32>(),
+            32
+        );
+        assert!(!report.claim_boundary.local_answer_permission);
+        assert!(!report.claim_boundary.safe_to_answer);
+    }
+
+    #[test]
+    fn evidence_proof_allows_only_bound_evidence_candidate() {
+        let report = evidence_proof::build_evidence_proof_report(
+            "Has customs cleared the goods?".to_string(),
+            "release-confirmed".to_string(),
+        );
+        assert_eq!(report.verdict, "EVIDENCE_PROOF_LOCAL_ANSWER_CANDIDATE");
+        assert_eq!(report.proof_state, "EVIDENCE_BOUND");
+        assert_eq!(report.answer_permission, "LOCAL_ANSWER_PERMISSION");
+        assert_eq!(report.metrics.evidence_binding_rate, 1.0);
+        assert_eq!(report.metrics.route_match_rate, 1.0);
+        assert_eq!(report.metrics.unsafe_answer_rate, 0.0);
+        assert!(report.negative_control.passed);
+        assert!(report.claim_boundary.local_answer_permission);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }

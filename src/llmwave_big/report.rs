@@ -6,6 +6,7 @@ use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::dialogue_state::DialogueStateReport;
 use super::eval::BigEvalReport;
+use super::evidence_proof::EvidenceProofReport;
 use super::hrr_binding::HrrBindingReport;
 use super::l2_l3_coupling::L2L3CouplingReport;
 use super::l2_word_field::L2WordFieldReport;
@@ -238,6 +239,18 @@ pub(crate) fn print_mature_anti_wave_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_mature_anti_wave_text(report),
         OutputFormat::Md => print_mature_anti_wave_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_evidence_proof_report(
+    report: &EvidenceProofReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_evidence_proof_text(report),
+        OutputFormat::Md => print_evidence_proof_md(report),
     }
     Ok(())
 }
@@ -2005,6 +2018,59 @@ fn print_mature_anti_wave_md(report: &MatureAntiWaveReport) {
     println!(
         "- safe to answer: `{}`",
         report.claim_boundary.safe_to_answer
+    );
+    println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_evidence_proof_text(report: &EvidenceProofReport) {
+    println!("LLMWave-Big Evidence Proof");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("evidence_mode: {}", report.evidence_mode);
+    println!("field_bridge_state: {}", report.field_bridge_state);
+    println!("proof_state: {}", report.proof_state);
+    println!("answer_permission: {}", report.answer_permission);
+    println!(
+        "missing_evidence_block_rate: {:.3}",
+        report.metrics.missing_evidence_block_rate
+    );
+}
+
+fn print_evidence_proof_md(report: &EvidenceProofReport) {
+    println!("# LLMWave-Big Evidence Proof");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- evidence mode: `{}`", report.evidence_mode);
+    println!("- proof state: `{}`", report.proof_state);
+    println!("- answer permission: `{}`", report.answer_permission);
+    println!();
+    println!("## Metrics");
+    println!();
+    println!(
+        "- evidence binding: `{:.3}`",
+        report.metrics.evidence_binding_rate
+    );
+    println!(
+        "- missing evidence block: `{:.3}`",
+        report.metrics.missing_evidence_block_rate
+    );
+    println!(
+        "- unsafe answer: `{:.3}`",
+        report.metrics.unsafe_answer_rate
+    );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- local answer permission: `{}`",
+        report.claim_boundary.local_answer_permission
     );
     println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
     println!(

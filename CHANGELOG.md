@@ -68,6 +68,9 @@
 - v1141-v1210 add `nanda-llmwave-big mature-anti-wave`: blocking lenses compile
   into local fixed `AntiLaneRecord32` suppress lanes that block unsupported
   answer permission while preserving the route peak for later proof.
+- v1211-v1280 add `nanda-llmwave-big evidence-proof`: stable field peaks can
+  bind to fixed `EvidenceProofRecord32` records; missing evidence stays blocked,
+  while release-confirmed evidence grants local answer permission only.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar
