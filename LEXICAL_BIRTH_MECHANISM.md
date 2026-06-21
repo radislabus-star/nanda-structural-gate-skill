@@ -359,6 +359,11 @@ Its state remains `RAW_INDUCTION_PASS_NOT_GENERAL_PROOF`.
 The noisy raw fixture adds near-root collisions and reports
 `NOISY_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF` only when those collision roots are
 rejected instead of promoted.
+The derived raw fixture removes the manual suffix inventory and derives
+suffixes from repeated tails in the observed form set. It reports
+`DERIVED_SUFFIX_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF`: one scaffold is removed,
+but broad morphology, corpus learning, and nonlinear lexical density remain
+unproven.
 
 ## Claim Boundary
 

@@ -86,6 +86,7 @@ nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-cor
 nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus-ru.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
+nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
 ```
 
 It promotes suffix families from a small embedded corpus and rejects fragments
@@ -99,6 +100,10 @@ surface-memory path.
 engine to induce the family roots from raw Cyrillic forms plus suffix inventory.
 The noisy variant adds near-root collisions and must keep those roots rejected
 until they have enough independent form evidence.
+The derived variant removes the manual suffix inventory too: suffixes are
+derived from repeated observed form tails before candidate root selection. This
+is a stronger lexical-birth scaffold, but it still is not broad morphology or
+nonlinear memory proof.
 
 ### Holographic Reduced Representations
 

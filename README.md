@@ -311,6 +311,7 @@ nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-cor
 nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus-ru.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
+nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -611,6 +612,13 @@ The noisy companion fixture,
 collisions such as `счетчик`, `маршрутизатор`, and `сертификатор`. It reports
 `NOISY_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF` only when these collision roots
 are rejected instead of promoted as families.
+The derived companion fixture,
+`examples/llmwave-big-raw-surface-corpus-ru-derived.json`, removes the manual
+suffix inventory from the input. `surface-raw-induce` derives suffixes from
+repeated observed form tails, selects non-overlapping candidate roots, and
+still rejects near-root collisions. It reports
+`DERIVED_SUFFIX_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF`, not broad morphology or
+nonlinear memory proof.
 
 `nanda-llmwave-big write` adds the v191-v205 Schema/Residual Write contract:
 write decomposition, reconstructability score, centroid update plus residual

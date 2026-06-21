@@ -58,6 +58,10 @@
 - v321-v330 add noisy raw induction fixture coverage: near-root Cyrillic
   collisions such as счетчик, маршрутизатор, and сертификатор must remain
   rejected collision roots instead of promoted families.
+- v331-v360 add derived suffix raw induction: `surface-raw-induce` can now
+  derive its suffix inventory from raw observed forms, select non-overlapping
+  candidate roots, keep near-root collisions rejected, and report
+  `DERIVED_SUFFIX_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF`.
 - v191-v205 add `nanda-llmwave-big write` and `nanda-bench6m --mode
   write-density`: write decomposition, reconstructability scoring, residual V1,
   centroid update plus residual decision, anti-residuals, promotion/split

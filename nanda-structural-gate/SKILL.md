@@ -167,6 +167,7 @@ scripts/nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-sur
 scripts/nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus-ru.json --format json
 scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
 scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
+scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -471,6 +472,10 @@ step. It groups candidate roots from a flat word-form list plus suffix
 inventory; expected roots are eval labels, not induction input.
 Use the noisy raw fixture to verify near-root collisions stay rejected until
 they have enough independent form evidence.
+Use the derived raw fixture to verify the inducer can build a suffix inventory
+from repeated observed form tails instead of receiving a manual suffix list.
+Treat `DERIVED_SUFFIX_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF` as scaffold removal,
+not as broad morphology or nonlinear memory proof.
 v191-v205 add `nanda-llmwave-big write` and
 `nanda-bench6m --mode write-density`: write decomposition, reconstructability
 score, residual V1, centroid update, anti-residual, schema promotion/split

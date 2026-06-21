@@ -1384,6 +1384,31 @@ false_family_rate must stay zero on the fixture
 nonlinear_surface_memory_proven remains false
 ```
 
+v331-v360: implemented as derived-suffix nanda-llmwave-big surface-raw-induce
+
+## Phase 17: Derived Suffix Raw Induction, v331-v360
+
+Goal:
+
+```text
+raw surface forms only
+  -> derive suffix inventory from repeated form tails
+  -> build candidate root families
+  -> select non-overlapping stable roots
+  -> reject near-root collisions
+  -> reconstruct held-out forms using derived suffixes
+```
+
+Stop rules:
+
+```text
+derived suffix inventory removes one manual scaffold
+derived suffix pass -> not open morphology
+small Cyrillic fixture pass -> not broad Russian training
+near-root rejection is safety evidence, not semantic understanding
+nonlinear_surface_memory_proven remains false
+```
+
 ## Summary
 
 ```text

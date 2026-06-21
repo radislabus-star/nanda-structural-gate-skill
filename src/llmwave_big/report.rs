@@ -468,6 +468,14 @@ fn print_surface_raw_induce_text(report: &SurfaceRawInduceReport) {
     println!("corpus_path: {}", report.corpus_path);
     println!("raw_forms: {}", report.corpus.raw_forms);
     println!(
+        "suffix_inventory_source: {}",
+        report.corpus.suffix_inventory_source
+    );
+    println!(
+        "derived_suffix_count: {}",
+        report.metrics.derived_suffix_count
+    );
+    println!(
         "induced_family_count: {}",
         report.metrics.induced_family_count
     );
@@ -1001,6 +1009,14 @@ fn print_surface_raw_induce_md(report: &SurfaceRawInduceReport) {
     println!();
     println!("- raw forms: `{}`", report.corpus.raw_forms);
     println!("- suffix inventory: `{}`", report.corpus.suffix_inventory);
+    println!(
+        "- suffix inventory source: `{}`",
+        report.corpus.suffix_inventory_source
+    );
+    println!(
+        "- derived suffix count: `{}`",
+        report.metrics.derived_suffix_count
+    );
     println!(
         "- induced families: `{}`",
         report.metrics.induced_family_count

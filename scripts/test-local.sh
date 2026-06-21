@@ -128,6 +128,11 @@ big_surface_raw_noisy_json="$("$llmwave_big" surface-raw-induce --corpus "$root/
 jq -e '.roadmap_block == "v321-v330" and .corpus.source == "russian_noisy_raw_business_surface_fixture_v1"' <<<"$big_surface_raw_noisy_json" >/dev/null
 jq -e '.metrics.induced_family_count == 6 and .metrics.expected_root_recall == 1 and .metrics.noise_reject_rate == 1 and .metrics.false_family_rate == 0' <<<"$big_surface_raw_noisy_json" >/dev/null
 jq -e '([.rejected_collision_roots[].root] | index("счетчик") and index("договоренност") and index("маршрутизатор") and index("сертификатор")) and .metrics.state == "NOISY_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF"' <<<"$big_surface_raw_noisy_json" >/dev/null
+big_surface_raw_derived_json="$("$llmwave_big" surface-raw-induce --corpus "$root/examples/llmwave-big-raw-surface-corpus-ru-derived.json" --format json)"
+jq -e '.roadmap_block == "v331-v360" and .corpus.source == "russian_derived_suffix_raw_business_surface_fixture_v1"' <<<"$big_surface_raw_derived_json" >/dev/null
+jq -e '.corpus.suffix_inventory_source == "derived_from_raw_forms" and .derived_suffix_inventory.enabled == true and .metrics.manual_suffix_count == 0 and .metrics.derived_suffix_count >= 8' <<<"$big_surface_raw_derived_json" >/dev/null
+jq -e '.metrics.induced_family_count == 9 and .metrics.expected_root_recall == 1 and .metrics.held_out_exact_match_rate == 1 and .metrics.noise_reject_rate == 1 and .metrics.false_family_rate == 0' <<<"$big_surface_raw_derived_json" >/dev/null
+jq -e '([.induced_families[].root] | index("деклараци") and index("инструкци") and index("счет")) and ([.rejected_collision_roots[].root] | index("счетчик") and index("маршрутизатор")) and .metrics.state == "DERIVED_SUFFIX_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF"' <<<"$big_surface_raw_derived_json" >/dev/null
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
@@ -178,6 +183,7 @@ jq empty "$root/examples/llmwave-big-surface-corpus.json"
 jq empty "$root/examples/llmwave-big-surface-corpus-ru.json"
 jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru.json"
 jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru-noisy.json"
+jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru-derived.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"

@@ -775,6 +775,44 @@ mod tests {
     }
 
     #[test]
+    fn surface_raw_induce_derives_suffix_inventory_from_raw_forms() {
+        let report = surface_raw_induce::build_surface_raw_induce_report(std::path::Path::new(
+            "examples/llmwave-big-raw-surface-corpus-ru-derived.json",
+        ))
+        .expect("derived raw induce report");
+        assert_eq!(report.roadmap_block, "v331-v360");
+        assert_eq!(
+            report.corpus.suffix_inventory_source,
+            "derived_from_raw_forms"
+        );
+        assert!(report.derived_suffix_inventory.enabled);
+        assert_eq!(report.metrics.manual_suffix_count, 0);
+        assert!(report.metrics.derived_suffix_count >= 8);
+        assert_eq!(report.metrics.induced_family_count, 9);
+        assert_eq!(report.metrics.expected_root_recall, 1.0);
+        assert_eq!(report.metrics.held_out_exact_match_rate, 1.0);
+        assert_eq!(report.metrics.noise_reject_rate, 1.0);
+        assert_eq!(report.metrics.false_family_rate, 0.0);
+        assert_eq!(
+            report.metrics.state,
+            "DERIVED_SUFFIX_RAW_INDUCTION_PASS_NOT_GENERAL_PROOF"
+        );
+        assert!(report
+            .derived_suffix_inventory
+            .suffixes
+            .iter()
+            .any(|suffix| suffix.suffix == "е"));
+        assert!(report
+            .induced_families
+            .iter()
+            .any(|family| family.root == "деклараци"));
+        assert!(!report
+            .induced_families
+            .iter()
+            .any(|family| family.root == "счетчик"));
+    }
+
+    #[test]
     fn write_report_keeps_nonlinear_claim_unproven() {
         let report = write::build_write_report();
         assert_eq!(report.roadmap_block, "v191-v205");
