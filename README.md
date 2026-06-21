@@ -297,6 +297,8 @@ nanda-llmwave-memory grow .nanda/llmwave-memory.json examples/triad-packet.token
 nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
 nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
+scripts/fetch-llmwave-big-gutenberg.sh
+nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples .nanda/external-corpus/gutenberg --out .nanda/llmwave-big-training/project-gutenberg-artifact.json --vocab-cap 65536 --transition-cap 262144 --active-chunk-cap 32768 --chunk-tokens 64 --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -783,6 +785,9 @@ check. The command keeps cold text and JSON outside the hot Active Core and
 reports the estimated hot record budget. Its successful verdict is
 `TRAINING_ARTIFACT_READY_NOT_LLM`: the corpus path is real, but broad chat,
 nonlinear memory proof, and cache-only execution remain explicitly unproven.
+Use `scripts/fetch-llmwave-big-gutenberg.sh` to fetch a reproducible
+public-domain text slice into `.nanda/external-corpus/gutenberg`. Generated
+corpora and training artifacts stay under `.nanda/` and are not committed.
 `nanda-llmwave-big ask` reads that compiled training artifact back into the
 field path. It builds a query wave, scores schema/chunk/transition peaks, and
 answers only when the trained-artifact field is focused. Its ready state is
