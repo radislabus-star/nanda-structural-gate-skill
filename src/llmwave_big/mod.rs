@@ -20,6 +20,7 @@ pub mod loader;
 pub mod multi_schema_competition;
 pub mod open_surface_generation;
 pub mod operators;
+pub mod reasoning_field;
 pub mod residuals;
 pub mod schema_memory_growth;
 pub mod schemas;
@@ -71,6 +72,8 @@ enum LlmwaveBigCommand {
     SchemaGrow(LlmwaveBigSchemaGrowArgs),
     /// Run the v621-v700 open surface generation core.
     SurfaceGenerate(LlmwaveBigSurfaceGenerateArgs),
+    /// Run the v701-v780 multi-step reasoning field.
+    ReasonField(LlmwaveBigReasonFieldArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -159,6 +162,12 @@ struct LlmwaveBigSchemaGrowArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigSurfaceGenerateArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigReasonFieldArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -325,6 +334,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SurfaceGenerate(args) => {
             let report = open_surface_generation::build_open_surface_generation_report();
             report::print_open_surface_generation_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ReasonField(args) => {
+            let report = reasoning_field::build_reasoning_field_report();
+            report::print_reasoning_field_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -832,6 +846,43 @@ mod tests {
         assert_eq!(report.generation_metrics.trap_reject_rate, 1.0);
         assert!(!report.claim_boundary.external_corpus_loaded);
         assert!(!report.claim_boundary.free_form_chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn reasoning_field_propagates_multi_step_chain() {
+        let report = reasoning_field::build_reasoning_field_report();
+        assert_eq!(report.roadmap_block, "v701-v780");
+        assert_eq!(report.verdict, "MULTI_STEP_REASONING_FIELD_READY_NOT_CHAT");
+        assert_eq!(
+            report.surface_bridge_state,
+            "OPEN_SURFACE_GENERATION_READY_NOT_CHAT"
+        );
+        assert_eq!(
+            report.premise_surface,
+            "Honglu issued invoice PI-03 to Rustrade"
+        );
+        assert_eq!(report.hops.len(), 3);
+        assert_eq!(report.metrics.hop_count, 3);
+        assert!(report.metrics.chain_exact);
+        assert_eq!(report.metrics.contradiction_rate, 0.0);
+        assert!(report
+            .inferred_state
+            .contains(&"payment_should_follow_invoice"));
+        assert_eq!(core::mem::size_of::<reasoning_field::ReasoningHop32>(), 32);
+        assert!(report.claim_boundary.fixed_reasoning_hop_records);
+    }
+
+    #[test]
+    fn reasoning_field_rejects_missing_evidence_shortcut() {
+        let report = reasoning_field::build_reasoning_field_report();
+        assert!(report.trap.rejected);
+        assert_eq!(report.trap.trap, "missing_evidence_shortcut");
+        assert_eq!(report.trap.proposed_inference, "customs cleared goods");
+        assert_eq!(report.metrics.missing_evidence_reject_rate, 1.0);
+        assert!(!report.claim_boundary.external_corpus_loaded);
+        assert!(!report.claim_boundary.broad_reasoning_proven);
+        assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }
 

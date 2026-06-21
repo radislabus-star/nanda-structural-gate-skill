@@ -121,6 +121,12 @@ jq -e '.schema_growth_bridge_state == "SCHEMA_MEMORY_GROWTH_READY_NOT_CHAT" and 
 jq -e '.materialized_surface == "Honglu issued invoice PI-03 to Rustrade" and .generation_metrics.step_count == 6 and .generation_metrics.exact_surface == true' <<<"$big_surface_generate_json" >/dev/null
 jq -e '.trap.proposed_surface == "Honglu paid invoice PI-03 to Rustrade" and .trap.rejected == true and .generation_metrics.trap_reject_rate == 1' <<<"$big_surface_generate_json" >/dev/null
 jq -e '.claim_boundary.fixed_surface_step_records == true and .claim_boundary.free_form_chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_surface_generate_json" >/dev/null
+big_reason_field_json="$("$llmwave_big" reason-field --format json)"
+jq -e '.roadmap_block == "v701-v780" and .verdict == "MULTI_STEP_REASONING_FIELD_READY_NOT_CHAT"' <<<"$big_reason_field_json" >/dev/null
+jq -e '.surface_bridge_state == "OPEN_SURFACE_GENERATION_READY_NOT_CHAT" and .premise_surface == "Honglu issued invoice PI-03 to Rustrade"' <<<"$big_reason_field_json" >/dev/null
+jq -e '.metrics.hop_count == 3 and .metrics.chain_exact == true and .metrics.contradiction_rate == 0 and .metrics.missing_evidence_reject_rate == 1' <<<"$big_reason_field_json" >/dev/null
+jq -e '.inferred_state | index("payment_should_follow_invoice") and index("customs_check_needs_declaration_packet")' <<<"$big_reason_field_json" >/dev/null
+jq -e '.trap.proposed_inference == "customs cleared goods" and .trap.rejected == true and .claim_boundary.fixed_reasoning_hop_records == true and .claim_boundary.broad_reasoning_proven == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_reason_field_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

@@ -44,6 +44,9 @@
 - v621-v700 add `nanda-llmwave-big surface-generate`: a learned schema
   materializes `Honglu issued invoice PI-03 to Rustrade` through fixed
   `SurfaceStep32` records and rejects a route-splice verb surface.
+- v701-v780 add `nanda-llmwave-big reason-field`: a generated invoice premise
+  propagates through three fixed `ReasoningHop32` records while the shortcut
+  `customs cleared goods` is rejected.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

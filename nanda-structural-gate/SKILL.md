@@ -164,6 +164,7 @@ scripts/nanda-llmwave-big decode-loop --format json
 scripts/nanda-llmwave-big multi-schema --format json
 scripts/nanda-llmwave-big schema-grow --format json
 scripts/nanda-llmwave-big surface-generate --format json
+scripts/nanda-llmwave-big reason-field --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -477,6 +478,10 @@ materializes a constrained phrase through fixed `SurfaceStep32` records and
 rejects a route-spliced verb. Treat
 `OPEN_SURFACE_GENERATION_READY_NOT_CHAT` as constrained surface generation, not
 free-form dialogue or nonlinear-memory proof.
+v701-v780 add `nanda-llmwave-big reason-field`: a generated premise propagates
+through fixed `ReasoningHop32` route dependencies and rejects a missing-evidence
+shortcut. Treat `MULTI_STEP_REASONING_FIELD_READY_NOT_CHAT` as a constrained
+multi-hop fixture, not broad reasoning or chat readiness.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

@@ -155,6 +155,11 @@ spans, grammar atoms, and surface programs, then rejects a plausible but
 route-spliced verb. This is the first post-growth surface generation step; it is
 not free-form dialogue.
 
+`nanda-llmwave-big reason-field` adds a constrained multi-hop field over that
+surface. It can propagate a generated invoice premise into payment/customs
+expectations while refusing to infer customs clearance without evidence. This is
+the first reasoning-chain fixture; it is not broad reasoning.
+
 ### Holographic Reduced Representations
 
 Sources:

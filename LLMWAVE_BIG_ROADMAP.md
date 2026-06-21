@@ -918,6 +918,48 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v701-v780: implemented as nanda-llmwave-big reason-field
+
+## Phase 26: Multi-Step Reasoning Field, v701-v780
+
+Goal:
+
+```text
+generated premise surface
+  -> route/schema dependency hops
+  -> inferred state
+  -> reject missing-evidence shortcut
+```
+
+Current sample:
+
+```text
+premise = Honglu issued invoice PI-03 to Rustrade
+
+hops:
+  supplier-docs -> creates_obligation_for -> buyer-payment
+  buyer-payment -> feeds -> customs-check
+  customs-check -> requires -> declaration-packet
+
+inferred state:
+  invoice_issued
+  payment_should_follow_invoice
+  customs_check_needs_declaration_packet
+
+trap = customs cleared goods
+reason = invoice/payment path does not prove customs clearance
+```
+
+Stop rules:
+
+```text
+three-hop fixture -> not broad reasoning
+missing-evidence rejection -> local safety evidence only
+ReasoningHop32 fixed record -> packed-boundary proof, not speed proof
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

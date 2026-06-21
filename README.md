@@ -308,6 +308,7 @@ nanda-llmwave-big decode-loop --format json
 nanda-llmwave-big multi-schema --format json
 nanda-llmwave-big schema-grow --format json
 nanda-llmwave-big surface-generate --format json
+nanda-llmwave-big reason-field --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -591,6 +592,11 @@ issued invoice PI-03 to Rustrade` through fixed `SurfaceStep32` records,
 combining surface programs, grammar atoms, and evidence-copy spans. It rejects
 the route-splice surface `Honglu paid invoice PI-03 to Rustrade`; this is still
 a constrained generation fixture, not free-form chat.
+`nanda-llmwave-big reason-field` adds the v701-v780 multi-step reasoning field.
+It propagates the generated invoice premise through three fixed
+`ReasoningHop32` records: invoice issuance creates a payment expectation,
+payment/declaration context feeds customs checking, and customs checking still
+requires declaration evidence. It rejects the shortcut `customs cleared goods`.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

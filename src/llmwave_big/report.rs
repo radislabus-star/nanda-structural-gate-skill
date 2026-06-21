@@ -13,6 +13,7 @@ use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
 use super::open_surface_generation::OpenSurfaceGenerationReport;
+use super::reasoning_field::ReasoningFieldReport;
 use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
 use super::surface_bank_fixture::SurfaceBankFixtureReport;
@@ -150,6 +151,18 @@ pub(crate) fn print_open_surface_generation_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_open_surface_generation_text(report),
         OutputFormat::Md => print_open_surface_generation_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_reasoning_field_report(
+    report: &ReasoningFieldReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_reasoning_field_text(report),
+        OutputFormat::Md => print_reasoning_field_md(report),
     }
     Ok(())
 }
@@ -535,6 +548,25 @@ fn print_open_surface_generation_text(report: &OpenSurfaceGenerationReport) {
     println!(
         "trap_reject_rate: {:.3}",
         report.generation_metrics.trap_reject_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_reasoning_field_text(report: &ReasoningFieldReport) {
+    println!("LLMWave-Big Reasoning Field");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("surface_bridge_state: {}", report.surface_bridge_state);
+    println!("premise_surface: {}", report.premise_surface);
+    println!("hop_count: {}", report.metrics.hop_count);
+    println!("chain_exact: {}", report.metrics.chain_exact);
+    println!(
+        "missing_evidence_reject_rate: {:.3}",
+        report.metrics.missing_evidence_reject_rate
     );
     println!(
         "nonlinear_memory_proven: {}",
@@ -1122,6 +1154,31 @@ fn print_open_surface_generation_md(report: &OpenSurfaceGenerationReport) {
     println!(
         "- `{}` rejected: `{}`",
         report.trap.proposed_surface, report.trap.rejected
+    );
+}
+
+fn print_reasoning_field_md(report: &ReasoningFieldReport) {
+    println!("# LLMWave-Big Reasoning Field");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- premise: `{}`", report.premise_surface);
+    println!();
+    println!("## Hops");
+    println!();
+    for hop in &report.hops {
+        println!(
+            "- `{}` `{}` `{}` -> `{}` score `{}`",
+            hop.from, hop.relation, hop.to, hop.evidence, hop.final_score
+        );
+    }
+    println!();
+    println!("## Trap");
+    println!();
+    println!(
+        "- `{}` rejected: `{}`",
+        report.trap.proposed_inference, report.trap.rejected
     );
 }
 
