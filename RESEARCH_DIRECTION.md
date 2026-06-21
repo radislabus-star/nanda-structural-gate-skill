@@ -111,6 +111,13 @@ suffix/program resonance, L3 phase bias, and local anti-wave suppression. The
 current Cyrillic sample deliberately includes the near-root trap `счетчик`; it
 must lose to the active `счет` family despite matching the prefix.
 
+`nanda-llmwave-big hrr` is the first direct import from the HRR/VSA line into
+the LLMWave-Big core. It binds role/filler waves, unbinds by role, and runs
+cleanup memory with noise and collision controls. The accepted first core uses
+bipolar VSA elementwise binding because the naive circular-convolution fixture
+was not stable enough; circular convolution/correlation remains a comparison
+target, not a current claim.
+
 ### Holographic Reduced Representations
 
 Sources:

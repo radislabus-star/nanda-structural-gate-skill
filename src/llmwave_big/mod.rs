@@ -9,6 +9,7 @@ pub mod active_core;
 pub mod atlas;
 pub mod consolidation;
 pub mod eval;
+pub mod hrr_binding;
 pub mod l2_word_field;
 pub mod l3_schema_field;
 pub mod lexical_birth;
@@ -49,6 +50,8 @@ enum LlmwaveBigCommand {
     ActiveCore(LlmwaveBigActiveCoreArgs),
     /// Print the v181-v190 L2 Word Field contract and surface sample.
     L2(LlmwaveBigL2Args),
+    /// Run the v391-v430 HRR/VSA role-filler binding core.
+    Hrr(LlmwaveBigHrrArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -95,6 +98,12 @@ struct LlmwaveBigActiveCoreArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigL2Args {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigHrrArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -226,6 +235,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 l2_word_field::build_l2_word_field_report(l3_schema_field::business_invoice_bias());
             report::print_l2_word_field_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::Hrr(args) => {
+            let report = hrr_binding::build_hrr_binding_report();
+            report::print_hrr_binding_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -463,6 +477,33 @@ mod tests {
         assert!(trap.final_score < top.final_score);
         assert!(!report.runtime_field.claim_boundary.chat_ready);
         assert!(!report.runtime_field.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn hrr_binding_recovers_role_fillers_with_cleanup() {
+        let report = hrr_binding::build_hrr_binding_report();
+        assert_eq!(report.roadmap_block, "v391-v430");
+        assert_eq!(report.verdict, "HRR_BINDING_READY_NOT_NONLINEAR_PROOF");
+        assert_eq!(report.metrics.role_recall, 1.0);
+        assert_eq!(report.metrics.noisy_role_recall, 1.0);
+        assert_eq!(report.metrics.ambiguous_cleanup_rate, 0.0);
+        assert!(report.bindings.iter().all(|binding| binding.exact));
+        assert!(report
+            .bindings
+            .iter()
+            .any(|binding| binding.role == "supplier" && binding.recovered == "Honglu"));
+    }
+
+    #[test]
+    fn hrr_binding_rejects_role_collision_trap() {
+        let report = hrr_binding::build_hrr_binding_report();
+        assert!(report.collision_eval.rejected);
+        assert_eq!(report.collision_eval.trap_role, "supplier");
+        assert_eq!(report.collision_eval.expected_filler, "Honglu");
+        assert_eq!(report.collision_eval.rejected_filler, "Rustrade");
+        assert!(report.collision_eval.expected_score > report.collision_eval.rejected_score);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(!report.claim_boundary.llm_ready);
     }
 
     #[test]

@@ -630,6 +630,51 @@ hot-loop claim excludes JSON/strings/heap from the scoring loop
 nonlinear_surface_memory_proven remains false
 ```
 
+v391-v430: implemented as nanda-llmwave-big hrr
+
+## Phase 19: HRR/VSA Binding and Cleanup Core, v391-v430
+
+Goal:
+
+```text
+role wave + filler wave
+  -> bind role/filler
+  -> superpose bound pairs into schema field
+  -> unbind by role
+  -> cleanup nearest known filler
+  -> reject role-collision traps
+  -> test small noise
+```
+
+Current sample:
+
+```text
+supplier -> Honglu
+buyer -> Rustrade
+document -> invoice
+route -> Guangzhou
+trap: supplier must not recover Rustrade
+```
+
+Implemented core:
+
+```text
+bipolar VSA elementwise binding
+cleanup memory with margin gate
+noise eval
+collision eval
+```
+
+Stop rules:
+
+```text
+fixture role recall -> not nonlinear memory proof
+cleanup on four fillers -> not language understanding
+circular convolution remains a comparison target, not current accepted core
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

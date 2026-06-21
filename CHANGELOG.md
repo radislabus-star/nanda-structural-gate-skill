@@ -23,6 +23,9 @@
   prefix wave × surface wave scoring, family/suffix resonance, L3 phase bias,
   local anti-wave suppression for near-root traps, and an explicit
   `L2_WAVE_RUNTIME_READY_NOT_CHAT` claim boundary.
+- v391-v430 add `nanda-llmwave-big hrr`: a first HRR/VSA role-filler binding
+  core with bipolar VSA bind/unbind, cleanup memory, small-noise recall,
+  collision rejection, and `HRR_BINDING_READY_NOT_NONLINEAR_PROOF`.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

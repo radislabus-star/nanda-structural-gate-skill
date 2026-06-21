@@ -4,6 +4,7 @@ use super::active_core::ActiveCoreReport;
 use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::eval::BigEvalReport;
+use super::hrr_binding::HrrBindingReport;
 use super::l2_word_field::L2WordFieldReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
@@ -59,6 +60,18 @@ pub(crate) fn print_l2_word_field_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_l2_word_field_text(report),
         OutputFormat::Md => print_l2_word_field_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_hrr_binding_report(
+    report: &HrrBindingReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_hrr_binding_text(report),
+        OutputFormat::Md => print_hrr_binding_md(report),
     }
     Ok(())
 }
@@ -303,6 +316,23 @@ fn print_l2_word_field_text(report: &L2WordFieldReport) {
     println!(
         "sync: {}/{}",
         report.sync_policy.l2_update, report.sync_policy.l3_update
+    );
+}
+
+fn print_hrr_binding_text(report: &HrrBindingReport) {
+    println!("LLMWave-Big HRR Binding");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("role_recall: {:.3}", report.metrics.role_recall);
+    println!("noisy_role_recall: {:.3}", report.metrics.noisy_role_recall);
+    println!(
+        "collision_reject_rate: {:.3}",
+        report.metrics.collision_reject_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
     );
 }
 
@@ -692,6 +722,40 @@ fn print_l2_word_field_md(report: &L2WordFieldReport) {
             candidate.label, candidate.final_score, candidate.anti_score
         );
     }
+}
+
+fn print_hrr_binding_md(report: &HrrBindingReport) {
+    println!("# LLMWave-Big HRR Binding");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- wave_dim: `{}`", report.wave_dim);
+    println!();
+    println!("## Bindings");
+    println!();
+    for binding in &report.bindings {
+        println!(
+            "- `{}` -> expected `{}`, recovered `{}`, margin `{}`",
+            binding.role, binding.filler, binding.recovered, binding.margin
+        );
+    }
+    println!();
+    println!("## Metrics");
+    println!();
+    println!("- role recall: `{:.3}`", report.metrics.role_recall);
+    println!(
+        "- noisy role recall: `{:.3}`",
+        report.metrics.noisy_role_recall
+    );
+    println!(
+        "- collision reject rate: `{:.3}`",
+        report.metrics.collision_reject_rate
+    );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
 }
 
 fn print_lexical_birth_md(report: &LexicalBirthReport) {

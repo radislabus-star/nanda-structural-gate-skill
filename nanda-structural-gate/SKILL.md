@@ -157,6 +157,7 @@ scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
 scripts/nanda-llmwave-big l2 --format json
+scripts/nanda-llmwave-big hrr --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -436,6 +437,11 @@ same command with an L2 Wave Field Runtime: prefix wave x surface wave,
 family/suffix resonance, L3 phase bias, and local anti-wave suppression for
 near-root prefix traps. Keep L2 as token/root/morpheme/form surface; do not
 store schemas/routes as L2 facts.
+v391-v430 add `nanda-llmwave-big hrr`: a first HRR/VSA role-filler binding
+core. It binds role/filler waves, superposes bound pairs into a schema field,
+unbinds by role, and runs cleanup memory with noise and collision controls.
+Treat `HRR_BINDING_READY_NOT_NONLINEAR_PROOF` as a fixture-level core result,
+not as nonlinear memory proof or LLM readiness.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

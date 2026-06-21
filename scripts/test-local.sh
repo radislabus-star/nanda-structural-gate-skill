@@ -78,6 +78,12 @@ jq -e '.candidate_cache.sample[] | select(.label == "inventory" and .anti_score 
 jq -e '.runtime_field.top_surface == "счете" and .runtime_field.top_family == "счет" and .runtime_field.margin >= 12 and .runtime_field.field_state == "L2_WAVE_RUNTIME_READY_NOT_CHAT"' <<<"$big_l2_json" >/dev/null
 jq -e '.runtime_field.candidates[] | select(.surface == "счетчик" and .prefix_resonance > 0 and .anti_wave > 0 and .final_score < 0)' <<<"$big_l2_json" >/dev/null
 jq -e '.runtime_field.claim_boundary.hot_loop_uses_json == false and .runtime_field.claim_boundary.hot_loop_uses_heap == false and .runtime_field.claim_boundary.chat_ready == false and .runtime_field.claim_boundary.nonlinear_memory_proven == false' <<<"$big_l2_json" >/dev/null
+big_hrr_json="$("$llmwave_big" hrr --format json)"
+jq -e '.roadmap_block == "v391-v430" and .verdict == "HRR_BINDING_READY_NOT_NONLINEAR_PROOF"' <<<"$big_hrr_json" >/dev/null
+jq -e '.metrics.role_recall == 1 and .metrics.cleanup_top1 == 1 and .metrics.noisy_role_recall == 1 and .metrics.collision_reject_rate == 1 and .metrics.ambiguous_cleanup_rate == 0' <<<"$big_hrr_json" >/dev/null
+jq -e '.bindings[] | select(.role == "supplier" and .filler == "Honglu" and .recovered == "Honglu" and .exact == true)' <<<"$big_hrr_json" >/dev/null
+jq -e '.collision_eval.trap_role == "supplier" and .collision_eval.expected_filler == "Honglu" and .collision_eval.rejected_filler == "Rustrade" and .collision_eval.rejected == true' <<<"$big_hrr_json" >/dev/null
+jq -e '.claim_boundary.hrr_binding_implemented == true and .claim_boundary.cleanup_memory_implemented == true and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_hrr_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

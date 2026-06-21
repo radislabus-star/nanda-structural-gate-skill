@@ -301,6 +301,7 @@ nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
 nanda-llmwave-big l2 --format json
+nanda-llmwave-big hrr --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -541,6 +542,13 @@ local anti-wave suppression. In the built-in sample, prefix `счет` ranks
 `счете` as the top surface while suppressing the near-root prefix trap
 `счетчик`. This is `L2_WAVE_RUNTIME_READY_NOT_CHAT`: L2 surface ranking works,
 but chat readiness and nonlinear memory proof remain false.
+`nanda-llmwave-big hrr` adds the v391-v430 HRR/VSA binding core. It binds
+role/filler waves such as `supplier ⊗ Honglu`, superposes them into a schema
+field, unbinds by role, and passes the recovered cue through cleanup memory.
+The first stable implementation uses bipolar VSA elementwise binding; naive
+circular convolution remains a planned comparison because it was not stable
+enough in the initial fixture. The report must keep
+`nonlinear_memory_proven=false` and `llm_ready=false`.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor
