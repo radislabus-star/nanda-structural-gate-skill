@@ -12,6 +12,7 @@ use super::l3_schema_bind::L3SchemaBindReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
+use super::open_surface_generation::OpenSurfaceGenerationReport;
 use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
 use super::surface_bank_fixture::SurfaceBankFixtureReport;
@@ -137,6 +138,18 @@ pub(crate) fn print_schema_memory_growth_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_schema_memory_growth_text(report),
         OutputFormat::Md => print_schema_memory_growth_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_open_surface_generation_report(
+    report: &OpenSurfaceGenerationReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_open_surface_generation_text(report),
+        OutputFormat::Md => print_open_surface_generation_md(report),
     }
     Ok(())
 }
@@ -499,6 +512,29 @@ fn print_schema_memory_growth_text(report: &SchemaMemoryGrowthReport) {
     println!(
         "false_promotion_rate: {:.3}",
         report.memory_metrics.false_promotion_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_open_surface_generation_text(report: &OpenSurfaceGenerationReport) {
+    println!("LLMWave-Big Open Surface Generation");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "schema_growth_bridge_state: {}",
+        report.schema_growth_bridge_state
+    );
+    println!("selected_route: {}", report.selected_schema.route);
+    println!("surface: {}", report.materialized_surface);
+    println!("step_count: {}", report.generation_metrics.step_count);
+    println!("exact_surface: {}", report.generation_metrics.exact_surface);
+    println!(
+        "trap_reject_rate: {:.3}",
+        report.generation_metrics.trap_reject_rate
     );
     println!(
         "nonlinear_memory_proven: {}",
@@ -1060,6 +1096,32 @@ fn print_schema_memory_growth_md(report: &SchemaMemoryGrowthReport) {
     println!(
         "- `{}` rejected: `{}`",
         report.negative_control.proposed_form, report.negative_control.rejected
+    );
+}
+
+fn print_open_surface_generation_md(report: &OpenSurfaceGenerationReport) {
+    println!("# LLMWave-Big Open Surface Generation");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- selected route: `{}`", report.selected_schema.route);
+    println!("- surface: `{}`", report.materialized_surface);
+    println!();
+    println!("## Surface Plan");
+    println!();
+    for step in &report.surface_plan {
+        println!(
+            "- `{}` `{}` via `{}`",
+            step.slot, step.surface, step.production_path
+        );
+    }
+    println!();
+    println!("## Trap");
+    println!();
+    println!(
+        "- `{}` rejected: `{}`",
+        report.trap.proposed_surface, report.trap.rejected
     );
 }
 

@@ -115,6 +115,12 @@ jq -e '.promoted_schemas[] | select(.route == "supplier-docs" and .support_count
 jq -e '.promoted_schemas[] | select(.route == "buyer-payment" and .support_count == 3)' <<<"$big_schema_grow_json" >/dev/null
 jq -e '.promoted_schemas[] | select(.route == "customs-check" and .support_count == 3)' <<<"$big_schema_grow_json" >/dev/null
 jq -e '.negative_control.proposed_form == "warehouse signs invoice" and .negative_control.rejected == true and .memory_metrics.false_promotion_rate == 0 and .claim_boundary.fixed_learned_schema_records == true and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_schema_grow_json" >/dev/null
+big_surface_generate_json="$("$llmwave_big" surface-generate --format json)"
+jq -e '.roadmap_block == "v621-v700" and .verdict == "OPEN_SURFACE_GENERATION_READY_NOT_CHAT"' <<<"$big_surface_generate_json" >/dev/null
+jq -e '.schema_growth_bridge_state == "SCHEMA_MEMORY_GROWTH_READY_NOT_CHAT" and .selected_schema.route == "supplier-docs"' <<<"$big_surface_generate_json" >/dev/null
+jq -e '.materialized_surface == "Honglu issued invoice PI-03 to Rustrade" and .generation_metrics.step_count == 6 and .generation_metrics.exact_surface == true' <<<"$big_surface_generate_json" >/dev/null
+jq -e '.trap.proposed_surface == "Honglu paid invoice PI-03 to Rustrade" and .trap.rejected == true and .generation_metrics.trap_reject_rate == 1' <<<"$big_surface_generate_json" >/dev/null
+jq -e '.claim_boundary.fixed_surface_step_records == true and .claim_boundary.free_form_chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_surface_generate_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

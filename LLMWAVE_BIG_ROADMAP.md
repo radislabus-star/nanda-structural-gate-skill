@@ -876,6 +876,48 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v621-v700: implemented as nanda-llmwave-big surface-generate
+
+## Phase 25: Open Surface Generation, v621-v700
+
+Goal:
+
+```text
+learned schema
+  -> role-safe surface plan
+  -> SurfaceStep32 records
+  -> materialized phrase
+  -> reject route-splice surface
+```
+
+Current sample:
+
+```text
+selected schema = supplier-docs
+surface = Honglu issued invoice PI-03 to Rustrade
+
+surface paths:
+  Honglu   -> evidence_copy_span
+  issued   -> surface_program
+  invoice  -> surface_program
+  PI-03    -> evidence_copy_span
+  to       -> grammar_atom
+  Rustrade -> evidence_copy_span
+
+trap = Honglu paid invoice PI-03 to Rustrade
+reason = paid belongs to buyer-payment, not supplier-docs
+```
+
+Stop rules:
+
+```text
+open surface fixture -> not free-form chat
+exact surface -> local materialization evidence only
+SurfaceStep32 fixed record -> packed-boundary proof, not speed proof
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

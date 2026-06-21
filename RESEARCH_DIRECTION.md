@@ -149,6 +149,12 @@ hand-written schemas, it promotes repeated observed route facts into compact
 embedded fixture, but it establishes the promotion gate that a real Atlas
 loader must later feed.
 
+`nanda-llmwave-big surface-generate` connects learned schemas back to visible
+language. The first fixture materializes a role-safe phrase from evidence-copy
+spans, grammar atoms, and surface programs, then rejects a plausible but
+route-spliced verb. This is the first post-growth surface generation step; it is
+not free-form dialogue.
+
 ### Holographic Reduced Representations
 
 Sources:

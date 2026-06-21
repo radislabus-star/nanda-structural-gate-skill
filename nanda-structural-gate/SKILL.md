@@ -163,6 +163,7 @@ scripts/nanda-llmwave-big l2-l3-couple --format json
 scripts/nanda-llmwave-big decode-loop --format json
 scripts/nanda-llmwave-big multi-schema --format json
 scripts/nanda-llmwave-big schema-grow --format json
+scripts/nanda-llmwave-big surface-generate --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -471,6 +472,11 @@ v561-v620 add `nanda-llmwave-big schema-grow`: repeated observed route facts
 promote compact `LearnedSchema32` records and one-off traps stay rejected.
 Treat `SCHEMA_MEMORY_GROWTH_READY_NOT_CHAT` as an embedded growth fixture, not
 real corpus training, chat readiness, or nonlinear-memory proof.
+v621-v700 add `nanda-llmwave-big surface-generate`: a learned schema
+materializes a constrained phrase through fixed `SurfaceStep32` records and
+rejects a route-spliced verb. Treat
+`OPEN_SURFACE_GENERATION_READY_NOT_CHAT` as constrained surface generation, not
+free-form dialogue or nonlinear-memory proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

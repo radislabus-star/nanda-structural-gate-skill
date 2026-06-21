@@ -18,6 +18,7 @@ pub mod l3_schema_field;
 pub mod lexical_birth;
 pub mod loader;
 pub mod multi_schema_competition;
+pub mod open_surface_generation;
 pub mod operators;
 pub mod residuals;
 pub mod schema_memory_growth;
@@ -68,6 +69,8 @@ enum LlmwaveBigCommand {
     MultiSchema(LlmwaveBigMultiSchemaArgs),
     /// Run the v561-v620 schema memory growth core.
     SchemaGrow(LlmwaveBigSchemaGrowArgs),
+    /// Run the v621-v700 open surface generation core.
+    SurfaceGenerate(LlmwaveBigSurfaceGenerateArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -150,6 +153,12 @@ struct LlmwaveBigMultiSchemaArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigSchemaGrowArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSurfaceGenerateArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -311,6 +320,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SchemaGrow(args) => {
             let report = schema_memory_growth::build_schema_memory_growth_report();
             report::print_schema_memory_growth_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SurfaceGenerate(args) => {
+            let report = open_surface_generation::build_open_surface_generation_report();
+            report::print_open_surface_generation_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -778,6 +792,46 @@ mod tests {
         }));
         assert!(!report.claim_boundary.external_corpus_loaded);
         assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn open_surface_generation_materializes_role_safe_phrase() {
+        let report = open_surface_generation::build_open_surface_generation_report();
+        assert_eq!(report.roadmap_block, "v621-v700");
+        assert_eq!(report.verdict, "OPEN_SURFACE_GENERATION_READY_NOT_CHAT");
+        assert_eq!(
+            report.schema_growth_bridge_state,
+            "SCHEMA_MEMORY_GROWTH_READY_NOT_CHAT"
+        );
+        assert_eq!(report.selected_schema.route, "supplier-docs");
+        assert_eq!(
+            report.materialized_surface,
+            "Honglu issued invoice PI-03 to Rustrade"
+        );
+        assert_eq!(report.surface_plan.len(), 6);
+        assert!(report.generation_metrics.exact_surface);
+        assert_eq!(report.generation_metrics.grammar_error_rate, 0.0);
+        assert_eq!(report.generation_metrics.role_surface_error_rate, 0.0);
+        assert_eq!(
+            core::mem::size_of::<open_surface_generation::SurfaceStep32>(),
+            32
+        );
+        assert!(report.claim_boundary.fixed_surface_step_records);
+    }
+
+    #[test]
+    fn open_surface_generation_rejects_route_splice_verb() {
+        let report = open_surface_generation::build_open_surface_generation_report();
+        assert!(report.trap.rejected);
+        assert_eq!(report.trap.trap, "surface_route_splice");
+        assert_eq!(
+            report.trap.proposed_surface,
+            "Honglu paid invoice PI-03 to Rustrade"
+        );
+        assert_eq!(report.generation_metrics.trap_reject_rate, 1.0);
+        assert!(!report.claim_boundary.external_corpus_loaded);
+        assert!(!report.claim_boundary.free_form_chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }
 

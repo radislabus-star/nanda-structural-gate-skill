@@ -307,6 +307,7 @@ nanda-llmwave-big l2-l3-couple --format json
 nanda-llmwave-big decode-loop --format json
 nanda-llmwave-big multi-schema --format json
 nanda-llmwave-big schema-grow --format json
+nanda-llmwave-big surface-generate --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -584,6 +585,12 @@ It scans a small embedded observation corpus, promotes repeated route forms into
 fixed `LearnedSchema32` records, and rejects the one-off `warehouse signs
 invoice` trap. This is the first growth step for L3 memory, but the corpus is
 still embedded and the report keeps chat readiness and nonlinear proof false.
+`nanda-llmwave-big surface-generate` adds the v621-v700 open-surface generation
+layer. It takes the learned `supplier-docs` schema and materializes `Honglu
+issued invoice PI-03 to Rustrade` through fixed `SurfaceStep32` records,
+combining surface programs, grammar atoms, and evidence-copy spans. It rejects
+the route-splice surface `Honglu paid invoice PI-03 to Rustrade`; this is still
+a constrained generation fixture, not free-form chat.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor
