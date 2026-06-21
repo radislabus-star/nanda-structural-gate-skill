@@ -157,6 +157,11 @@ jq -e '.field_bridge_state == "STABLE_PEAK" and .top_route == "customs-clearance
 jq -e '.metrics.role_lens_pass_rate == 1 and .metrics.evidence_block_rate == 1 and .metrics.answer_block_rate == 1 and .metrics.lens_agreement_rate > 0.5' <<<"$big_lens_scan_json" >/dev/null
 jq -e '([.lenses[].lens] | index("role") and index("evidence") and index("temporal") and index("causal") and index("contradiction") and index("surface") and index("answer"))' <<<"$big_lens_scan_json" >/dev/null
 jq -e '.claim_boundary.fixed_lens_records == true and .claim_boundary.safe_to_answer == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_lens_scan_json" >/dev/null
+big_mature_anti_wave_json="$("$llmwave_big" mature-anti-wave --text "Has customs cleared the goods?" --format json)"
+jq -e '.roadmap_block == "v1141-v1210" and .verdict == "MATURE_ANTI_WAVE_READY_NOT_ANSWER"' <<<"$big_mature_anti_wave_json" >/dev/null
+jq -e '.lens_bridge_verdict == "LENS_SCAN_READY_NOT_ANSWER" and .field_after_anti.anti_field_state == "SUPPRESSED_UNSUPPORTED_ANSWER"' <<<"$big_mature_anti_wave_json" >/dev/null
+jq -e '.metrics.lane_count == 3 and .metrics.evidence_lane_rate == 1 and .metrics.causal_lane_rate == 1 and .metrics.answer_lane_rate == 1' <<<"$big_mature_anti_wave_json" >/dev/null
+jq -e '.claim_boundary.fixed_anti_lane_records == true and .claim_boundary.local_suppression_only == true and .claim_boundary.safe_to_answer == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_mature_anti_wave_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

@@ -1104,6 +1104,81 @@ chat_ready remains false
 nonlinear_memory_proven remains false
 ```
 
+v1061-v1140: implemented as nanda-llmwave-big lens-scan
+
+## Phase 31: Lens Scan, v1061-v1140
+
+Goal:
+
+```text
+raw stable peak
+  -> role lens
+  -> evidence lens
+  -> temporal lens
+  -> causal lens
+  -> contradiction lens
+  -> surface lens
+  -> answer lens
+  -> answer block or answer candidate
+```
+
+Current controls:
+
+```text
+role          -> PASS
+evidence      -> WATCH
+temporal      -> PASS
+causal        -> WATCH
+contradiction -> PASS
+surface       -> PASS
+answer        -> BLOCK
+```
+
+Stop rules:
+
+```text
+stable peak plus lens block -> no answer
+LensRecord32 fixed record -> packed-boundary proof, not speed proof
+safe_to_answer remains false
+full_field_mature remains false
+chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
+v1141-v1210: implemented as nanda-llmwave-big mature-anti-wave
+
+## Phase 32: Mature Anti-Wave, v1141-v1210
+
+Goal:
+
+```text
+blocking lenses
+  -> local suppress lanes
+  -> route peak preserved
+  -> unsupported answer permission suppressed
+  -> later evidence proof can still use the route basin
+```
+
+Current controls:
+
+```text
+evidence WATCH -> suppress_missing_evidence_claim
+causal WATCH   -> suppress_causal_shortcut
+answer BLOCK   -> suppress_answer_permission
+```
+
+Stop rules:
+
+```text
+anti-wave suppression -> not answer permission
+AntiLaneRecord32 fixed record -> packed-boundary proof, not speed proof
+local suppression only -> not global memory deletion
+safe_to_answer remains false
+full_field_mature remains false
+chat_ready remains false
+nonlinear_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

@@ -314,6 +314,7 @@ nanda-llmwave-big mini-chat-eval --format json
 nanda-llmwave-big query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big multi-peak-field --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big lens-scan --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -631,6 +632,10 @@ through role, evidence, temporal, causal, contradiction, surface, and answer
 lenses. A stable customs-clearance peak is still blocked when the evidence and
 answer lenses do not permit a claim. This is the first mature-field lens layer,
 not chat readiness.
+`nanda-llmwave-big mature-anti-wave` adds v1141-v1210. It compiles WATCH/BLOCK
+lenses into fixed `AntiLaneRecord32` lanes, suppresses the unsupported answer
+permission, and preserves the route peak for later evidence proof. This is local
+anti-wave field shaping, not answer permission and not chat readiness.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

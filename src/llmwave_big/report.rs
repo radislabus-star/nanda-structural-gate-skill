@@ -13,6 +13,7 @@ use super::l3_schema_bind::L3SchemaBindReport;
 use super::lens_scan::LensScanReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
+use super::mature_anti_wave::MatureAntiWaveReport;
 use super::mini_chat_eval::MiniChatEvalReport;
 use super::multi_peak_field::MultiPeakFieldReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
@@ -225,6 +226,18 @@ pub(crate) fn print_lens_scan_report(report: &LensScanReport, format: &OutputFor
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_lens_scan_text(report),
         OutputFormat::Md => print_lens_scan_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_mature_anti_wave_report(
+    report: &MatureAntiWaveReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_mature_anti_wave_text(report),
+        OutputFormat::Md => print_mature_anti_wave_md(report),
     }
     Ok(())
 }
@@ -1925,6 +1938,67 @@ fn print_lens_scan_md(report: &LensScanReport) {
         "- lens agreement: `{:.3}`",
         report.metrics.lens_agreement_rate
     );
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- safe to answer: `{}`",
+        report.claim_boundary.safe_to_answer
+    );
+    println!("- chat ready: `{}`", report.claim_boundary.chat_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_mature_anti_wave_text(report: &MatureAntiWaveReport) {
+    println!("LLMWave-Big Mature Anti-Wave");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("lens_bridge_verdict: {}", report.lens_bridge_verdict);
+    println!(
+        "anti_field_state: {}",
+        report.field_after_anti.anti_field_state
+    );
+    println!(
+        "answer_decision: {}",
+        report.field_after_anti.answer_decision
+    );
+    println!("lane_count: {}", report.metrics.lane_count);
+    println!("suppress_total: {}", report.metrics.suppress_total);
+    println!(
+        "support_preserved_total: {}",
+        report.metrics.support_preserved_total
+    );
+}
+
+fn print_mature_anti_wave_md(report: &MatureAntiWaveReport) {
+    println!("# LLMWave-Big Mature Anti-Wave");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- lens bridge: `{}`", report.lens_bridge_verdict);
+    println!(
+        "- anti field state: `{}`",
+        report.field_after_anti.anti_field_state
+    );
+    println!(
+        "- answer decision: `{}`",
+        report.field_after_anti.answer_decision
+    );
+    println!();
+    println!("## Metrics");
+    println!();
+    println!("- lanes: `{}`", report.metrics.lane_count);
+    println!("- suppress total: `{}`", report.metrics.suppress_total);
+    println!(
+        "- support preserved: `{}`",
+        report.metrics.support_preserved_total
+    );
+    println!("- locality floor: `{}`", report.metrics.locality_floor);
     println!();
     println!("## Claim Boundary");
     println!();

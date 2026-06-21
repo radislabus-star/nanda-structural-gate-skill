@@ -19,6 +19,7 @@ pub mod l3_schema_field;
 pub mod lens_scan;
 pub mod lexical_birth;
 pub mod loader;
+pub mod mature_anti_wave;
 pub mod mini_chat_eval;
 pub mod multi_peak_field;
 pub mod multi_schema_competition;
@@ -93,6 +94,9 @@ enum LlmwaveBigCommand {
     /// Run the v1061-v1140 field lens scan.
     #[command(name = "lens-scan")]
     LensScan(LlmwaveBigLensScanArgs),
+    /// Run the v1141-v1210 mature anti-wave layer.
+    #[command(name = "mature-anti-wave", alias = "anti-wave")]
+    MatureAntiWave(LlmwaveBigMatureAntiWaveArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -221,6 +225,14 @@ struct LlmwaveBigMultiPeakFieldArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigLensScanArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigMatureAntiWaveArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, value_enum, default_value = "json")]
@@ -419,6 +431,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::LensScan(args) => {
             let report = lens_scan::build_lens_scan_report(args.text);
             report::print_lens_scan_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::MatureAntiWave(args) => {
+            let report = mature_anti_wave::build_mature_anti_wave_report(args.text);
+            report::print_mature_anti_wave_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -1128,6 +1145,45 @@ mod tests {
         assert_eq!(report.metrics.answer_block_rate, 1.0);
         assert!(report.metrics.lens_agreement_rate > 0.5);
         assert!(report.claim_boundary.fixed_lens_records);
+        assert!(!report.claim_boundary.safe_to_answer);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn mature_anti_wave_compiles_blocking_lenses_into_local_lanes() {
+        let report = mature_anti_wave::build_mature_anti_wave_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.roadmap_block, "v1141-v1210");
+        assert_eq!(report.verdict, "MATURE_ANTI_WAVE_READY_NOT_ANSWER");
+        assert_eq!(report.lens_bridge_verdict, "LENS_SCAN_READY_NOT_ANSWER");
+        assert_eq!(report.metrics.lane_count, 3);
+        assert_eq!(report.metrics.evidence_lane_rate, 1.0);
+        assert_eq!(report.metrics.causal_lane_rate, 1.0);
+        assert_eq!(report.metrics.answer_lane_rate, 1.0);
+        assert!(
+            report.field_after_anti.suppress_total
+                > report.field_after_anti.support_preserved_total
+        );
+        assert_eq!(
+            core::mem::size_of::<mature_anti_wave::AntiLaneRecord32>(),
+            32
+        );
+    }
+
+    #[test]
+    fn mature_anti_wave_does_not_grant_answer_permission() {
+        let report = mature_anti_wave::build_mature_anti_wave_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(
+            report.field_after_anti.answer_decision,
+            "ANSWER_BLOCKED_BY_ANTI_WAVE"
+        );
+        assert_eq!(report.metrics.unsafe_answer_rate, 0.0);
+        assert!(report.claim_boundary.fixed_anti_lane_records);
+        assert!(report.claim_boundary.local_suppression_only);
         assert!(!report.claim_boundary.safe_to_answer);
         assert!(!report.claim_boundary.chat_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);

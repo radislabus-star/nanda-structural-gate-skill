@@ -170,6 +170,7 @@ scripts/nanda-llmwave-big mini-chat-eval --format json
 scripts/nanda-llmwave-big query-wave --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big multi-peak-field --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big lens-scan --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -508,6 +509,10 @@ selection only; do not answer until later lens/answer gates allow it.
 v1061-v1140 add `nanda-llmwave-big lens-scan`: a stable raw peak is scanned by
 role, evidence, temporal, causal, contradiction, surface, and answer lenses.
 Treat `LENS_SCAN_READY_NOT_ANSWER` as lens-level blocking/diagnostics, not as
+permission to answer.
+v1141-v1210 add `nanda-llmwave-big mature-anti-wave`: WATCH/BLOCK lenses compile
+into local anti-wave suppress lanes. Treat
+`MATURE_ANTI_WAVE_READY_NOT_ANSWER` as unsupported-answer suppression, not as
 permission to answer.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word

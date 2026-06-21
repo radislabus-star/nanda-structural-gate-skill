@@ -65,6 +65,9 @@
 - v1061-v1140 add `nanda-llmwave-big lens-scan`: stable raw peaks are scanned
   through role/evidence/temporal/causal/contradiction/surface/answer lenses
   with fixed `LensRecord32`; missing evidence blocks answer permission.
+- v1141-v1210 add `nanda-llmwave-big mature-anti-wave`: blocking lenses compile
+  into local fixed `AntiLaneRecord32` suppress lanes that block unsupported
+  answer permission while preserving the route peak for later proof.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar
