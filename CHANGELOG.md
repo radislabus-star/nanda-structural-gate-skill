@@ -50,6 +50,10 @@
 - v781-v860 add `nanda-llmwave-big dialogue-state`: a single constrained
   question receives a `Not proven` answer while unsupported customs-clearance
   certainty is rejected through fixed `DialogueTurn32`.
+- v861-v950 add `nanda-llmwave-big mini-chat-eval`: five embedded answer,
+  refusal, route-splice, schema-noise, and exact-surface controls pass through
+  fixed `MiniChatEvalCase32` records while full LLM/chat/nonlinear claims stay
+  false.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

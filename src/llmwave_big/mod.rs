@@ -18,6 +18,7 @@ pub mod l3_schema_bind;
 pub mod l3_schema_field;
 pub mod lexical_birth;
 pub mod loader;
+pub mod mini_chat_eval;
 pub mod multi_schema_competition;
 pub mod open_surface_generation;
 pub mod operators;
@@ -77,6 +78,9 @@ enum LlmwaveBigCommand {
     ReasonField(LlmwaveBigReasonFieldArgs),
     /// Run the v781-v860 dialogue state core.
     DialogueState(LlmwaveBigDialogueStateArgs),
+    /// Run the v861-v950 mini chat eval boundary.
+    #[command(name = "mini-chat-eval", alias = "chat-eval")]
+    MiniChatEval(LlmwaveBigMiniChatEvalArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -177,6 +181,12 @@ struct LlmwaveBigReasonFieldArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigDialogueStateArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigMiniChatEvalArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -353,6 +363,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::DialogueState(args) => {
             let report = dialogue_state::build_dialogue_state_report();
             report::print_dialogue_state_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::MiniChatEval(args) => {
+            let report = mini_chat_eval::build_mini_chat_eval_report();
+            report::print_mini_chat_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -926,6 +941,48 @@ mod tests {
         assert_eq!(report.trap.unsafe_answer, "Yes, customs cleared the goods.");
         assert_eq!(report.metrics.unsupported_answer_reject_rate, 1.0);
         assert!(!report.claim_boundary.multi_turn_chat_ready);
+        assert!(!report.claim_boundary.broad_reasoning_proven);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+    }
+
+    #[test]
+    fn mini_chat_eval_passes_all_control_cases() {
+        let report = mini_chat_eval::build_mini_chat_eval_report();
+        assert_eq!(report.roadmap_block, "v861-v950");
+        assert_eq!(report.verdict, "MINI_CHAT_EVAL_PASS_NOT_GENERAL_LLM");
+        assert_eq!(
+            report.dialogue_bridge_state,
+            "DIALOGUE_STATE_READY_NOT_CHAT"
+        );
+        assert_eq!(report.eval_cases.len(), 5);
+        assert_eq!(report.metrics.passed_cases, 5);
+        assert_eq!(report.metrics.failed_cases, 0);
+        assert_eq!(report.metrics.grounded_answer_rate, 1.0);
+        assert_eq!(report.metrics.unsupported_reject_rate, 1.0);
+        assert_eq!(report.metrics.route_splice_reject_rate, 1.0);
+        assert_eq!(report.metrics.surface_exact_rate, 1.0);
+        assert_eq!(
+            core::mem::size_of::<mini_chat_eval::MiniChatEvalCase32>(),
+            32
+        );
+        assert!(report.claim_boundary.fixed_eval_case_records);
+        assert!(report.claim_boundary.mini_chat_candidate);
+    }
+
+    #[test]
+    fn mini_chat_eval_keeps_hard_claims_false() {
+        let report = mini_chat_eval::build_mini_chat_eval_report();
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "unsupported_clearance" && case.passed));
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "route_splice_surface" && case.passed));
+        assert!(!report.claim_boundary.full_llm_ready);
+        assert!(!report.claim_boundary.multi_turn_chat_ready);
+        assert!(!report.claim_boundary.external_corpus_loaded);
         assert!(!report.claim_boundary.broad_reasoning_proven);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
     }

@@ -996,6 +996,41 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v861-v950: implemented as nanda-llmwave-big mini-chat-eval
+
+## Phase 28: Mini Chat Eval Boundary, v861-v950
+
+Goal:
+
+```text
+schema memory growth
+  -> constrained surface generation
+  -> multi-hop reasoning field
+  -> dialogue state
+  -> embedded answer/refusal eval
+```
+
+Current controls:
+
+```text
+grounded_clearance_answer -> Not proven + declaration evidence boundary
+unsupported_clearance     -> reject "Yes, customs cleared the goods"
+route_splice_surface      -> reject "Honglu paid invoice PI-03 to Rustrade"
+one_off_schema_noise      -> reject "warehouse signs invoice" promotion
+exact_constrained_surface -> produce "Honglu issued invoice PI-03 to Rustrade"
+```
+
+Stop rules:
+
+```text
+5/5 embedded controls -> mini chat candidate only
+MiniChatEvalCase32 fixed record -> packed-boundary proof, not speed proof
+embedded_fixture_chain_only -> not external-corpus training
+single-turn constrained eval -> not multi-turn chat
+general LLM remains false
+nonlinear_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

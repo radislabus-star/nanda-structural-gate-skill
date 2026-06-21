@@ -166,6 +166,7 @@ scripts/nanda-llmwave-big schema-grow --format json
 scripts/nanda-llmwave-big surface-generate --format json
 scripts/nanda-llmwave-big reason-field --format json
 scripts/nanda-llmwave-big dialogue-state --format json
+scripts/nanda-llmwave-big mini-chat-eval --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -487,6 +488,11 @@ v781-v860 add `nanda-llmwave-big dialogue-state`: a constrained question gets
 a stateful not-proven answer and unsupported certainty is rejected. Treat
 `DIALOGUE_STATE_READY_NOT_CHAT` as single-turn answer-state control, not
 multi-turn chat readiness.
+v861-v950 add `nanda-llmwave-big mini-chat-eval`: five embedded controls check
+grounded answer, unsupported refusal, route-splice rejection, one-off schema
+noise rejection, and exact constrained surface generation. Treat
+`MINI_CHAT_EVAL_PASS_NOT_GENERAL_LLM` as a local eval pass only, not a general
+LLM, multi-turn chat readiness, or nonlinear-memory proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

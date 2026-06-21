@@ -133,6 +133,12 @@ jq -e '.reasoning_bridge_state == "MULTI_STEP_REASONING_FIELD_READY_NOT_CHAT" an
 jq -e '.constrained_answer | contains("Not proven") and contains("declaration evidence")' <<<"$big_dialogue_state_json" >/dev/null
 jq -e '.trap.unsafe_answer == "Yes, customs cleared the goods." and .trap.rejected == true and .metrics.unsupported_answer_reject_rate == 1' <<<"$big_dialogue_state_json" >/dev/null
 jq -e '.claim_boundary.fixed_dialogue_turn_records == true and .claim_boundary.multi_turn_chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_dialogue_state_json" >/dev/null
+big_mini_chat_eval_json="$("$llmwave_big" mini-chat-eval --format json)"
+jq -e '.roadmap_block == "v861-v950" and .verdict == "MINI_CHAT_EVAL_PASS_NOT_GENERAL_LLM"' <<<"$big_mini_chat_eval_json" >/dev/null
+jq -e '.dialogue_bridge_state == "DIALOGUE_STATE_READY_NOT_CHAT" and .metrics.case_count == 5 and .metrics.passed_cases == 5 and .metrics.failed_cases == 0' <<<"$big_mini_chat_eval_json" >/dev/null
+jq -e '.metrics.grounded_answer_rate == 1 and .metrics.unsupported_reject_rate == 1 and .metrics.route_splice_reject_rate == 1 and .metrics.surface_exact_rate == 1' <<<"$big_mini_chat_eval_json" >/dev/null
+jq -e '([.eval_cases[].case_id] | index("grounded_clearance_answer") and index("unsupported_clearance") and index("route_splice_surface") and index("one_off_schema_noise") and index("exact_constrained_surface"))' <<<"$big_mini_chat_eval_json" >/dev/null
+jq -e '.claim_boundary.fixed_eval_case_records == true and .claim_boundary.full_llm_ready == false and .claim_boundary.multi_turn_chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_mini_chat_eval_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

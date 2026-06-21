@@ -12,6 +12,7 @@ use super::l2_word_field::L2WordFieldReport;
 use super::l3_schema_bind::L3SchemaBindReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
+use super::mini_chat_eval::MiniChatEvalReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
 use super::open_surface_generation::OpenSurfaceGenerationReport;
 use super::reasoning_field::ReasoningFieldReport;
@@ -176,6 +177,18 @@ pub(crate) fn print_dialogue_state_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_dialogue_state_text(report),
         OutputFormat::Md => print_dialogue_state_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_mini_chat_eval_report(
+    report: &MiniChatEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_mini_chat_eval_text(report),
+        OutputFormat::Md => print_mini_chat_eval_md(report),
     }
     Ok(())
 }
@@ -1693,4 +1706,44 @@ fn print_runtime_product_md(report: &RuntimeProductReport) {
         report.performance.target_hot_query_ms
     );
     println!("- LLM ready: `{}`", report.claim_boundary.llm_ready);
+}
+
+fn print_mini_chat_eval_text(report: &MiniChatEvalReport) {
+    println!("LLMWave-Big Mini Chat Eval");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("dialogue_bridge_state: {}", report.dialogue_bridge_state);
+    println!("case_count: {}", report.metrics.case_count);
+    println!("passed_cases: {}", report.metrics.passed_cases);
+    println!("failed_cases: {}", report.metrics.failed_cases);
+    println!("full_llm_ready: {}", report.claim_boundary.full_llm_ready);
+}
+
+fn print_mini_chat_eval_md(report: &MiniChatEvalReport) {
+    println!("# LLMWave-Big Mini Chat Eval");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- dialogue bridge: `{}`", report.dialogue_bridge_state);
+    println!("- scope: `{}`", report.evaluation_scope);
+    println!("- cases: `{}`", report.metrics.case_count);
+    println!("- passed: `{}`", report.metrics.passed_cases);
+    println!("- failed: `{}`", report.metrics.failed_cases);
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- mini chat candidate: `{}`",
+        report.claim_boundary.mini_chat_candidate
+    );
+    println!(
+        "- full LLM ready: `{}`",
+        report.claim_boundary.full_llm_ready
+    );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
 }

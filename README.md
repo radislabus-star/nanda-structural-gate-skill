@@ -310,6 +310,7 @@ nanda-llmwave-big schema-grow --format json
 nanda-llmwave-big surface-generate --format json
 nanda-llmwave-big reason-field --format json
 nanda-llmwave-big dialogue-state --format json
+nanda-llmwave-big mini-chat-eval --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -603,6 +604,13 @@ answers the question `Has customs cleared the goods?` with a constrained
 `Not proven` response, keeps the declaration-evidence boundary, and rejects the
 unsupported answer `Yes, customs cleared the goods.` This is single-turn state
 control, not multi-turn chat readiness.
+`nanda-llmwave-big mini-chat-eval` adds the v861-v950 eval boundary over the
+current schema-growth, surface-generation, reasoning, and dialogue chain. It
+checks five embedded cases: grounded not-proven answer, unsupported-certainty
+rejection, route-splice rejection, one-off schema-noise rejection, and exact
+constrained surface generation. Its passing verdict is a mini chat candidate
+for this fixture chain only, not a general LLM, not broad chat readiness, and
+not nonlinear-memory proof.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor
