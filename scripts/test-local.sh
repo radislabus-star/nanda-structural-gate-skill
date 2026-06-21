@@ -280,6 +280,9 @@ big_train_json="$("$llmwave_big" train "$tmp_big_train/corpus.txt" --out "$tmp_b
 jq -e '.version == "llmwave-big-v1901-corpus-training" and .verdict == "TRAINING_ARTIFACT_READY_NOT_LLM" and .claim_boundary.real_corpus_loaded == true and .claim_boundary.chat_llm_ready == false' <<<"$big_train_json" >/dev/null
 jq -e '.field_budget.fits_hot_budget == true and .field_budget.transition_records > 0 and .eval.state == "HELD_OUT_EVAL_RAN"' <<<"$big_train_json" >/dev/null
 test -s "$tmp_big_train/artifact.json"
+big_ask_json="$("$llmwave_big" ask --artifact "$tmp_big_train/artifact.json" --text "what requires evidence" --top-k 3 --format json)"
+jq -e '.version == "llmwave-big-v1902-artifact-ask" and .claim_boundary.artifact_loaded == true and .claim_boundary.trained_field_used == true and .claim_boundary.broad_chat_llm_ready == false' <<<"$big_ask_json" >/dev/null
+jq -e '.field.top_chunk_peaks | length > 0' <<<"$big_ask_json" >/dev/null
 rm -rf "$tmp_big_train"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null

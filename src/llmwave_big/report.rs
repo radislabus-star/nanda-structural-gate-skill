@@ -36,7 +36,7 @@ use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
 use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
-use super::training::TrainingCompileReport;
+use super::training::{ArtifactAskReport, TrainingCompileReport};
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
@@ -554,6 +554,18 @@ pub(crate) fn print_training_compile_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_training_compile_text(report),
         OutputFormat::Md => print_training_compile_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_artifact_ask_report(
+    report: &ArtifactAskReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_artifact_ask_text(report),
+        OutputFormat::Md => print_artifact_ask_md(report),
     }
     Ok(())
 }
@@ -1131,6 +1143,19 @@ fn print_training_compile_text(report: &TrainingCompileReport) {
         println!("artifact: {path}");
     }
     println!("chat_llm_ready: {}", report.claim_boundary.chat_llm_ready);
+}
+
+fn print_artifact_ask_text(report: &ArtifactAskReport) {
+    println!("LLMWave-Big Ask");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("query: {}", report.query);
+    println!("field_state: {}", report.field.state);
+    println!("support_score: {:.4}", report.field.support_score);
+    println!("margin: {:.4}", report.field.margin);
+    println!("safe_to_answer: {}", report.answer.safe_to_answer);
+    println!("answer_state: {}", report.answer.state);
+    println!("answer: {}", report.answer.text);
 }
 
 fn print_contract_md(report: &LlmwaveBigReport) {
@@ -1994,6 +2019,21 @@ fn print_training_compile_md(report: &TrainingCompileReport) {
     if let Some(path) = &report.output.artifact_path {
         println!("- artifact: `{path}`");
     }
+}
+
+fn print_artifact_ask_md(report: &ArtifactAskReport) {
+    println!("# LLMWave-Big Ask");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- query: `{}`", report.query);
+    println!("- field state: `{}`", report.field.state);
+    println!("- support score: `{:.4}`", report.field.support_score);
+    println!("- margin: `{:.4}`", report.field.margin);
+    println!("- safe to answer: `{}`", report.answer.safe_to_answer);
+    println!("- answer state: `{}`", report.answer.state);
+    println!();
+    println!("{}", report.answer.text);
 }
 
 fn print_mini_chat_eval_text(report: &MiniChatEvalReport) {

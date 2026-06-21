@@ -161,6 +161,8 @@ enum LlmwaveBigCommand {
     Query(LlmwaveBigQueryArgs),
     /// Compile a real corpus into LLMWave-Big training records.
     Train(LlmwaveBigTrainArgs),
+    /// Ask a compiled LLMWave-Big training artifact.
+    Ask(LlmwaveBigAskArgs),
 }
 
 #[derive(Parser)]
@@ -484,6 +486,18 @@ struct LlmwaveBigTrainArgs {
     format: OutputFormat,
 }
 
+#[derive(Parser)]
+struct LlmwaveBigAskArgs {
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long)]
+    text: String,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
 #[derive(Serialize, Clone)]
 pub(crate) struct LlmwaveBigReport {
     pub command: &'static str,
@@ -744,6 +758,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 extensions: training::parse_extensions(&args.extensions),
             })?;
             report::print_training_compile_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::Ask(args) => {
+            let report = training::ask_training_artifact(&args.artifact, args.text, args.top_k)?;
+            report::print_artifact_ask_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
@@ -2156,6 +2175,11 @@ mod tests {
         assert!(!artifact.records.tokens.is_empty());
         assert!(!artifact.records.transitions.is_empty());
         assert_eq!(artifact.version, training::TRAINING_VERSION);
+        let ask =
+            training::ask_training_artifact(&out, "what requires evidence".to_string(), 3).unwrap();
+        assert!(ask.claim_boundary.trained_field_used);
+        assert!(!ask.claim_boundary.broad_chat_llm_ready);
+        assert!(!ask.field.top_chunk_peaks.is_empty());
         let _ = fs::remove_dir_all(&dir);
     }
 

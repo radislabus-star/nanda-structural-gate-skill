@@ -338,6 +338,7 @@ nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-c
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
 nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples --out .nanda/llmwave-big-training/project-artifact.json --format json
+nanda-llmwave-big ask --artifact .nanda/llmwave-big-training/project-artifact.json --text "what does declaration require" --top-k 5 --format json
 nanda-llmwave-big write --format json
 nanda-llmwave-big consolidate --format json
 nanda-llmwave-big eval --format json
@@ -781,6 +782,11 @@ check. The command keeps cold text and JSON outside the hot Active Core and
 reports the estimated hot record budget. Its successful verdict is
 `TRAINING_ARTIFACT_READY_NOT_LLM`: the corpus path is real, but broad chat,
 nonlinear memory proof, and cache-only execution remain explicitly unproven.
+`nanda-llmwave-big ask` reads that compiled training artifact back into the
+field path. It builds a query wave, scores schema/chunk/transition peaks, and
+answers only when the trained-artifact field is focused. Its ready state is
+`ARTIFACT_FIELD_ANSWER_READY_NOT_GENERAL_LLM`: useful narrow answering from the
+artifact, not a broad chat model.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

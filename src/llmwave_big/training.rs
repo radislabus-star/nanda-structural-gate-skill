@@ -110,6 +110,96 @@ pub(crate) struct TrainingClaimBoundary {
     pub forbidden_claims: Vec<&'static str>,
 }
 
+#[derive(Serialize, Clone)]
+pub(crate) struct ArtifactAskReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub query: String,
+    pub artifact: ArtifactAskSummary,
+    pub query_wave: QueryWaveSummary,
+    pub field: ArtifactFieldSummary,
+    pub answer: ArtifactAnswer,
+    pub claim_boundary: ArtifactAskClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ArtifactAskSummary {
+    pub path: String,
+    pub corpus_tokens: usize,
+    pub token_records: usize,
+    pub transition_records: usize,
+    pub chunk_records: usize,
+    pub schema_hint_records: usize,
+    pub estimated_hot_bytes: usize,
+    pub fits_hot_budget: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct QueryWaveSummary {
+    pub tokens: Vec<String>,
+    pub token_count: usize,
+    pub phase: u16,
+    pub energy: u32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ArtifactFieldSummary {
+    pub state: &'static str,
+    pub top_chunk_peaks: Vec<ChunkPeak>,
+    pub top_schema_peaks: Vec<SchemaPeak>,
+    pub top_transition_peaks: Vec<TransitionPeak>,
+    pub support_score: f32,
+    pub margin: f32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ChunkPeak {
+    pub chunk_id: u32,
+    pub score: f32,
+    pub overlap: usize,
+    pub phase_alignment: f32,
+    pub text: String,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct SchemaPeak {
+    pub schema_id: u32,
+    pub score: f32,
+    pub subject: String,
+    pub relation: String,
+    pub object: String,
+    pub count: u32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct TransitionPeak {
+    pub transition_id: u32,
+    pub score: f32,
+    pub from: String,
+    pub to: String,
+    pub count: u32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ArtifactAnswer {
+    pub state: &'static str,
+    pub safe_to_answer: bool,
+    pub text: String,
+    pub evidence_chunks: Vec<u32>,
+    pub evidence_schemas: Vec<u32>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ArtifactAskClaimBoundary {
+    pub artifact_loaded: bool,
+    pub trained_field_used: bool,
+    pub generated_from_training_artifact: bool,
+    pub broad_chat_llm_ready: bool,
+    pub nonlinear_memory_proven: bool,
+    pub safe_claim: &'static str,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct TrainingArtifact {
     pub mode: String,
@@ -345,12 +435,102 @@ pub(crate) fn compile_training_corpus(config: TrainingConfig) -> Result<Training
     })
 }
 
-#[cfg(test)]
 pub(crate) fn load_training_artifact(path: &Path) -> Result<TrainingArtifact> {
     let raw = fs::read_to_string(path)
         .with_context(|| format!("read training artifact {}", path.display()))?;
     serde_json::from_str(&raw)
         .with_context(|| format!("parse training artifact {}", path.display()))
+}
+
+pub(crate) fn ask_training_artifact(
+    artifact_path: &Path,
+    query: String,
+    top_k: usize,
+) -> Result<ArtifactAskReport> {
+    let artifact = load_training_artifact(artifact_path)?;
+    let query_tokens = tokenize(&query)
+        .into_iter()
+        .filter(|token| is_word_token(token))
+        .collect::<Vec<_>>();
+    let query_wave = QueryWaveSummary {
+        phase: phase_for(&query_tokens.join(" ")),
+        energy: query_tokens.len() as u32,
+        token_count: query_tokens.len(),
+        tokens: query_tokens.clone(),
+    };
+    let top_k = top_k.max(1);
+    let chunk_peaks = score_chunks(&artifact, &query_tokens, query_wave.phase, top_k);
+    let schema_peaks = score_schemas(&artifact, &query_tokens, top_k);
+    let transition_peaks = score_transitions(&artifact, &query_tokens, top_k);
+    let support_score = chunk_peaks
+        .first()
+        .map(|peak| peak.score)
+        .unwrap_or(0.0)
+        .max(schema_peaks.first().map(|peak| peak.score).unwrap_or(0.0));
+    let chunk_margin = chunk_peaks.first().map(|peak| peak.score).unwrap_or(0.0)
+        - chunk_peaks.get(1).map(|peak| peak.score).unwrap_or(0.0);
+    let schema_margin = schema_peaks.first().map(|peak| peak.score).unwrap_or(0.0)
+        - schema_peaks.get(1).map(|peak| peak.score).unwrap_or(0.0);
+    let _second_score = chunk_peaks
+        .get(1)
+        .map(|peak| peak.score)
+        .unwrap_or(0.0)
+        .max(schema_peaks.get(1).map(|peak| peak.score).unwrap_or(0.0));
+    let margin = round4(chunk_margin.max(schema_margin));
+    let focused_schema = schema_peaks
+        .first()
+        .is_some_and(|peak| peak.score >= 1.5 && schema_margin >= 0.1 && peak.count >= 2);
+    let focused_chunk = chunk_peaks
+        .first()
+        .is_some_and(|peak| peak.score >= 1.5 && chunk_margin >= 0.1);
+    let field_state = if focused_schema || focused_chunk {
+        "TRAINED_FIELD_FOCUSED"
+    } else if support_score > 0.0 {
+        "TRAINED_FIELD_THIN"
+    } else {
+        "TRAINED_FIELD_NO_MATCH"
+    };
+    let answer = build_artifact_answer(field_state, &chunk_peaks, &schema_peaks);
+
+    Ok(ArtifactAskReport {
+        mode: "llmwave-big-ask",
+        version: "llmwave-big-v1902-artifact-ask",
+        verdict: if answer.safe_to_answer {
+            "ARTIFACT_FIELD_ANSWER_READY_NOT_GENERAL_LLM"
+        } else {
+            "ARTIFACT_FIELD_REVIEW"
+        },
+        query,
+        artifact: ArtifactAskSummary {
+            path: artifact_path.display().to_string(),
+            corpus_tokens: artifact.corpus.tokens_seen,
+            token_records: artifact.records.tokens.len(),
+            transition_records: artifact.records.transitions.len(),
+            chunk_records: artifact.records.chunks.len(),
+            schema_hint_records: artifact.records.schema_hints.len(),
+            estimated_hot_bytes: artifact.field_budget.estimated_hot_bytes,
+            fits_hot_budget: artifact.field_budget.fits_hot_budget,
+        },
+        query_wave,
+        field: ArtifactFieldSummary {
+            state: field_state,
+            top_chunk_peaks: chunk_peaks,
+            top_schema_peaks: schema_peaks,
+            top_transition_peaks: transition_peaks,
+            support_score,
+            margin,
+        },
+        answer,
+        claim_boundary: ArtifactAskClaimBoundary {
+            artifact_loaded: true,
+            trained_field_used: true,
+            generated_from_training_artifact: true,
+            broad_chat_llm_ready: false,
+            nonlinear_memory_proven: false,
+            safe_claim:
+                "LLMWave-Big can answer narrowly by retrieving peaks from a compiled training artifact.",
+        },
+    })
 }
 
 fn load_corpus(config: &TrainingConfig) -> Result<CorpusBuild> {
@@ -719,6 +899,181 @@ fn eval_next_token(
             "large corpus quality is judged by held-out lift and field stability",
         ],
     }
+}
+
+fn score_chunks(
+    artifact: &TrainingArtifact,
+    query_tokens: &[String],
+    query_phase: u16,
+    top_k: usize,
+) -> Vec<ChunkPeak> {
+    let query_set = query_tokens
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let mut peaks = artifact
+        .records
+        .chunks
+        .iter()
+        .filter_map(|chunk| {
+            let chunk_tokens = tokenize(&chunk.text);
+            let overlap = chunk_tokens
+                .iter()
+                .filter(|token| query_set.contains(token.as_str()))
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>()
+                .len();
+            if overlap == 0 {
+                return None;
+            }
+            let phase_alignment = phase_alignment(query_phase, chunk.centroid_phase);
+            let score =
+                round4(overlap as f32 + phase_alignment + (chunk.energy as f32).ln_1p() * 0.05);
+            Some(ChunkPeak {
+                chunk_id: chunk.id,
+                score,
+                overlap,
+                phase_alignment,
+                text: chunk.text.clone(),
+            })
+        })
+        .collect::<Vec<_>>();
+    peaks.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| b.overlap.cmp(&a.overlap))
+            .then_with(|| a.chunk_id.cmp(&b.chunk_id))
+    });
+    peaks.truncate(top_k);
+    peaks
+}
+
+fn score_schemas(
+    artifact: &TrainingArtifact,
+    query_tokens: &[String],
+    top_k: usize,
+) -> Vec<SchemaPeak> {
+    let query_set = query_tokens
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let mut peaks = artifact
+        .records
+        .schema_hints
+        .iter()
+        .filter_map(|schema| {
+            let mut overlap = 0usize;
+            for part in [&schema.subject, &schema.relation, &schema.object] {
+                if query_set.contains(part.as_str()) {
+                    overlap += 1;
+                }
+            }
+            if overlap == 0 {
+                return None;
+            }
+            let score = round4(overlap as f32 + (schema.count as f32).ln_1p() * 0.25);
+            Some(SchemaPeak {
+                schema_id: schema.id,
+                score,
+                subject: schema.subject.clone(),
+                relation: schema.relation.clone(),
+                object: schema.object.clone(),
+                count: schema.count,
+            })
+        })
+        .collect::<Vec<_>>();
+    peaks.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| b.count.cmp(&a.count))
+            .then_with(|| a.schema_id.cmp(&b.schema_id))
+    });
+    peaks.truncate(top_k);
+    peaks
+}
+
+fn score_transitions(
+    artifact: &TrainingArtifact,
+    query_tokens: &[String],
+    top_k: usize,
+) -> Vec<TransitionPeak> {
+    let query_set = query_tokens
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let mut peaks = artifact
+        .records
+        .transitions
+        .iter()
+        .filter_map(|transition| {
+            let overlap = usize::from(query_set.contains(transition.from.as_str()))
+                + usize::from(query_set.contains(transition.to.as_str()));
+            if overlap == 0 {
+                return None;
+            }
+            let score = round4(overlap as f32 + transition.score * 0.2);
+            Some(TransitionPeak {
+                transition_id: transition.id,
+                score,
+                from: transition.from.clone(),
+                to: transition.to.clone(),
+                count: transition.count,
+            })
+        })
+        .collect::<Vec<_>>();
+    peaks.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| b.count.cmp(&a.count))
+            .then_with(|| a.transition_id.cmp(&b.transition_id))
+    });
+    peaks.truncate(top_k);
+    peaks
+}
+
+fn build_artifact_answer(
+    field_state: &'static str,
+    chunk_peaks: &[ChunkPeak],
+    schema_peaks: &[SchemaPeak],
+) -> ArtifactAnswer {
+    let safe_to_answer = field_state == "TRAINED_FIELD_FOCUSED"
+        && (!chunk_peaks.is_empty() || !schema_peaks.is_empty());
+    if !safe_to_answer {
+        return ArtifactAnswer {
+            state: "ANSWER_REVIEW",
+            safe_to_answer: false,
+            text: "LLMWave-Big did not find a stable trained-artifact peak.".to_string(),
+            evidence_chunks: chunk_peaks.iter().map(|peak| peak.chunk_id).collect(),
+            evidence_schemas: schema_peaks.iter().map(|peak| peak.schema_id).collect(),
+        };
+    }
+
+    let mut parts = Vec::new();
+    if let Some(schema) = schema_peaks.first() {
+        parts.push(format!(
+            "{} {} {}",
+            schema.subject, schema.relation, schema.object
+        ));
+    }
+    if parts.is_empty() {
+        if let Some(chunk) = chunk_peaks.first() {
+            parts.push(chunk.text.clone());
+        }
+    } else if let Some(chunk) = chunk_peaks.first() {
+        parts.push(format!("evidence chunk {}", chunk.chunk_id));
+    }
+    ArtifactAnswer {
+        state: "ANSWER_FROM_TRAINED_ARTIFACT",
+        safe_to_answer: true,
+        text: parts.join(" | "),
+        evidence_chunks: chunk_peaks.iter().map(|peak| peak.chunk_id).collect(),
+        evidence_schemas: schema_peaks.iter().map(|peak| peak.schema_id).collect(),
+    }
+}
+
+fn phase_alignment(a: u16, b: u16) -> f32 {
+    let diff = a.abs_diff(b).min(65535 - a.abs_diff(b)) as f32;
+    round4(1.0 - diff / 32767.0)
 }
 
 fn phase_for(input: &str) -> u16 {
