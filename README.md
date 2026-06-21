@@ -534,10 +534,13 @@ schema/residual wave projection, focus competition axes, runtime operation
 list, and an `ACTIVE_CORE_READY` sample verdict. `nanda-bench6m --mode
 active-core` measures that typed in-memory microkernel and excludes CLI, JSON,
 Atlas loading, and report serialization.
-`nanda-llmwave-big l2` adds the v181-v190 L2 Word Field contract: active
-surface slice, prefix wave, 128-4096 candidate cache, L3 bias into surface
-candidates, anti-wave suppression for schema-breaking prefix matches, L2/L3
-sync policy, multilingual surface banks, and L2 eval metrics.
+`nanda-llmwave-big l2` started as the v181-v190 L2 Word Field contract and now
+includes the v361-v390 L2 Wave Field Runtime: typed prefix wave, candidate
+surface wave, family resonance, suffix/program resonance, L3 phase bias, and
+local anti-wave suppression. In the built-in sample, prefix `счет` ranks
+`счете` as the top surface while suppressing the near-root prefix trap
+`счетчик`. This is `L2_WAVE_RUNTIME_READY_NOT_CHAT`: L2 surface ranking works,
+but chat readiness and nonlinear memory proof remain false.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

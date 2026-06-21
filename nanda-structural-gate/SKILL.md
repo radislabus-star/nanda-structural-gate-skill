@@ -431,8 +431,11 @@ nonlinear memory proof.
 v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface
 slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
 L2/L3 sync policy, multilingual surface banks, L2 eval metrics, and
-`L2_READY` / `L2_NEEDS_L3` / `L2_AMBIGUOUS` verdicts. Keep L2 as
-token/root/morpheme/form surface; do not store schemas/routes as L2 facts.
+`L2_READY` / `L2_NEEDS_L3` / `L2_AMBIGUOUS` verdicts. v361-v390 upgrades the
+same command with an L2 Wave Field Runtime: prefix wave x surface wave,
+family/suffix resonance, L3 phase bias, and local anti-wave suppression for
+near-root prefix traps. Keep L2 as token/root/morpheme/form surface; do not
+store schemas/routes as L2 facts.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

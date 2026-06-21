@@ -19,6 +19,10 @@
   slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
   L2/L3 sync policy, multilingual surface banks, eval metrics, and L2 runtime
   verdicts.
+- v361-v390 upgrade `nanda-llmwave-big l2` into an L2 Wave Field Runtime:
+  prefix wave × surface wave scoring, family/suffix resonance, L3 phase bias,
+  local anti-wave suppression for near-root traps, and an explicit
+  `L2_WAVE_RUNTIME_READY_NOT_CHAT` claim boundary.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

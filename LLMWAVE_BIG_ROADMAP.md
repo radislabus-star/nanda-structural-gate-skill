@@ -592,6 +592,44 @@ scope: L2 ownership, active slice, prefix wave, candidate cache,
 not claimed: natural language generation, full tokenizer, L3 schema storage in L2
 ```
 
+v361-v390: implemented as L2 Wave Field Runtime inside nanda-llmwave-big l2
+
+## Phase 18: L2 Wave Field Runtime, v361-v390
+
+Goal:
+
+```text
+typed prefix
+  -> PrefixWave update
+  -> candidate SurfaceWave projection
+  -> prefix resonance
+  -> family resonance
+  -> suffix/program resonance
+  -> L3 phase bias
+  -> local anti-wave suppression
+  -> ranked surface candidate
+```
+
+Current sample:
+
+```text
+input_prefix = счет
+top_surface = счете
+top_family = счет
+near-root trap = счетчик
+state = L2_WAVE_RUNTIME_READY_NOT_CHAT
+```
+
+Stop rules:
+
+```text
+runtime field ready -> not chat-ready
+prefix trap suppressed -> local safety evidence only
+L3 bias enters as phase/bias, not shared L3 storage
+hot-loop claim excludes JSON/strings/heap from the scoring loop
+nonlinear_surface_memory_proven remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition

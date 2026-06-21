@@ -413,12 +413,17 @@ mod tests {
     fn l2_word_field_uses_l3_bias_without_l3_storage_mix() {
         let report =
             l2_word_field::build_l2_word_field_report(l3_schema_field::business_invoice_bias());
-        assert_eq!(report.roadmap_block, "v181-v190");
+        assert_eq!(report.roadmap_block, "v361-v390");
         assert_eq!(report.verdict, "L2_READY");
         assert_eq!(report.candidate_cache.record_bytes, 32);
         assert_eq!(report.candidate_cache.top_token_label, "invoice");
         assert_eq!(report.l3_bias.operator, "issues");
         assert_eq!(report.sync_policy.l2_update, "per_keystroke");
+        assert_eq!(report.runtime_field.top_surface, "счете");
+        assert_eq!(
+            report.runtime_field.field_state,
+            "L2_WAVE_RUNTIME_READY_NOT_CHAT"
+        );
     }
 
     #[test]
@@ -433,6 +438,31 @@ mod tests {
             .expect("inventory candidate");
         assert!(inventory.anti_score > 0);
         assert!(inventory.final_score < report.candidate_cache.sample[0].final_score);
+    }
+
+    #[test]
+    fn l2_wave_runtime_suppresses_near_root_prefix_trap() {
+        let report =
+            l2_word_field::build_l2_word_field_report(l3_schema_field::business_invoice_bias());
+        let top = report
+            .runtime_field
+            .candidates
+            .iter()
+            .find(|candidate| candidate.surface == "счете")
+            .expect("top surface");
+        let trap = report
+            .runtime_field
+            .candidates
+            .iter()
+            .find(|candidate| candidate.surface == "счетчик")
+            .expect("prefix trap");
+        assert_eq!(report.runtime_field.top_family, "счет");
+        assert!(report.runtime_field.margin >= l2_word_field::L2_MIN_READY_MARGIN);
+        assert!(trap.prefix_resonance >= top.prefix_resonance);
+        assert!(trap.anti_wave > 0);
+        assert!(trap.final_score < top.final_score);
+        assert!(!report.runtime_field.claim_boundary.chat_ready);
+        assert!(!report.runtime_field.claim_boundary.nonlinear_memory_proven);
     }
 
     #[test]

@@ -71,10 +71,13 @@ jq -e '.budget.total_bytes == 6291456 and .budget.fits_nanda_6m_budget == true' 
 jq -e '.packet_format.schema_record_bytes == 32 and .packet_format.residual_record_bytes == 32 and .packet_format.lane_record_bytes == 64' <<<"$big_active_core_json" >/dev/null
 jq -e '.cycle.top_schema_id == 101 and .cycle.safe_to_answer == true and .cycle.margin > 0' <<<"$big_active_core_json" >/dev/null
 big_l2_json="$("$llmwave_big" l2 --format json)"
-jq -e '.roadmap_block == "v181-v190" and .verdict == "L2_READY"' <<<"$big_l2_json" >/dev/null
+jq -e '.roadmap_block == "v361-v390" and .verdict == "L2_READY"' <<<"$big_l2_json" >/dev/null
 jq -e '.candidate_cache.record_bytes == 32 and .candidate_cache.top_token_label == "invoice" and .candidate_cache.margin >= 12' <<<"$big_l2_json" >/dev/null
 jq -e '.sync_policy.l2_update == "per_keystroke" and .sync_policy.l3_update == "word_boundary_punctuation_semantic_shift"' <<<"$big_l2_json" >/dev/null
 jq -e '.candidate_cache.sample[] | select(.label == "inventory" and .anti_score > 0 and .final_score < 0)' <<<"$big_l2_json" >/dev/null
+jq -e '.runtime_field.top_surface == "счете" and .runtime_field.top_family == "счет" and .runtime_field.margin >= 12 and .runtime_field.field_state == "L2_WAVE_RUNTIME_READY_NOT_CHAT"' <<<"$big_l2_json" >/dev/null
+jq -e '.runtime_field.candidates[] | select(.surface == "счетчик" and .prefix_resonance > 0 and .anti_wave > 0 and .final_score < 0)' <<<"$big_l2_json" >/dev/null
+jq -e '.runtime_field.claim_boundary.hot_loop_uses_json == false and .runtime_field.claim_boundary.hot_loop_uses_heap == false and .runtime_field.claim_boundary.chat_ready == false and .runtime_field.claim_boundary.nonlinear_memory_proven == false' <<<"$big_l2_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

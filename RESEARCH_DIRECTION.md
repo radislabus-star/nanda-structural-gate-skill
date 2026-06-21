@@ -105,6 +105,12 @@ derived from repeated observed form tails before candidate root selection. This
 is a stronger lexical-birth scaffold, but it still is not broad morphology or
 nonlinear memory proof.
 
+`nanda-llmwave-big l2` now also carries the v361-v390 L2 Wave Field Runtime.
+It ranks surface candidates by prefix-wave resonance, family resonance,
+suffix/program resonance, L3 phase bias, and local anti-wave suppression. The
+current Cyrillic sample deliberately includes the near-root trap `счетчик`; it
+must lose to the active `счет` family despite matching the prefix.
+
 ### Holographic Reduced Representations
 
 Sources:

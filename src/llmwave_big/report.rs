@@ -296,6 +296,9 @@ fn print_l2_word_field_text(report: &L2WordFieldReport) {
     println!("prefix: {}", report.prefix_wave.prefix);
     println!("top_token: {}", report.candidate_cache.top_token_label);
     println!("margin: {}", report.candidate_cache.margin);
+    println!("runtime_top_surface: {}", report.runtime_field.top_surface);
+    println!("runtime_margin: {}", report.runtime_field.margin);
+    println!("runtime_state: {}", report.runtime_field.field_state);
     println!("record_bytes: {}", report.candidate_cache.record_bytes);
     println!(
         "sync: {}/{}",
@@ -659,6 +662,27 @@ fn print_l2_word_field_md(report: &L2WordFieldReport) {
     println!("- prefix: `{}`", report.prefix_wave.prefix);
     println!("- top token: `{}`", report.candidate_cache.top_token_label);
     println!("- margin: `{}`", report.candidate_cache.margin);
+    println!(
+        "- runtime top surface: `{}`",
+        report.runtime_field.top_surface
+    );
+    println!("- runtime margin: `{}`", report.runtime_field.margin);
+    println!("- runtime state: `{}`", report.runtime_field.field_state);
+    println!();
+    println!("## Runtime Field");
+    println!();
+    for candidate in &report.runtime_field.candidates {
+        println!(
+            "- `{}`: final={} prefix={} family={} suffix={} l3={} anti={}",
+            candidate.surface,
+            candidate.final_score,
+            candidate.prefix_resonance,
+            candidate.family_resonance,
+            candidate.suffix_resonance,
+            candidate.l3_phase_bias,
+            candidate.anti_wave
+        );
+    }
     println!();
     println!("## Candidate Sample");
     println!();
