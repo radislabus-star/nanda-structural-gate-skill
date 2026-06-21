@@ -200,6 +200,54 @@ pub(crate) struct ArtifactAskClaimBoundary {
     pub safe_claim: &'static str,
 }
 
+#[derive(Serialize, Clone)]
+pub(crate) struct ArtifactAskEvalReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub artifact: String,
+    pub suite: String,
+    pub cases: Vec<ArtifactAskEvalCaseReport>,
+    pub metrics: ArtifactAskEvalMetrics,
+    pub claim_boundary: ArtifactAskClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ArtifactAskEvalCaseReport {
+    pub id: String,
+    pub query: String,
+    pub expected_contains: String,
+    pub expected_safe_to_answer: bool,
+    pub observed_state: &'static str,
+    pub observed_safe_to_answer: bool,
+    pub observed_answer: String,
+    pub passed: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ArtifactAskEvalMetrics {
+    pub total: usize,
+    pub passed: usize,
+    pub answer_accuracy: f32,
+    pub false_positive_rate: f32,
+    pub false_negative_rate: f32,
+}
+
+#[derive(Deserialize)]
+struct ArtifactAskEvalSuite {
+    cases: Vec<ArtifactAskEvalCase>,
+}
+
+#[derive(Deserialize)]
+struct ArtifactAskEvalCase {
+    id: String,
+    query: String,
+    #[serde(default)]
+    expected_contains: String,
+    #[serde(default)]
+    expected_safe_to_answer: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct TrainingArtifact {
     pub mode: String,
@@ -452,6 +500,7 @@ pub(crate) fn ask_training_artifact(
         .into_iter()
         .filter(|token| is_word_token(token))
         .collect::<Vec<_>>();
+    let query_terms = expand_query_terms(&query_tokens);
     let query_wave = QueryWaveSummary {
         phase: phase_for(&query_tokens.join(" ")),
         energy: query_tokens.len() as u32,
@@ -459,9 +508,9 @@ pub(crate) fn ask_training_artifact(
         tokens: query_tokens.clone(),
     };
     let top_k = top_k.max(1);
-    let chunk_peaks = score_chunks(&artifact, &query_tokens, query_wave.phase, top_k);
-    let schema_peaks = score_schemas(&artifact, &query_tokens, top_k);
-    let transition_peaks = score_transitions(&artifact, &query_tokens, top_k);
+    let chunk_peaks = score_chunks(&artifact, &query_terms, query_wave.phase, top_k);
+    let schema_peaks = score_schemas(&artifact, &query_terms, top_k);
+    let transition_peaks = score_transitions(&artifact, &query_terms, top_k);
     let support_score = chunk_peaks
         .first()
         .map(|peak| peak.score)
@@ -480,11 +529,13 @@ pub(crate) fn ask_training_artifact(
     let focused_schema = schema_peaks
         .first()
         .is_some_and(|peak| peak.score >= 1.5 && schema_margin >= 0.1 && peak.count >= 2);
-    let focused_chunk = chunk_peaks
-        .first()
-        .is_some_and(|peak| peak.score >= 1.5 && chunk_margin >= 0.1);
-    let field_state = if focused_schema || focused_chunk {
+    let field_state = if focused_schema {
         "TRAINED_FIELD_FOCUSED"
+    } else if chunk_peaks
+        .first()
+        .is_some_and(|peak| peak.score >= 1.5 && chunk_margin >= 0.1)
+    {
+        "TRAINED_FIELD_EVIDENCE_REVIEW"
     } else if support_score > 0.0 {
         "TRAINED_FIELD_THIN"
     } else {
@@ -529,6 +580,77 @@ pub(crate) fn ask_training_artifact(
             nonlinear_memory_proven: false,
             safe_claim:
                 "LLMWave-Big can answer narrowly by retrieving peaks from a compiled training artifact.",
+        },
+    })
+}
+
+pub(crate) fn eval_training_artifact(
+    artifact_path: &Path,
+    suite_path: &Path,
+    top_k: usize,
+) -> Result<ArtifactAskEvalReport> {
+    let raw = fs::read_to_string(suite_path)
+        .with_context(|| format!("read ask eval suite {}", suite_path.display()))?;
+    let suite: ArtifactAskEvalSuite = serde_json::from_str(&raw)
+        .with_context(|| format!("parse ask eval suite {}", suite_path.display()))?;
+    let mut cases = Vec::new();
+    let mut false_positive = 0usize;
+    let mut false_negative = 0usize;
+    for case in suite.cases {
+        let observed = ask_training_artifact(artifact_path, case.query.clone(), top_k)?;
+        let contains_ok = case.expected_contains.is_empty()
+            || observed
+                .answer
+                .text
+                .to_lowercase()
+                .contains(&case.expected_contains.to_lowercase());
+        let safe_ok = observed.answer.safe_to_answer == case.expected_safe_to_answer;
+        if observed.answer.safe_to_answer && !case.expected_safe_to_answer {
+            false_positive += 1;
+        }
+        if !observed.answer.safe_to_answer && case.expected_safe_to_answer {
+            false_negative += 1;
+        }
+        cases.push(ArtifactAskEvalCaseReport {
+            id: case.id,
+            query: observed.query,
+            expected_contains: case.expected_contains,
+            expected_safe_to_answer: case.expected_safe_to_answer,
+            observed_state: observed.field.state,
+            observed_safe_to_answer: observed.answer.safe_to_answer,
+            observed_answer: observed.answer.text,
+            passed: contains_ok && safe_ok,
+        });
+    }
+    let total = cases.len();
+    let passed = cases.iter().filter(|case| case.passed).count();
+    let verdict = if total > 0 && passed == total {
+        "ARTIFACT_ASK_EVAL_PASS_NOT_GENERAL_LLM"
+    } else {
+        "ARTIFACT_ASK_EVAL_REVIEW"
+    };
+    Ok(ArtifactAskEvalReport {
+        mode: "llmwave-big-ask-eval",
+        version: "llmwave-big-v1903-artifact-ask-eval",
+        verdict,
+        artifact: artifact_path.display().to_string(),
+        suite: suite_path.display().to_string(),
+        cases,
+        metrics: ArtifactAskEvalMetrics {
+            total,
+            passed,
+            answer_accuracy: ratio(passed, total),
+            false_positive_rate: ratio(false_positive, total),
+            false_negative_rate: ratio(false_negative, total),
+        },
+        claim_boundary: ArtifactAskClaimBoundary {
+            artifact_loaded: true,
+            trained_field_used: true,
+            generated_from_training_artifact: true,
+            broad_chat_llm_ready: false,
+            nonlinear_memory_proven: false,
+            safe_claim:
+                "LLMWave-Big can run an artifact-grounded ask eval suite without claiming broad LLM readiness.",
         },
     })
 }
@@ -903,14 +1025,10 @@ fn eval_next_token(
 
 fn score_chunks(
     artifact: &TrainingArtifact,
-    query_tokens: &[String],
+    query_set: &BTreeSet<String>,
     query_phase: u16,
     top_k: usize,
 ) -> Vec<ChunkPeak> {
-    let query_set = query_tokens
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
     let mut peaks = artifact
         .records
         .chunks
@@ -950,13 +1068,9 @@ fn score_chunks(
 
 fn score_schemas(
     artifact: &TrainingArtifact,
-    query_tokens: &[String],
+    query_set: &BTreeSet<String>,
     top_k: usize,
 ) -> Vec<SchemaPeak> {
-    let query_set = query_tokens
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
     let mut peaks = artifact
         .records
         .schema_hints
@@ -994,13 +1108,9 @@ fn score_schemas(
 
 fn score_transitions(
     artifact: &TrainingArtifact,
-    query_tokens: &[String],
+    query_set: &BTreeSet<String>,
     top_k: usize,
 ) -> Vec<TransitionPeak> {
-    let query_set = query_tokens
-        .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
     let mut peaks = artifact
         .records
         .transitions
@@ -1076,6 +1186,24 @@ fn phase_alignment(a: u16, b: u16) -> f32 {
     round4(1.0 - diff / 32767.0)
 }
 
+fn expand_query_terms(tokens: &[String]) -> BTreeSet<String> {
+    let mut terms = BTreeSet::new();
+    for token in tokens {
+        terms.insert(token.clone());
+        if token.ends_with('s') && token.len() > 3 {
+            terms.insert(token.trim_end_matches('s').to_string());
+        } else if token.len() > 3 {
+            terms.insert(format!("{token}s"));
+        }
+        if token.ends_with("es") && token.len() > 4 {
+            terms.insert(token.trim_end_matches("es").to_string());
+        } else if token.len() > 3 {
+            terms.insert(format!("{token}es"));
+        }
+    }
+    terms
+}
+
 fn phase_for(input: &str) -> u16 {
     let digest = Sha256::digest(input.as_bytes());
     u16::from_le_bytes([digest[0], digest[1]])
@@ -1091,6 +1219,14 @@ fn short_hash(bytes: &[u8]) -> String {
 
 fn round4(value: f32) -> f32 {
     (value * 10_000.0).round() / 10_000.0
+}
+
+fn ratio(numerator: usize, denominator: usize) -> f32 {
+    if denominator == 0 {
+        0.0
+    } else {
+        round4(numerator as f32 / denominator as f32)
+    }
 }
 
 pub(crate) fn default_extensions_csv() -> String {

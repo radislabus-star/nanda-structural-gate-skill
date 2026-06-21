@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "id": "declaration_requires",
+      "query": "what does declaration require",
+      "expected_contains": "declaration requires protocols",
+      "expected_safe_to_answer": true
+    },
+    {
+      "id": "customs_checks",
+      "query": "what does customs check",
+      "expected_contains": "customs checks declaration",
+      "expected_safe_to_answer": true
+    },
+    {
+      "id": "unknown_route_review",
+      "query": "does moonlight clear customs invoice",
+      "expected_contains": "",
+      "expected_safe_to_answer": false
+    }
+  ]
+}

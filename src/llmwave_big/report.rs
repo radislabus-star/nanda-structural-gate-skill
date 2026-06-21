@@ -36,7 +36,7 @@ use super::surface_corpus_eval::SurfaceCorpusEvalReport;
 use super::surface_production::SurfaceProductionReport;
 use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
-use super::training::{ArtifactAskReport, TrainingCompileReport};
+use super::training::{ArtifactAskEvalReport, ArtifactAskReport, TrainingCompileReport};
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
@@ -566,6 +566,18 @@ pub(crate) fn print_artifact_ask_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_artifact_ask_text(report),
         OutputFormat::Md => print_artifact_ask_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_artifact_ask_eval_report(
+    report: &ArtifactAskEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_artifact_ask_eval_text(report),
+        OutputFormat::Md => print_artifact_ask_eval_md(report),
     }
     Ok(())
 }
@@ -1156,6 +1168,23 @@ fn print_artifact_ask_text(report: &ArtifactAskReport) {
     println!("safe_to_answer: {}", report.answer.safe_to_answer);
     println!("answer_state: {}", report.answer.state);
     println!("answer: {}", report.answer.text);
+}
+
+fn print_artifact_ask_eval_text(report: &ArtifactAskEvalReport) {
+    println!("LLMWave-Big Ask Eval");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("cases: {}", report.metrics.total);
+    println!("passed: {}", report.metrics.passed);
+    println!("answer_accuracy: {:.4}", report.metrics.answer_accuracy);
+    println!(
+        "false_positive_rate: {:.4}",
+        report.metrics.false_positive_rate
+    );
+    println!(
+        "false_negative_rate: {:.4}",
+        report.metrics.false_negative_rate
+    );
 }
 
 fn print_contract_md(report: &LlmwaveBigReport) {
@@ -2034,6 +2063,24 @@ fn print_artifact_ask_md(report: &ArtifactAskReport) {
     println!("- answer state: `{}`", report.answer.state);
     println!();
     println!("{}", report.answer.text);
+}
+
+fn print_artifact_ask_eval_md(report: &ArtifactAskEvalReport) {
+    println!("# LLMWave-Big Ask Eval");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- cases: `{}`", report.metrics.total);
+    println!("- passed: `{}`", report.metrics.passed);
+    println!("- answer accuracy: `{:.4}`", report.metrics.answer_accuracy);
+    println!(
+        "- false positive rate: `{:.4}`",
+        report.metrics.false_positive_rate
+    );
+    println!(
+        "- false negative rate: `{:.4}`",
+        report.metrics.false_negative_rate
+    );
 }
 
 fn print_mini_chat_eval_text(report: &MiniChatEvalReport) {

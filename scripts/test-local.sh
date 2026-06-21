@@ -274,7 +274,8 @@ tmp_big_train="$(mktemp -d)"
 cat > "$tmp_big_train/corpus.txt" <<'EOF'
 Honglu issues invoice. invoice requires payment.
 Payment supports customs declaration. declaration requires evidence.
-Honglu issues invoice. evidence blocks unsupported answer.
+Honglu issues invoice. invoice requires payment.
+evidence blocks unsupported answer.
 EOF
 big_train_json="$("$llmwave_big" train "$tmp_big_train/corpus.txt" --out "$tmp_big_train/artifact.json" --vocab-cap 128 --transition-cap 256 --active-chunk-cap 64 --chunk-tokens 8 --extensions txt --format json)"
 jq -e '.version == "llmwave-big-v1901-corpus-training" and .verdict == "TRAINING_ARTIFACT_READY_NOT_LLM" and .claim_boundary.real_corpus_loaded == true and .claim_boundary.chat_llm_ready == false' <<<"$big_train_json" >/dev/null
@@ -283,6 +284,14 @@ test -s "$tmp_big_train/artifact.json"
 big_ask_json="$("$llmwave_big" ask --artifact "$tmp_big_train/artifact.json" --text "what requires evidence" --top-k 3 --format json)"
 jq -e '.version == "llmwave-big-v1902-artifact-ask" and .claim_boundary.artifact_loaded == true and .claim_boundary.trained_field_used == true and .claim_boundary.broad_chat_llm_ready == false' <<<"$big_ask_json" >/dev/null
 jq -e '.field.top_chunk_peaks | length > 0' <<<"$big_ask_json" >/dev/null
+cat > "$tmp_big_train/ask-eval.json" <<'EOF'
+{"cases":[
+  {"id":"requires","query":"what does invoice require","expected_contains":"invoice requires payment","expected_safe_to_answer":true},
+  {"id":"unknown","query":"moonlight customs route","expected_contains":"","expected_safe_to_answer":false}
+]}
+EOF
+big_ask_eval_json="$("$llmwave_big" ask-eval --artifact "$tmp_big_train/artifact.json" --suite "$tmp_big_train/ask-eval.json" --top-k 3 --format json)"
+jq -e '.version == "llmwave-big-v1903-artifact-ask-eval" and .verdict == "ARTIFACT_ASK_EVAL_PASS_NOT_GENERAL_LLM" and .metrics.false_positive_rate == 0' <<<"$big_ask_eval_json" >/dev/null
 rm -rf "$tmp_big_train"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null

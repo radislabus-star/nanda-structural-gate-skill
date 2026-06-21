@@ -163,6 +163,9 @@ enum LlmwaveBigCommand {
     Train(LlmwaveBigTrainArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
+    /// Evaluate ask behavior over a compiled training artifact.
+    #[command(name = "ask-eval")]
+    AskEval(LlmwaveBigAskEvalArgs),
 }
 
 #[derive(Parser)]
@@ -498,6 +501,18 @@ struct LlmwaveBigAskArgs {
     format: OutputFormat,
 }
 
+#[derive(Parser)]
+struct LlmwaveBigAskEvalArgs {
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long)]
+    suite: PathBuf,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
 #[derive(Serialize, Clone)]
 pub(crate) struct LlmwaveBigReport {
     pub command: &'static str,
@@ -763,6 +778,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::Ask(args) => {
             let report = training::ask_training_artifact(&args.artifact, args.text, args.top_k)?;
             report::print_artifact_ask_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::AskEval(args) => {
+            let report = training::eval_training_artifact(&args.artifact, &args.suite, args.top_k)?;
+            report::print_artifact_ask_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }

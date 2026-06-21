@@ -195,6 +195,7 @@ scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-s
 scripts/nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
 scripts/nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples --out .nanda/llmwave-big-training/project-artifact.json --format json
 scripts/nanda-llmwave-big ask --artifact .nanda/llmwave-big-training/project-artifact.json --text "what does declaration require" --top-k 5 --format json
+scripts/nanda-llmwave-big ask-eval --artifact .nanda/llmwave-big-training/project-artifact.json --suite examples/llmwave-big-ask-eval.json --top-k 5 --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
@@ -553,6 +554,9 @@ compiled artifact, builds a query wave, scores schema/chunk/transition peaks,
 and answers only when the artifact field is focused. Treat
 `ARTIFACT_FIELD_ANSWER_READY_NOT_GENERAL_LLM` as narrow artifact-grounded
 answering, not broad chat readiness.
+`nanda-llmwave-big ask-eval` runs artifact-grounded QA suites and reports
+answer accuracy, false-positive rate, and false-negative rate. Treat chunk-only
+retrieval as review evidence; answer permission requires a focused schema peak.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,
