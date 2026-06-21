@@ -571,7 +571,8 @@ cache-only execution proof or broad chat readiness.
 `nanda-llmwave-big ask-hot` scans the binary hot pack for schema/transition
 peaks. It may use the cold artifact only to decode labels for display. Treat
 `json_used_in_hot_scan=false` as a packed-scan claim, not full cache-only
-execution.
+execution. The hot scan applies a subject/object polarity lens: `ALIGNED` can
+answer, `OBJECT_FOREIGN_PULL` is review-only, and `REVERSED` is a hard stop.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

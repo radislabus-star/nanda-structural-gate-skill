@@ -307,19 +307,35 @@ pub(crate) struct HotAskField {
     pub top_hot_schema_peaks: Vec<HotSchemaPeak>,
     pub top_hot_transition_peaks: Vec<HotTransitionPeak>,
     pub margin: f32,
+    pub polarity_state: &'static str,
+    pub polarity_penalty: f32,
+    pub anti_polarity_energy: f32,
 }
 
 #[derive(Serialize, Clone)]
 pub(crate) struct HotSchemaPeak {
     pub score: f32,
+    pub raw_score: f32,
     pub matched_terms: usize,
     pub subject_matched: bool,
     pub relation_matched: bool,
     pub object_matched: bool,
+    pub polarization: HotSchemaPolarization,
     pub subject: String,
     pub relation: String,
     pub object: String,
     pub count: u32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotSchemaPolarization {
+    pub state: &'static str,
+    pub role_order: &'static str,
+    pub subject_position: Option<usize>,
+    pub object_position: Option<usize>,
+    pub penalty: f32,
+    pub anti_energy: f32,
+    pub hard_stop: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -342,6 +358,8 @@ pub(crate) struct HotAskAnswer {
 pub(crate) struct HotAskClaimBoundary {
     pub binary_hot_pack_loaded: bool,
     pub hot_records_scanned: bool,
+    pub polarity_lens_applied: bool,
+    pub reversed_polarity_hard_stop: bool,
     pub cold_artifact_used_for_labels: bool,
     pub json_used_in_hot_scan: bool,
     pub cache_only_execution_proven: bool,
@@ -732,8 +750,9 @@ pub(crate) fn ask_hot_pack(
         .map(|token| hash32(token))
         .collect::<Vec<_>>();
     let query_hash_set = query_hashes.iter().copied().collect::<BTreeSet<_>>();
+    let query_positions = build_query_hash_positions(&query_hashes);
     let top_k = top_k.max(1);
-    let schema_peaks = score_hot_schemas(&hot, &artifact, &query_hash_set, top_k);
+    let schema_peaks = score_hot_schemas(&hot, &artifact, &query_positions, top_k);
     let transition_peaks = score_hot_transitions(&hot, &artifact, &query_hash_set, top_k);
     let top_score = schema_peaks
         .first()
@@ -756,10 +775,41 @@ pub(crate) fn ask_hot_pack(
                 .unwrap_or(0.0),
         );
     let margin = round4(top_score - second_score);
-    let field_state = if schema_peaks.first().is_some_and(|peak| {
-        peak.subject_matched && peak.matched_terms >= 2 && peak.score >= 2.0 && margin >= 0.1
-    }) {
+    let focused_schema = schema_peaks.first().is_some_and(|peak| {
+        peak.subject_matched
+            && peak.matched_terms >= 2
+            && peak.score >= 2.0
+            && margin >= 0.1
+            && !peak.polarization.hard_stop
+    });
+    let polarity_peak = if focused_schema {
+        schema_peaks.first()
+    } else {
+        schema_peaks
+            .iter()
+            .find(|peak| peak.polarization.state == "REVERSED")
+            .or_else(|| {
+                schema_peaks
+                    .iter()
+                    .find(|peak| peak.polarization.state == "OBJECT_FOREIGN_PULL")
+            })
+            .or_else(|| schema_peaks.first())
+    };
+    let top_polarization = polarity_peak
+        .map(|peak| peak.polarization.state)
+        .unwrap_or("NONE");
+    let polarity_penalty = polarity_peak
+        .map(|peak| peak.polarization.penalty)
+        .unwrap_or(0.0);
+    let anti_polarity_energy = polarity_peak
+        .map(|peak| peak.polarization.anti_energy)
+        .unwrap_or(0.0);
+    let field_state = if focused_schema {
         "HOT_FIELD_SCHEMA_FOCUSED"
+    } else if top_polarization == "REVERSED" {
+        "HOT_FIELD_POLARITY_REVERSED"
+    } else if top_polarization == "OBJECT_FOREIGN_PULL" {
+        "HOT_FIELD_POLARITY_FOREIGN_PULL"
     } else if top_score > 0.0 {
         "HOT_FIELD_REVIEW"
     } else {
@@ -790,11 +840,16 @@ pub(crate) fn ask_hot_pack(
             top_hot_schema_peaks: schema_peaks,
             top_hot_transition_peaks: transition_peaks,
             margin,
+            polarity_state: top_polarization,
+            polarity_penalty,
+            anti_polarity_energy,
         },
         answer,
         claim_boundary: HotAskClaimBoundary {
             binary_hot_pack_loaded: true,
             hot_records_scanned: true,
+            polarity_lens_applied: true,
+            reversed_polarity_hard_stop: true,
             cold_artifact_used_for_labels: true,
             json_used_in_hot_scan: false,
             cache_only_execution_proven: false,
@@ -1361,6 +1416,34 @@ fn build_hot_answer(
             ),
         };
     }
+    if field_state == "HOT_FIELD_POLARITY_REVERSED" {
+        let peak = schema_peaks
+            .iter()
+            .find(|peak| peak.polarization.state == "REVERSED")
+            .unwrap_or(&schema_peaks[0]);
+        return HotAskAnswer {
+            state: "HOT_POLARITY_REVERSED_STOP",
+            safe_to_answer: false,
+            text: format!(
+                "Reversed polarity: query order conflicts with {} -> {} -> {}",
+                peak.subject, peak.relation, peak.object
+            ),
+        };
+    }
+    if field_state == "HOT_FIELD_POLARITY_FOREIGN_PULL" {
+        let peak = schema_peaks
+            .iter()
+            .find(|peak| peak.polarization.state == "OBJECT_FOREIGN_PULL")
+            .unwrap_or(&schema_peaks[0]);
+        return HotAskAnswer {
+            state: "HOT_POLARITY_FOREIGN_PULL_REVIEW",
+            safe_to_answer: false,
+            text: format!(
+                "Review only: query pulls relation/object from {} -> {} -> {} without matching subject",
+                peak.subject, peak.relation, peak.object
+            ),
+        };
+    }
     if let Some(peak) = transition_peaks.first() {
         return HotAskAnswer {
             state: "HOT_TRANSITION_REVIEW_ONLY",
@@ -1378,10 +1461,68 @@ fn build_hot_answer(
     }
 }
 
+fn build_query_hash_positions(query_hashes: &[u32]) -> BTreeMap<u32, usize> {
+    let mut positions = BTreeMap::new();
+    for (idx, hash) in query_hashes.iter().copied().enumerate() {
+        positions.entry(hash).or_insert(idx);
+    }
+    positions
+}
+
+fn hot_schema_polarization(
+    record: &HotSchemaRecord,
+    query_positions: &BTreeMap<u32, usize>,
+) -> HotSchemaPolarization {
+    let subject_position = query_positions.get(&record.subject_hash).copied();
+    let object_position = query_positions.get(&record.object_hash).copied();
+    let relation_matched = query_positions.contains_key(&record.relation_hash);
+    let (state, role_order, penalty, anti_energy, hard_stop) =
+        match (subject_position, object_position) {
+            (Some(subject), Some(object)) if subject < object => {
+                ("ALIGNED", "subject_before_object", 0.0, 0.0, false)
+            }
+            (Some(subject), Some(object)) if subject > object => {
+                ("REVERSED", "object_before_subject", 2.0, 1.0, true)
+            }
+            (Some(_), Some(_)) => ("NEUTRAL", "same_position", 0.25, 0.1, false),
+            (Some(_), None) => (
+                "SUBJECT_ALIGNED_PARTIAL",
+                "subject_present_object_absent",
+                0.0,
+                0.0,
+                false,
+            ),
+            (None, Some(_)) if relation_matched => (
+                "OBJECT_FOREIGN_PULL",
+                "object_present_subject_absent",
+                0.75,
+                0.5,
+                true,
+            ),
+            (None, Some(_)) => (
+                "OBJECT_ONLY_REVIEW",
+                "object_present_subject_absent",
+                0.5,
+                0.25,
+                false,
+            ),
+            (None, None) => ("NEUTRAL", "roles_absent", 0.0, 0.0, false),
+        };
+    HotSchemaPolarization {
+        state,
+        role_order,
+        subject_position,
+        object_position,
+        penalty,
+        anti_energy,
+        hard_stop,
+    }
+}
+
 fn score_hot_schemas(
     hot: &HotPackImage,
     artifact: &TrainingArtifact,
-    query_hashes: &BTreeSet<u32>,
+    query_positions: &BTreeMap<u32, usize>,
     top_k: usize,
 ) -> Vec<HotSchemaPeak> {
     let labels = artifact
@@ -1409,29 +1550,33 @@ fn score_hot_schemas(
                 record.object_hash,
             ]
             .into_iter()
-            .filter(|hash| query_hashes.contains(hash))
+            .filter(|hash| query_positions.contains_key(hash))
             .count();
             if matched_terms == 0 {
                 return None;
             }
-            let subject_matched = query_hashes.contains(&record.subject_hash);
-            let relation_matched = query_hashes.contains(&record.relation_hash);
-            let object_matched = query_hashes.contains(&record.object_hash);
+            let subject_matched = query_positions.contains_key(&record.subject_hash);
+            let relation_matched = query_positions.contains_key(&record.relation_hash);
+            let object_matched = query_positions.contains_key(&record.object_hash);
+            let polarization = hot_schema_polarization(record, query_positions);
             let label = labels.get(&(
                 record.subject_hash,
                 record.relation_hash,
                 record.object_hash,
             ))?;
+            let raw_score = round4(
+                matched_terms as f32
+                    + if subject_matched { 0.75 } else { 0.0 }
+                    + (record.count as f32).ln_1p() * 0.2,
+            );
             Some(HotSchemaPeak {
-                score: round4(
-                    matched_terms as f32
-                        + if subject_matched { 0.75 } else { 0.0 }
-                        + (record.count as f32).ln_1p() * 0.2,
-                ),
+                score: round4((raw_score - polarization.penalty).max(0.0)),
+                raw_score,
                 matched_terms,
                 subject_matched,
                 relation_matched,
                 object_matched,
+                polarization,
                 subject: label.subject.clone(),
                 relation: label.relation.clone(),
                 object: label.object.clone(),

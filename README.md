@@ -806,7 +806,10 @@ file bytes against the hot budget. Its successful verdict is
 cache-only execution and broad chat readiness remain unproven.
 `nanda-llmwave-big ask-hot` scans that binary hot pack for schema and
 transition peaks. It may use the cold artifact only to decode labels for human
-output, while reporting `json_used_in_hot_scan=false`. Its successful verdict is
+output, while reporting `json_used_in_hot_scan=false`. The hot scan applies a
+role-polarity lens over `subject -> relation -> object`: aligned role order can
+answer, `OBJECT_FOREIGN_PULL` stays review-only, and reversed subject/object
+order is a hard stop. Its successful verdict is
 `HOT_FIELD_ANSWER_READY_NOT_GENERAL_LLM`, still not cache-only execution proof
 and still not broad chat readiness.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a

@@ -298,7 +298,11 @@ jq -e '.claim_boundary.binary_hot_pack_written == true and .claim_boundary.strin
 test -s "$tmp_big_train/artifact.hot.bin"
 big_ask_hot_json="$("$llmwave_big" ask-hot --hot-pack "$tmp_big_train/artifact.hot.bin" --artifact "$tmp_big_train/artifact.json" --text "invoice requires payment" --top-k 3 --format json)"
 jq -e '.version == "llmwave-big-v1905-hot-ask" and .verdict == "HOT_FIELD_ANSWER_READY_NOT_GENERAL_LLM" and .field.state == "HOT_FIELD_SCHEMA_FOCUSED" and .answer.safe_to_answer == true' <<<"$big_ask_hot_json" >/dev/null
-jq -e '.claim_boundary.binary_hot_pack_loaded == true and .claim_boundary.hot_records_scanned == true and .claim_boundary.cold_artifact_used_for_labels == true and .claim_boundary.json_used_in_hot_scan == false and .claim_boundary.cache_only_execution_proven == false' <<<"$big_ask_hot_json" >/dev/null
+jq -e '.field.polarity_state == "ALIGNED" and .field.top_hot_schema_peaks[0].polarization.state == "ALIGNED" and .field.top_hot_schema_peaks[0].polarization.hard_stop == false' <<<"$big_ask_hot_json" >/dev/null
+jq -e '.claim_boundary.binary_hot_pack_loaded == true and .claim_boundary.hot_records_scanned == true and .claim_boundary.polarity_lens_applied == true and .claim_boundary.reversed_polarity_hard_stop == true and .claim_boundary.cold_artifact_used_for_labels == true and .claim_boundary.json_used_in_hot_scan == false and .claim_boundary.cache_only_execution_proven == false' <<<"$big_ask_hot_json" >/dev/null
+big_ask_hot_reversed_json="$("$llmwave_big" ask-hot --hot-pack "$tmp_big_train/artifact.hot.bin" --artifact "$tmp_big_train/artifact.json" --text "payment requires invoice" --top-k 3 --format json)"
+jq -e '.version == "llmwave-big-v1905-hot-ask" and .verdict == "HOT_FIELD_REVIEW" and .field.state == "HOT_FIELD_POLARITY_REVERSED" and .answer.safe_to_answer == false' <<<"$big_ask_hot_reversed_json" >/dev/null
+jq -e '.field.polarity_state == "REVERSED" and .field.top_hot_schema_peaks[0].polarization.state == "REVERSED" and .field.top_hot_schema_peaks[0].polarization.hard_stop == true and .answer.state == "HOT_POLARITY_REVERSED_STOP"' <<<"$big_ask_hot_reversed_json" >/dev/null
 rm -rf "$tmp_big_train"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
