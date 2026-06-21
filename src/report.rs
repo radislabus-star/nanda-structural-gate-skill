@@ -18,11 +18,22 @@ pub(crate) fn make_report(
     let wave = score_candidates(source, candidates);
     let routes = route_coherence(source, candidates);
     let structural_map = structural_map(source, candidates);
+    let codex_failure_field = codex_failure_field(packet, source, candidates);
+    let repair_queue = structural_map["repair_queue"].clone();
     let baselines = baseline_summary(source, candidates);
 
     let has_foreign_pull = structural_map["foreign_pull"]
         .as_array()
         .is_some_and(|items| !items.is_empty());
+    let has_owner_conflict = structural_map["owner_gravity"]["conflicts"]
+        .as_array()
+        .is_some_and(|items| !items.is_empty());
+    let has_negative_routes = structural_map["negative_routes"]["hits"]
+        .as_array()
+        .is_some_and(|items| !items.is_empty());
+    let failure_verdict = codex_failure_field["verdict"]
+        .as_str()
+        .unwrap_or("NOT_ENABLED");
 
     let alias_watch = packet.canonicalization.conflict_count > 0
         || packet
@@ -36,9 +47,14 @@ pub(crate) fn make_report(
         !candidates.is_empty() && wave["weak"].as_array().is_some_and(|x| !x.is_empty());
     let has_candidate_watch = alias_watch || !gaps.is_empty() || !weak_conf.is_empty();
 
-    let verdict = if limits.iter().any(|x| x.contains("hard limit")) {
+    let verdict = if failure_verdict == "HARD_STOP" || failure_verdict == "VETO" {
+        "VETO"
+    } else if failure_verdict == "ANALYSIS_INSUFFICIENT"
+        || limits.iter().any(|x| x.contains("hard limit"))
+    {
         "WATCH"
-    } else if !conflicts.is_empty() || has_foreign_pull {
+    } else if !conflicts.is_empty() || has_foreign_pull || has_owner_conflict || has_negative_routes
+    {
         "VETO"
     } else if has_candidate_watch {
         "WATCH"
@@ -94,10 +110,14 @@ pub(crate) fn make_report(
         wave_summary: wave,
         route_coherence: routes,
         structural_map,
+        codex_failure_field,
+        repair_queue,
+        agent_decision: Value::Null,
         explanation: vec![],
         repair_prompt: String::new(),
         trace_path: String::new(),
     };
+    report.agent_decision = report_agent_decision(&report);
     report.explanation = build_explanation(&report);
     report.repair_prompt = build_repair_prompt(&report);
     report.trace_path = write_trace(&report)?;
@@ -113,6 +133,18 @@ pub(crate) fn print_report(report: &Report, format: &OutputFormat) -> Result<()>
             println!("task_id: {}", report.task_id);
             println!("complexity_score: {}", report.complexity_score);
             println!("mandatory_gate: {}", report.mandatory_gate);
+            println!(
+                "agent_action: {}",
+                report.agent_decision["action"]
+                    .as_str()
+                    .unwrap_or("REVIEW_REQUIRED")
+            );
+            println!(
+                "codex_failure_field: {}",
+                report.codex_failure_field["verdict"]
+                    .as_str()
+                    .unwrap_or("NOT_ENABLED")
+            );
             if report.canonicalization.enabled {
                 println!(
                     "canonicalization: applied={} conflicts={} warnings={}",
@@ -141,6 +173,7 @@ pub(crate) fn print_report(report: &Report, format: &OutputFormat) -> Result<()>
                 }
             }
             if report.verdict != "PASS" {
+                print_repair_queue_text(&report.repair_queue);
                 println!("repair:");
                 for line in report.repair_prompt.lines() {
                     println!("  {line}");
@@ -152,6 +185,18 @@ pub(crate) fn print_report(report: &Report, format: &OutputFormat) -> Result<()>
             println!("# NANDA Report\n");
             println!("- verdict: `{}`", report.verdict);
             println!("- action: `{}`", action_for_report(report));
+            println!(
+                "- agent_action: `{}`",
+                report.agent_decision["action"]
+                    .as_str()
+                    .unwrap_or("REVIEW_REQUIRED")
+            );
+            println!(
+                "- codex_failure_field: `{}`",
+                report.codex_failure_field["verdict"]
+                    .as_str()
+                    .unwrap_or("NOT_ENABLED")
+            );
             println!("- complexity: `{}`", report.complexity_score);
             if report.canonicalization.enabled {
                 println!(
@@ -165,6 +210,26 @@ pub(crate) fn print_report(report: &Report, format: &OutputFormat) -> Result<()>
         }
     }
     Ok(())
+}
+
+fn print_repair_queue_text(repair_queue: &Value) {
+    let Some(items) = repair_queue.as_array() else {
+        return;
+    };
+    if items.is_empty() {
+        return;
+    }
+    println!("repair_queue:");
+    for item in items {
+        println!(
+            "  - [{}] {}: {}",
+            item["priority"].as_str().unwrap_or("medium"),
+            item["kind"].as_str().unwrap_or("repair"),
+            item["repair"]
+                .as_str()
+                .unwrap_or("repair route before retrying")
+        );
+    }
 }
 
 pub(crate) fn print_waw_text(out: &Value) {
@@ -895,6 +960,12 @@ pub(crate) fn write_or_print(path: PathBuf, stdout: bool, output: String) -> Res
 }
 
 pub(crate) fn action_for_report(report: &Report) -> &'static str {
+    if report.agent_decision["action"].as_str() == Some("HARD_STOP") {
+        return "HARD_STOP";
+    }
+    if report.agent_decision["action"].as_str() == Some("ANALYSIS_INSUFFICIENT") {
+        return "ANALYSIS_INSUFFICIENT";
+    }
     match report.verdict.as_str() {
         "PASS" => "SEND_OK",
         "WATCH" => "DRAFT_OK_REVIEW_REQUIRED",

@@ -60,6 +60,23 @@ pub(crate) fn norm(value: &str) -> String {
     value.trim().to_lowercase()
 }
 
+pub(crate) fn normalize_owner_label(value: &str) -> String {
+    let mut out = norm(value).replace('\\', "/").replace('/', "::");
+    for suffix in [
+        ".rs", ".py", ".js", ".ts", ".tsx", ".jsx", ".toml", ".json", ".sh",
+    ] {
+        if out.ends_with(suffix) {
+            let next_len = out.len().saturating_sub(suffix.len());
+            out.truncate(next_len);
+            break;
+        }
+    }
+    while out.contains("::::") {
+        out = out.replace("::::", "::");
+    }
+    out.trim_matches(':').to_string()
+}
+
 pub(crate) fn structural_key(triad: &Triad) -> (String, String, String) {
     (
         norm(&triad.subject),
@@ -655,6 +672,12 @@ pub(crate) fn build_explanation(report: &Report) -> Vec<String> {
     if report.canonicalization.conflict_count > 0 || report.canonicalization.watch_count > 0 {
         notes.push("Alias canonicalization needs review before structural acceptance.".to_string());
     }
+    if report.codex_failure_field["verdict"]
+        .as_str()
+        .is_some_and(|verdict| matches!(verdict, "HARD_STOP" | "VETO" | "ANALYSIS_INSUFFICIENT"))
+    {
+        notes.push("Codex Failure Field blocked or downgraded the edit route.".to_string());
+    }
     if notes.is_empty() {
         notes.push("No decisive structural signal was found.".to_string());
     }
@@ -669,6 +692,39 @@ pub(crate) fn build_repair_prompt(report: &Report) -> String {
         "Repair the candidate answer using only one coherent structural route.".to_string(),
         format!("NANDA verdict: {}.", report.verdict),
     ];
+    if let Some(queue) = report.repair_queue.as_array() {
+        if !queue.is_empty() {
+            lines.push("Primary repair_queue:".to_string());
+            for item in queue {
+                lines.push(format!(
+                    "- [{}] {}: {}",
+                    item["priority"].as_str().unwrap_or("medium"),
+                    item["kind"].as_str().unwrap_or("repair"),
+                    item["repair"]
+                        .as_str()
+                        .unwrap_or("repair route before retrying")
+                ));
+            }
+        }
+    }
+    if report.codex_failure_field["verdict"]
+        .as_str()
+        .is_some_and(|verdict| verdict != "NOT_ENABLED")
+    {
+        lines.push(format!(
+            "Codex Failure Field: {}.",
+            report.codex_failure_field["verdict"]
+                .as_str()
+                .unwrap_or("UNKNOWN")
+        ));
+        if let Some(reasons) = report.codex_failure_field["reason_codes"].as_array() {
+            for reason in reasons {
+                if let Some(reason) = reason.as_str() {
+                    lines.push(format!("- failure_reason: {reason}"));
+                }
+            }
+        }
+    }
     if !report.conflicts.is_empty() {
         lines.push("Fix these conflicts:".to_string());
         for item in &report.conflicts {
@@ -751,6 +807,43 @@ pub(crate) fn build_repair_prompt(report: &Report) -> String {
         }
     }
     lines.join("\n")
+}
+
+pub(crate) fn report_agent_decision(report: &Report) -> Value {
+    let failure_verdict = report.codex_failure_field["verdict"]
+        .as_str()
+        .unwrap_or("NOT_ENABLED");
+    let repair_count = report
+        .repair_queue
+        .as_array()
+        .map(|items| items.len())
+        .unwrap_or(0);
+    let action = if failure_verdict == "HARD_STOP" {
+        "HARD_STOP"
+    } else if report.verdict == "PASS" {
+        "SAFE_TO_EDIT"
+    } else if report.verdict == "VETO" {
+        "REPAIR_REQUIRED"
+    } else if failure_verdict == "ANALYSIS_INSUFFICIENT" {
+        "ANALYSIS_INSUFFICIENT"
+    } else {
+        "REVIEW_REQUIRED"
+    };
+    json!({
+        "action": action,
+        "safe_to_edit": action == "SAFE_TO_EDIT",
+        "codex_failure_verdict": failure_verdict,
+        "codex_failure_reasons": report.codex_failure_field["reason_codes"],
+        "repair_count": repair_count,
+        "repair_queue": report.repair_queue,
+        "next": match action {
+            "SAFE_TO_EDIT" => "Proceed only within the checked route boundary.",
+            "HARD_STOP" => "No tools, no code, no restart.",
+            "ANALYSIS_INSUFFICIENT" => "Name a precise action_id, evidence, namespaces, and verification before editing.",
+            "REPAIR_REQUIRED" => "Apply the repair_queue before editing or accepting this route.",
+            _ => "Review unresolved structure before editing.",
+        }
+    })
 }
 
 pub(crate) fn verdict_code(verdict: &str) -> u8 {
@@ -2856,6 +2949,9 @@ pub(crate) struct Report {
     pub(crate) wave_summary: Value,
     pub(crate) route_coherence: Value,
     pub(crate) structural_map: Value,
+    pub(crate) codex_failure_field: Value,
+    pub(crate) repair_queue: Value,
+    pub(crate) agent_decision: Value,
     pub(crate) explanation: Vec<String>,
     pub(crate) repair_prompt: String,
     pub(crate) trace_path: String,

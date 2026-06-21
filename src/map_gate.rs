@@ -611,15 +611,15 @@ fn layer_name(triad: &Triad) -> String {
 
 fn owner_name(triad: &Triad) -> String {
     if !triad.owner.trim().is_empty() {
-        return norm(&triad.owner);
+        return normalize_owner_label(&triad.owner);
     }
     if norm(&triad.subject_role).contains("owner") {
-        return norm(&triad.subject);
+        return normalize_owner_label(&triad.subject);
     }
     if norm(&triad.object_role).contains("owner") {
-        return norm(&triad.object);
+        return normalize_owner_label(&triad.object);
     }
-    group_name(triad, "unowned")
+    normalize_owner_label(&group_name(triad, "unowned"))
 }
 
 fn scope_name(triad: &Triad) -> String {

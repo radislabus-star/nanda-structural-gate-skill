@@ -1,6 +1,7 @@
 use crate::*;
 
 pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
+    let requested_input = args.input.clone();
     let input = resolve_dogfood_input(&args.input)?;
     let packet = load_packet_auto(
         &input,
@@ -16,11 +17,15 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
     let stop_on = parse_csv(&args.stop_on);
     let topology = topology(&triads, &candidates);
     let refactor_plan = if args.refactor_plan {
-        let repo_root = input
-            .parent()
-            .and_then(Path::parent)
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| PathBuf::from("."));
+        let repo_root = if requested_input.is_dir() {
+            requested_input.clone()
+        } else {
+            input
+                .parent()
+                .and_then(Path::parent)
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from("."))
+        };
         let main_rs = repo_root.join("src/main.rs");
         if main_rs.is_file() {
             Some(commands::code_map::report(&main_rs, 2, 12)?)
@@ -275,12 +280,14 @@ fn auto_layer_for_path(path: &str) -> String {
 }
 
 fn auto_owner_for_path(path: &str) -> String {
-    path.split('/')
+    let raw = path
+        .split('/')
         .take(3)
         .collect::<Vec<_>>()
         .join("::")
         .trim_end_matches("::")
-        .to_string()
+        .to_string();
+    normalize_owner_label(&raw)
 }
 
 pub(crate) fn dogfood_decision(tree: &Value, summary: &Value, failure_field: &Value) -> Value {
