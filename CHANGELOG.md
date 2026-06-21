@@ -29,6 +29,9 @@
 - v431-v455 add `nanda-llmwave-big schema-bind`: L3 schema record 101 is bound
   to role/filler waves, recovered through cleanup memory, and checked against a
   subject/object role-swap trap.
+- v456-v480 add `nanda-llmwave-big l2-l3-couple`: L2 surface candidates are
+  reranked by the active L3 schema role, raw prefix traps can be suppressed, and
+  L2/L3 disagreement keeps chat and nonlinear-memory claims false.
 - v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
   birth mechanism with statistical segmentation, fast mapping,
   cross-situational convergence, usage/exemplar strengthening, grammar

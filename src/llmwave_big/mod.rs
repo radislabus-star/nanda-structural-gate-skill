@@ -10,6 +10,7 @@ pub mod atlas;
 pub mod consolidation;
 pub mod eval;
 pub mod hrr_binding;
+pub mod l2_l3_coupling;
 pub mod l2_word_field;
 pub mod l3_schema_bind;
 pub mod l3_schema_field;
@@ -55,6 +56,9 @@ enum LlmwaveBigCommand {
     Hrr(LlmwaveBigHrrArgs),
     /// Run the v431-v455 L3 schema binding core.
     SchemaBind(LlmwaveBigSchemaBindArgs),
+    /// Run the v456-v480 L2/L3 coupling core.
+    #[command(name = "l2-l3-couple", alias = "l2l3-couple")]
+    L2L3Couple(LlmwaveBigL2L3CoupleArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -113,6 +117,12 @@ struct LlmwaveBigHrrArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigSchemaBindArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigL2L3CoupleArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -254,6 +264,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::SchemaBind(args) => {
             let report = l3_schema_bind::build_l3_schema_bind_report();
             report::print_l3_schema_bind_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::L2L3Couple(args) => {
+            let report = l2_l3_coupling::build_l2_l3_coupling_report();
+            report::print_l2_l3_coupling_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
@@ -549,6 +564,41 @@ mod tests {
         assert_eq!(report.metrics.role_swap_reject_rate, 1.0);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert!(!report.claim_boundary.llm_ready);
+    }
+
+    #[test]
+    fn l2_l3_coupling_reranks_surface_by_schema_role() {
+        let report = l2_l3_coupling::build_l2_l3_coupling_report();
+        assert_eq!(report.roadmap_block, "v456-v480");
+        assert_eq!(report.verdict, "L2_L3_COUPLED_READY_NOT_CHAT");
+        assert_eq!(report.l2_probe.raw_top, "inventory");
+        assert_eq!(report.l2_probe.coupled_top, "invoice");
+        assert_eq!(report.l3_schema.schema_id, 101);
+        assert_eq!(report.l3_schema.expected_role, "object:document");
+        assert_eq!(report.l3_schema.expected_filler, "invoice");
+        assert_eq!(report.metrics.l2_l3_agreement_rate, 1.0);
+        assert_eq!(report.metrics.role_error_rate, 0.0);
+        assert!(report.rerank.top_margin > 0);
+    }
+
+    #[test]
+    fn l2_l3_coupling_rejects_role_disagreement_trap() {
+        let report = l2_l3_coupling::build_l2_l3_coupling_report();
+        assert!(report.disagreement_trap.rejected);
+        assert_eq!(
+            report.disagreement_trap.trap,
+            "l2_surface_looks_valid_but_l3_role_disagrees"
+        );
+        assert_eq!(report.disagreement_trap.l2_preferred, "invoice");
+        assert_eq!(
+            report.disagreement_trap.l3_expected_role,
+            "subject:supplier"
+        );
+        assert_eq!(report.disagreement_trap.l3_expected_filler, "Honglu");
+        assert_eq!(report.metrics.disagreement_reject_rate, 1.0);
+        assert!(!report.claim_boundary.l2_l3_storage_mixed);
+        assert!(!report.claim_boundary.chat_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
     }
 
     #[test]

@@ -159,6 +159,7 @@ scripts/nanda-llmwave-big active-core --format json
 scripts/nanda-llmwave-big l2 --format json
 scripts/nanda-llmwave-big hrr --format json
 scripts/nanda-llmwave-big schema-bind --format json
+scripts/nanda-llmwave-big l2-l3-couple --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -448,6 +449,11 @@ role/filler waves, recovered through cleanup memory, and checked against the
 subject/object role-swap trap `invoice issues Honglu`. Treat
 `L3_SCHEMA_BIND_READY_NOT_LLM` as fixture-level schema cognition, not broad
 understanding.
+v456-v480 add `nanda-llmwave-big l2-l3-couple`: L2 surface candidates are
+reranked by the active L3 schema role. Treat
+`L2_L3_COUPLED_READY_NOT_CHAT` as a local feedback-loop result: L3 can suppress
+an L2-valid but role-invalid surface candidate, but chat readiness and
+nonlinear-memory proof remain false.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

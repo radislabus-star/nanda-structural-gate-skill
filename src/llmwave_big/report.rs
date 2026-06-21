@@ -5,6 +5,7 @@ use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::eval::BigEvalReport;
 use super::hrr_binding::HrrBindingReport;
+use super::l2_l3_coupling::L2L3CouplingReport;
 use super::l2_word_field::L2WordFieldReport;
 use super::l3_schema_bind::L3SchemaBindReport;
 use super::lexical_birth::LexicalBirthReport;
@@ -85,6 +86,18 @@ pub(crate) fn print_l3_schema_bind_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => print_l3_schema_bind_text(report),
         OutputFormat::Md => print_l3_schema_bind_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_l2_l3_coupling_report(
+    report: &L2L3CouplingReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => print_l2_l3_coupling_text(report),
+        OutputFormat::Md => print_l2_l3_coupling_md(report),
     }
     Ok(())
 }
@@ -363,6 +376,26 @@ fn print_l3_schema_bind_text(report: &L3SchemaBindReport) {
     println!(
         "role_swap_reject_rate: {:.3}",
         report.metrics.role_swap_reject_rate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_l2_l3_coupling_text(report: &L2L3CouplingReport) {
+    println!("LLMWave-Big L2/L3 Coupling");
+    println!("version: {}", report.version);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!("prefix: {}", report.l2_probe.prefix);
+    println!("role_slot: {}", report.l2_probe.role_slot);
+    println!("raw_top: {}", report.l2_probe.raw_top);
+    println!("coupled_top: {}", report.l2_probe.coupled_top);
+    println!("top_margin: {}", report.rerank.top_margin);
+    println!(
+        "disagreement_reject_rate: {:.3}",
+        report.metrics.disagreement_reject_rate
     );
     println!(
         "nonlinear_memory_proven: {}",
@@ -815,6 +848,36 @@ fn print_l3_schema_bind_md(report: &L3SchemaBindReport) {
     println!(
         "- `{}` rejected: `{}`",
         report.role_swap_trap.wrong_claim, report.role_swap_trap.rejected
+    );
+}
+
+fn print_l2_l3_coupling_md(report: &L2L3CouplingReport) {
+    println!("# LLMWave-Big L2/L3 Coupling");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- raw top: `{}`", report.l2_probe.raw_top);
+    println!("- coupled top: `{}`", report.l2_probe.coupled_top);
+    println!("- schema: `{}`", report.l3_schema.form);
+    println!();
+    println!("## Rerank");
+    println!();
+    for candidate in &report.rerank.candidates {
+        println!(
+            "- `{}` final `{}` l3 `{}` accepted `{}`",
+            candidate.surface,
+            candidate.final_score,
+            candidate.l3_role_score,
+            candidate.role_accepted
+        );
+    }
+    println!();
+    println!("## Trap");
+    println!();
+    println!(
+        "- `{}` rejected: `{}`",
+        report.disagreement_trap.rejected_surface, report.disagreement_trap.rejected
     );
 }
 

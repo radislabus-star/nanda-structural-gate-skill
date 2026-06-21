@@ -123,6 +123,14 @@ field. The first fixture uses SchemaRecord 101 (`supplier issues invoice`),
 recovers subject/object/route/operator fillers, and rejects the subject/object
 role-swap reading `invoice issues Honglu`.
 
+`nanda-llmwave-big l2-l3-couple` connects the surface field to the schema
+field. The first fixture lets L2 prefer a prefix-valid surface (`inventory`)
+and then lets the active L3 `object:document` role rerank the field toward
+`invoice`; the trap rejects the same `invoice` surface when the active L3 slot
+expects `subject:supplier -> Honglu`. This is the first local feedback loop
+where a word candidate is not just looked up, but accepted or suppressed by
+schema role resonance.
+
 ### Holographic Reduced Representations
 
 Sources:

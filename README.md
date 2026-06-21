@@ -303,6 +303,7 @@ nanda-llmwave-big active-core --format json
 nanda-llmwave-big l2 --format json
 nanda-llmwave-big hrr --format json
 nanda-llmwave-big schema-bind --format json
+nanda-llmwave-big l2-l3-couple --format json
 nanda-llmwave-big word-birth --format json
 nanda-llmwave-big surface-production --format json
 nanda-llmwave-big surface-reconstruct --format json
@@ -556,6 +557,12 @@ bindings, recovers `subject:supplier -> Honglu` and
 `object:document -> invoice`, and rejects the role-swap trap
 `invoice issues Honglu`. This is still fixture-level schema cognition, not LLM
 readiness or nonlinear memory proof.
+`nanda-llmwave-big l2-l3-couple` adds the v456-v480 L2/L3 coupling core. It
+lets an L2 surface probe propose candidates, then applies the L3 schema role as
+a phase-bias/rerank layer. In the sample, raw L2 prefers `inventory` for prefix
+`in`, but the L3 `object:document` role lifts `invoice`; the disagreement trap
+rejects `invoice` when the active L3 slot expects `subject:supplier -> Honglu`.
+This is a local L2/L3 feedback loop, not chat readiness or nonlinear proof.
 `nanda-llmwave-big word-birth` adds the v246-v252 lexical birth mechanism from
 the literature line: statistical segmentation, fast mapping, cross-situational
 convergence, usage/exemplar strengthening, grammar integration, attractor

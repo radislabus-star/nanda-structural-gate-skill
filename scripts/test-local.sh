@@ -90,6 +90,12 @@ jq -e '.schema.schema_id == 101 and .schema.operator_id == 3 and .metrics.schema
 jq -e '.recovered_roles[] | select(.role == "subject:supplier" and .expected == "Honglu" and .recovered == "Honglu" and .exact == true)' <<<"$big_schema_bind_json" >/dev/null
 jq -e '.recovered_roles[] | select(.role == "object:document" and .expected == "invoice" and .recovered == "invoice" and .exact == true)' <<<"$big_schema_bind_json" >/dev/null
 jq -e '.role_swap_trap.wrong_claim == "invoice issues Honglu" and .role_swap_trap.rejected == true and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_schema_bind_json" >/dev/null
+big_l2_l3_json="$("$llmwave_big" l2-l3-couple --format json)"
+jq -e '.roadmap_block == "v456-v480" and .verdict == "L2_L3_COUPLED_READY_NOT_CHAT"' <<<"$big_l2_l3_json" >/dev/null
+jq -e '.l2_probe.raw_top == "inventory" and .l2_probe.coupled_top == "invoice" and .l3_schema.schema_id == 101' <<<"$big_l2_l3_json" >/dev/null
+jq -e '.metrics.l2_l3_agreement_rate == 1 and .metrics.role_error_rate == 0 and .metrics.disagreement_reject_rate == 1' <<<"$big_l2_l3_json" >/dev/null
+jq -e '.disagreement_trap.l2_preferred == "invoice" and .disagreement_trap.l3_expected_filler == "Honglu" and .disagreement_trap.rejected == true' <<<"$big_l2_l3_json" >/dev/null
+jq -e '.claim_boundary.l2_l3_storage_mixed == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_l2_l3_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

@@ -711,6 +711,41 @@ nonlinear_memory_proven remains false
 llm_ready remains false
 ```
 
+v456-v480: implemented as nanda-llmwave-big l2-l3-couple
+
+## Phase 21: L2/L3 Coupling, v456-v480
+
+Goal:
+
+```text
+L2 Word Field candidate
+  -> L3 schema role probe
+  -> phase-bias/rerank
+  -> reject L2-valid but role-invalid surface
+```
+
+Current sample:
+
+```text
+prefix = in
+raw L2 top = inventory
+active L3 slot = object:document
+expected filler = invoice
+coupled top = invoice
+trap: invoice in subject:supplier slot
+expected subject filler = Honglu
+```
+
+Stop rules:
+
+```text
+L2/L3 agreement on fixture -> not chat readiness
+disagreement rejection -> local safety evidence only
+L2 and L3 storage must stay separate
+nonlinear_memory_proven remains false
+llm_ready remains false
+```
+
 ## Phase 4: Schema/Residual Nonlinear Write, v191-v205
 
 ### v191 Write Decomposition
