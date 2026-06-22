@@ -872,12 +872,16 @@ field_core::peak::FieldPeakInput / FieldPeakResult
 field_core::coherence::FieldCoherenceInput / FieldCoherenceResult
 field_core::coherence::field_verdict_for_state
 field_core::anti_wave::FieldAntiWaveEffect
+field_core::readout::FieldReadoutInput / FieldReadoutResult
+field_core::readout::FieldLocalPathInput / FieldLocalPathResult
 ```
 
 `search.rs` still emits the legacy `peak_decision` and
 `field_state_machine` JSON shapes, but the actual peak/coherence/verdict
-decisions are delegated to `field_core`. This keeps downstream compatibility
-while moving ownership of the field physics into one module family.
+decisions are delegated to `field_core`. `model.rs::field_interpretation` and
+`search.rs::coarse_to_fine_trace` are now compatibility wrappers around
+`field_core::readout`. This keeps downstream compatibility while moving
+ownership of the field physics into one module family.
 
 `nanda field-audit --format json` reports:
 
@@ -886,6 +890,8 @@ field_operation_contract.version = unified-field-operation-contract-v1
 field_operation_contract.peak_owner = field_core::peak::FieldPeakResult
 field_operation_contract.coherence_owner = field_core::coherence::FieldCoherenceResult
 field_operation_contract.anti_wave_owner = field_core::anti_wave::FieldAntiWaveEffect
+field_operation_contract.readout_owner = field_core::readout::FieldReadoutResult
+field_operation_contract.local_path_owner = field_core::readout::FieldLocalPathResult
 acceptance.structural_decision_uses_field_core = true
 ```
 

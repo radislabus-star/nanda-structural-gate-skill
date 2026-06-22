@@ -1335,10 +1335,24 @@ pub(crate) fn field_interpretation(
     lexical_baseline: &Value,
 ) -> Value {
     if peaks.is_empty() {
-        return json!({
-            "state": "NO_FIELD",
-            "read_as": "No resonance field was produced."
-        });
+        return field_core::readout_value(field_core::structural_field_readout(
+            field_core::FieldReadoutInput {
+                has_peak: false,
+                top_peak: String::new(),
+                second_peak: String::new(),
+                lexical_baseline_top: lexical_baseline["top_peak"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string(),
+                top_polarization: String::new(),
+                margin,
+                top_component_score: 0.0,
+                second_component_score: 0.0,
+                top_center: Value::Null,
+                second_center: None,
+                nearest_foreign_pull: None,
+            },
+        ));
     }
     let top = &peaks[0];
     let second = peaks.get(1);
@@ -1351,66 +1365,28 @@ pub(crate) fn field_interpretation(
     let second_component = second
         .and_then(|peak| peak["propagation"]["component_score"].as_f64())
         .unwrap_or(0.0);
-    let component_gap = round4(top_component - second_component);
     let top_polarization = top["polarization"]["state"].as_str().unwrap_or("");
-    let stability = if top_polarization == "REVERSED" {
-        "polarity_reversed"
-    } else if margin >= 0.055 && component_gap >= 0.12 {
-        "stable"
-    } else if margin < 0.04 {
-        "contested"
-    } else {
-        "thin"
-    };
     let top_center = &top["center"];
-    let second_center = second.map(|peak| &peak["center"]);
-    let centroid_drift = json!({
-        "from_second_peak": second_name,
-        "route": center_pair(second_center, top_center, "route"),
-        "relation": center_pair(second_center, top_center, "relation"),
-        "entity": center_pair(second_center, top_center, "entity"),
-        "subject_role": center_pair(second_center, top_center, "subject_role"),
-        "object_role": center_pair(second_center, top_center, "object_role")
-    });
+    let second_center = second.map(|peak| peak["center"].clone());
     let nearest_foreign_pull = top["anti_triads"]
         .as_array()
         .and_then(|items| items.first())
-        .cloned()
-        .unwrap_or(Value::Null);
-    let lexical_trap = !lexical_peak.is_empty() && lexical_peak != top_name;
-    json!({
-        "state": stability,
-        "top_peak": top_name,
-        "second_peak": second_name,
-        "margin": round4(margin),
-        "component_gap": component_gap,
-        "lexical_baseline_top": lexical_peak,
-        "lexical_trap_detected": lexical_trap,
-        "top_polarization": top_polarization,
-        "centroid_drift": centroid_drift,
-        "nearest_foreign_pull": nearest_foreign_pull,
-        "read_as": if lexical_trap {
-            "The structural field beats the lexical baseline; inspect support and anti-triads before final prose."
-        } else if stability == "polarity_reversed" {
-            "The top route has reversed role-direction polarity; do not use it as an answer route."
-        } else if stability == "stable" {
-            "The top route has a stable connected peak."
-        } else {
-            "The field is useful as retrieval context but is not a final answer skeleton."
-        }
-    })
-}
-
-pub(crate) fn center_pair(second_center: Option<&Value>, top_center: &Value, key: &str) -> Value {
-    json!({
-        "from": second_center
-            .and_then(|center| center[key].as_str())
-            .unwrap_or(""),
-        "to": top_center[key].as_str().unwrap_or(""),
-        "changed": second_center
-            .and_then(|center| center[key].as_str())
-            .unwrap_or("") != top_center[key].as_str().unwrap_or("")
-    })
+        .cloned();
+    field_core::readout_value(field_core::structural_field_readout(
+        field_core::FieldReadoutInput {
+            has_peak: true,
+            top_peak: top_name.to_string(),
+            second_peak: second_name.to_string(),
+            lexical_baseline_top: lexical_peak.to_string(),
+            top_polarization: top_polarization.to_string(),
+            margin,
+            top_component_score: top_component,
+            second_component_score: second_component,
+            top_center: top_center.clone(),
+            second_center,
+            nearest_foreign_pull,
+        },
+    ))
 }
 
 pub(crate) fn field_state_machine(

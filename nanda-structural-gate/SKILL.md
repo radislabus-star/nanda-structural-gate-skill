@@ -541,7 +541,9 @@ builders.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
 should point to `field_core::peak::FieldPeakResult`,
 `field_core::coherence::FieldCoherenceResult`, and
-`field_core::anti_wave::FieldAntiWaveEffect`. If those owners drift back into
+`field_core::anti_wave::FieldAntiWaveEffect`; readout/local-path ownership
+should point to `field_core::readout::FieldReadoutResult` and
+`field_core::readout::FieldLocalPathResult`. If those owners drift back into
 structural search/report code, treat it as a unified-field regression rather
 than a harmless reporting difference.
 v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface

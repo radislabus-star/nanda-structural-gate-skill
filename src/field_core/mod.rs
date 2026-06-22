@@ -10,6 +10,7 @@ pub(crate) mod feedback;
 pub(crate) mod lens;
 pub(crate) mod pass;
 pub(crate) mod peak;
+pub(crate) mod readout;
 pub(crate) mod record;
 pub(crate) mod runtime;
 pub(crate) mod vector;
@@ -22,6 +23,7 @@ pub(crate) use feedback::*;
 pub(crate) use lens::*;
 pub(crate) use pass::*;
 pub(crate) use peak::*;
+pub(crate) use readout::*;
 pub(crate) use record::*;
 pub(crate) use runtime::*;
 pub(crate) use vector::*;
@@ -474,6 +476,60 @@ mod tests {
 
         assert_eq!(effect.decision_effect, "LOCAL_SUPPRESSION");
         assert_eq!(effect.suppressed_target.as_deref(), Some("false-route"));
+    }
+
+    #[test]
+    fn structural_readout_reports_centroid_drift() {
+        let result = structural_field_readout(FieldReadoutInput {
+            has_peak: true,
+            top_peak: "invoice-route".to_string(),
+            second_peak: "payment-route".to_string(),
+            lexical_baseline_top: "payment-route".to_string(),
+            top_polarization: "ALIGNED".to_string(),
+            margin: 0.08,
+            top_component_score: 0.4,
+            second_component_score: 0.2,
+            top_center: json!({
+                "route": "invoice-route",
+                "relation": "requires",
+                "entity": "invoice",
+                "subject_role": "supplier",
+                "object_role": "document"
+            }),
+            second_center: Some(json!({
+                "route": "payment-route",
+                "relation": "pays",
+                "entity": "payment",
+                "subject_role": "buyer",
+                "object_role": "money"
+            })),
+            nearest_foreign_pull: Some(json!({"id": "anti-1"})),
+        });
+
+        assert_eq!(result.state, "stable");
+        assert!(result.lexical_trap_detected);
+        assert_eq!(result.centroid_drift["route"]["changed"], true);
+        assert_eq!(result.nearest_foreign_pull["id"], "anti-1");
+    }
+
+    #[test]
+    fn structural_local_path_marks_localized_support() {
+        let result = structural_local_path(FieldLocalPathInput {
+            peak: "invoice-route".to_string(),
+            support: vec![json!({
+                "id": "t1",
+                "subject": "supplier",
+                "relation": "issues",
+                "object": "invoice",
+                "score": 0.7,
+                "polarity": "ALIGNED"
+            })],
+            query_terms: ["invoice".to_string()].into_iter().collect(),
+        });
+
+        assert_eq!(result.state, "LOCALIZED");
+        assert_eq!(result.local_memory_size, 1);
+        assert_eq!(result.local_path[0]["query_hits"][0], "invoice");
     }
 
     #[test]

@@ -560,11 +560,15 @@ pub(crate) fn interference_search(
 
 pub(crate) fn coarse_to_fine_trace(peaks: &[Value], query_terms: &BTreeSet<String>) -> Value {
     let Some(top) = peaks.first() else {
-        return json!({
-            "enabled": true,
-            "state": "NO_PEAK",
-            "coarse_peak": "",
-            "local_path": []
+        return field_core::local_path_value(field_core::FieldLocalPathResult {
+            enabled: true,
+            state: "NO_PEAK".to_string(),
+            coarse_peak: String::new(),
+            local_memory_size: 0,
+            local_path: vec![],
+            read_as:
+                "Coarse route first, then inspect the local supporting path inside that route."
+                    .to_string(),
         });
     };
     let coarse_peak = top["peak"].as_str().unwrap_or("");
@@ -572,37 +576,13 @@ pub(crate) fn coarse_to_fine_trace(peaks: &[Value], query_terms: &BTreeSet<Strin
         .as_array()
         .cloned()
         .unwrap_or_default();
-    let local_path = support
-        .iter()
-        .take(5)
-        .map(|item| {
-            let subject = item["subject"].as_str().unwrap_or("");
-            let relation = item["relation"].as_str().unwrap_or("");
-            let object = item["object"].as_str().unwrap_or("");
-            let mut hits = vec![];
-            for term in query_terms {
-                let haystack = norm(&format!("{subject} {relation} {object}"));
-                if haystack.contains(term) {
-                    hits.push(term.clone());
-                }
-            }
-            json!({
-                "triad": item["id"].as_str().unwrap_or(""),
-                "edge": format!("{subject} -> {relation} -> {object}"),
-                "score": item["score"].as_f64().unwrap_or(0.0),
-                "polarity": item["polarity"].as_str().unwrap_or(""),
-                "query_hits": hits
-            })
-        })
-        .collect::<Vec<_>>();
-    json!({
-        "enabled": true,
-        "state": if local_path.is_empty() { "THIN" } else { "LOCALIZED" },
-        "coarse_peak": coarse_peak,
-        "local_memory_size": support.len(),
-        "local_path": local_path,
-        "read_as": "Coarse route first, then inspect the local supporting path inside that route."
-    })
+    field_core::local_path_value(field_core::structural_local_path(
+        field_core::FieldLocalPathInput {
+            peak: coarse_peak.to_string(),
+            support,
+            query_terms: query_terms.clone(),
+        },
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
