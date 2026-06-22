@@ -1203,9 +1203,10 @@ mkdir -p "$tmp_atlas_repo/src/bin/lay_daemon" "$tmp_atlas_repo/src/bin/lay_ibus_
 printf 'fn main() {}' >"$tmp_atlas_repo/src/bin/lay_daemon.rs"
 printf 'fn main() {}' >"$tmp_atlas_repo/src/bin/lay_ibus_engine.rs"
 printf 'fn handle_manual_trigger_runtime() {}' >"$tmp_atlas_repo/src/runtime/manual_trigger_runtime.rs"
+printf 'pub fn toggle_manual_mode() {}' >"$tmp_atlas_repo/src/manual_toggle.rs"
 atlas_path="$tmp_atlas_repo/.nanda/route-atlas.json"
 atlas_json="$("$build_atlas" "$tmp_atlas_repo" --out "$atlas_path" --format json)"
-jq -e '.mode == "route-atlas" and (.input | length) > 0 and (.output | length) > 0 and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .written_to' <<<"$atlas_json" >/dev/null
+jq -e '.mode == "route-atlas" and (.input | length) > 0 and (.output | length) > 0 and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .shared_contracts["shared.manual_toggle_contract"] and .written_to' <<<"$atlas_json" >/dev/null
 test -s "$atlas_path"
 atlas_file_json="$(cat "$atlas_path")"
 jq -e '(.input | length) > 0 and (.output | length) > 0' <<<"$atlas_file_json" >/dev/null
@@ -1236,6 +1237,13 @@ diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
 EOF_DIFF
 guard_diff_pass="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_atlas_repo/ime.diff" --format json)"
 jq -e '.verdict == "PASS" and .safe_to_edit == true' <<<"$guard_diff_pass" >/dev/null
+touch "$tmp_atlas_repo/empty.diff"
+set +e
+guard_diff_empty="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_atlas_repo/empty.diff" --format json)"
+guard_diff_empty_status=$?
+set -e
+test "$guard_diff_empty_status" -eq 3
+jq -e '.verdict == "WATCH" and .safe_to_edit == false and .reason == "empty_or_unreadable_diff"' <<<"$guard_diff_empty" >/dev/null
 cat >"$tmp_atlas_repo/mixed.diff" <<'EOF_DIFF'
 diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
 --- a/src/bin/lay_ibus_engine.rs
@@ -1249,7 +1257,37 @@ guard_diff_veto="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" 
 guard_diff_status=$?
 set -e
 test "$guard_diff_status" -eq 1
-jq -e '.verdict == "VETO" and (.foreign_routes | index("manual-trigger-flow"))' <<<"$guard_diff_veto" >/dev/null
+jq -e '.verdict == "VETO" and (.foreign_routes | index("manual-trigger-flow")) and .route_crossing_report.decision == "allowed only if action_id is an explicit shared contract for these routes"' <<<"$guard_diff_veto" >/dev/null
+cat >"$tmp_atlas_repo/shared.diff" <<'EOF_DIFF'
+diff --git a/src/manual_toggle.rs b/src/manual_toggle.rs
+--- a/src/manual_toggle.rs
++++ b/src/manual_toggle.rs
+diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
+--- a/src/bin/lay_ibus_engine.rs
++++ b/src/bin/lay_ibus_engine.rs
+EOF_DIFF
+guard_diff_shared="$("$guard_diff" "$atlas_path" --action-id "shared.manual_toggle_contract" --diff "$tmp_atlas_repo/shared.diff" --format json)"
+jq -e '.verdict == "PASS" and .safe_to_edit == true and .reason == "shared_contract_allows_route_crossing" and (.changed_routes | index("source-flow")) and (.changed_routes | index("ime-display-flow")) and (.shared_candidates | index("src/manual_toggle.rs")) and .route_crossing_report.decision == "allowed by shared.manual_toggle_contract"' <<<"$guard_diff_shared" >/dev/null
+set +e
+guard_diff_shared_veto="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_atlas_repo/shared.diff" --format json)"
+guard_diff_shared_veto_status=$?
+set -e
+test "$guard_diff_shared_veto_status" -eq 1
+jq -e '.verdict == "VETO" and (.route_crossing_report.suggested_shared_actions | index("shared.manual_toggle_contract"))' <<<"$guard_diff_shared_veto" >/dev/null
+tmp_diff_source_repo="$(mktemp -d)"
+git -C "$tmp_diff_source_repo" init -q
+cat >"$tmp_diff_source_repo/from-other-repo.diff" <<'EOF_DIFF'
+diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
+--- a/src/bin/lay_ibus_engine.rs
++++ b/src/bin/lay_ibus_engine.rs
+EOF_DIFF
+set +e
+guard_diff_source_watch="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_diff_source_repo/from-other-repo.diff" --format json)"
+guard_diff_source_status=$?
+set -e
+test "$guard_diff_source_status" -eq 3
+jq -e '.verdict == "WATCH" and .reason == "diff_source_repo_mismatch" and .safe_to_edit == false and .diff_source.mismatch == true' <<<"$guard_diff_source_watch" >/dev/null
+rm -rf "$tmp_diff_source_repo"
 set +e
 release_json="$("$release_gate" "$atlas_path" --format json)"
 release_status=$?

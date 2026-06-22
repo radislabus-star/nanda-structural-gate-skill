@@ -445,8 +445,15 @@ needs a separate merge plan or review.
 `nanda-build-atlas` writes reusable route memory to `.nanda/route-atlas.json`.
 `nanda-guard-action` is the fast pre-edit check: symptom plus `action_id` must
 resolve to an atlas route. `nanda-guard-diff` is the post-edit check: changed
-files must stay inside the selected route capsule. `nanda-release-gate` is a
-checklist summary over the atlas before publishing.
+files must stay inside the selected route capsule. Empty, unreadable, or
+unparseable diffs return `WATCH` with `safe_to_edit=false`, not PASS. Diff
+files from a different git repository return `WATCH` with
+`reason=diff_source_repo_mismatch`. Intentional cross-route edits must use an
+explicit shared contract action such as `shared.manual_toggle_contract`,
+`shared.text_edit_contract`, `shared.candidate_contract`, or
+`shared.layout_sync_contract`; otherwise route crossing is `VETO` and the
+report names changed routes, shared candidates, and suggested shared actions.
+`nanda-release-gate` is a checklist summary over the atlas before publishing.
 `nanda-profile-guards` measures the atlas-first workflow before optimization:
 build-atlas, guard-action, guard-diff, map-code, dogfood, and the warm
 `nanda-serve` guard path. Cold `guard-action`/`guard-diff` includes process

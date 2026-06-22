@@ -289,7 +289,14 @@ not touch the boundary.
 Use `nanda-build-atlas` to write reusable route memory once. Use
 `nanda-guard-action` before editing and `nanda-guard-diff` after editing. Use
 `nanda-release-gate` only before publishing or merging. Do not run the full
-route-field gate on every small question.
+route-field gate on every small question. Treat empty, unreadable, or
+unparseable diffs as `WATCH`, not PASS. If `guard-diff` reports
+`diff_source_repo_mismatch`, regenerate the diff from the same repository as
+the atlas. Intentional cross-route edits require explicit shared contract
+actions such as `shared.manual_toggle_contract`, `shared.text_edit_contract`,
+`shared.candidate_contract`, or `shared.layout_sync_contract`; otherwise route
+crossing remains `VETO`. Inspect `route_crossing_report` for changed routes,
+shared candidates, and suggested shared actions.
 Use `nanda-profile-guards` before changing performance-sensitive guard
 workflow. Treat it as wall-clock CLI evidence for whether the fast guard path
 or the heavier full-field path is dominating the edit cycle. Inspect

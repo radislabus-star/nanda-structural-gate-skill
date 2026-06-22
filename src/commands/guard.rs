@@ -95,14 +95,32 @@ pub(crate) fn guard_action_cmd(args: GuardActionArgs) -> Result<u8> {
 
 pub(crate) fn guard_diff_cmd(args: GuardDiffArgs) -> Result<u8> {
     let atlas = load_atlas(&args.atlas)?;
-    let diff = if args.diff.to_string_lossy() == "-" {
+    let diff_source = diff_source_repo(&atlas, &args.diff);
+    let diff_result = if args.diff.to_string_lossy() == "-" {
         let mut buf = String::new();
         io::stdin().read_to_string(&mut buf)?;
-        buf
+        Ok(buf)
     } else {
-        fs::read_to_string(&args.diff)?
+        fs::read_to_string(&args.diff)
     };
-    let mut out = guard_diff(&atlas, &args.action_id, &diff);
+    let diff = match diff_result {
+        Ok(diff) => diff,
+        Err(err) => {
+            let mut out = guard_diff_unreadable(&atlas, &args.action_id, diff_source, &err);
+            if args.boundary_economics {
+                let boundary_decision = commands::boundary::boundary_from_guard_diff(&atlas, &out);
+                out["boundary_decision"] = boundary_decision.clone();
+                out["boundary_economics"] = json!({
+                    "mode": "boundary-economics",
+                    "scope": "route-atlas-diff",
+                    "boundary_decision": boundary_decision
+                });
+            }
+            print_guard_output(&out, &args.format)?;
+            return Ok(guard_exit_code(&out));
+        }
+    };
+    let mut out = guard_diff_with_source(&atlas, &args.action_id, &diff, diff_source);
     if args.boundary_economics {
         let boundary_decision = commands::boundary::boundary_from_guard_diff(&atlas, &out);
         out["boundary_decision"] = boundary_decision.clone();
@@ -183,6 +201,7 @@ pub(crate) fn build_route_atlas(repo: &Path) -> Result<Value> {
         "repo": repo.display().to_string(),
         "total_files": files.len(),
         "routes": route_values,
+        "shared_contracts": shared_contracts(),
         "action_prefixes": action_prefixes(),
         "read_as": "Atlas-first route memory: use guard-action before edits and guard-diff after edits; rebuild atlas after large refactors."
     })
@@ -294,7 +313,33 @@ fn action_prefixes() -> Value {
         "tray": "ui-status-flow",
         "config": "config-flow",
         "install": "install-flow",
-        "test": "test-flow"
+        "test": "test-flow",
+        "shared": "shared-contract"
+    })
+}
+
+fn shared_contracts() -> Value {
+    json!({
+        "shared.manual_toggle_contract": {
+            "allowed_routes": ["source-flow", "manual-trigger-flow", "ime-display-flow", "runtime-flow", "test-flow"],
+            "shared_candidates": ["src/manual_toggle.rs", "src/manual_toggle/", "manual_toggle"],
+            "reason": "manual toggle is a shared contract between input/runtime and display adapters"
+        },
+        "shared.text_edit_contract": {
+            "allowed_routes": ["source-flow", "ime-display-flow", "space-autocorrect-flow", "runtime-flow", "test-flow"],
+            "shared_candidates": ["text_edit", "edit_contract", "composition_edit", "word_buffer"],
+            "reason": "text edit contract may bridge visible edit state and correction/runtime state"
+        },
+        "shared.candidate_contract": {
+            "allowed_routes": ["source-flow", "ime-display-flow", "nanda-field-flow", "space-autocorrect-flow", "test-flow"],
+            "shared_candidates": ["candidate_contract", "candidate", "suggestion"],
+            "reason": "candidate contract may bridge display, scoring, and correction candidates"
+        },
+        "shared.layout_sync_contract": {
+            "allowed_routes": ["source-flow", "ime-display-flow", "runtime-flow", "config-flow", "test-flow"],
+            "shared_candidates": ["layout_sync", "layout_controller", "backend_hint"],
+            "reason": "layout sync contract may bridge runtime layout state and visible adapter state"
+        }
     })
 }
 
@@ -401,10 +446,62 @@ pub(crate) fn guard_action(
 }
 
 pub(crate) fn guard_diff(atlas: &Value, action_id: &str, diff: &str) -> Value {
+    guard_diff_with_source(atlas, action_id, diff, None)
+}
+
+fn guard_diff_unreadable(
+    atlas: &Value,
+    action_id: &str,
+    diff_source: Option<Value>,
+    err: &std::io::Error,
+) -> Value {
+    json!({
+        "mode": "guard-diff",
+        "verdict": "WATCH",
+        "safe_to_edit": false,
+        "action_id": action_id,
+        "route": route_for_action(atlas, action_id),
+        "reason": "empty_or_unreadable_diff",
+        "diff_source": diff_source,
+        "diff_error": err.to_string(),
+        "changed_files": [],
+        "changed_routes": [],
+        "shared_candidates": [],
+        "foreign_files": [],
+        "foreign_routes": [],
+        "route_crossing_report": {
+            "changed_routes": [],
+            "shared_candidates": [],
+            "suggested_shared_actions": [],
+            "decision": "diff unreadable"
+        },
+        "repair_queue": guard_diff_repairs("WATCH", "empty_or_unreadable_diff", &[]),
+        "read_as": "Diff guard: changed files must stay inside the selected route atlas capsule."
+    })
+}
+
+fn guard_diff_with_source(
+    atlas: &Value,
+    action_id: &str,
+    diff: &str,
+    diff_source: Option<Value>,
+) -> Value {
     let route = route_for_action(atlas, action_id);
     let mut changed = diff_changed_files(diff);
     changed.sort();
     changed.dedup();
+    let shared_contract = shared_contract_for_action(atlas, action_id);
+    let shared_allowed_routes = shared_contract
+        .and_then(|contract| contract["allowed_routes"].as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<BTreeSet<_>>()
+        })
+        .unwrap_or_default();
+    let shared_candidates = shared_candidate_files(shared_contract, &changed);
     let allowed = route
         .as_ref()
         .and_then(|route| atlas["routes"][route]["allowed_files"].as_array())
@@ -420,20 +517,77 @@ pub(crate) fn guard_diff(atlas: &Value, action_id: &str, diff: &str) -> Value {
         .iter()
         .map(|file| commands::dogfood::auto_route_for_path(file))
         .collect::<BTreeSet<_>>();
-    let foreign_files = changed
-        .iter()
-        .filter(|file| !allowed.iter().any(|allowed| path_matches(file, allowed)))
-        .cloned()
-        .collect::<Vec<_>>();
-    let foreign_routes = changed_routes
-        .iter()
-        .filter(|changed_route| route.as_ref() != Some(*changed_route))
-        .cloned()
-        .collect::<Vec<_>>();
-    let verdict = if route.is_none() || !foreign_files.is_empty() || !foreign_routes.is_empty() {
+    let changed_route_list = changed_routes.iter().cloned().collect::<Vec<_>>();
+    let foreign_files = if shared_contract.is_some() {
+        changed
+            .iter()
+            .filter(|file| {
+                let changed_route = commands::dogfood::auto_route_for_path(file);
+                !shared_allowed_routes.contains(&changed_route)
+            })
+            .cloned()
+            .collect::<Vec<_>>()
+    } else {
+        changed
+            .iter()
+            .filter(|file| !allowed.iter().any(|allowed| path_matches(file, allowed)))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let foreign_routes = if shared_contract.is_some() {
+        changed_routes
+            .iter()
+            .filter(|changed_route| !shared_allowed_routes.contains(*changed_route))
+            .cloned()
+            .collect::<Vec<_>>()
+    } else {
+        changed_routes
+            .iter()
+            .filter(|changed_route| route.as_ref() != Some(*changed_route))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let source_mismatch = diff_source
+        .as_ref()
+        .and_then(|source| source["mismatch"].as_bool())
+        .unwrap_or(false);
+    let empty_or_unreadable = diff.trim().is_empty() || changed.is_empty();
+    let shared_allows_crossing = shared_contract.is_some()
+        && !changed.is_empty()
+        && changed_routes
+            .iter()
+            .all(|changed_route| shared_allowed_routes.contains(changed_route));
+    let route_crossing =
+        changed_routes.len() > 1 || !foreign_files.is_empty() || !foreign_routes.is_empty();
+    let verdict = if empty_or_unreadable || source_mismatch {
+        "WATCH"
+    } else if (route.is_none() && shared_contract.is_none())
+        || (route_crossing && !shared_allows_crossing)
+    {
         "VETO"
     } else {
         "PASS"
+    };
+    let reason = if empty_or_unreadable {
+        "empty_or_unreadable_diff"
+    } else if source_mismatch {
+        "diff_source_repo_mismatch"
+    } else if route_crossing && shared_allows_crossing {
+        "shared_contract_allows_route_crossing"
+    } else if route_crossing {
+        "route_crossing_requires_shared_contract"
+    } else if route.is_none() && shared_contract.is_none() {
+        "action_route_not_in_atlas"
+    } else {
+        "diff_stays_inside_allowed_routes"
+    };
+    let suggested_shared_actions = suggested_shared_actions(atlas, &changed_routes, &changed);
+    let route_crossing_decision = if verdict == "PASS" && shared_contract.is_some() {
+        format!("allowed by {action_id}")
+    } else if route_crossing {
+        "allowed only if action_id is an explicit shared contract for these routes".to_string()
+    } else {
+        "single-route diff".to_string()
     };
     json!({
         "mode": "guard-diff",
@@ -441,13 +595,148 @@ pub(crate) fn guard_diff(atlas: &Value, action_id: &str, diff: &str) -> Value {
         "safe_to_edit": verdict == "PASS",
         "action_id": action_id,
         "route": route,
+        "shared_contract": shared_contract.map(|contract| json!({
+            "action_id": action_id,
+            "allowed_routes": contract["allowed_routes"].clone(),
+            "reason": contract["reason"].clone()
+        })),
+        "reason": reason,
+        "diff_source": diff_source,
         "changed_files": changed,
-        "changed_routes": changed_routes.into_iter().collect::<Vec<_>>(),
+        "changed_routes": changed_route_list,
+        "shared_candidates": shared_candidates.clone(),
         "foreign_files": foreign_files,
         "foreign_routes": foreign_routes,
-        "repair_queue": if verdict == "PASS" { json!([]) } else { json!([repair("side_effect_creep", "Split the diff or choose an action_id that owns all changed routes.")]) },
+        "route_crossing_report": {
+            "changed_routes": changed_route_list,
+            "shared_candidates": shared_candidates,
+            "suggested_shared_actions": suggested_shared_actions.clone(),
+            "decision": route_crossing_decision
+        },
+        "repair_queue": guard_diff_repairs(verdict, reason, &suggested_shared_actions),
         "read_as": "Diff guard: changed files must stay inside the selected route atlas capsule."
     })
+}
+
+fn shared_contract_for_action<'a>(atlas: &'a Value, action_id: &str) -> Option<&'a Value> {
+    atlas["shared_contracts"][action_id].as_object()?;
+    Some(&atlas["shared_contracts"][action_id])
+}
+
+fn shared_candidate_files(contract: Option<&Value>, changed: &[String]) -> Vec<String> {
+    let patterns = contract
+        .and_then(|contract| contract["shared_candidates"].as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(|item| item.to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    changed
+        .iter()
+        .filter(|file| {
+            let lower = file.to_ascii_lowercase();
+            patterns.iter().any(|pattern| lower.contains(pattern))
+        })
+        .cloned()
+        .collect()
+}
+
+fn suggested_shared_actions(
+    atlas: &Value,
+    changed_routes: &BTreeSet<String>,
+    changed: &[String],
+) -> Vec<String> {
+    atlas["shared_contracts"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter_map(|(action, contract)| {
+            let allowed_routes = contract["allowed_routes"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<BTreeSet<_>>();
+            let has_shared_candidate = !shared_candidate_files(Some(contract), changed).is_empty();
+            (has_shared_candidate
+                && changed_routes
+                    .iter()
+                    .all(|route| allowed_routes.contains(route)))
+            .then(|| action.clone())
+        })
+        .collect()
+}
+
+fn guard_diff_repairs(verdict: &str, reason: &str, suggested_shared_actions: &[String]) -> Value {
+    if verdict == "PASS" {
+        return json!([]);
+    }
+    match reason {
+        "empty_or_unreadable_diff" => {
+            json!([repair(
+                "empty_or_unreadable_diff",
+                "Provide a non-empty git diff from the target repository before allowing edits."
+            )])
+        }
+        "diff_source_repo_mismatch" => {
+            json!([repair(
+                "diff_source_repo_mismatch",
+                "Regenerate the diff from the same repository as the route atlas."
+            )])
+        }
+        "route_crossing_requires_shared_contract" if !suggested_shared_actions.is_empty() => {
+            json!([repair(
+                "route_crossing_requires_shared_contract",
+                &format!(
+                    "Use one of these shared action_id values if the crossing is intentional: {}",
+                    suggested_shared_actions.join(", ")
+                )
+            )])
+        }
+        _ => json!([repair(
+            "side_effect_creep",
+            "Split the diff or choose an action_id that owns all changed routes.",
+        )]),
+    }
+}
+
+fn diff_source_repo(atlas: &Value, diff_path: &Path) -> Option<Value> {
+    if diff_path.to_string_lossy() == "-" {
+        return None;
+    }
+    let atlas_repo = atlas["repo"]
+        .as_str()
+        .or_else(|| atlas["input"].as_str())
+        .and_then(|repo| fs::canonicalize(repo).ok());
+    let diff_root = git_root_for_path(diff_path);
+    let mismatch = atlas_repo
+        .as_ref()
+        .zip(diff_root.as_ref())
+        .is_some_and(|(atlas_repo, diff_root)| atlas_repo != diff_root);
+    Some(json!({
+        "repo": atlas_repo.as_ref().map(|path| path.display().to_string()),
+        "diff_source": diff_root.as_ref().map(|path| path.display().to_string()),
+        "diff_path": diff_path.display().to_string(),
+        "mismatch": mismatch
+    }))
+}
+
+fn git_root_for_path(path: &Path) -> Option<PathBuf> {
+    let canonical = fs::canonicalize(path).ok()?;
+    let mut current = if canonical.is_dir() {
+        canonical
+    } else {
+        canonical.parent()?.to_path_buf()
+    };
+    loop {
+        if current.join(".git").exists() {
+            return Some(current);
+        }
+        if !current.pop() {
+            return None;
+        }
+    }
 }
 
 fn release_gate(atlas: &Value) -> Value {
