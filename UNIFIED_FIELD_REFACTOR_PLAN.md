@@ -546,6 +546,23 @@ This is the honest Level 2 closure:
 - full sole-engine cutover is blocked until packed zero-cost views and
   benchmark guards exist.
 
+### Phase 16: Packed FieldRecordView
+
+Status: done.
+
+`nanda_6m::PackedFieldRecordView<'a>` is a borrowed typed view over
+`PackedTriad32`:
+
+- no JSON;
+- no string;
+- no heap/hashmap;
+- no copied record payload;
+- exposes numeric subject/relation/object/route/group/confidence/polarity axes.
+
+`nanda pack6m --format json` reports the view contract under
+`field_record_view`. This is a hot-core storage/readiness contract, not a hot
+cutover by itself.
+
 ## Refactor Gates
 
 Before each phase:

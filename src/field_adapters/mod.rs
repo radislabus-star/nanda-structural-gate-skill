@@ -65,7 +65,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "field_pass_present": true,
                 "sole_engine": false,
                 "state": "DUAL_RUN_READY_PROTECTED_HOT_CORE",
-                "remaining": ["zero-cost packed FieldRecordView", "bench before replacing hot summaries"]
+                "remaining": ["bench before replacing hot summaries"]
             },
             {
                 "family": "cognitive",
@@ -88,6 +88,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "structural_cutover_eval_ready": true,
             "packed_dual_run_active": true,
             "packed_hot_core_exception": true,
+            "packed_field_record_view": true,
             "cognitive_dual_run_active": true,
             "unified_lens_contract": true,
             "unified_anti_wave_contract": true,

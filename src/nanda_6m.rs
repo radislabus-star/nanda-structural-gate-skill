@@ -13,6 +13,7 @@ pub use replay::*;
 pub use wave::*;
 
 pub const VERSION: &str = "nanda-6m-v40-llmwave-pattern-runtime";
+pub const FIELD_RECORD_VIEW_VERSION: &str = "packed-field-record-view-v1";
 pub const WAVE_DIM: usize = 1024;
 
 pub const BUDGET_BYTES: usize = 6_291_456;
@@ -87,6 +88,53 @@ impl PackedTriad32 {
             confidence: input.confidence,
             polarity: input.polarity,
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PackedFieldRecordView<'a> {
+    triad: &'a PackedTriad32,
+}
+
+impl<'a> PackedFieldRecordView<'a> {
+    pub const fn new(triad: &'a PackedTriad32) -> Self {
+        Self { triad }
+    }
+
+    pub const fn source(self) -> &'a PackedTriad32 {
+        self.triad
+    }
+
+    pub const fn subject_id(self) -> u32 {
+        self.triad.subject_id
+    }
+
+    pub const fn relation_id(self) -> u16 {
+        self.triad.relation_id
+    }
+
+    pub const fn object_id(self) -> u32 {
+        self.triad.object_id
+    }
+
+    pub const fn route_id(self) -> u16 {
+        self.triad.route_id
+    }
+
+    pub const fn group_id(self) -> u16 {
+        self.triad.group_id
+    }
+
+    pub const fn confidence(self) -> u8 {
+        self.triad.confidence
+    }
+
+    pub const fn polarity(self) -> u8 {
+        self.triad.polarity
+    }
+
+    pub const fn lane_hint(self) -> u16 {
+        self.triad.lane_hint
     }
 }
 
@@ -1284,12 +1332,42 @@ mod tests {
     #[test]
     fn fixed_record_sizes_match_contract() {
         assert_eq!(core::mem::size_of::<PackedTriad32>(), TRIAD_BYTES);
+        assert_eq!(
+            core::mem::size_of::<PackedFieldRecordView<'static>>(),
+            core::mem::size_of::<&PackedTriad32>()
+        );
         assert_eq!(core::mem::size_of::<PackedCentroid1024>(), CENTROID_BYTES);
         assert_eq!(core::mem::size_of::<PackedLane64>(), LANE_BYTES);
         assert_eq!(core::mem::size_of::<PackedWave1024>(), QUERY_WAVE_BYTES);
         assert_eq!(core::mem::size_of::<PackedTriadSupportScore>(), 16);
         assert_eq!(core::mem::size_of::<PackedFieldRequest>(), 8);
         assert_eq!(core::mem::size_of::<PackedSupportField>(), 56);
+    }
+
+    #[test]
+    fn packed_field_record_view_borrows_triad_axes() {
+        let triad = PackedTriad32::new(PackedTriadInput {
+            subject_id: 10,
+            relation_id: 20,
+            object_id: 30,
+            route_id: 40,
+            group_id: 50,
+            confidence: 200,
+            polarity: 1,
+            lane_hint: 60,
+            ..PackedTriadInput::default()
+        });
+        let view = PackedFieldRecordView::new(&triad);
+
+        assert_eq!(view.source(), &triad);
+        assert_eq!(view.subject_id(), 10);
+        assert_eq!(view.relation_id(), 20);
+        assert_eq!(view.object_id(), 30);
+        assert_eq!(view.route_id(), 40);
+        assert_eq!(view.group_id(), 50);
+        assert_eq!(view.confidence(), 200);
+        assert_eq!(view.polarity(), 1);
+        assert_eq!(view.lane_hint(), 60);
     }
 
     #[test]

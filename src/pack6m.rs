@@ -480,6 +480,16 @@ pub(crate) fn pack_report(
         "packed_lane_store": packed_lane_store,
         "compact_pattern_store": compact_pattern_store,
         "runtime_contract": runtime_contract,
+        "field_record_view": {
+            "version": nanda_6m::FIELD_RECORD_VIEW_VERSION,
+            "source_record": "PackedTriad32",
+            "source_record_bytes": nanda_6m::TRIAD_BYTES,
+            "view_bytes": core::mem::size_of::<nanda_6m::PackedFieldRecordView<'static>>(),
+            "zero_copy": true,
+            "borrowed_view": true,
+            "inner_loop_forbidden": ["json", "string", "heap", "hashmap"],
+            "hot_loop_safe": true
+        },
         "packed_lane_application": packed_lane_application,
         "packed_lane_replay": packed_lane_replay,
         "packed_replay_decision": packed_replay_decision,
