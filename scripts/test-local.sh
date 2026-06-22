@@ -53,6 +53,7 @@ profile_guards="$root/nanda-structural-gate/scripts/nanda-profile-guards"
 release_gate="$root/nanda-structural-gate/scripts/nanda-release-gate"
 field_report="$root/nanda-structural-gate/scripts/nanda-field-report"
 field_audit="$root/nanda-structural-gate/scripts/nanda-field-audit"
+field_equivalence="$root/nanda-structural-gate/scripts/nanda-field-equivalence"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
@@ -1633,7 +1634,9 @@ EOF_FIELD
 field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_cognitive_json" >/dev/null
 field_audit_json="$("$field_audit" --format json)"
-jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .acceptance.one_field_pass == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_audit_json" >/dev/null
+jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .acceptance.one_field_pass == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.semantic_equivalence_gate == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_audit_json" >/dev/null
+field_equivalence_json="$("$field_equivalence" --structural-from "$tmp_field_report/structural.json" --packed-from "$tmp_field_report/packed.json" --cognitive-from "$tmp_field_report/cognitive.json" --format json)"
+jq -e '.mode == "unified-field-equivalence" and .version == "unified-field-pass-v1" and .acceptance.equivalent_contract == true and .acceptance.all_have_field_pass == true and .acceptance.all_have_memory_delta == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_equivalence_json" >/dev/null
 
 "$search" "$root/examples/triad-packet.interference-search.json" --query "runtime route" --format json >"$tmp_field_report/live-search.json"
 live_structural_field="$("$field_report" --from "$tmp_field_report/live-search.json" --format json)"
@@ -1666,6 +1669,7 @@ rm -rf "$tmp_field_report"
 "$release_gate" --help | grep -q "Usage: nanda release-gate"
 "$field_report" --help | grep -q "Usage: nanda field-report"
 "$field_audit" --help | grep -q "Usage: nanda field-audit"
+"$field_equivalence" --help | grep -q "Usage: nanda field-equivalence"
 "$split_packet" --help | grep -q "Usage: nanda split"
 "$reporter" --format md --title "Smoke Markdown Report" --domain code --overall "$root/examples/triads.watch-large.md" --route code:"$root/examples/triads.code-flow.md" >/dev/null || test "$?" -eq 3
 

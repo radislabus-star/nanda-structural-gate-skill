@@ -14,6 +14,18 @@ pub(crate) struct FieldAuditArgs {
     pub(crate) format: OutputFormat,
 }
 
+#[derive(Parser)]
+pub(crate) struct FieldEquivalenceArgs {
+    #[arg(long = "structural-from")]
+    pub(crate) structural_from: PathBuf,
+    #[arg(long = "packed-from")]
+    pub(crate) packed_from: PathBuf,
+    #[arg(long = "cognitive-from")]
+    pub(crate) cognitive_from: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    pub(crate) format: OutputFormat,
+}
+
 pub(crate) fn field_report_cmd(args: FieldReportArgs) -> Result<u8> {
     let input = serde_json::from_str::<Value>(
         &fs::read_to_string(&args.from)
@@ -70,11 +82,11 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "all_json_reports_project_unified_field": true,
             "field_core_as_sole_engine": false,
             "feedback_memory_delta_unified": true,
+            "semantic_equivalence_gate": true,
             "nonlinear_memory_proven": false,
             "llm_ready": false
         },
         "next_required_steps": [
-            "semantic equivalence tests across structural/packed/cognitive",
             "route-scoped extraction of large report modules only after boundary audit"
         ]
     });
@@ -94,6 +106,118 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         }
     }
     Ok(EXIT_PASS)
+}
+
+pub(crate) fn field_equivalence_cmd(args: FieldEquivalenceArgs) -> Result<u8> {
+    let cases = [
+        ("structural", &args.structural_from),
+        ("packed", &args.packed_from),
+        ("cognitive", &args.cognitive_from),
+    ];
+    let mut families = vec![];
+    for (expected_family, path) in cases {
+        let input = serde_json::from_str::<Value>(
+            &fs::read_to_string(path)
+                .with_context(|| format!("read field equivalence input {}", path.display()))?,
+        )
+        .with_context(|| format!("parse JSON field equivalence input {}", path.display()))?;
+        let report = field_core::adapters::adapt_value(&input);
+        let value = report.to_value();
+        let field_pass = &value["field_pass"];
+        let compute_probe = &value["compute_probe"];
+        let memory_delta = &value["memory_delta"];
+        let claim_boundary = &value["claim_boundary"];
+        let actual_family = value["family"].as_str().unwrap_or("unknown");
+        families.push(json!({
+            "expected_family": expected_family,
+            "actual_family": actual_family,
+            "input": path.display().to_string(),
+            "family_matches": actual_family == expected_family,
+            "compute_probe_version": compute_probe["version"].as_str().unwrap_or(""),
+            "field_pass_version": field_pass["version"].as_str().unwrap_or(""),
+            "field_pass_family": field_pass["family"].as_str().unwrap_or(""),
+            "field_pass_present": field_pass["version"].as_str() == Some(field_core::FIELD_PASS_VERSION),
+            "memory_delta_present": memory_delta["replayable_into_next_pass"].is_boolean(),
+            "claim_boundary_preserved": claim_boundary["not_llm_ready"].as_bool().unwrap_or(false)
+                && claim_boundary["not_nonlinear_memory_proof"].as_bool().unwrap_or(false),
+            "verdict": field_pass["verdict"].as_str().unwrap_or("UNKNOWN"),
+            "safe_to_answer": field_pass["safe_to_answer"].as_bool().unwrap_or(false)
+        }));
+    }
+
+    let families_checked = families.len();
+    let all_family_matches = families
+        .iter()
+        .all(|case| case["family_matches"].as_bool().unwrap_or(false));
+    let all_have_compute_probe = families.iter().all(|case| {
+        case["compute_probe_version"].as_str() == Some(field_core::FIELD_COMPUTE_VERSION)
+    });
+    let all_have_field_pass = families.iter().all(|case| {
+        case["field_pass_present"].as_bool().unwrap_or(false)
+            && case["field_pass_version"].as_str() == Some(field_core::FIELD_PASS_VERSION)
+    });
+    let all_field_pass_families_match = families
+        .iter()
+        .all(|case| case["field_pass_family"].as_str() == case["expected_family"].as_str());
+    let all_have_memory_delta = families
+        .iter()
+        .all(|case| case["memory_delta_present"].as_bool().unwrap_or(false));
+    let all_preserve_claim_boundary = families
+        .iter()
+        .all(|case| case["claim_boundary_preserved"].as_bool().unwrap_or(false));
+    let equivalent_contract = families_checked == 3
+        && all_family_matches
+        && all_have_compute_probe
+        && all_have_field_pass
+        && all_field_pass_families_match
+        && all_have_memory_delta
+        && all_preserve_claim_boundary;
+    let state = if equivalent_contract {
+        "FIELD_EQUIVALENCE_PASS"
+    } else {
+        "FIELD_EQUIVALENCE_WATCH"
+    };
+    let out = json!({
+        "mode": "unified-field-equivalence",
+        "version": field_core::FIELD_PASS_VERSION,
+        "state": state,
+        "families": families,
+        "acceptance": {
+            "families_checked": families_checked,
+            "all_family_matches": all_family_matches,
+            "all_have_compute_probe": all_have_compute_probe,
+            "all_have_field_pass": all_have_field_pass,
+            "all_field_pass_families_match": all_field_pass_families_match,
+            "all_have_memory_delta": all_have_memory_delta,
+            "all_preserve_claim_boundary": all_preserve_claim_boundary,
+            "equivalent_contract": equivalent_contract,
+            "field_core_as_sole_engine": false,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false
+        }
+    });
+
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => {
+            println!("mode: unified-field-equivalence");
+            println!("version: {}", out["version"].as_str().unwrap_or(""));
+            println!("state: {state}");
+            println!("equivalent_contract: {equivalent_contract}");
+        }
+        OutputFormat::Md => {
+            println!("# Unified Field Equivalence\n");
+            println!("- version: `{}`", out["version"].as_str().unwrap_or(""));
+            println!("- state: `{state}`");
+            println!("- equivalent_contract: `{equivalent_contract}`");
+        }
+    }
+
+    Ok(if equivalent_contract {
+        EXIT_PASS
+    } else {
+        EXIT_WATCH
+    })
 }
 
 fn print_unified_field_report(

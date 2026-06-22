@@ -388,6 +388,33 @@ scripts/test-local.sh
 nanda field-audit --format json
 ```
 
+### Phase 9: Semantic Field Equivalence
+
+Status: done through `nanda field-equivalence` and
+`scripts/nanda-field-equivalence`.
+
+The equivalence command checks that structural, packed, and cognitive reports
+all project into the same shared report contract:
+
+- `compute_probe`;
+- `memory_delta`;
+- `field_pass`;
+- family-specific `field_pass.family`;
+- conservative claim boundary.
+
+This is semantic contract equivalence, not proof that the three engines compute
+identical domain scores.
+
+Acceptance:
+
+```bash
+nanda field-equivalence \
+  --structural-from search-result.json \
+  --packed-from pack6m-result.json \
+  --cognitive-from llmwave-big-result.json \
+  --format json
+```
+
 ## Refactor Gates
 
 Before each phase:
@@ -439,13 +466,11 @@ This creates the target seam without moving scoring logic.
 
 Priority order:
 
-1. Add semantic equivalence tests across structural, packed, and cognitive
-   report projections.
-2. Move one bounded scoring explanation from structural report text into
+1. Move one bounded scoring explanation from structural report text into
    `field_core` vocabulary.
-3. Add a route-scoped refactor plan for any large reporting file before
+2. Add a route-scoped refactor plan for any large reporting file before
    splitting it.
-4. Only then consider extracting reporting submodules.
+3. Only then consider extracting reporting submodules.
 
 Files not to refactor first:
 
@@ -463,6 +488,7 @@ The refactor is successful only if all are true:
 - three adapters can project into it;
 - one shared field pass exists and is visible in report outputs;
 - feedback can emit a local memory delta that changes the next field pass;
+- structural, packed, and cognitive reports pass the shared equivalence gate;
 - packed hot-loop constraints are preserved;
 - old outputs and tests remain compatible;
 - agent-facing reports become clearer;
