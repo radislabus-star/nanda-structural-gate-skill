@@ -429,7 +429,7 @@ pub(crate) fn pack_report(
         && groups.len() <= u16::MAX as usize
         && roles.len() <= u8::MAX as usize;
     let packed_ok = budget["safe_for_hot_core"].as_bool().unwrap_or(false) && dictionary_ok;
-    json!({
+    let mut out = json!({
         "core_version": CORE_VERSION,
         "nanda_6m_version": nanda_6m::VERSION,
         "mode": "nanda-6m-pack-skeleton",
@@ -494,7 +494,9 @@ pub(crate) fn pack_report(
         },
         "blockers": blockers,
         "hot_core_note": "This command still runs in the cold layer. It now separates memory/source centroids from the candidate/query projection wave, proving the first honest packed peak path before full packed interference search."
-    })
+    });
+    out["field_runtime"] = field_core::packed_dual_run_value(&out);
+    out
 }
 
 #[derive(Clone, Copy)]

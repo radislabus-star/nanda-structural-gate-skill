@@ -64,7 +64,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "embedded_unified_field": true,
                 "field_pass_present": true,
                 "sole_engine": false,
-                "state": "PROTECTED_HOT_CORE_EXCEPTION",
+                "state": "DUAL_RUN_READY_PROTECTED_HOT_CORE",
                 "remaining": ["zero-cost packed FieldRecordView", "bench before replacing hot summaries"]
             },
             {
@@ -85,6 +85,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "semantic_equivalence_gate": true,
             "structural_dual_run_active": true,
             "structural_cutover_eval_ready": true,
+            "packed_dual_run_active": true,
+            "packed_hot_core_exception": true,
             "route_scoped_extraction_required": false,
             "nonlinear_memory_proven": false,
             "llm_ready": false

@@ -152,6 +152,98 @@ pub(crate) fn structural_dual_run_value(search: &Value) -> Value {
     })
 }
 
+pub(crate) fn packed_dual_run_from_pack(pack: &Value) -> FieldRuntimeDualRun {
+    let report = adapters::adapt_value(pack);
+    let unified = report.to_value();
+    let field_pass = &unified["field_pass"];
+    let old_peak = pack["top_peak"]
+        .as_str()
+        .map(str::to_string)
+        .or_else(|| {
+            pack["peak_decision"]["route"]["top_id"]
+                .as_u64()
+                .map(|id| format!("route:{id}"))
+        })
+        .unwrap_or_default();
+    let field_peak = field_pass["peak"]["target"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let old_verdict = pack["peak_decision"]["verdict"]
+        .as_str()
+        .or_else(|| pack["verdict"].as_str())
+        .unwrap_or("WATCH")
+        .to_string();
+    let field_verdict = field_pass["verdict"]
+        .as_str()
+        .unwrap_or("WATCH")
+        .to_string();
+    let old_field_state = pack["peak_decision"]["state"]
+        .as_str()
+        .unwrap_or("PACKED_UNKNOWN")
+        .to_string();
+    let field_state = field_pass["coherence_state"]
+        .as_str()
+        .or_else(|| field_pass["peak"]["state"].as_str())
+        .unwrap_or("FIELD_UNKNOWN")
+        .to_string();
+    let old_safe_to_answer = pack["peak_decision"]["safe_to_answer"]
+        .as_bool()
+        .unwrap_or(false);
+    let field_safe_to_answer = field_pass["safe_to_answer"].as_bool().unwrap_or(false);
+    let peak_matches = !old_peak.is_empty() && old_peak == field_peak;
+    let state_family_matches = state_family(&old_field_state) == state_family(&field_state);
+    let field_not_more_permissive = !field_safe_to_answer || old_safe_to_answer;
+    let mut mismatch_reason = vec![];
+    if !peak_matches {
+        mismatch_reason.push("peak_mismatch".to_string());
+    }
+    if !state_family_matches {
+        mismatch_reason.push("state_family_mismatch".to_string());
+    }
+    if !field_not_more_permissive {
+        mismatch_reason.push("field_more_permissive_than_packed_engine".to_string());
+    }
+    if field_pass["version"].as_str() != Some(FIELD_PASS_VERSION) {
+        mismatch_reason.push("field_pass_version_mismatch".to_string());
+    }
+    let cutover_ready = peak_matches
+        && state_family_matches
+        && field_not_more_permissive
+        && mismatch_reason.is_empty();
+
+    FieldRuntimeDualRun {
+        version: FIELD_RUNTIME_VERSION,
+        family: FieldFamily::Packed,
+        mode: "packed-dual-run",
+        old_peak,
+        field_peak,
+        old_verdict,
+        field_verdict,
+        old_field_state,
+        field_state,
+        old_safe_to_answer,
+        field_safe_to_answer,
+        peak_matches,
+        state_family_matches,
+        field_not_more_permissive,
+        cutover_ready,
+        mismatch_reason,
+    }
+}
+
+pub(crate) fn packed_dual_run_value(pack: &Value) -> Value {
+    serde_json::to_value(packed_dual_run_from_pack(pack)).unwrap_or_else(|_| {
+        json!({
+            "version": FIELD_RUNTIME_VERSION,
+            "family": "packed",
+            "mode": "packed-dual-run",
+            "cutover_ready": false,
+            "mismatch_reason": ["serialization_failed"]
+        })
+    })
+}
+
 fn state_family(state: &str) -> &'static str {
     match state {
         "PASS" | "FOCUSED" | "FIELD_FOCUSED" | "FIELD_SAFE" | "PACKED_FOCUSED" => "focused",

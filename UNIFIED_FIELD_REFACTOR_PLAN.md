@@ -487,6 +487,24 @@ Claim boundary:
   existing domain engine;
 - `field_safe_to_answer` remains blocked by claim boundary.
 
+### Phase 13: Packed Dual-Run
+
+Status: active for `nanda pack6m`.
+
+`nanda pack6m --format json` now emits `field_runtime`:
+
+- old packed route peak/state/verdict/safe flag;
+- field-core peak/state/verdict/safe flag;
+- not-more-permissive check;
+- `cutover_ready`.
+
+Packed remains a protected hot-core exception:
+
+- no JSON/string/heap is introduced into the packed inner loop;
+- dual-run is report-layer evidence;
+- `packed_hot_core_exception = true` remains in audit until a zero-cost
+  `FieldRecordView` and benchmark guard exist.
+
 ## Refactor Gates
 
 Before each phase:

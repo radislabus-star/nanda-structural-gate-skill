@@ -162,11 +162,17 @@ impl FieldPassProjection {
                 strength: 1,
             }],
             anti_waves,
-            state_hint: Some(if report.coherence.field_state.trim().is_empty() {
-                report.peak.state.clone()
-            } else {
-                report.coherence.field_state.clone()
-            }),
+            state_hint: Some(
+                if report.coherence.field_state.trim().is_empty()
+                    || report.coherence.field_state == "FIELD_UNKNOWN"
+                    || report.coherence.field_state == "PACKED_FIELD"
+                    || report.coherence.field_state == "LLMWAVE_FIELD"
+                {
+                    report.peak.state.clone()
+                } else {
+                    report.coherence.field_state.clone()
+                },
+            ),
             claim_boundary: report.claim_boundary.clone(),
         };
         let input = apply_memory_deltas_to_pass(&input, deltas);
