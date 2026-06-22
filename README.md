@@ -378,6 +378,7 @@ nanda-map-code .
 nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
 nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+nanda-profile-guards . --iterations 50 --format json
 nanda-release-gate .nanda/route-atlas.json
 nanda-dogfood . --refactor-plan --format json
 nanda-self-check
@@ -427,6 +428,10 @@ repository.
 resolve to an atlas route. `nanda-guard-diff` is the post-edit check: changed
 files must stay inside the selected route capsule. `nanda-release-gate` is a
 checklist summary over the atlas before publishing.
+`nanda-profile-guards` measures the atlas-first workflow before optimization:
+build-atlas, guard-action, guard-diff, map-code, and dogfood wall-clock CLI
+time. Use it before making performance claims or moving full-field checks into
+the protected edit loop.
 `nanda-report` is agent-first: it returns a JSON decision packet by default.
 Use `--format md` only when a human-facing report is explicitly needed.
 `nanda-map` exposes the core structural map: source/candidate group sizes,
@@ -1011,6 +1016,7 @@ nanda-dogfood . --build-atlas --atlas-out .nanda/route-atlas.json
 nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
 nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+nanda-profile-guards . --iterations 50 --format json
 nanda-release-gate .nanda/route-atlas.json
 nanda-report --overall overall.md --route invoice:invoice.md
 nanda-report --format md --overall overall.md --route invoice:invoice.md
@@ -1154,6 +1160,7 @@ mkdir -p .nanda
 nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
 nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+nanda-profile-guards . --iterations 50 --format json
 nanda-dogfood . --out-dir .nanda/
 nanda-dogfood . --refactor-plan --format json
 nanda-release-gate .nanda/route-atlas.json

@@ -48,6 +48,7 @@ code_mapper="$root/nanda-structural-gate/scripts/nanda-map-code"
 build_atlas="$root/nanda-structural-gate/scripts/nanda-build-atlas"
 guard_action="$root/nanda-structural-gate/scripts/nanda-guard-action"
 guard_diff="$root/nanda-structural-gate/scripts/nanda-guard-diff"
+profile_guards="$root/nanda-structural-gate/scripts/nanda-profile-guards"
 release_gate="$root/nanda-structural-gate/scripts/nanda-release-gate"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
@@ -1254,6 +1255,8 @@ release_status=$?
 set -e
 test "$release_status" -eq 3
 jq -e '.mode == "release-gate" and .verdict == "WATCH" and (.routes | index("ime-display-flow"))' <<<"$release_json" >/dev/null
+profile_json="$("$profile_guards" "$tmp_atlas_repo" --iterations 2 --build-iterations 1 --full-iterations 1 --format json)"
+jq -e '.mode == "guard-profile" and .avg_ms.build_atlas >= 0 and .avg_ms.guard_action >= 0 and .avg_ms.guard_diff >= 0 and .avg_ms.map_code_repo >= 0 and .avg_ms.dogfood_refactor >= 0' <<<"$profile_json" >/dev/null
 rm -rf "$tmp_atlas_repo"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
@@ -1396,6 +1399,7 @@ fi
 "$build_atlas" --help | grep -q "Usage: nanda build-atlas"
 "$guard_action" --help | grep -q "Usage: nanda guard-action"
 "$guard_diff" --help | grep -q "Usage: nanda guard-diff"
+"$profile_guards" --help | grep -q "Usage: nanda profile-guards"
 "$release_gate" --help | grep -q "Usage: nanda release-gate"
 "$split_packet" --help | grep -q "Usage: nanda split"
 "$reporter" --format md --title "Smoke Markdown Report" --domain code --overall "$root/examples/triads.watch-large.md" --route code:"$root/examples/triads.code-flow.md" >/dev/null || test "$?" -eq 3
