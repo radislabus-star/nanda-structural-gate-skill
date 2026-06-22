@@ -51,7 +51,10 @@ pub(crate) fn print_contract_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_contract_text(report),
         OutputFormat::Md => print_contract_md(report),
     }
@@ -60,7 +63,10 @@ pub(crate) fn print_contract_report(
 
 pub(crate) fn print_atlas_report(report: &AtlasReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_atlas_text(report),
         OutputFormat::Md => print_atlas_md(report),
     }
@@ -72,7 +78,10 @@ pub(crate) fn print_active_core_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_active_core_text(report),
         OutputFormat::Md => print_active_core_md(report),
     }
@@ -84,7 +93,10 @@ pub(crate) fn print_l2_word_field_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_l2_word_field_text(report),
         OutputFormat::Md => print_l2_word_field_md(report),
     }
@@ -96,7 +108,10 @@ pub(crate) fn print_hrr_binding_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_hrr_binding_text(report),
         OutputFormat::Md => print_hrr_binding_md(report),
     }
@@ -108,7 +123,10 @@ pub(crate) fn print_l3_schema_bind_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_l3_schema_bind_text(report),
         OutputFormat::Md => print_l3_schema_bind_md(report),
     }
@@ -120,7 +138,10 @@ pub(crate) fn print_l2_l3_coupling_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_l2_l3_coupling_text(report),
         OutputFormat::Md => print_l2_l3_coupling_md(report),
     }
@@ -132,7 +153,10 @@ pub(crate) fn print_coupled_decode_loop_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_coupled_decode_loop_text(report),
         OutputFormat::Md => print_coupled_decode_loop_md(report),
     }
@@ -144,7 +168,10 @@ pub(crate) fn print_multi_schema_competition_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_multi_schema_competition_text(report),
         OutputFormat::Md => print_multi_schema_competition_md(report),
     }
@@ -156,7 +183,10 @@ pub(crate) fn print_schema_memory_growth_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_schema_memory_growth_text(report),
         OutputFormat::Md => print_schema_memory_growth_md(report),
     }
@@ -168,7 +198,10 @@ pub(crate) fn print_open_surface_generation_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_open_surface_generation_text(report),
         OutputFormat::Md => print_open_surface_generation_md(report),
     }
@@ -180,7 +213,10 @@ pub(crate) fn print_reasoning_field_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_reasoning_field_text(report),
         OutputFormat::Md => print_reasoning_field_md(report),
     }
@@ -192,7 +228,10 @@ pub(crate) fn print_dialogue_state_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_dialogue_state_text(report),
         OutputFormat::Md => print_dialogue_state_md(report),
     }
@@ -204,7 +243,10 @@ pub(crate) fn print_mini_chat_eval_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_mini_chat_eval_text(report),
         OutputFormat::Md => print_mini_chat_eval_md(report),
     }
@@ -300,7 +342,10 @@ pub(crate) fn print_answer_surface_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_answer_surface_text(report),
         OutputFormat::Md => print_answer_surface_md(report),
     }
@@ -312,7 +357,10 @@ pub(crate) fn print_field_feedback_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_field_feedback_text(report),
         OutputFormat::Md => print_field_feedback_md(report),
     }
@@ -324,7 +372,10 @@ pub(crate) fn print_applied_feedback_memory_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => print_runtime_md(
             "Applied Feedback Memory",
@@ -357,7 +408,10 @@ pub(crate) fn print_applied_anti_memory_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => {
             print_runtime_md("Applied Anti-Memory", report.roadmap_block, report.verdict)
@@ -371,7 +425,10 @@ pub(crate) fn print_persistent_memory_store_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => print_runtime_md(
             "Persistent Memory Store",
@@ -387,7 +444,10 @@ pub(crate) fn print_learning_eval_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => print_runtime_md("Learning Eval", report.roadmap_block, report.verdict),
     }
@@ -399,7 +459,10 @@ pub(crate) fn print_memory_consolidate_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => {
             print_runtime_md("Memory Consolidate", report.roadmap_block, report.verdict)
@@ -413,7 +476,10 @@ pub(crate) fn print_runtime_pipeline_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => {
             print_runtime_md("Runtime Pipeline", report.roadmap_block, report.verdict)
@@ -424,7 +490,10 @@ pub(crate) fn print_runtime_pipeline_report(
 
 pub(crate) fn print_core_eval_report(report: &CoreEvalReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => print_runtime_md("Core Eval", report.roadmap_block, report.verdict),
     }
@@ -436,7 +505,10 @@ pub(crate) fn print_lexical_birth_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_lexical_birth_text(report),
         OutputFormat::Md => print_lexical_birth_md(report),
     }
@@ -460,7 +532,10 @@ pub(crate) fn print_surface_production_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_surface_production_text(report),
         OutputFormat::Md => print_surface_production_md(report),
     }
@@ -472,7 +547,10 @@ pub(crate) fn print_surface_reconstruct_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_surface_reconstruct_text(report),
         OutputFormat::Md => print_surface_reconstruct_md(report),
     }
@@ -484,7 +562,10 @@ pub(crate) fn print_surface_corpus_eval_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_surface_corpus_eval_text(report),
         OutputFormat::Md => print_surface_corpus_eval_md(report),
     }
@@ -496,7 +577,10 @@ pub(crate) fn print_surface_bank_build_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_surface_bank_build_text(report),
         OutputFormat::Md => print_surface_bank_build_md(report),
     }
@@ -508,7 +592,10 @@ pub(crate) fn print_surface_bank_validate_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_surface_bank_validate_text(report),
         OutputFormat::Md => print_surface_bank_validate_md(report),
     }
@@ -520,7 +607,10 @@ pub(crate) fn print_surface_bank_fixture_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_surface_bank_fixture_text(report),
         OutputFormat::Md => print_surface_bank_fixture_md(report),
     }
@@ -532,7 +622,10 @@ pub(crate) fn print_surface_raw_induce_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_surface_raw_induce_text(report),
         OutputFormat::Md => print_surface_raw_induce_md(report),
     }
@@ -541,7 +634,10 @@ pub(crate) fn print_surface_raw_induce_report(
 
 pub(crate) fn print_write_report(report: &WriteReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_write_text(report),
         OutputFormat::Md => print_write_md(report),
     }
@@ -553,7 +649,10 @@ pub(crate) fn print_consolidation_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_consolidation_text(report),
         OutputFormat::Md => print_consolidation_md(report),
     }
@@ -562,7 +661,10 @@ pub(crate) fn print_consolidation_report(
 
 pub(crate) fn print_big_eval_report(report: &BigEvalReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_big_eval_text(report),
         OutputFormat::Md => print_big_eval_md(report),
     }
@@ -574,7 +676,10 @@ pub(crate) fn print_runtime_product_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_product_text(report),
         OutputFormat::Md => print_runtime_product_md(report),
     }
@@ -586,7 +691,10 @@ pub(crate) fn print_training_compile_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_training_compile_text(report),
         OutputFormat::Md => print_training_compile_md(report),
     }
@@ -598,7 +706,10 @@ pub(crate) fn print_artifact_ask_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_artifact_ask_text(report),
         OutputFormat::Md => print_artifact_ask_md(report),
     }
@@ -610,7 +721,10 @@ pub(crate) fn print_artifact_ask_eval_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_artifact_ask_eval_text(report),
         OutputFormat::Md => print_artifact_ask_eval_md(report),
     }
@@ -619,7 +733,10 @@ pub(crate) fn print_artifact_ask_eval_report(
 
 pub(crate) fn print_hot_pack_report(report: &HotPackReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_hot_pack_text(report),
         OutputFormat::Md => print_hot_pack_md(report),
     }
@@ -628,7 +745,10 @@ pub(crate) fn print_hot_pack_report(report: &HotPackReport, format: &OutputForma
 
 pub(crate) fn print_hot_ask_report(report: &HotAskReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_hot_ask_text(report),
         OutputFormat::Md => print_hot_ask_md(report),
     }
@@ -637,7 +757,10 @@ pub(crate) fn print_hot_ask_report(report: &HotAskReport, format: &OutputFormat)
 
 pub(crate) fn print_hot_learn_report(report: &HotLearnReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_hot_learn_text(report),
         OutputFormat::Md => print_hot_learn_md(report),
     }
@@ -646,7 +769,10 @@ pub(crate) fn print_hot_learn_report(report: &HotLearnReport, format: &OutputFor
 
 pub(crate) fn print_hot_chat_report(report: &HotChatReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_hot_chat_text(report),
         OutputFormat::Md => print_hot_chat_md(report),
     }
