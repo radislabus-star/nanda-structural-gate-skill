@@ -802,7 +802,7 @@ fn check_version_bump_contract(atlas: &Value, diff: &str, changed: &[String]) ->
             .iter()
             .filter(|file| should_scan_for_stale_version(file))
         {
-            let stale = stale_semver_tokens(&repo.join(file), expected);
+            let stale = stale_version_tokens_for_file(file, &repo.join(file), expected);
             if !stale.is_empty() {
                 violations.push(format!(
                     "{file} still contains stale version(s): {}",
@@ -899,13 +899,24 @@ fn parse_cargo_lock_lay_version(path: &Path) -> Option<String> {
 }
 
 fn quoted_value(line: &str) -> Option<String> {
-    let mut quoted = line.split('"');
-    let _before = quoted.next()?;
-    if let Some(value) = quoted.next() {
-        return Some(value.to_string()).filter(|value| !value.is_empty());
+    for quote in ['"', '\''] {
+        let mut quoted = line.split(quote);
+        let _before = quoted.next()?;
+        if let Some(value) = quoted.next() {
+            return Some(value.trim().to_string()).filter(|value| !value.is_empty());
+        }
     }
     let (_, value) = line.split_once('=')?;
-    Some(value.trim().trim_matches('"').to_string()).filter(|value| !value.is_empty())
+    Some(
+        value
+            .trim()
+            .trim_end_matches(';')
+            .trim()
+            .trim_matches('"')
+            .trim_matches('\'')
+            .to_string(),
+    )
+    .filter(|value| !value.is_empty())
 }
 
 fn read_json_file(path: &Path) -> Option<Value> {
@@ -939,8 +950,7 @@ fn parse_app_versions(path: &Path) -> Vec<String> {
     };
     content
         .lines()
-        .filter(|line| line.contains("APP_VERSION"))
-        .filter_map(quoted_value)
+        .filter_map(parse_app_version_definition)
         .collect()
 }
 
@@ -948,17 +958,46 @@ fn should_scan_for_stale_version(file: &str) -> bool {
     file == "Cargo.toml" || file.ends_with("metadata.json") || is_js_version_file(file)
 }
 
-fn stale_semver_tokens(path: &Path, expected: &str) -> Vec<String> {
-    let content = match fs::read_to_string(path) {
-        Ok(content) => content,
-        Err(_) => return vec![],
-    };
-    semver_tokens(&content)
-        .into_iter()
-        .filter(|version| version != expected)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
+fn parse_app_version_definition(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    let rest = trimmed
+        .strip_prefix("export ")
+        .unwrap_or(trimmed)
+        .trim_start();
+    let rest = rest.strip_prefix("const ")?.trim_start();
+    let rest = rest.strip_prefix("APP_VERSION")?.trim_start();
+    let rest = rest.strip_prefix('=')?.trim_start();
+    let quote = rest.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let value = rest[quote.len_utf8()..].split(quote).next()?.trim();
+    Some(value.to_string()).filter(|value| !value.is_empty())
+}
+
+fn stale_version_tokens_for_file(file: &str, path: &Path, expected: &str) -> Vec<String> {
+    if file == "Cargo.toml" {
+        return parse_cargo_toml_version(path)
+            .filter(|version| version != expected)
+            .into_iter()
+            .collect();
+    }
+    if file.ends_with("metadata.json") {
+        return read_json_file(path)
+            .and_then(|json_value| json_value["version-name"].as_str().map(str::to_string))
+            .filter(|version| version != expected)
+            .into_iter()
+            .collect();
+    }
+    if is_js_version_file(file) {
+        return parse_app_versions(path)
+            .into_iter()
+            .filter(|version| version != expected)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+    }
+    vec![]
 }
 
 fn contains_semver(value: &str) -> bool {

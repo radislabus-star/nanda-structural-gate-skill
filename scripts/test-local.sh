@@ -1209,6 +1209,10 @@ cat >"$tmp_atlas_repo/Cargo.toml" <<'EOF_ATLAS_VERSION'
 [package]
 name = "lay"
 version = "1.2.3"
+
+[dependencies]
+gtk = "0.3.2"
+glib = "5.15.0"
 EOF_ATLAS_VERSION
 cat >"$tmp_atlas_repo/Cargo.lock" <<'EOF_ATLAS_VERSION'
 [[package]]
@@ -1222,13 +1226,14 @@ cat >"$tmp_atlas_repo/extension/gnome/metadata.json" <<'EOF_ATLAS_VERSION'
 {"version-name":"1.2.3","version":3}
 EOF_ATLAS_VERSION
 cat >"$tmp_atlas_repo/extension/gnome/prefs.js" <<'EOF_ATLAS_VERSION'
-const APP_VERSION = "1.2.3";
+const APP_VERSION = '1.2.3';
 EOF_ATLAS_VERSION
 cat >"$tmp_atlas_repo/extension/gnome/settings.js" <<'EOF_ATLAS_VERSION'
-const APP_VERSION = "1.2.3";
+export const APP_VERSION = '1.2.3';
+const label = new Gtk.Label({label: `Lay ${APP_VERSION}`});
 EOF_ATLAS_VERSION
 cat >"$tmp_atlas_repo/extension/gnome/tray_support.js" <<'EOF_ATLAS_VERSION'
-const APP_VERSION = "1.2.3";
+const APP_VERSION = '1.2.3';
 EOF_ATLAS_VERSION
 atlas_path="$tmp_atlas_repo/.nanda/route-atlas.json"
 atlas_json="$("$build_atlas" "$tmp_atlas_repo" --out "$atlas_path" --format json)"
@@ -1340,7 +1345,8 @@ set -e
 test "$guard_diff_version_veto_status" -eq 1
 jq -e '.verdict == "VETO" and .reason == "version_bump_scope_violation" and (.version_bump.scope_violations | index("src/runtime/manual_trigger_runtime.rs"))' <<<"$guard_diff_version_veto" >/dev/null
 cat >"$tmp_atlas_repo/extension/gnome/settings.js" <<'EOF_ATLAS_VERSION'
-const APP_VERSION = "1.2.2";
+export const APP_VERSION = '1.2.2';
+const label = new Gtk.Label({label: `Lay ${APP_VERSION}`});
 EOF_ATLAS_VERSION
 set +e
 guard_diff_version_watch="$("$guard_diff" "$atlas_path" --action-id "shared.version_bump_contract" --diff "$tmp_atlas_repo/version.diff" --format json)"
@@ -1349,7 +1355,8 @@ set -e
 test "$guard_diff_version_watch_status" -eq 3
 jq -e '.verdict == "WATCH" and .reason == "version_bump_inconsistent" and (.version_bump.violations | length) > 0' <<<"$guard_diff_version_watch" >/dev/null
 cat >"$tmp_atlas_repo/extension/gnome/settings.js" <<'EOF_ATLAS_VERSION'
-const APP_VERSION = "1.2.3";
+export const APP_VERSION = '1.2.3';
+const label = new Gtk.Label({label: `Lay ${APP_VERSION}`});
 EOF_ATLAS_VERSION
 tmp_diff_source_repo="$(mktemp -d)"
 git -C "$tmp_diff_source_repo" init -q
