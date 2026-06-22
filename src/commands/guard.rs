@@ -58,14 +58,14 @@ struct RouteBuild {
 }
 
 pub(crate) fn build_atlas_cmd(args: BuildAtlasArgs) -> Result<u8> {
-    let atlas = build_route_atlas(&args.repo)?;
+    let mut atlas = build_route_atlas(&args.repo)?;
+    atlas["output"] = json!(args.out.display().to_string());
+    atlas["written_to"] = json!(args.out.display().to_string());
     if let Some(parent) = args.out.parent() {
         fs::create_dir_all(parent)?;
     }
     fs::write(&args.out, serde_json::to_string_pretty(&atlas)? + "\n")?;
-    let mut out = atlas.clone();
-    out["written_to"] = json!(args.out.display().to_string());
-    print_guard_output(&out, &args.format)?;
+    print_guard_output(&atlas, &args.format)?;
     Ok(EXIT_PASS)
 }
 
@@ -157,6 +157,7 @@ pub(crate) fn build_route_atlas(repo: &Path) -> Result<Value> {
     json!({
         "mode": "route-atlas",
         "core_version": CORE_VERSION,
+        "input": repo.display().to_string(),
         "repo": repo.display().to_string(),
         "total_files": files.len(),
         "routes": route_values,

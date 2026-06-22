@@ -1203,8 +1203,10 @@ printf 'fn main() {}' >"$tmp_atlas_repo/src/bin/lay_ibus_engine.rs"
 printf 'fn handle_manual_trigger_runtime() {}' >"$tmp_atlas_repo/src/runtime/manual_trigger_runtime.rs"
 atlas_path="$tmp_atlas_repo/.nanda/route-atlas.json"
 atlas_json="$("$build_atlas" "$tmp_atlas_repo" --out "$atlas_path" --format json)"
-jq -e '.mode == "route-atlas" and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .written_to' <<<"$atlas_json" >/dev/null
+jq -e '.mode == "route-atlas" and (.input | length) > 0 and (.output | length) > 0 and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .written_to' <<<"$atlas_json" >/dev/null
 test -s "$atlas_path"
+atlas_file_json="$(cat "$atlas_path")"
+jq -e '(.input | length) > 0 and (.output | length) > 0' <<<"$atlas_file_json" >/dev/null
 dogfood_atlas_json="$("$dogfood" "$tmp_atlas_repo" --build-atlas --atlas-out "$tmp_atlas_repo/.nanda/dogfood-atlas.json" --format json)"
 jq -e '.mode == "route-atlas" and .routes["ime-display-flow"]' <<<"$dogfood_atlas_json" >/dev/null
 guard_pass_json="$("$guard_action" "$atlas_path" --symptom "IME not visible" --action-id "ime.activate_engine" --format json)"
