@@ -155,23 +155,27 @@ jq -e '([.paraphrase_eval[].case_id] | index("en_has_cleared") and index("en_is_
 jq -e '.claim_boundary.fixed_query_wave_records == true and .claim_boundary.full_field_mature == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_query_wave_json" >/dev/null
 big_multi_peak_json="$("$llmwave_big" multi-peak-field --text "Has customs cleared the goods?" --format json)"
 jq -e '.roadmap_block == "v1001-v1060" and .verdict == "MULTI_PEAK_FIELD_READY_NOT_ANSWER"' <<<"$big_multi_peak_json" >/dev/null
+jq -e '.unified_field.family == "cognitive" and .unified_field.compute_probe.version == "unified-field-compute-v1" and .unified_field.claim_boundary.not_llm_ready == true' <<<"$big_multi_peak_json" >/dev/null
 jq -e '.query_wave_state == "QUERY_WAVE_READY_NOT_FIELD_MATURE" and .field_state == "STABLE_PEAK" and .top_peak.route == "customs-clearance-status"' <<<"$big_multi_peak_json" >/dev/null
 jq -e '.metrics.stable_peak_accuracy == 1 and .metrics.contested_detection_rate == 1 and .metrics.no_answer_detection_rate == 1 and .metrics.route_leakage_reject_rate == 1' <<<"$big_multi_peak_json" >/dev/null
 jq -e '([.eval_cases[].expected_state] | index("STABLE_PEAK") and index("CONTESTED") and index("NO_ANSWER") and index("REJECTED"))' <<<"$big_multi_peak_json" >/dev/null
 jq -e '.claim_boundary.fixed_peak_records == true and .claim_boundary.safe_to_answer == false and .claim_boundary.full_field_mature == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_multi_peak_json" >/dev/null
 big_lens_scan_json="$("$llmwave_big" lens-scan --text "Has customs cleared the goods?" --format json)"
 jq -e '.roadmap_block == "v1061-v1140" and .verdict == "LENS_SCAN_READY_NOT_ANSWER"' <<<"$big_lens_scan_json" >/dev/null
+jq -e '.unified_field.family == "cognitive" and .unified_field.compute_probe.version == "unified-field-compute-v1" and .unified_field.claim_boundary.not_llm_ready == true' <<<"$big_lens_scan_json" >/dev/null
 jq -e '.field_bridge_state == "STABLE_PEAK" and .top_route == "customs-clearance-status" and .answer_decision == "ANSWER_BLOCKED_BY_LENSES"' <<<"$big_lens_scan_json" >/dev/null
 jq -e '.metrics.role_lens_pass_rate == 1 and .metrics.evidence_block_rate == 1 and .metrics.answer_block_rate == 1 and .metrics.lens_agreement_rate > 0.5' <<<"$big_lens_scan_json" >/dev/null
 jq -e '([.lenses[].lens] | index("role") and index("evidence") and index("temporal") and index("causal") and index("contradiction") and index("surface") and index("answer"))' <<<"$big_lens_scan_json" >/dev/null
 jq -e '.claim_boundary.fixed_lens_records == true and .claim_boundary.safe_to_answer == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_lens_scan_json" >/dev/null
 big_mature_anti_wave_json="$("$llmwave_big" mature-anti-wave --text "Has customs cleared the goods?" --format json)"
 jq -e '.roadmap_block == "v1141-v1210" and .verdict == "MATURE_ANTI_WAVE_READY_NOT_ANSWER"' <<<"$big_mature_anti_wave_json" >/dev/null
+jq -e '.unified_field.family == "cognitive" and .unified_field.compute_probe.version == "unified-field-compute-v1" and .unified_field.claim_boundary.not_llm_ready == true' <<<"$big_mature_anti_wave_json" >/dev/null
 jq -e '.lens_bridge_verdict == "LENS_SCAN_READY_NOT_ANSWER" and .field_after_anti.anti_field_state == "SUPPRESSED_UNSUPPORTED_ANSWER"' <<<"$big_mature_anti_wave_json" >/dev/null
 jq -e '.metrics.lane_count == 3 and .metrics.evidence_lane_rate == 1 and .metrics.causal_lane_rate == 1 and .metrics.answer_lane_rate == 1' <<<"$big_mature_anti_wave_json" >/dev/null
 jq -e '.claim_boundary.fixed_anti_lane_records == true and .claim_boundary.local_suppression_only == true and .claim_boundary.safe_to_answer == false and .claim_boundary.chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_mature_anti_wave_json" >/dev/null
 big_evidence_missing_json="$("$llmwave_big" evidence-proof --text "Has customs cleared the goods?" --evidence-mode missing --format json)"
 jq -e '.roadmap_block == "v1211-v1280" and .verdict == "EVIDENCE_PROOF_READY_NOT_ANSWER"' <<<"$big_evidence_missing_json" >/dev/null
+jq -e '.unified_field.family == "cognitive" and .unified_field.compute_probe.version == "unified-field-compute-v1" and .unified_field.claim_boundary.not_llm_ready == true' <<<"$big_evidence_missing_json" >/dev/null
 jq -e '.proof_state == "EVIDENCE_MISSING" and .answer_permission == "ANSWER_BLOCKED_BY_EVIDENCE"' <<<"$big_evidence_missing_json" >/dev/null
 jq -e '.claim_boundary.fixed_evidence_proof_records == true and .claim_boundary.local_answer_permission == false and .claim_boundary.safe_to_answer == false and .claim_boundary.chat_ready == false' <<<"$big_evidence_missing_json" >/dev/null
 big_evidence_bound_json="$("$llmwave_big" evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json)"
@@ -199,6 +203,7 @@ jq -e '.roadmap_block == "v1421-v1480" and .verdict == "FEEDBACK_MEMORY_READY" a
 jq -e '.claim_boundary.fixed_applied_memory_records == true and .claim_boundary.can_feed_next_field_pass == true and .claim_boundary.persistent_training_done == false' <<<"$big_feedback_memory_json" >/dev/null
 big_feedback_field_json="$("$llmwave_big" feedback-aware-field --text "Has customs cleared the goods?" --memory-mode accept --format json)"
 jq -e '.roadmap_block == "v1481-v1540" and .verdict == "FEEDBACK_AWARE_FIELD_REINFORCED"' <<<"$big_feedback_field_json" >/dev/null
+jq -e '.unified_field.family == "cognitive" and .unified_field.compute_probe.version == "unified-field-compute-v1" and .unified_field.claim_boundary.not_llm_ready == true' <<<"$big_feedback_field_json" >/dev/null
 jq -e '.metrics.adjusted_top_score > .metrics.baseline_top_score and .claim_boundary.feedback_applied_to_field == true and .claim_boundary.safe_to_answer == false' <<<"$big_feedback_field_json" >/dev/null
 big_anti_memory_json="$("$llmwave_big" applied-anti-memory --format json)"
 jq -e '.roadmap_block == "v1541-v1600" and .verdict == "APPLIED_ANTI_MEMORY_READY"' <<<"$big_anti_memory_json" >/dev/null

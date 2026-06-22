@@ -243,7 +243,10 @@ pub(crate) fn print_multi_peak_field_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_multi_peak_field_text(report),
         OutputFormat::Md => print_multi_peak_field_md(report),
     }
@@ -252,7 +255,10 @@ pub(crate) fn print_multi_peak_field_report(
 
 pub(crate) fn print_lens_scan_report(report: &LensScanReport, format: &OutputFormat) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_lens_scan_text(report),
         OutputFormat::Md => print_lens_scan_md(report),
     }
@@ -264,7 +270,10 @@ pub(crate) fn print_mature_anti_wave_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_mature_anti_wave_text(report),
         OutputFormat::Md => print_mature_anti_wave_md(report),
     }
@@ -276,7 +285,10 @@ pub(crate) fn print_evidence_proof_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_evidence_proof_text(report),
         OutputFormat::Md => print_evidence_proof_md(report),
     }
@@ -328,7 +340,10 @@ pub(crate) fn print_feedback_aware_field_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => {
             print_runtime_md("Feedback-Aware Field", report.roadmap_block, report.verdict)
