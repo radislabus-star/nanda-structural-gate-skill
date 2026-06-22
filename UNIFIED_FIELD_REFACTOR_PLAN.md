@@ -577,6 +577,37 @@ Status: done as a guard, not permission.
 This prevents the project from silently turning report-layer dual-run into a
 hot packed cutover without benchmark evidence and an explicit follow-up change.
 
+### Phase 18: Structural Cutover Suite
+
+Status: done as an explicit structural proof gate, not global cutover.
+
+`nanda field-cutover --format json` now accepts structural `nanda search`
+outputs through repeated `--structural-case` arguments and evaluates the
+shared runtime contract across a suite:
+
+- peak match;
+- state-family match;
+- field pass is not more permissive than the structural domain engine;
+- every case is `cutover_ready`.
+
+The suite is intended to include at least:
+
+- focused route-trap;
+- contested/noisy field;
+- reversed polarity stop;
+- thin/negative-lane field.
+
+Passing the suite means:
+
+```text
+field_core_as_structural_engine_candidate = true
+field_core_as_sole_engine_allowed = false
+```
+
+This is deliberately narrower than full sole-engine cutover. Packed remains a
+protected hot-core exception, and cognitive remains not-LLM/not-chat until
+separate eval evidence changes those claim boundaries.
+
 ## Refactor Gates
 
 Before each phase:

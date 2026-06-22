@@ -54,6 +54,7 @@ release_gate="$root/nanda-structural-gate/scripts/nanda-release-gate"
 field_report="$root/nanda-structural-gate/scripts/nanda-field-report"
 field_audit="$root/nanda-structural-gate/scripts/nanda-field-audit"
 field_equivalence="$root/nanda-structural-gate/scripts/nanda-field-equivalence"
+field_cutover="$root/nanda-structural-gate/scripts/nanda-field-cutover"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
@@ -1644,9 +1645,20 @@ EOF_FIELD
 field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_cognitive_json" >/dev/null
 field_audit_json="$("$field_audit" --format json)"
-jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .overall_state == "UNIFIED_FIELD_RUNTIME_DUAL_RUN_ACTIVE_NOT_SOLE_ENGINE" and .acceptance.one_field_pass == true and .acceptance.field_core_as_semantic_engine == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.semantic_equivalence_gate == true and .acceptance.structural_dual_run_active == true and .acceptance.structural_cutover_eval_ready == true and .acceptance.packed_dual_run_active == true and .acceptance.packed_hot_core_exception == true and .acceptance.packed_field_record_view == true and .acceptance.cognitive_dual_run_active == true and .acceptance.unified_lens_contract == true and .acceptance.unified_anti_wave_contract == true and .acceptance.unified_memory_delta_store == true and .acceptance.route_scoped_extraction_required == false and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false and (.next_required_steps | length) == 0' <<<"$field_audit_json" >/dev/null
+jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .overall_state == "UNIFIED_FIELD_RUNTIME_DUAL_RUN_ACTIVE_NOT_SOLE_ENGINE" and .acceptance.one_field_pass == true and .acceptance.field_core_as_semantic_engine == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.semantic_equivalence_gate == true and .acceptance.structural_dual_run_active == true and .acceptance.structural_cutover_eval_ready == true and .acceptance.structural_cutover_suite_available == true and .acceptance.packed_dual_run_active == true and .acceptance.packed_hot_core_exception == true and .acceptance.packed_field_record_view == true and .acceptance.cognitive_dual_run_active == true and .acceptance.unified_lens_contract == true and .acceptance.unified_anti_wave_contract == true and .acceptance.unified_memory_delta_store == true and .acceptance.route_scoped_extraction_required == false and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false and (.next_required_steps | length) == 0' <<<"$field_audit_json" >/dev/null
 field_equivalence_json="$("$field_equivalence" --structural-from "$tmp_field_report/structural.json" --packed-from "$tmp_field_report/packed.json" --cognitive-from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.mode == "unified-field-equivalence" and .version == "unified-field-pass-v1" and .acceptance.equivalent_contract == true and .acceptance.all_have_field_pass == true and .acceptance.all_have_memory_delta == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_equivalence_json" >/dev/null
+printf '%s\n' "$trap_search_json" >"$tmp_field_report/cutover-focused.json"
+printf '%s\n' "$noisy_search_json" >"$tmp_field_report/cutover-contested.json"
+printf '%s\n' "$polarity_stop_json" >"$tmp_field_report/cutover-reversed.json"
+printf '%s\n' "$negative_lanes_json" >"$tmp_field_report/cutover-thin.json"
+field_cutover_json="$("$field_cutover" \
+  --structural-case "$tmp_field_report/cutover-focused.json" \
+  --structural-case "$tmp_field_report/cutover-contested.json" \
+  --structural-case "$tmp_field_report/cutover-reversed.json" \
+  --structural-case "$tmp_field_report/cutover-thin.json" \
+  --format json)"
+jq -e '.mode == "unified-field-cutover-suite" and .version == "unified-field-runtime-v1" and .family == "structural" and .acceptance.cases_checked == 4 and .acceptance.structural_cutover_suite_pass == true and .acceptance.all_peak_match == true and .acceptance.all_state_family_match == true and .acceptance.all_not_more_permissive == true and .acceptance.field_core_as_structural_engine_candidate == true and .acceptance.field_core_as_sole_engine_allowed == false and .claim_boundary.global_sole_engine == false' <<<"$field_cutover_json" >/dev/null
 
 "$search" "$root/examples/triad-packet.interference-search.json" --query "runtime route" --format json >"$tmp_field_report/live-search.json"
 live_structural_field="$("$field_report" --from "$tmp_field_report/live-search.json" --format json)"
@@ -1680,6 +1692,7 @@ rm -rf "$tmp_field_report"
 "$field_report" --help | grep -q "Usage: nanda field-report"
 "$field_audit" --help | grep -q "Usage: nanda field-audit"
 "$field_equivalence" --help | grep -q "Usage: nanda field-equivalence"
+"$field_cutover" --help | grep -q "Usage: nanda field-cutover"
 "$split_packet" --help | grep -q "Usage: nanda split"
 "$reporter" --format md --title "Smoke Markdown Report" --domain code --overall "$root/examples/triads.watch-large.md" --route code:"$root/examples/triads.code-flow.md" >/dev/null || test "$?" -eq 3
 

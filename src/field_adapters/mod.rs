@@ -26,6 +26,14 @@ pub(crate) struct FieldEquivalenceArgs {
     pub(crate) format: OutputFormat,
 }
 
+#[derive(Parser)]
+pub(crate) struct FieldCutoverArgs {
+    #[arg(long = "structural-case")]
+    pub(crate) structural_cases: Vec<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    pub(crate) format: OutputFormat,
+}
+
 pub(crate) fn field_report_cmd(args: FieldReportArgs) -> Result<u8> {
     let input = serde_json::from_str::<Value>(
         &fs::read_to_string(&args.from)
@@ -56,8 +64,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "embedded_unified_field": true,
                 "field_pass_present": true,
                 "sole_engine": false,
-                "state": "DUAL_RUN_CUTOVER_EVAL_READY",
-                "remaining": ["run structural cutover suite before using field_core as sole structural engine"]
+                "state": "DUAL_RUN_CUTOVER_SUITE_AVAILABLE",
+                "remaining": ["run nanda-field-cutover before any explicit structural sole-engine cutover"]
             },
             {
                 "family": "packed",
@@ -86,6 +94,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "semantic_equivalence_gate": true,
             "structural_dual_run_active": true,
             "structural_cutover_eval_ready": true,
+            "structural_cutover_suite_available": true,
             "packed_dual_run_active": true,
             "packed_hot_core_exception": true,
             "packed_field_record_view": true,
@@ -231,6 +240,117 @@ pub(crate) fn field_equivalence_cmd(args: FieldEquivalenceArgs) -> Result<u8> {
     } else {
         EXIT_WATCH
     })
+}
+
+pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
+    let mut cases = vec![];
+    for path in &args.structural_cases {
+        let input = serde_json::from_str::<Value>(
+            &fs::read_to_string(path)
+                .with_context(|| format!("read field cutover input {}", path.display()))?,
+        )
+        .with_context(|| format!("parse JSON field cutover input {}", path.display()))?;
+        let dual_run = field_core::structural_dual_run_from_search(&input);
+        let field_runtime = serde_json::to_value(&dual_run)?;
+        cases.push(json!({
+            "family": "structural",
+            "input": path.display().to_string(),
+            "old_peak": dual_run.old_peak,
+            "field_peak": dual_run.field_peak,
+            "old_verdict": dual_run.old_verdict,
+            "field_verdict": dual_run.field_verdict,
+            "old_field_state": dual_run.old_field_state,
+            "field_state": dual_run.field_state,
+            "old_safe_to_answer": dual_run.old_safe_to_answer,
+            "field_safe_to_answer": dual_run.field_safe_to_answer,
+            "peak_matches": dual_run.peak_matches,
+            "state_family_matches": dual_run.state_family_matches,
+            "field_not_more_permissive": dual_run.field_not_more_permissive,
+            "cutover_ready": dual_run.cutover_ready,
+            "mismatch_reason": dual_run.mismatch_reason,
+            "field_runtime": field_runtime
+        }));
+    }
+
+    let cases_checked = cases.len();
+    let all_peak_match = nonempty_all(&cases, "peak_matches");
+    let all_state_family_match = nonempty_all(&cases, "state_family_matches");
+    let all_not_more_permissive = nonempty_all(&cases, "field_not_more_permissive");
+    let all_cutover_ready = nonempty_all(&cases, "cutover_ready");
+    let structural_cutover_suite_pass = cases_checked > 0
+        && all_peak_match
+        && all_state_family_match
+        && all_not_more_permissive
+        && all_cutover_ready;
+    let state = if structural_cutover_suite_pass {
+        "STRUCTURAL_FIELD_CUTOVER_SUITE_PASS"
+    } else if cases_checked == 0 {
+        "STRUCTURAL_FIELD_CUTOVER_SUITE_NO_CASES"
+    } else {
+        "STRUCTURAL_FIELD_CUTOVER_SUITE_WATCH"
+    };
+    let out = json!({
+        "mode": "unified-field-cutover-suite",
+        "version": field_core::FIELD_RUNTIME_VERSION,
+        "family": "structural",
+        "state": state,
+        "cases": cases,
+        "acceptance": {
+            "cases_checked": cases_checked,
+            "all_peak_match": all_peak_match,
+            "all_state_family_match": all_state_family_match,
+            "all_not_more_permissive": all_not_more_permissive,
+            "all_cutover_ready": all_cutover_ready,
+            "structural_cutover_suite_pass": structural_cutover_suite_pass,
+            "field_core_as_structural_engine_candidate": structural_cutover_suite_pass,
+            "field_core_as_sole_engine_allowed": false,
+            "packed_hot_core_exception": true,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false
+        },
+        "claim_boundary": {
+            "global_sole_engine": false,
+            "structural_only_candidate": structural_cutover_suite_pass,
+            "packed_hot_core_exception": true,
+            "cognitive_not_llm": true,
+            "requires_explicit_follow_up_cutover": true
+        }
+    });
+
+    match args.format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
+        OutputFormat::Text => {
+            println!("mode: unified-field-cutover-suite");
+            println!("version: {}", field_core::FIELD_RUNTIME_VERSION);
+            println!("family: structural");
+            println!("state: {state}");
+            println!("cases_checked: {cases_checked}");
+            println!("structural_cutover_suite_pass: {structural_cutover_suite_pass}");
+            println!("field_core_as_sole_engine_allowed: false");
+        }
+        OutputFormat::Md => {
+            println!("# Unified Field Cutover Suite\n");
+            println!("- version: `{}`", field_core::FIELD_RUNTIME_VERSION);
+            println!("- family: `structural`");
+            println!("- state: `{state}`");
+            println!("- cases_checked: `{cases_checked}`");
+            println!("- structural_cutover_suite_pass: `{structural_cutover_suite_pass}`");
+            println!("- field_core_as_sole_engine_allowed: `false`");
+        }
+    }
+
+    Ok(if structural_cutover_suite_pass {
+        EXIT_PASS
+    } else {
+        EXIT_WATCH
+    })
+}
+
+fn nonempty_all(cases: &[Value], key: &str) -> bool {
+    !cases.is_empty()
+        && cases
+            .iter()
+            .all(|case| case[key].as_bool().unwrap_or(false))
 }
 
 fn print_unified_field_report(
