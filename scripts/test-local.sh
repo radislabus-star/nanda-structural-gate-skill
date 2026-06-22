@@ -1605,6 +1605,18 @@ cat >"$tmp_field_report/cognitive.json" <<'EOF_FIELD'
 EOF_FIELD
 field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_cognitive_json" >/dev/null
+
+"$search" "$root/examples/triad-packet.interference-search.json" --query "runtime route" --format json >"$tmp_field_report/live-search.json"
+live_structural_field="$("$field_report" --from "$tmp_field_report/live-search.json" --format json)"
+jq -e '.family == "structural" and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$live_structural_field" >/dev/null
+
+"$pack6m" "$root/examples/triad-packet.pack6m-replay-waw.json" --query "route replay" --format json >"$tmp_field_report/live-pack6m.json"
+live_packed_field="$("$field_report" --from "$tmp_field_report/live-pack6m.json" --format json)"
+jq -e '.family == "packed" and (.query.signature | type == "string" and length == 16) and .compute_probe.dim == 1024' <<<"$live_packed_field" >/dev/null
+
+"$llmwave_big" query-wave --text "Has customs cleared the goods?" --format json >"$tmp_field_report/live-llmwave-big.json"
+live_cognitive_field="$("$field_report" --from "$tmp_field_report/live-llmwave-big.json" --format json)"
+jq -e '.family == "cognitive" and (.query.signature | type == "string" and length == 16) and .claim_boundary.not_llm_ready == true and .compute_probe.version == "unified-field-compute-v1"' <<<"$live_cognitive_field" >/dev/null
 rm -rf "$tmp_field_report"
 "$gate_md" --help | grep -q "Usage: nanda gate-md"
 "$reporter" --help | grep -q "Usage: nanda report"
