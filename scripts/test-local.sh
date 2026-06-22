@@ -1207,7 +1207,7 @@ printf 'fn handle_manual_trigger_runtime() {}' >"$tmp_atlas_repo/src/runtime/man
 printf 'pub fn toggle_manual_mode() {}' >"$tmp_atlas_repo/src/manual_toggle.rs"
 cat >"$tmp_atlas_repo/Cargo.toml" <<'EOF_ATLAS_VERSION'
 [package]
-name = "lay"
+name = "generic-app"
 version = "1.2.3"
 
 [dependencies]
@@ -1216,7 +1216,7 @@ glib = "5.15.0"
 EOF_ATLAS_VERSION
 cat >"$tmp_atlas_repo/Cargo.lock" <<'EOF_ATLAS_VERSION'
 [[package]]
-name = "lay"
+name = "generic-app"
 version = "1.2.3"
 EOF_ATLAS_VERSION
 cat >"$tmp_atlas_repo/VERSIONING.md" <<'EOF_ATLAS_VERSION'

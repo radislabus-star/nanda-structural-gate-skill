@@ -712,7 +712,9 @@ fn check_version_bump_contract(atlas: &Value, diff: &str, changed: &[String]) ->
         .filter(|file| !is_version_owned_file(&repo, file, diff))
         .cloned()
         .collect::<Vec<_>>();
-    let cargo_version = parse_cargo_toml_version(&repo.join("Cargo.toml"));
+    let cargo_package = parse_cargo_toml_package(&repo.join("Cargo.toml"));
+    let cargo_package_name = cargo_package.as_ref().map(|package| package.0.as_str());
+    let cargo_version = cargo_package.as_ref().map(|package| package.1.clone());
     let mut checks = vec![];
     let mut violations = vec![];
 
@@ -725,23 +727,38 @@ fn check_version_bump_contract(atlas: &Value, diff: &str, changed: &[String]) ->
 
     if changed.iter().any(|file| file == "Cargo.lock") {
         match (
+            cargo_package_name,
             cargo_version.as_deref(),
-            parse_cargo_lock_lay_version(&repo.join("Cargo.lock")),
+            cargo_package_name
+                .and_then(|name| parse_cargo_lock_package_version(&repo.join("Cargo.lock"), name)),
         ) {
-            (Some(expected), Some(actual)) if expected == actual => {
-                checks.push(json!({"name": "cargo_lock_lay_version", "ok": true, "value": actual}));
+            (Some(package), Some(expected), Some(actual)) if expected == actual => {
+                checks.push(json!({"name": "cargo_lock_package_version", "ok": true, "package": package, "value": actual}));
             }
-            (Some(expected), Some(actual)) => {
+            (Some(package), Some(expected), Some(actual)) => {
                 violations.push(format!(
-                    "Cargo.lock lay version {actual} != Cargo.toml {expected}"
+                    "Cargo.lock package {package} version {actual} != Cargo.toml {expected}"
                 ));
-                checks.push(json!({"name": "cargo_lock_lay_version", "ok": false, "expected": expected, "actual": actual}));
+                checks.push(json!({"name": "cargo_lock_package_version", "ok": false, "package": package, "expected": expected, "actual": actual}));
             }
-            (_, None) => {
-                violations.push("Cargo.lock package lay version not found".to_string());
-                checks.push(json!({"name": "cargo_lock_lay_version", "ok": false}));
+            (Some(package), _, None) => {
+                violations.push(format!("Cargo.lock package {package} version not found"));
+                checks.push(
+                    json!({"name": "cargo_lock_package_version", "ok": false, "package": package}),
+                );
             }
-            _ => {}
+            (Some(package), None, Some(actual)) => {
+                violations.push(format!(
+                    "Cargo.toml package {package} version not found while Cargo.lock has {actual}"
+                ));
+                checks.push(
+                    json!({"name": "cargo_lock_package_version", "ok": false, "package": package, "actual": actual}),
+                );
+            }
+            (None, _, _) => {
+                violations.push("Cargo.toml package.name not found".to_string());
+                checks.push(json!({"name": "cargo_lock_package_version", "ok": false}));
+            }
         }
     }
 
@@ -818,6 +835,7 @@ fn check_version_bump_contract(atlas: &Value, diff: &str, changed: &[String]) ->
         "contract_scope": "version metadata only",
         "scope_ok": scope_violations.is_empty(),
         "consistent": scope_violations.is_empty() && violations.is_empty() && cargo_version.is_some(),
+        "cargo_package": cargo_package_name,
         "cargo_version": cargo_version,
         "scope_violations": scope_violations,
         "violations": violations,
@@ -859,39 +877,50 @@ fn diff_block_contains_semver(file: &str, diff: &str) -> bool {
 }
 
 fn parse_cargo_toml_version(path: &Path) -> Option<String> {
+    parse_cargo_toml_package(path).map(|package| package.1)
+}
+
+fn parse_cargo_toml_package(path: &Path) -> Option<(String, String)> {
     let content = fs::read_to_string(path).ok()?;
     let mut in_package = false;
+    let mut name = None;
+    let mut version = None;
     for line in content.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with('[') {
             in_package = trimmed == "[package]";
+            if !in_package && name.is_some() && version.is_some() {
+                break;
+            }
+        } else if in_package && trimmed.starts_with("name") {
+            name = quoted_value(trimmed);
         } else if in_package && trimmed.starts_with("version") {
-            return quoted_value(trimmed);
+            version = quoted_value(trimmed);
         }
     }
-    None
+    Some((name?, version?))
 }
 
-fn parse_cargo_lock_lay_version(path: &Path) -> Option<String> {
+fn parse_cargo_lock_package_version(path: &Path, package_name: &str) -> Option<String> {
     let content = fs::read_to_string(path).ok()?;
     let mut in_package = false;
-    let mut is_lay = false;
+    let mut is_target_package = false;
     for line in content.lines() {
         let trimmed = line.trim();
         if trimmed == "[[package]]" {
-            if in_package && is_lay {
+            if in_package && is_target_package {
                 return None;
             }
             in_package = true;
-            is_lay = false;
+            is_target_package = false;
             continue;
         }
         if !in_package {
             continue;
         }
-        if trimmed.starts_with("name") && quoted_value(trimmed).as_deref() == Some("lay") {
-            is_lay = true;
-        } else if is_lay && trimmed.starts_with("version") {
+        if trimmed.starts_with("name") && quoted_value(trimmed).as_deref() == Some(package_name) {
+            is_target_package = true;
+        } else if is_target_package && trimmed.starts_with("version") {
             return quoted_value(trimmed);
         }
     }

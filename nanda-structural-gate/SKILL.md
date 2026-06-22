@@ -808,6 +808,13 @@ example `src/bin/check.rs` -> `bin::check`.
 
 For repository architecture reviews, build a worksheet with these groups:
 
+NANDA Structural Gate must stay universal. Do not hardcode project-specific
+names, routes, package names, file stems, product names, or local conventions
+into the core. Domain specifics must enter through route atlas data, schemas,
+contracts, fixtures, or user-provided packets. Examples may mention a real
+project, but the implementation must work on an unrelated Rust/Python/JS/docs
+repository with different names.
+
 - source module;
 - public export;
 - binary/CLI;

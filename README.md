@@ -46,6 +46,15 @@ LLMs can read individual facts correctly and still confuse the relation shape:
 This project tests whether a compact wave/VSA-style structural verifier can
 catch those broken bindings cheaply enough to become a mandatory local gate.
 
+## Universality Rule
+
+NANDA Structural Gate is universal infrastructure. Do not hardcode
+project-specific names, routes, package names, file stems, product names, or
+local conventions into the core. Domain specifics belong in route atlas data,
+schemas, contracts, fixtures, or user-provided packets. Examples may mention a
+real project, but the implementation must work on unrelated repositories with
+different names.
+
 ## Trigger Rule
 
 The gate should run when relation complexity crosses a threshold:
