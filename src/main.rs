@@ -330,6 +330,8 @@ struct SearchArgs {
     route_triad_cap: usize,
     #[arg(long, value_enum, default_value = "route")]
     group_by: PeakGroupBy,
+    #[arg(long, value_enum, default_value = "legacy")]
+    field_engine: FieldEngineMode,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]

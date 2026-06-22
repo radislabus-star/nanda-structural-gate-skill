@@ -46,12 +46,75 @@ pub(crate) fn search_cmd(args: SearchArgs) -> Result<u8> {
     result["canonicalization"] = json!(packet.canonicalization);
     result["unified_field"] = field_core::adapters::adapt_value(&result).to_value();
     result["field_runtime"] = field_core::structural_dual_run_value(&result);
+    result["field_engine"] = field_engine_decision(&result, &args.field_engine);
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&result)?),
         OutputFormat::Text => print_search_text(&result),
         OutputFormat::Md => print_search_md(&result),
     }
     Ok(EXIT_PASS)
+}
+
+fn field_engine_decision(search: &Value, mode: &FieldEngineMode) -> Value {
+    let mode_label = match mode {
+        FieldEngineMode::Legacy => "legacy",
+        FieldEngineMode::Shadow => "shadow",
+        FieldEngineMode::Candidate => "candidate",
+    };
+    let legacy = json!({
+        "engine": "structural-domain",
+        "peak": search["top_peak"].as_str().unwrap_or(""),
+        "verdict": search["verdict"].as_str().unwrap_or("WATCH"),
+        "field_state": search["field_state"].as_str().unwrap_or("FIELD_UNKNOWN"),
+        "safe_to_answer": search["safe_to_answer"].as_bool().unwrap_or(false)
+    });
+    let runtime = &search["field_runtime"];
+    let field_candidate = json!({
+        "engine": "field-core",
+        "peak": runtime["field_peak"].as_str().unwrap_or(""),
+        "verdict": runtime["field_verdict"].as_str().unwrap_or("WATCH"),
+        "field_state": runtime["field_state"].as_str().unwrap_or("FIELD_UNKNOWN"),
+        "safe_to_answer": runtime["field_safe_to_answer"].as_bool().unwrap_or(false),
+        "cutover_ready": runtime["cutover_ready"].as_bool().unwrap_or(false),
+        "peak_matches": runtime["peak_matches"].as_bool().unwrap_or(false),
+        "state_family_matches": runtime["state_family_matches"].as_bool().unwrap_or(false),
+        "field_not_more_permissive": runtime["field_not_more_permissive"].as_bool().unwrap_or(false),
+        "mismatch_reason": runtime["mismatch_reason"].clone()
+    });
+    let candidate_allowed = matches!(mode, FieldEngineMode::Candidate)
+        && runtime["cutover_ready"].as_bool().unwrap_or(false)
+        && runtime["field_not_more_permissive"]
+            .as_bool()
+            .unwrap_or(false);
+    let selected_engine = if candidate_allowed {
+        "field-core-candidate"
+    } else {
+        "structural-domain"
+    };
+    let selected = if candidate_allowed {
+        field_candidate.clone()
+    } else {
+        legacy.clone()
+    };
+    json!({
+        "version": "structural-field-engine-v1",
+        "mode": mode_label,
+        "field_participates": !matches!(mode, FieldEngineMode::Legacy),
+        "selected_engine": selected_engine,
+        "selected": selected,
+        "legacy": legacy,
+        "field_candidate": field_candidate,
+        "candidate_allowed": candidate_allowed,
+        "top_level_behavior_changed": false,
+        "field_core_as_sole_engine": false,
+        "claim_boundary": {
+            "structural_candidate_only": matches!(mode, FieldEngineMode::Candidate),
+            "requires_cutover_suite": true,
+            "packed_hot_core_exception": true,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false
+        }
+    })
 }
 
 pub(crate) fn probe_search_summary(search: &Value) -> Value {

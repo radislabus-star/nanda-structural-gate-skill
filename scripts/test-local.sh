@@ -588,6 +588,7 @@ jq -e '.unified_field.family == "structural" and .unified_field.compute_probe.ve
 jq -e '.unified_field.field_pass.version == "unified-field-pass-v1" and .unified_field.field_pass.family == "structural" and .unified_field.field_pass.safe_to_answer == false' <<<"$search_json" >/dev/null
 jq -e '.unified_field.runtime_contract.version == "unified-field-runtime-v1" and .unified_field.runtime_contract.input_contract == "FieldPassInput" and .unified_field.runtime_contract.output_contract == "FieldPassReport" and .unified_field.runtime_contract.field_core_as_sole_engine == false' <<<"$search_json" >/dev/null
 jq -e '.field_runtime.version == "unified-field-runtime-v1" and .field_runtime.mode == "structural-dual-run" and .field_runtime.peak_matches == true and .field_runtime.field_not_more_permissive == true' <<<"$search_json" >/dev/null
+jq -e '.field_engine.version == "structural-field-engine-v1" and .field_engine.mode == "legacy" and .field_engine.field_participates == false and .field_engine.selected_engine == "structural-domain" and .field_engine.top_level_behavior_changed == false and .field_engine.field_core_as_sole_engine == false' <<<"$search_json" >/dev/null
 jq -e '.unified_field.memory_delta.replayable_into_next_pass | type == "boolean"' <<<"$search_json" >/dev/null
 jq -e '.unified_field.record.records == 10 and .unified_field.record.routes >= 1 and .unified_field.record.groups >= 1 and .unified_field.peak.support_count == 4 and .unified_field.peak.anti_support_count == 5' <<<"$search_json" >/dev/null
 
@@ -826,6 +827,10 @@ jq -e '.noisy.field_state == "FIELD_CONTESTED" and .noisy.field_safe_to_answer =
 trap_search_json="$("$search" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3)"
 jq -e '.verdict == "PASS" and .field_state == "FIELD_FOCUSED" and .safe_to_answer == true and .top_peak == "certification"' <<<"$trap_search_json" >/dev/null
 jq -e '.field_runtime.mode == "structural-dual-run" and .field_runtime.cutover_ready == true and .field_runtime.field_safe_to_answer == false' <<<"$trap_search_json" >/dev/null
+trap_shadow_search_json="$("$search" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3 --field-engine shadow)"
+jq -e '.top_peak == "certification" and .field_engine.mode == "shadow" and .field_engine.field_participates == true and .field_engine.selected_engine == "structural-domain" and .field_engine.candidate_allowed == false and .field_engine.top_level_behavior_changed == false' <<<"$trap_shadow_search_json" >/dev/null
+trap_candidate_search_json="$("$search" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3 --field-engine candidate)"
+jq -e '.top_peak == "certification" and .field_engine.mode == "candidate" and .field_engine.field_participates == true and .field_engine.selected_engine == "field-core-candidate" and .field_engine.selected.peak == "certification" and .field_engine.candidate_allowed == true and .field_engine.field_core_as_sole_engine == false and .field_engine.top_level_behavior_changed == false' <<<"$trap_candidate_search_json" >/dev/null
 trap_first_peak="$(jq -r '.peaks[0].peak' <<<"$trap_search_json")"
 trap_lexical_peak="$(jq -r '.lexical_baseline.top_peak' <<<"$trap_search_json")"
 trap_wins="$(jq -r '.wins_over_lexical_baseline' <<<"$trap_search_json")"

@@ -2677,6 +2677,13 @@ pub(crate) enum PeakGroupBy {
     Route,
 }
 
+#[derive(Clone, ValueEnum, PartialEq, Eq)]
+pub(crate) enum FieldEngineMode {
+    Legacy,
+    Shadow,
+    Candidate,
+}
+
 #[derive(Clone, ValueEnum)]
 pub(crate) enum ServeFormat {
     Jsonl,

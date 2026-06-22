@@ -124,6 +124,8 @@ scripts/nanda-proof .nanda/index.json --input-format json --query "declaration r
 scripts/nanda-proof --cache-only .nanda/cache/<key>.manifest.json
 scripts/nanda-proof --suite examples/proof-corpus.json --input-format json
 scripts/nanda-search task.json --input-format json --top-k 5
+scripts/nanda-search task.json --input-format json --top-k 5 --field-engine shadow
+scripts/nanda-search task.json --input-format json --top-k 5 --field-engine candidate
 scripts/nanda-search .nanda/focus.json --input-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query-file query.json --query-format json --top-k 5
 scripts/nanda-search .nanda/index.json --input-format json --query "lower operator debt route" --route-cap 256 --route-triad-cap 32 --top-k 5

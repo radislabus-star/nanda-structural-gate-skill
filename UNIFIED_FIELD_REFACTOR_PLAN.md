@@ -629,6 +629,38 @@ field_core_as_sole_engine = false
 The audit can therefore be used as a quick health report for the unified field,
 but still does not grant global cutover permission.
 
+### Phase 20: Structural Field Engine Candidate Mode
+
+Status: done as participant mode, not behavior cutover.
+
+`nanda search` now accepts:
+
+```bash
+nanda search packet.json --input-format json --field-engine legacy
+nanda search packet.json --input-format json --field-engine shadow
+nanda search packet.json --input-format json --field-engine candidate
+```
+
+The output includes `field_engine`:
+
+- `legacy`: structural-domain engine remains selected, field is reported by
+  dual-run only;
+- `shadow`: field explicitly participates as a shadow candidate, but selected
+  output remains structural-domain;
+- `candidate`: if the dual-run case is `cutover_ready` and the field is not
+  more permissive, `selected_engine=field-core-candidate`.
+
+Important boundary:
+
+```text
+top_level_behavior_changed = false
+field_core_as_sole_engine = false
+```
+
+This is the first step where the field becomes an explicit structural compute
+participant. It still does not replace the structural search top-level verdict
+or peak until a separate structural cutover phase changes that contract.
+
 ## Refactor Gates
 
 Before each phase:
