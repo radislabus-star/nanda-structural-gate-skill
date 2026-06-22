@@ -119,6 +119,10 @@ enum Command {
     Doctor(DoctorArgs),
     Dogfood(DogfoodArgs),
     MapCode(commands::code_map::MapCodeArgs),
+    BuildAtlas(commands::guard::BuildAtlasArgs),
+    GuardAction(commands::guard::GuardActionArgs),
+    GuardDiff(commands::guard::GuardDiffArgs),
+    ReleaseGate(commands::guard::ReleaseGateArgs),
     Report(ReportArgs),
     SelfCheck,
     Bench6m(bench6m::Bench6mArgs),
@@ -1197,6 +1201,10 @@ struct DogfoodArgs {
     normalize_paths: bool,
     #[arg(long)]
     refactor_plan: bool,
+    #[arg(long)]
+    build_atlas: bool,
+    #[arg(long)]
+    atlas_out: Option<PathBuf>,
 }
 
 #[derive(Parser)]
@@ -1267,6 +1275,10 @@ fn run() -> Result<u8> {
         Command::Doctor(args) => doctor_cmd(args),
         Command::Dogfood(args) => commands::dogfood::dogfood_cmd(args),
         Command::MapCode(args) => commands::code_map::cmd(args),
+        Command::BuildAtlas(args) => commands::guard::build_atlas_cmd(args),
+        Command::GuardAction(args) => commands::guard::guard_action_cmd(args),
+        Command::GuardDiff(args) => commands::guard::guard_diff_cmd(args),
+        Command::ReleaseGate(args) => commands::guard::release_gate_cmd(args),
         Command::Report(args) => report_cmd(args),
         Command::SelfCheck => self_check(),
         Command::Bench6m(args) => bench6m::cmd(args),

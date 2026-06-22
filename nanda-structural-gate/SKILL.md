@@ -92,6 +92,11 @@ To inspect the structural wave map directly:
 scripts/nanda-map task.md --domain general
 scripts/nanda-map task.md --domain code --normalize-paths
 scripts/nanda-map-code src/main.rs --format json
+scripts/nanda-map-code . --format json
+scripts/nanda-build-atlas . --out .nanda/route-atlas.json
+scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
+scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+scripts/nanda-release-gate .nanda/route-atlas.json
 scripts/nanda-dogfood . --refactor-plan --format json
 scripts/nanda-comb task.json --input-format json --depth 2
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
@@ -262,6 +267,10 @@ functions, reports cross-cluster dependencies, suggests target files, and marks
 extraction risk. On a directory, it returns a repo-level `repo-code-map`.
 Hotkey/FSM/event/state-machine code is route-critical even when dependency
 count is small.
+Use `nanda-build-atlas` to write reusable route memory once. Use
+`nanda-guard-action` before editing and `nanda-guard-diff` after editing. Use
+`nanda-release-gate` only before publishing or merging. Do not run the full
+route-field gate on every small question.
 Use `nanda-index` to build a reusable memory packet from triad packets or
 worksheets.
 Use `nanda-extract` when the input is simple notes rather than JSON/Markdown
@@ -815,8 +824,12 @@ before generic structural coherence repairs.
 Recommended repository workflow:
 
 ```bash
+scripts/nanda-build-atlas . --out .nanda/route-atlas.json
+scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
+scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
 scripts/nanda-dogfood . --refactor-plan --format json
 scripts/nanda-map-code . --format json
+scripts/nanda-release-gate .nanda/route-atlas.json
 scripts/nanda-dogfood . --out-dir .nanda/
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index code-flow.json --input-format json --out .nanda/index.json
@@ -845,6 +858,10 @@ done
 
 Interpret the result as:
 
+- Use the route atlas as memory. Rebuild it after large refactors, not on every
+  small prompt.
+- `guard-action` must pass before code edits; `guard-diff` must pass after code
+  edits if a route capsule is declared.
 - global map clean + global gate size stop = split, not failure;
 - global `foreign_pull` non-empty = repair before PASS;
 - `owner_gravity.conflicts` or `negative_routes.hits` non-empty = repair before

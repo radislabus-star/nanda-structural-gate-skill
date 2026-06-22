@@ -45,6 +45,10 @@ split_md="$root/nanda-structural-gate/scripts/nanda-split-md"
 split_packet="$root/nanda-structural-gate/scripts/nanda-split"
 mapper="$root/nanda-structural-gate/scripts/nanda-map"
 code_mapper="$root/nanda-structural-gate/scripts/nanda-map-code"
+build_atlas="$root/nanda-structural-gate/scripts/nanda-build-atlas"
+guard_action="$root/nanda-structural-gate/scripts/nanda-guard-action"
+guard_diff="$root/nanda-structural-gate/scripts/nanda-guard-diff"
+release_gate="$root/nanda-structural-gate/scripts/nanda-release-gate"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
@@ -1192,6 +1196,63 @@ EOF_EVENT
 state_code_json="$("$code_mapper" "$tmp_state_repo/src/event.rs" --format json --min-cluster-functions 1)"
 jq -e '.clusters[] | select(.cluster == "manual-trigger" and .risk == "HIGH" and (.risk_reason | contains("ROUTE_CRITICAL")))' <<<"$state_code_json" >/dev/null
 rm -rf "$tmp_state_repo"
+tmp_atlas_repo="$(mktemp -d)"
+mkdir -p "$tmp_atlas_repo/src/bin/lay_daemon" "$tmp_atlas_repo/src/bin/lay_ibus_engine" "$tmp_atlas_repo/src/runtime"
+printf 'fn main() {}' >"$tmp_atlas_repo/src/bin/lay_daemon.rs"
+printf 'fn main() {}' >"$tmp_atlas_repo/src/bin/lay_ibus_engine.rs"
+printf 'fn handle_manual_trigger_runtime() {}' >"$tmp_atlas_repo/src/runtime/manual_trigger_runtime.rs"
+atlas_path="$tmp_atlas_repo/.nanda/route-atlas.json"
+atlas_json="$("$build_atlas" "$tmp_atlas_repo" --out "$atlas_path" --format json)"
+jq -e '.mode == "route-atlas" and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .written_to' <<<"$atlas_json" >/dev/null
+test -s "$atlas_path"
+dogfood_atlas_json="$("$dogfood" "$tmp_atlas_repo" --build-atlas --atlas-out "$tmp_atlas_repo/.nanda/dogfood-atlas.json" --format json)"
+jq -e '.mode == "route-atlas" and .routes["ime-display-flow"]' <<<"$dogfood_atlas_json" >/dev/null
+guard_pass_json="$("$guard_action" "$atlas_path" --symptom "IME not visible" --action-id "ime.activate_engine" --format json)"
+jq -e '.verdict == "PASS" and .safe_to_edit == true and .route == "ime-display-flow"' <<<"$guard_pass_json" >/dev/null
+printf '{"ibus_engine":"xkb:ru::rus","processes":["lay-daemon"],"config":{"text_backend":"ime"}}\n' >"$tmp_atlas_repo/runtime-snapshot.json"
+set +e
+guard_veto_json="$("$guard_action" "$atlas_path" --symptom "IME not visible" --action-id "nanda.edit_candidate_generation" --runtime-snapshot "$tmp_atlas_repo/runtime-snapshot.json" --format json)"
+guard_veto_status=$?
+set -e
+test "$guard_veto_status" -eq 1
+jq -e '.verdict == "VETO" and (.reason_codes | index("symptom_action_mismatch")) and .safe_to_edit == false' <<<"$guard_veto_json" >/dev/null
+set +e
+guard_stop_json="$("$guard_action" "$atlas_path" --symptom "СТОЙ не трогай код" --action-id "ime.activate_engine" --format json)"
+guard_stop_status=$?
+set -e
+test "$guard_stop_status" -eq 1
+jq -e '.verdict == "HARD_STOP" and .safe_to_edit == false' <<<"$guard_stop_json" >/dev/null
+cat >"$tmp_atlas_repo/ime.diff" <<'EOF_DIFF'
+diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
+--- a/src/bin/lay_ibus_engine.rs
++++ b/src/bin/lay_ibus_engine.rs
+@@ -1 +1 @@
+-fn main() {}
++fn main() { }
+EOF_DIFF
+guard_diff_pass="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_atlas_repo/ime.diff" --format json)"
+jq -e '.verdict == "PASS" and .safe_to_edit == true' <<<"$guard_diff_pass" >/dev/null
+cat >"$tmp_atlas_repo/mixed.diff" <<'EOF_DIFF'
+diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
+--- a/src/bin/lay_ibus_engine.rs
++++ b/src/bin/lay_ibus_engine.rs
+diff --git a/src/runtime/manual_trigger_runtime.rs b/src/runtime/manual_trigger_runtime.rs
+--- a/src/runtime/manual_trigger_runtime.rs
++++ b/src/runtime/manual_trigger_runtime.rs
+EOF_DIFF
+set +e
+guard_diff_veto="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_atlas_repo/mixed.diff" --format json)"
+guard_diff_status=$?
+set -e
+test "$guard_diff_status" -eq 1
+jq -e '.verdict == "VETO" and (.foreign_routes | index("manual-trigger-flow"))' <<<"$guard_diff_veto" >/dev/null
+set +e
+release_json="$("$release_gate" "$atlas_path" --format json)"
+release_status=$?
+set -e
+test "$release_status" -eq 3
+jq -e '.mode == "release-gate" and .verdict == "WATCH" and (.routes | index("ime-display-flow"))' <<<"$release_json" >/dev/null
+rm -rf "$tmp_atlas_repo"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null
@@ -1330,6 +1391,10 @@ fi
 "$serve" --help | grep -q "Usage: nanda serve"
 "$dogfood" --help | grep -q "Usage: nanda dogfood"
 "$code_mapper" --help | grep -q "Usage: nanda map-code"
+"$build_atlas" --help | grep -q "Usage: nanda build-atlas"
+"$guard_action" --help | grep -q "Usage: nanda guard-action"
+"$guard_diff" --help | grep -q "Usage: nanda guard-diff"
+"$release_gate" --help | grep -q "Usage: nanda release-gate"
 "$split_packet" --help | grep -q "Usage: nanda split"
 "$reporter" --format md --title "Smoke Markdown Report" --domain code --overall "$root/examples/triads.watch-large.md" --route code:"$root/examples/triads.code-flow.md" >/dev/null || test "$?" -eq 3
 

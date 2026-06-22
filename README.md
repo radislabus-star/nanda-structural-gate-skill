@@ -374,6 +374,11 @@ printf '{"command":"llmwave_answer","memory":".nanda/llmwave-memory.json","promp
 nanda-doctor
 nanda-dogfood .
 nanda-map-code src/main.rs
+nanda-map-code .
+nanda-build-atlas . --out .nanda/route-atlas.json
+nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
+nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+nanda-release-gate .nanda/route-atlas.json
 nanda-dogfood . --refactor-plan --format json
 nanda-self-check
 ```
@@ -405,15 +410,23 @@ For code projects, add `--normalize-paths` to collapse paths such as
 `src/bin/check.rs` into `bin::check` and `src/core/gate.rs` into `core::gate`.
 `nanda-self-check` verifies the checker/gate/tooling contour itself.
 `nanda-dogfood .` verifies a repository against its own
-`examples/self-dogfood.nanda.json` packet. It is the fast agent-facing readiness
-check: a root `WATCH` is acceptable only when it is size-only, the map is clean,
-and every linked branch is `PASS`.
-`nanda-map-code` is the refactor planning pass for large Rust files. It clusters
-functions, reports cross-cluster dependencies, suggests target files, and marks
-extraction risk. Use `nanda-dogfood . --refactor-plan` when you want the normal
-structural verdict plus repository-level code-boundary recommendations in one
-packet. The dogfood refactor plan scans multiple Rust files and reports
-`risk_files`; it should not treat `src/main.rs` as the whole repository.
+`examples/self-dogfood.nanda.json` packet when present. If no curated packet
+exists, it builds a low-confidence repo auto-field. Auto-field is review-only
+until the agent provides a precise `action_id`, evidence, and route-specific
+verification.
+`nanda-map-code` is the refactor planning pass for Rust files or repositories.
+On a file, it clusters functions, reports cross-cluster dependencies, suggests
+target files, and marks extraction risk. On a directory, it returns a
+repo-level `repo-code-map`. Use `nanda-dogfood . --refactor-plan` when you want
+the normal structural verdict plus repository-level code-boundary
+recommendations in one packet. The dogfood refactor plan scans multiple Rust
+files and reports `risk_files`; it should not treat `src/main.rs` as the whole
+repository.
+`nanda-build-atlas` writes reusable route memory to `.nanda/route-atlas.json`.
+`nanda-guard-action` is the fast pre-edit check: symptom plus `action_id` must
+resolve to an atlas route. `nanda-guard-diff` is the post-edit check: changed
+files must stay inside the selected route capsule. `nanda-release-gate` is a
+checklist summary over the atlas before publishing.
 `nanda-report` is agent-first: it returns a JSON decision packet by default.
 Use `--format md` only when a human-facing report is explicitly needed.
 `nanda-map` exposes the core structural map: source/candidate group sizes,
@@ -994,6 +1007,11 @@ nanda-self-check
 NANDA_SELF_CHECK_RUNTIME_ONLY=1 nanda-self-check
 nanda-dogfood .
 nanda-dogfood . --format json --out-dir .nanda/
+nanda-dogfood . --build-atlas --atlas-out .nanda/route-atlas.json
+nanda-build-atlas . --out .nanda/route-atlas.json
+nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
+nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+nanda-release-gate .nanda/route-atlas.json
 nanda-report --overall overall.md --route invoice:invoice.md
 nanda-report --format md --overall overall.md --route invoice:invoice.md
 ```
@@ -1122,12 +1140,23 @@ SAFE_TO_EDIT: true | false
 
 ## Recommended Workflow
 
-Use this workflow for large code-flow, repository, contract, logistics, or
-multi-route graphs:
+Use a tiered workflow, not full-field scanning on every prompt:
+
+1. Always-on micro gate: STOP, edit permission, action_id, symptom/action fit.
+2. Route snapshot gate: use route atlas and guard-action before code edits.
+3. Full route-field gate: use dogfood/map/hgate for multi-route changes.
+4. Release gate: run tests, dogfood, route-specific smoke, and release-gate.
+
+Atlas-first, gate-on-diff workflow:
 
 ```bash
 mkdir -p .nanda
+nanda-build-atlas . --out .nanda/route-atlas.json
+nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
+nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
 nanda-dogfood . --out-dir .nanda/
+nanda-dogfood . --refactor-plan --format json
+nanda-release-gate .nanda/route-atlas.json
 nanda-extract notes.raw.txt --out .nanda/notes.json
 nanda-index memory-a.json memory-b.md --out .nanda/index.json
 nanda-dataset-doctor .nanda/index.json --input-format json

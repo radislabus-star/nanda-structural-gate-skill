@@ -1,6 +1,17 @@
 use crate::*;
 
 pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
+    if args.build_atlas {
+        let out = args
+            .atlas_out
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(".nanda/route-atlas.json"));
+        return commands::guard::build_atlas_cmd(commands::guard::BuildAtlasArgs {
+            repo: args.input,
+            out,
+            format: args.format,
+        });
+    }
     let requested_input = args.input.clone();
     let input = resolve_dogfood_input(&args.input)?;
     let packet = load_packet_auto(
@@ -267,7 +278,7 @@ fn is_architecture_file(path: &Path) -> bool {
         })
 }
 
-fn auto_route_for_path(path: &str) -> String {
+pub(crate) fn auto_route_for_path(path: &str) -> String {
     let lower = path.to_ascii_lowercase();
     if lower.contains("test") || lower.contains("spec") {
         "test-flow".to_string()
@@ -313,7 +324,7 @@ fn auto_route_for_path(path: &str) -> String {
     }
 }
 
-fn auto_layer_for_path(path: &str) -> String {
+pub(crate) fn auto_layer_for_path(path: &str) -> String {
     match auto_route_for_path(path).as_str() {
         "test-flow" => "test",
         "install-flow" => "install",
@@ -330,7 +341,7 @@ fn auto_layer_for_path(path: &str) -> String {
     .to_string()
 }
 
-fn auto_owner_for_path(path: &str) -> String {
+pub(crate) fn auto_owner_for_path(path: &str) -> String {
     let raw = path
         .split('/')
         .take(3)
