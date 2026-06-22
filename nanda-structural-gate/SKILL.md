@@ -101,6 +101,7 @@ scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate 
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id shared.version_bump_contract --diff version.diff
 scripts/nanda-field-report --from search-result.json --format json
 scripts/nanda-field-equivalence --structural-from search-result.json --packed-from pack6m-result.json --cognitive-from llmwave-big-result.json --format json
+scripts/nanda-field-cutover --suite structural-standard --format json
 scripts/nanda-field-cutover --structural-case focused-search.json --structural-case contested-search.json --format json
 scripts/nanda-profile-guards . --iterations 50 --format json
 scripts/nanda-release-gate .nanda/route-atlas.json

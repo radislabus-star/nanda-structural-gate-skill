@@ -1659,6 +1659,8 @@ field_cutover_json="$("$field_cutover" \
   --structural-case "$tmp_field_report/cutover-thin.json" \
   --format json)"
 jq -e '.mode == "unified-field-cutover-suite" and .version == "unified-field-runtime-v1" and .family == "structural" and .acceptance.cases_checked == 4 and .acceptance.structural_cutover_suite_pass == true and .acceptance.all_peak_match == true and .acceptance.all_state_family_match == true and .acceptance.all_not_more_permissive == true and .acceptance.field_core_as_structural_engine_candidate == true and .acceptance.field_core_as_sole_engine_allowed == false and .claim_boundary.global_sole_engine == false' <<<"$field_cutover_json" >/dev/null
+field_cutover_suite_json="$("$field_cutover" --suite structural-standard --format json)"
+jq -e '.mode == "unified-field-cutover-suite" and .suite == "structural-standard" and .version == "unified-field-runtime-v1" and .family == "structural" and .acceptance.cases_checked == 4 and .acceptance.structural_cutover_suite_pass == true and .acceptance.all_peak_match == true and .acceptance.all_state_family_match == true and .acceptance.all_not_more_permissive == true and .acceptance.field_core_as_structural_engine_candidate == true and .acceptance.field_core_as_sole_engine_allowed == false and .claim_boundary.global_sole_engine == false' <<<"$field_cutover_suite_json" >/dev/null
 
 "$search" "$root/examples/triad-packet.interference-search.json" --query "runtime route" --format json >"$tmp_field_report/live-search.json"
 live_structural_field="$("$field_report" --from "$tmp_field_report/live-search.json" --format json)"

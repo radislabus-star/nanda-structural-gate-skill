@@ -1,4 +1,5 @@
 use crate::*;
+use clap::ValueEnum;
 
 #[derive(Parser)]
 pub(crate) struct FieldReportArgs {
@@ -30,8 +31,15 @@ pub(crate) struct FieldEquivalenceArgs {
 pub(crate) struct FieldCutoverArgs {
     #[arg(long = "structural-case")]
     pub(crate) structural_cases: Vec<PathBuf>,
+    #[arg(long, value_enum)]
+    pub(crate) suite: Option<FieldCutoverSuite>,
     #[arg(long, value_enum, default_value = "json")]
     pub(crate) format: OutputFormat,
+}
+
+#[derive(Clone, ValueEnum)]
+pub(crate) enum FieldCutoverSuite {
+    StructuralStandard,
 }
 
 pub(crate) fn field_report_cmd(args: FieldReportArgs) -> Result<u8> {
@@ -251,25 +259,16 @@ pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
         )
         .with_context(|| format!("parse JSON field cutover input {}", path.display()))?;
         let dual_run = field_core::structural_dual_run_from_search(&input);
-        let field_runtime = serde_json::to_value(&dual_run)?;
-        cases.push(json!({
-            "family": "structural",
-            "input": path.display().to_string(),
-            "old_peak": dual_run.old_peak,
-            "field_peak": dual_run.field_peak,
-            "old_verdict": dual_run.old_verdict,
-            "field_verdict": dual_run.field_verdict,
-            "old_field_state": dual_run.old_field_state,
-            "field_state": dual_run.field_state,
-            "old_safe_to_answer": dual_run.old_safe_to_answer,
-            "field_safe_to_answer": dual_run.field_safe_to_answer,
-            "peak_matches": dual_run.peak_matches,
-            "state_family_matches": dual_run.state_family_matches,
-            "field_not_more_permissive": dual_run.field_not_more_permissive,
-            "cutover_ready": dual_run.cutover_ready,
-            "mismatch_reason": dual_run.mismatch_reason,
-            "field_runtime": field_runtime
-        }));
+        cases.push(field_cutover_case(
+            "manual",
+            &path.display().to_string(),
+            dual_run,
+        )?);
+    }
+    if let Some(suite) = &args.suite {
+        for case in field_cutover_suite_cases(suite)? {
+            cases.push(case);
+        }
     }
 
     let cases_checked = cases.len();
@@ -293,6 +292,10 @@ pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
         "mode": "unified-field-cutover-suite",
         "version": field_core::FIELD_RUNTIME_VERSION,
         "family": "structural",
+        "suite": match args.suite {
+            Some(FieldCutoverSuite::StructuralStandard) => "structural-standard",
+            None => "manual",
+        },
         "state": state,
         "cases": cases,
         "acceptance": {
@@ -344,6 +347,107 @@ pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
     } else {
         EXIT_WATCH
     })
+}
+
+fn field_cutover_case(
+    source: &str,
+    input: &str,
+    dual_run: field_core::FieldRuntimeDualRun,
+) -> Result<Value> {
+    let field_runtime = serde_json::to_value(&dual_run)?;
+    Ok(json!({
+        "family": "structural",
+        "source": source,
+        "input": input,
+        "old_peak": dual_run.old_peak,
+        "field_peak": dual_run.field_peak,
+        "old_verdict": dual_run.old_verdict,
+        "field_verdict": dual_run.field_verdict,
+        "old_field_state": dual_run.old_field_state,
+        "field_state": dual_run.field_state,
+        "old_safe_to_answer": dual_run.old_safe_to_answer,
+        "field_safe_to_answer": dual_run.field_safe_to_answer,
+        "peak_matches": dual_run.peak_matches,
+        "state_family_matches": dual_run.state_family_matches,
+        "field_not_more_permissive": dual_run.field_not_more_permissive,
+        "cutover_ready": dual_run.cutover_ready,
+        "mismatch_reason": dual_run.mismatch_reason,
+        "field_runtime": field_runtime
+    }))
+}
+
+fn field_cutover_suite_cases(suite: &FieldCutoverSuite) -> Result<Vec<Value>> {
+    match suite {
+        FieldCutoverSuite::StructuralStandard => structural_standard_cutover_cases(),
+    }
+}
+
+fn structural_standard_cutover_cases() -> Result<Vec<Value>> {
+    let specs = [
+        (
+            "focused-route-trap",
+            "examples/triad-packet.interference-search-route-trap.json",
+        ),
+        (
+            "contested-noisy",
+            "examples/triad-packet.interference-search-noisy.json",
+        ),
+        (
+            "reversed-polarity",
+            "examples/triad-packet.polarization-reversed-stop.json",
+        ),
+        (
+            "thin-negative-lane",
+            "examples/triad-packet.negative-shortcut-lanes.json",
+        ),
+    ];
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut cases = vec![];
+    for (label, rel_path) in specs {
+        let path = root.join(rel_path);
+        let input = structural_suite_search_value(&path)?;
+        let dual_run = field_core::structural_dual_run_from_search(&input);
+        cases.push(field_cutover_case(
+            "structural-standard",
+            &format!("{label}:{rel_path}"),
+            dual_run,
+        )?);
+    }
+    Ok(cases)
+}
+
+fn structural_suite_search_value(path: &Path) -> Result<Value> {
+    let mut packet = load_packet_auto(
+        path,
+        &InputFormat::Json,
+        "field-cutover",
+        "structural",
+        "",
+        false,
+    )?;
+    let memory = normalize_ids(packet.triads.clone(), "m");
+    let query_packet = packet.clone();
+    let query_text = if !query_packet.query.trim().is_empty() {
+        query_packet.query.clone()
+    } else {
+        packet.query.clone()
+    };
+    packet.query = query_text.clone();
+    let (query, query_source) = search_query_triads(&query_packet, &query_text);
+    let focus = route_balanced_focus(&memory, &query, 256, 32);
+    let mut result = interference_search(
+        &packet,
+        &focus.memory,
+        &query,
+        3,
+        &PeakGroupBy::Route,
+        query_source,
+        focus.metadata,
+    );
+    result["canonicalization"] = json!(packet.canonicalization);
+    result["unified_field"] = field_core::adapters::adapt_value(&result).to_value();
+    result["field_runtime"] = field_core::structural_dual_run_value(&result);
+    Ok(result)
 }
 
 fn nonempty_all(cases: &[Value], key: &str) -> bool {

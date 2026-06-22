@@ -581,9 +581,10 @@ hot packed cutover without benchmark evidence and an explicit follow-up change.
 
 Status: done as an explicit structural proof gate, not global cutover.
 
-`nanda field-cutover --format json` now accepts structural `nanda search`
-outputs through repeated `--structural-case` arguments and evaluates the
-shared runtime contract across a suite:
+`nanda field-cutover --suite structural-standard --format json` now runs the
+standard structural fixtures directly. It also accepts structural
+`nanda search` outputs through repeated `--structural-case` arguments for
+custom suites. Both paths evaluate the shared runtime contract across a suite:
 
 - peak match;
 - state-family match;
