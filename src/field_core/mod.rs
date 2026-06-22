@@ -87,6 +87,11 @@ impl UnifiedFieldReport {
                 serde_json::to_value(&memory_delta)
                     .unwrap_or_else(|_| json!({"state": "FIELD_MEMORY_DELTA_FAILED"})),
             );
+            object.insert(
+                "anti_wave_effect".to_string(),
+                serde_json::to_value(summarize_anti_wave_effect(&self.anti_wave))
+                    .unwrap_or_else(|_| json!({"decision_effect": "FIELD_ANTI_WAVE_FAILED"})),
+            );
             let field_pass = FieldPassProjection::from_report(self, &memory_delta.deltas);
             object.insert(
                 "runtime_contract".to_string(),
@@ -414,6 +419,61 @@ mod tests {
         assert!(application.suppressed);
         assert!(application.after_alignment < application.before_alignment);
         assert!(after_useful >= before_useful);
+    }
+
+    #[test]
+    fn structural_peak_contract_blocks_reversed_polarity() {
+        let result = evaluate_structural_peak(FieldPeakInput {
+            has_peak: true,
+            top_peak: "supplier-route".to_string(),
+            lexical_baseline_top: "buyer-route".to_string(),
+            top_polarization: "REVERSED".to_string(),
+            margin: 0.2,
+            top_component_score: 0.9,
+            second_component_score: 0.1,
+        });
+
+        assert_eq!(result.state, "POLARITY_REVERSED");
+        assert!(!result.safe_to_answer);
+        assert!(result.wins_over_lexical_baseline);
+    }
+
+    #[test]
+    fn structural_coherence_contract_flags_low_margin() {
+        let result = evaluate_structural_coherence(FieldCoherenceInput {
+            has_peak: true,
+            top_peak: "manual-trigger-flow".to_string(),
+            margin: 0.01,
+            component_gap: 0.8,
+            top_polarization: "ALIGNED".to_string(),
+            corpus_verdict: "PASS".to_string(),
+            corpus_warnings: vec![],
+            route_balanced: false,
+            coarse_to_fine_state: "LOCALIZED".to_string(),
+            lexical_baseline_top: "manual-trigger-flow".to_string(),
+        });
+
+        assert_eq!(result.state, "FIELD_CONTESTED");
+        assert_eq!(result.action, "SPLIT_OR_QUERY");
+        assert_eq!(
+            field_verdict_for_state(&result.state, result.safe_to_answer),
+            "WATCH"
+        );
+        assert!(result.blocking.contains(&"low_margin".to_string()));
+    }
+
+    #[test]
+    fn anti_wave_effect_reports_local_suppression() {
+        let effect = summarize_anti_wave_effect(&AntiWaveSummary {
+            active: true,
+            lanes: 2,
+            suppressed_target: Some("false-route".to_string()),
+            suppression_energy: 0.42,
+            local_only: true,
+        });
+
+        assert_eq!(effect.decision_effect, "LOCAL_SUPPRESSION");
+        assert_eq!(effect.suppressed_target.as_deref(), Some("false-route"));
     }
 
     #[test]

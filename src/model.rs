@@ -1421,28 +1421,53 @@ pub(crate) fn field_state_machine(
     route_balanced_focus: &Value,
     coarse_to_fine: &Value,
 ) -> Value {
+    let corpus_verdict = corpus["verdict"].as_str().unwrap_or("");
+    let warnings = corpus["warnings"].as_array().cloned().unwrap_or_default();
+    let warning_kinds = warnings
+        .iter()
+        .filter_map(|warning| warning["kind"].as_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    let route_balanced = route_balanced_focus["enabled"].as_bool().unwrap_or(false);
+    let ctf_state = coarse_to_fine["state"].as_str().unwrap_or("");
+    let lexical_peak = lexical_baseline["top_peak"].as_str().unwrap_or("");
+
     if peaks.is_empty() {
+        let result = field_core::evaluate_structural_coherence(field_core::FieldCoherenceInput {
+            has_peak: false,
+            top_peak: String::new(),
+            margin,
+            component_gap: 0.0,
+            top_polarization: String::new(),
+            corpus_verdict: corpus_verdict.to_string(),
+            corpus_warnings: warning_kinds.clone(),
+            route_balanced,
+            coarse_to_fine_state: ctf_state.to_string(),
+            lexical_baseline_top: lexical_peak.to_string(),
+        });
         return json!({
-            "state": "NO_FIELD",
-            "safe_to_answer": false,
-            "action": "NO_ANSWER",
-            "blocking": ["no_peak"],
+            "state": result.state,
+            "safe_to_answer": result.safe_to_answer,
+            "action": result.action,
+            "top_peak": result.top_peak,
+            "blocking": result.blocking,
             "signals": {
-                "margin": round4(margin),
-                "component_gap": 0.0,
-                "top_polarization": "",
-                "corpus_verdict": corpus["verdict"].as_str().unwrap_or(""),
-                "route_balanced": route_balanced_focus["enabled"].as_bool().unwrap_or(false),
-                "coarse_to_fine": coarse_to_fine["state"].as_str().unwrap_or("")
+                "margin": result.margin,
+                "component_gap": result.component_gap,
+                "top_polarization": result.top_polarization,
+                "corpus_verdict": result.corpus_verdict,
+                "corpus_warnings": result.corpus_warnings,
+                "route_balanced": result.route_balanced,
+                "coarse_to_fine": result.coarse_to_fine_state,
+                "lexical_baseline_top": result.lexical_baseline_top,
+                "lexical_trap_detected": result.lexical_trap_detected
             },
-            "read_as": "No resonance field was produced."
+            "read_as": result.read_as
         });
     }
 
     let top = &peaks[0];
     let second = peaks.get(1);
     let top_name = top["peak"].as_str().unwrap_or("");
-    let lexical_peak = lexical_baseline["top_peak"].as_str().unwrap_or("");
     let top_polarization = top["polarization"]["state"].as_str().unwrap_or("");
     let top_component = top["propagation"]["component_score"]
         .as_f64()
@@ -1451,113 +1476,37 @@ pub(crate) fn field_state_machine(
         .and_then(|peak| peak["propagation"]["component_score"].as_f64())
         .unwrap_or(0.0);
     let component_gap = round4(top_component - second_component);
-    let route_balanced = route_balanced_focus["enabled"].as_bool().unwrap_or(false);
-    let ctf_state = coarse_to_fine["state"].as_str().unwrap_or("");
-    let corpus_verdict = corpus["verdict"].as_str().unwrap_or("");
-    let warnings = corpus["warnings"].as_array().cloned().unwrap_or_default();
-    let warning_kinds = warnings
-        .iter()
-        .filter_map(|warning| warning["kind"].as_str().map(str::to_string))
-        .collect::<Vec<_>>();
-    let noisy_warning_count = warning_kinds
-        .iter()
-        .filter(|kind| {
-            matches!(
-                kind.as_str(),
-                "large_unbalanced_corpus"
-                    | "route_imbalance"
-                    | "hub_dominance"
-                    | "duplicate_current"
-            )
-        })
-        .count();
-    let weak_text_query = warning_kinds.iter().any(|kind| kind == "weak_text_query");
-    let corpus_noisy = corpus_verdict == "WATCH" && (noisy_warning_count > 0 || weak_text_query);
-    let focused = margin >= 0.055 && component_gap >= 0.12 && ctf_state == "LOCALIZED";
-    let lexical_trap = !lexical_peak.is_empty() && lexical_peak != top_name;
-
-    let mut blocking: Vec<String> = vec![];
-    let (state, safe_to_answer, action, read_as) = if top_polarization == "REVERSED" {
-        blocking.push("polarity_reversed".to_string());
-        (
-            "FIELD_REVERSED",
-            false,
-            "STOP_REPAIR_POLARITY",
-            "The top peak is role-direction reversed; do not read it as the answer route.",
-        )
-    } else if corpus_noisy && !route_balanced {
-        blocking.extend(warning_kinds.iter().cloned());
-        (
-            "FIELD_NOISY",
-            false,
-            "FOCUS_CORPUS",
-            "The corpus field is noisy; run dataset-doctor or route-balanced focus before trusting the peak.",
-        )
-    } else if margin < 0.04 {
-        blocking.push("low_margin".to_string());
-        (
-            "FIELD_CONTESTED",
-            false,
-            "SPLIT_OR_QUERY",
-            "The top peaks are too close; use the result as retrieval context and split or sharpen the query.",
-        )
-    } else if !focused {
-        if component_gap < 0.12 {
-            blocking.push("weak_component_gap".to_string());
-        }
-        if ctf_state != "LOCALIZED" {
-            blocking.push("not_localized".to_string());
-        }
-        (
-            "FIELD_THIN",
-            false,
-            "USE_AS_HINT",
-            "The peak is plausible but not connected/localized enough to become an answer skeleton.",
-        )
-    } else if route_balanced {
-        (
-            "FIELD_ROUTE_BALANCED",
-            true,
-            "ANSWER_WITH_BALANCED_SUPPORT",
-            "The peak is focused after route-balanced filtering; answer from support and mention the focused packet.",
-        )
-    } else if lexical_trap {
-        (
-            "FIELD_FOCUSED",
-            true,
-            "ANSWER_WITH_SUPPORT",
-            "The structural field beats the lexical baseline and is focused enough to draft from support.",
-        )
-    } else {
-        (
-            "FIELD_SAFE",
-            true,
-            "ANSWER_WITH_SUPPORT",
-            "The field is focused, localized, and not blocked by corpus or polarity warnings.",
-        )
-    };
-
-    blocking.sort();
-    blocking.dedup();
+    let result = field_core::evaluate_structural_coherence(field_core::FieldCoherenceInput {
+        has_peak: true,
+        top_peak: top_name.to_string(),
+        margin,
+        component_gap,
+        top_polarization: top_polarization.to_string(),
+        corpus_verdict: corpus_verdict.to_string(),
+        corpus_warnings: warning_kinds,
+        route_balanced,
+        coarse_to_fine_state: ctf_state.to_string(),
+        lexical_baseline_top: lexical_peak.to_string(),
+    });
 
     json!({
-        "state": state,
-        "safe_to_answer": safe_to_answer,
-        "action": action,
-        "top_peak": top_name,
-        "blocking": blocking,
+        "state": result.state,
+        "safe_to_answer": result.safe_to_answer,
+        "action": result.action,
+        "top_peak": result.top_peak,
+        "blocking": result.blocking,
         "signals": {
-            "margin": round4(margin),
-            "component_gap": component_gap,
-            "top_polarization": top_polarization,
-            "corpus_verdict": corpus_verdict,
-            "corpus_warnings": warning_kinds,
-            "route_balanced": route_balanced,
-            "coarse_to_fine": ctf_state,
-            "lexical_baseline_top": lexical_peak,
-            "lexical_trap_detected": lexical_trap
+            "margin": result.margin,
+            "component_gap": result.component_gap,
+            "top_polarization": result.top_polarization,
+            "corpus_verdict": result.corpus_verdict,
+            "corpus_warnings": result.corpus_warnings,
+            "route_balanced": result.route_balanced,
+            "coarse_to_fine": result.coarse_to_fine_state,
+            "lexical_baseline_top": result.lexical_baseline_top,
+            "lexical_trap_detected": result.lexical_trap_detected
         },
-        "read_as": read_as
+        "read_as": result.read_as
     })
 }
 

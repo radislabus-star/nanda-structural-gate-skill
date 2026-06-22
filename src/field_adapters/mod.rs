@@ -135,12 +135,26 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "global_sole_engine": false
             }
         },
+        "field_operation_contract": {
+            "version": "unified-field-operation-contract-v1",
+            "peak_owner": "field_core::peak::FieldPeakResult",
+            "coherence_owner": "field_core::coherence::FieldCoherenceResult",
+            "anti_wave_owner": "field_core::anti_wave::FieldAntiWaveEffect",
+            "verdict_owner": "field_core::coherence::field_verdict_for_state",
+            "structural_decision_uses_field_core": true,
+            "packed_decision_still_guarded": true,
+            "cognitive_decision_still_guarded": true
+        },
         "acceptance": {
             "one_field_vocabulary": true,
             "one_field_pass": true,
             "all_json_reports_project_unified_field": true,
             "three_family_engine_contract": true,
             "field_engine_policy_in_field_core": true,
+            "field_core_owns_peak_contract": true,
+            "field_core_owns_coherence_contract": true,
+            "field_core_owns_anti_wave_contract": true,
+            "structural_decision_uses_field_core": true,
             "field_core_as_sole_engine": false,
             "field_core_as_semantic_engine": true,
             "feedback_memory_delta_unified": true,

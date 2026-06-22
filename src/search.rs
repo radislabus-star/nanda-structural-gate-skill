@@ -513,7 +513,7 @@ pub(crate) fn interference_search(
     let safe_to_answer = field_state_machine["safe_to_answer"]
         .as_bool()
         .unwrap_or(false);
-    let verdict = search_verdict(field_state, safe_to_answer);
+    let verdict = field_core::field_verdict_for_state(field_state, safe_to_answer);
     let mut output_peaks = peaks;
     output_peaks.truncate(top_k);
 
@@ -603,14 +603,6 @@ pub(crate) fn coarse_to_fine_trace(peaks: &[Value], query_terms: &BTreeSet<Strin
         "local_path": local_path,
         "read_as": "Coarse route first, then inspect the local supporting path inside that route."
     })
-}
-
-pub(crate) fn search_verdict(field_state: &str, safe_to_answer: bool) -> &'static str {
-    match field_state {
-        "FIELD_REVERSED" => "VETO",
-        "FIELD_FOCUSED" | "FIELD_SAFE" | "FIELD_ROUTE_BALANCED" if safe_to_answer => "PASS",
-        _ => "WATCH",
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1024,10 +1016,23 @@ fn coherence_memory_report(packet: &Packet, top_peak: &str) -> Value {
 
 pub(crate) fn peak_decision(peaks: &[Value], margin: f64, lexical_peak: &str) -> Value {
     if peaks.is_empty() {
-        return json!({
-            "state": "NO_PEAK",
-            "safe_to_answer": false,
-            "reason": "No route/group peak was produced."
+        return serde_json::to_value(field_core::evaluate_structural_peak(
+            field_core::FieldPeakInput {
+                has_peak: false,
+                top_peak: String::new(),
+                lexical_baseline_top: lexical_peak.to_string(),
+                top_polarization: String::new(),
+                margin,
+                top_component_score: 0.0,
+                second_component_score: 0.0,
+            },
+        ))
+        .unwrap_or_else(|_| {
+            json!({
+                "state": "NO_PEAK",
+                "safe_to_answer": false,
+                "reason": "No route/group peak was produced."
+            })
         });
     }
     let top = &peaks[0];
@@ -1040,51 +1045,31 @@ pub(crate) fn peak_decision(peaks: &[Value], margin: f64, lexical_peak: &str) ->
     let second_component = second
         .and_then(|peak| peak["propagation"]["component_score"].as_f64())
         .unwrap_or(0.0);
-    let component_gap = round4(top_component - second_component);
-    let wins_lexical = !lexical_peak.is_empty() && top_name != lexical_peak;
-    let (state, safe_to_answer, reason) = if top_polarization == "REVERSED" {
-        (
-            "POLARITY_REVERSED",
-            false,
-            "Top peak has reversed role-direction polarity relative to the query.",
-        )
-    } else if margin >= 0.055 && component_gap >= 0.12 {
-        (
-            "FOCUSED",
-            true,
-            "Top peak has enough margin and stronger connected component than the nearest rival.",
-        )
-    } else if margin < 0.04 {
-        (
-            "WATCH",
-            false,
-            "Top peak is close to the nearest rival; use as retrieval hint, not final structure.",
-        )
-    } else if component_gap < 0.0 {
-        (
-            "AMBIGUOUS",
-            false,
-            "Nearest rival has stronger connected component; inspect support and anti-triads.",
-        )
-    } else {
-        (
-            "WATCH",
-            false,
-            "Top peak is plausible but not focused enough for a confident structural answer.",
-        )
-    };
-    json!({
-        "state": state,
-        "safe_to_answer": safe_to_answer,
-        "top_peak": top_name,
-        "lexical_baseline_top": lexical_peak,
-        "wins_over_lexical_baseline": wins_lexical,
-        "top_polarization": top_polarization,
-        "margin": round4(margin),
-        "top_component_score": round4(top_component),
-        "second_component_score": round4(second_component),
-        "component_gap": component_gap,
-        "reason": reason
+    serde_json::to_value(field_core::evaluate_structural_peak(
+        field_core::FieldPeakInput {
+            has_peak: true,
+            top_peak: top_name.to_string(),
+            lexical_baseline_top: lexical_peak.to_string(),
+            top_polarization: top_polarization.to_string(),
+            margin,
+            top_component_score: top_component,
+            second_component_score: second_component,
+        },
+    ))
+    .unwrap_or_else(|_| {
+        json!({
+            "state": "WATCH",
+            "safe_to_answer": false,
+            "top_peak": top_name,
+            "lexical_baseline_top": lexical_peak,
+            "wins_over_lexical_baseline": !lexical_peak.is_empty() && top_name != lexical_peak,
+            "top_polarization": top_polarization,
+            "margin": round4(margin),
+            "top_component_score": round4(top_component),
+            "second_component_score": round4(second_component),
+            "component_gap": round4(top_component - second_component),
+            "reason": "field_core peak result serialization failed"
+        })
     })
 }
 

@@ -862,6 +862,36 @@ tests: compile-only plus tiny type tests
 
 This creates the target seam without moving scoring logic.
 
+## Latest Implemented Step: Shared Field Operation Contracts
+
+The unified field now owns the first shared operation contracts, not only the
+report vocabulary:
+
+```text
+field_core::peak::FieldPeakInput / FieldPeakResult
+field_core::coherence::FieldCoherenceInput / FieldCoherenceResult
+field_core::coherence::field_verdict_for_state
+field_core::anti_wave::FieldAntiWaveEffect
+```
+
+`search.rs` still emits the legacy `peak_decision` and
+`field_state_machine` JSON shapes, but the actual peak/coherence/verdict
+decisions are delegated to `field_core`. This keeps downstream compatibility
+while moving ownership of the field physics into one module family.
+
+`nanda field-audit --format json` reports:
+
+```text
+field_operation_contract.version = unified-field-operation-contract-v1
+field_operation_contract.peak_owner = field_core::peak::FieldPeakResult
+field_operation_contract.coherence_owner = field_core::coherence::FieldCoherenceResult
+field_operation_contract.anti_wave_owner = field_core::anti_wave::FieldAntiWaveEffect
+acceptance.structural_decision_uses_field_core = true
+```
+
+This is still not a global sole-engine claim. Packed and cognitive paths remain
+guarded by their hot-core and LLM/chat claim boundaries.
+
 ## Refactor Queue
 
 Priority order:

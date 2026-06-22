@@ -538,6 +538,12 @@ by the LLM/chat claim boundary. Inspect
 `field_core::engine::FieldEngineDecision`, meaning structural, packed, and
 cognitive engine decisions share one policy owner instead of three copied JSON
 builders.
+Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
+should point to `field_core::peak::FieldPeakResult`,
+`field_core::coherence::FieldCoherenceResult`, and
+`field_core::anti_wave::FieldAntiWaveEffect`. If those owners drift back into
+structural search/report code, treat it as a unified-field regression rather
+than a harmless reporting difference.
 v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface
 slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
 L2/L3 sync policy, multilingual surface banks, L2 eval metrics, and
