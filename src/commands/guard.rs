@@ -339,6 +339,12 @@ fn shared_contracts() -> Value {
             "allowed_routes": ["source-flow", "ime-display-flow", "runtime-flow", "config-flow", "test-flow"],
             "shared_candidates": ["layout_sync", "layout_controller", "backend_hint"],
             "reason": "layout sync contract may bridge runtime layout state and visible adapter state"
+        },
+        "shared.version_bump_contract": {
+            "allowed_routes": ["source-flow", "config-flow", "ui-status-flow", "install-flow"],
+            "shared_candidates": ["Cargo.toml", "Cargo.lock", "VERSIONING.md", "metadata.json", "prefs.js", "settings.js", "tray_support.js", "README", "HOW_IT_WORKS", "version"],
+            "contract_scope": "version metadata only",
+            "reason": "release version bump may synchronously update package, lockfile, extension metadata, and version-owned UI metadata"
         }
     })
 }
@@ -552,6 +558,11 @@ fn guard_diff_with_source(
         .and_then(|source| source["mismatch"].as_bool())
         .unwrap_or(false);
     let empty_or_unreadable = diff.trim().is_empty() || changed.is_empty();
+    let version_bump = if action_id == "shared.version_bump_contract" {
+        Some(check_version_bump_contract(atlas, diff, &changed))
+    } else {
+        None
+    };
     let shared_allows_crossing = shared_contract.is_some()
         && !changed.is_empty()
         && changed_routes
@@ -561,6 +572,14 @@ fn guard_diff_with_source(
         changed_routes.len() > 1 || !foreign_files.is_empty() || !foreign_routes.is_empty();
     let verdict = if empty_or_unreadable || source_mismatch {
         "WATCH"
+    } else if let Some(version_bump) = version_bump.as_ref() {
+        if !version_bump["scope_ok"].as_bool().unwrap_or(false) {
+            "VETO"
+        } else if !version_bump["consistent"].as_bool().unwrap_or(false) {
+            "WATCH"
+        } else {
+            "PASS"
+        }
     } else if (route.is_none() && shared_contract.is_none())
         || (route_crossing && !shared_allows_crossing)
     {
@@ -572,6 +591,14 @@ fn guard_diff_with_source(
         "empty_or_unreadable_diff"
     } else if source_mismatch {
         "diff_source_repo_mismatch"
+    } else if let Some(version_bump) = version_bump.as_ref() {
+        if !version_bump["scope_ok"].as_bool().unwrap_or(false) {
+            "version_bump_scope_violation"
+        } else if !version_bump["consistent"].as_bool().unwrap_or(false) {
+            "version_bump_inconsistent"
+        } else {
+            "version_bump_contract_pass"
+        }
     } else if route_crossing && shared_allows_crossing {
         "shared_contract_allows_route_crossing"
     } else if route_crossing {
@@ -582,13 +609,16 @@ fn guard_diff_with_source(
         "diff_stays_inside_allowed_routes"
     };
     let suggested_shared_actions = suggested_shared_actions(atlas, &changed_routes, &changed);
-    let route_crossing_decision = if verdict == "PASS" && shared_contract.is_some() {
-        format!("allowed by {action_id}")
-    } else if route_crossing {
-        "allowed only if action_id is an explicit shared contract for these routes".to_string()
-    } else {
-        "single-route diff".to_string()
-    };
+    let route_crossing_decision =
+        if action_id == "shared.version_bump_contract" && verdict == "PASS" {
+            "allowed by shared.version_bump_contract".to_string()
+        } else if verdict == "PASS" && shared_contract.is_some() {
+            format!("allowed by {action_id}")
+        } else if route_crossing {
+            "allowed only if action_id is an explicit shared contract for these routes".to_string()
+        } else {
+            "single-route diff".to_string()
+        };
     json!({
         "mode": "guard-diff",
         "verdict": verdict,
@@ -598,8 +628,10 @@ fn guard_diff_with_source(
         "shared_contract": shared_contract.map(|contract| json!({
             "action_id": action_id,
             "allowed_routes": contract["allowed_routes"].clone(),
-            "reason": contract["reason"].clone()
+            "reason": contract["reason"].clone(),
+            "contract_scope": contract["contract_scope"].clone()
         })),
+        "version_bump": version_bump,
         "reason": reason,
         "diff_source": diff_source,
         "changed_files": changed,
@@ -611,6 +643,7 @@ fn guard_diff_with_source(
             "changed_routes": changed_route_list,
             "shared_candidates": shared_candidates,
             "suggested_shared_actions": suggested_shared_actions.clone(),
+            "contract_scope": if action_id == "shared.version_bump_contract" { json!("version metadata only") } else { Value::Null },
             "decision": route_crossing_decision
         },
         "repair_queue": guard_diff_repairs(verdict, reason, &suggested_shared_actions),
@@ -668,11 +701,301 @@ fn suggested_shared_actions(
         .collect()
 }
 
+fn check_version_bump_contract(atlas: &Value, diff: &str, changed: &[String]) -> Value {
+    let repo = atlas["repo"]
+        .as_str()
+        .or_else(|| atlas["input"].as_str())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let scope_violations = changed
+        .iter()
+        .filter(|file| !is_version_owned_file(&repo, file, diff))
+        .cloned()
+        .collect::<Vec<_>>();
+    let cargo_version = parse_cargo_toml_version(&repo.join("Cargo.toml"));
+    let mut checks = vec![];
+    let mut violations = vec![];
+
+    if let Some(version) = cargo_version.as_deref() {
+        checks.push(json!({"name": "cargo_toml_package_version", "ok": true, "value": version}));
+    } else {
+        violations.push("Cargo.toml package.version not found".to_string());
+        checks.push(json!({"name": "cargo_toml_package_version", "ok": false}));
+    }
+
+    if changed.iter().any(|file| file == "Cargo.lock") {
+        match (
+            cargo_version.as_deref(),
+            parse_cargo_lock_lay_version(&repo.join("Cargo.lock")),
+        ) {
+            (Some(expected), Some(actual)) if expected == actual => {
+                checks.push(json!({"name": "cargo_lock_lay_version", "ok": true, "value": actual}));
+            }
+            (Some(expected), Some(actual)) => {
+                violations.push(format!(
+                    "Cargo.lock lay version {actual} != Cargo.toml {expected}"
+                ));
+                checks.push(json!({"name": "cargo_lock_lay_version", "ok": false, "expected": expected, "actual": actual}));
+            }
+            (_, None) => {
+                violations.push("Cargo.lock package lay version not found".to_string());
+                checks.push(json!({"name": "cargo_lock_lay_version", "ok": false}));
+            }
+            _ => {}
+        }
+    }
+
+    for file in changed
+        .iter()
+        .filter(|file| file.ends_with("metadata.json"))
+    {
+        match (cargo_version.as_deref(), read_json_file(&repo.join(file))) {
+            (Some(expected), Some(json_value)) => {
+                let name_ok = json_value["version-name"].as_str() == Some(expected);
+                let numeric_ok = json_value["version"]
+                    .as_i64()
+                    .is_some_and(|value| version_number_matches(expected, value));
+                if !name_ok {
+                    violations.push(format!("{file} version-name does not match {expected}"));
+                }
+                if !numeric_ok {
+                    violations.push(format!(
+                        "{file} numeric version does not match patch/build for {expected}"
+                    ));
+                }
+                checks.push(json!({
+                    "name": "metadata_json_version",
+                    "file": file,
+                    "ok": name_ok && numeric_ok,
+                    "version_name": json_value["version-name"].clone(),
+                    "numeric_version": json_value["version"].clone()
+                }));
+            }
+            _ => {
+                violations.push(format!("{file} metadata.json unreadable"));
+                checks.push(json!({"name": "metadata_json_version", "file": file, "ok": false}));
+            }
+        }
+    }
+
+    for file in changed.iter().filter(|file| is_js_version_file(file)) {
+        let versions = parse_app_versions(&repo.join(file));
+        if versions.is_empty() {
+            continue;
+        }
+        let file_ok = cargo_version
+            .as_deref()
+            .is_some_and(|expected| versions.iter().all(|actual| actual == expected));
+        if !file_ok {
+            violations.push(format!("{file} APP_VERSION does not match Cargo.toml"));
+        }
+        checks.push(json!({
+            "name": "js_app_version",
+            "file": file,
+            "ok": file_ok,
+            "versions": versions
+        }));
+    }
+
+    if let Some(expected) = cargo_version.as_deref() {
+        for file in changed
+            .iter()
+            .filter(|file| should_scan_for_stale_version(file))
+        {
+            let stale = stale_semver_tokens(&repo.join(file), expected);
+            if !stale.is_empty() {
+                violations.push(format!(
+                    "{file} still contains stale version(s): {}",
+                    stale.join(", ")
+                ));
+                checks.push(json!({"name": "stale_version_scan", "file": file, "ok": false, "stale": stale}));
+            }
+        }
+    }
+
+    json!({
+        "contract": "shared.version_bump_contract",
+        "contract_scope": "version metadata only",
+        "scope_ok": scope_violations.is_empty(),
+        "consistent": scope_violations.is_empty() && violations.is_empty() && cargo_version.is_some(),
+        "cargo_version": cargo_version,
+        "scope_violations": scope_violations,
+        "violations": violations,
+        "checks": checks
+    })
+}
+
+fn is_version_owned_file(repo: &Path, file: &str, diff: &str) -> bool {
+    matches!(file, "Cargo.toml" | "Cargo.lock" | "VERSIONING.md")
+        || (file.starts_with("extension/")
+            && matches!(
+                Path::new(file).file_name().and_then(|name| name.to_str()),
+                Some("metadata.json" | "prefs.js" | "settings.js" | "tray_support.js")
+            ))
+        || (matches!(file, "README.md" | "HOW_IT_WORKS.md")
+            && file_or_diff_contains_version(&repo.join(file), file, diff))
+}
+
+fn file_or_diff_contains_version(path: &Path, file: &str, diff: &str) -> bool {
+    fs::read_to_string(path)
+        .map(|content| contains_semver(&content))
+        .unwrap_or(false)
+        || diff_block_contains_semver(file, diff)
+}
+
+fn diff_block_contains_semver(file: &str, diff: &str) -> bool {
+    let mut in_file = false;
+    for line in diff.lines() {
+        if let Some(path) = line.strip_prefix("diff --git a/") {
+            let file_marker = format!(" b/{file}");
+            in_file = path.ends_with(&file_marker);
+            continue;
+        }
+        if in_file && contains_semver(line) {
+            return true;
+        }
+    }
+    false
+}
+
+fn parse_cargo_toml_version(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let mut in_package = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_package = trimmed == "[package]";
+        } else if in_package && trimmed.starts_with("version") {
+            return quoted_value(trimmed);
+        }
+    }
+    None
+}
+
+fn parse_cargo_lock_lay_version(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let mut in_package = false;
+    let mut is_lay = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[[package]]" {
+            if in_package && is_lay {
+                return None;
+            }
+            in_package = true;
+            is_lay = false;
+            continue;
+        }
+        if !in_package {
+            continue;
+        }
+        if trimmed.starts_with("name") && quoted_value(trimmed).as_deref() == Some("lay") {
+            is_lay = true;
+        } else if is_lay && trimmed.starts_with("version") {
+            return quoted_value(trimmed);
+        }
+    }
+    None
+}
+
+fn quoted_value(line: &str) -> Option<String> {
+    let mut quoted = line.split('"');
+    let _before = quoted.next()?;
+    if let Some(value) = quoted.next() {
+        return Some(value.to_string()).filter(|value| !value.is_empty());
+    }
+    let (_, value) = line.split_once('=')?;
+    Some(value.trim().trim_matches('"').to_string()).filter(|value| !value.is_empty())
+}
+
+fn read_json_file(path: &Path) -> Option<Value> {
+    serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
+}
+
+fn version_number_matches(version: &str, value: i64) -> bool {
+    let parts = version
+        .split('.')
+        .filter_map(|part| part.parse::<i64>().ok())
+        .collect::<Vec<_>>();
+    if parts.len() != 3 {
+        return false;
+    }
+    let patch = parts[2];
+    let packed = parts[0] * 10_000 + parts[1] * 100 + parts[2];
+    value == patch || value == packed
+}
+
+fn is_js_version_file(file: &str) -> bool {
+    matches!(
+        Path::new(file).file_name().and_then(|name| name.to_str()),
+        Some("prefs.js" | "settings.js" | "tray_support.js")
+    )
+}
+
+fn parse_app_versions(path: &Path) -> Vec<String> {
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(_) => return vec![],
+    };
+    content
+        .lines()
+        .filter(|line| line.contains("APP_VERSION"))
+        .filter_map(quoted_value)
+        .collect()
+}
+
+fn should_scan_for_stale_version(file: &str) -> bool {
+    file == "Cargo.toml" || file.ends_with("metadata.json") || is_js_version_file(file)
+}
+
+fn stale_semver_tokens(path: &Path, expected: &str) -> Vec<String> {
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(_) => return vec![],
+    };
+    semver_tokens(&content)
+        .into_iter()
+        .filter(|version| version != expected)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn contains_semver(value: &str) -> bool {
+    !semver_tokens(value).is_empty()
+}
+
+fn semver_tokens(value: &str) -> Vec<String> {
+    value
+        .split(|ch: char| !(ch.is_ascii_digit() || ch == '.'))
+        .filter(|part| {
+            let pieces = part.split('.').collect::<Vec<_>>();
+            pieces.len() == 3
+                && pieces
+                    .iter()
+                    .all(|piece| !piece.is_empty() && piece.chars().all(|ch| ch.is_ascii_digit()))
+        })
+        .map(str::to_string)
+        .collect()
+}
+
 fn guard_diff_repairs(verdict: &str, reason: &str, suggested_shared_actions: &[String]) -> Value {
     if verdict == "PASS" {
         return json!([]);
     }
     match reason {
+        "version_bump_scope_violation" => {
+            json!([repair(
+                "version_bump_scope_violation",
+                "Keep shared.version_bump_contract limited to version-owned files; split real code/UI/runtime changes into their own guarded diff."
+            )])
+        }
+        "version_bump_inconsistent" => {
+            json!([repair(
+                "version_bump_inconsistent",
+                "Make Cargo.toml, Cargo.lock, metadata.json, and APP_VERSION values agree before accepting the version bump."
+            )])
+        }
         "empty_or_unreadable_diff" => {
             json!([repair(
                 "empty_or_unreadable_diff",

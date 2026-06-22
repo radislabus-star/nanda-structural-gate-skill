@@ -453,6 +453,11 @@ explicit shared contract action such as `shared.manual_toggle_contract`,
 `shared.text_edit_contract`, `shared.candidate_contract`, or
 `shared.layout_sync_contract`; otherwise route crossing is `VETO` and the
 report names changed routes, shared candidates, and suggested shared actions.
+Use `shared.version_bump_contract` only for release metadata diffs. It is scoped
+to `Cargo.toml`, `Cargo.lock`, `VERSIONING.md`, extension metadata/version JS,
+and explicitly versioned README/HOW_IT_WORKS edits. The guard checks Cargo,
+lockfile, extension `version-name`, numeric metadata version, JS `APP_VERSION`,
+and stale version tokens before returning PASS.
 `nanda-release-gate` is a checklist summary over the atlas before publishing.
 `nanda-profile-guards` measures the atlas-first workflow before optimization:
 build-atlas, guard-action, guard-diff, map-code, dogfood, and the warm
@@ -1044,6 +1049,7 @@ nanda-dogfood . --build-atlas --atlas-out .nanda/route-atlas.json
 nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
 nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+nanda-guard-diff .nanda/route-atlas.json --action-id shared.version_bump_contract --diff version.diff
 nanda-profile-guards . --iterations 50 --format json
 nanda-release-gate .nanda/route-atlas.json
 nanda-report --overall overall.md --route invoice:invoice.md

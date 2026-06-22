@@ -98,6 +98,7 @@ scripts/nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-d
 scripts/nanda-build-atlas . --out .nanda/route-atlas.json
 scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
+scripts/nanda-guard-diff .nanda/route-atlas.json --action-id shared.version_bump_contract --diff version.diff
 scripts/nanda-profile-guards . --iterations 50 --format json
 scripts/nanda-release-gate .nanda/route-atlas.json
 scripts/nanda-dogfood . --refactor-plan --boundary-economics --format json
@@ -295,8 +296,13 @@ unparseable diffs as `WATCH`, not PASS. If `guard-diff` reports
 the atlas. Intentional cross-route edits require explicit shared contract
 actions such as `shared.manual_toggle_contract`, `shared.text_edit_contract`,
 `shared.candidate_contract`, or `shared.layout_sync_contract`; otherwise route
-crossing remains `VETO`. Inspect `route_crossing_report` for changed routes,
-shared candidates, and suggested shared actions.
+crossing remains `VETO`. Use `shared.version_bump_contract` only for release
+metadata diffs. It is scoped to `Cargo.toml`, `Cargo.lock`, `VERSIONING.md`,
+extension metadata/version JS, and explicitly versioned README/HOW_IT_WORKS
+edits. It must verify Cargo, lockfile, extension `version-name`, numeric
+metadata version, JS `APP_VERSION`, and stale version tokens before PASS.
+Inspect `route_crossing_report` for changed routes, shared candidates,
+contract scope, and suggested shared actions.
 Use `nanda-profile-guards` before changing performance-sensitive guard
 workflow. Treat it as wall-clock CLI evidence for whether the fast guard path
 or the heavier full-field path is dominating the edit cycle. Inspect
