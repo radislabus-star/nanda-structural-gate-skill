@@ -754,7 +754,7 @@ The top-level packed peak decision is updated only through
 
 ### Phase 23: Cognitive Field Engine Guard
 
-Status: done as a cognitive claim firewall, not chat/LLM cutover.
+Status: superseded by the cognitive-only field-core cutover step below.
 
 LLMWave-Big JSON reports emitted through the shared report layer now include
 `cognitive_field_engine`.
@@ -769,10 +769,30 @@ cognitive_field_engine.field_core_as_llm = false
 cognitive_field_engine.cutover_applied = false
 ```
 
-This means the unified field is allowed to participate as a semantic/cognitive
-projection, but it cannot be interpreted as a general chat model, LLM, nonlinear
-memory proof, or global sole engine until separate broad evals and claim
-boundary changes explicitly permit that.
+This older guard allowed the unified field to participate as a
+semantic/cognitive projection, but it did not yet make cognitive a family-scoped
+field-core engine.
+
+### Latest Implemented Step: Cognitive-Only Field-Core Cutover
+
+LLMWave-Big reports now expose a cognitive-only field-core cutover when the
+cognitive dual-run is cutover-ready and not more permissive than the domain
+report. Domain-specific top-level verdicts are preserved for human/API
+compatibility; the selected field-core state is exposed in
+`cognitive_field_engine` and `cognitive_field_cutover`.
+
+```text
+cognitive_field_engine.selected_engine = field-core-cognitive-cutover
+cognitive_field_engine.cutover_applied = true
+cognitive_field_engine.field_core_as_cognitive_sole_engine = true
+cognitive_field_engine.field_core_as_chat_engine = false
+cognitive_field_engine.field_core_as_llm = false
+cognitive_field_cutover.top_level_domain_contract_preserved = true
+```
+
+This completes the unified-field engine cutover across structural, packed, and
+cognitive families without claiming broad chat, LLM readiness, or nonlinear
+memory proof.
 
 ### Phase 24: Three-Family Field Engine Audit
 
@@ -785,8 +805,8 @@ all three families:
   the structural standard suite passes;
 - packed: `packed-field-engine-guard-v1`, explicit packed-only cutover is
   allowed through the typed packed decision core;
-- cognitive: `cognitive-field-engine-guard-v1`, cutover is blocked by the
-  LLM/chat claim boundary.
+- cognitive: `cognitive-field-engine-guard-v1`, cognitive-only cutover is
+  allowed while the LLM/chat claim remains blocked.
 
 Acceptance fields:
 
@@ -797,15 +817,19 @@ packed_field_engine_guard = true
 packed_cutover_blocked_by_hot_guard = false
 packed_field_core_as_sole_engine = true
 cognitive_field_engine_guard = true
-cognitive_cutover_blocked_by_claim_guard = true
-field_core_as_sole_engine = false
+cognitive_cutover_blocked_by_claim_guard = false
+cognitive_field_core_as_sole_engine = true
+field_core_as_sole_engine = true
+llm_ready = false
+nonlinear_memory_proven = false
 ```
 
 This is the present answer to "do we have one field?": yes, one field
 vocabulary/pass/engine contract now covers structural, packed, and cognitive
 reports. Structural and packed now have family-scoped field-core sole-engine
-paths; cognitive remains guarded by the LLM/chat claim boundary, so global
-sole-engine remains false.
+paths, and cognitive has a cognitive-only field-core sole-engine path. Global
+field-core sole-engine is now true, while LLM/chat readiness and nonlinear
+memory proof remain false behind claim gates.
 
 ### Phase 25: Shared Field Engine Policy Owner
 
@@ -935,18 +959,19 @@ more permissive than the legacy route.
 `nanda field-audit --format json` now reports:
 
 ```text
-overall_state = STRUCTURAL_FIELD_CORE_SOLE_ENGINE_ACTIVE_GLOBAL_NOT_READY
+overall_state = FIELD_CORE_SOLE_ENGINE_ACTIVE_LLM_NOT_READY
 acceptance.structural_field_core_as_sole_engine = true
+acceptance.packed_field_core_as_sole_engine = true
+acceptance.cognitive_field_core_as_sole_engine = true
 field_engine_contract.structural.cutover_mode = default
 field_engine_contract.structural.structural_sole_engine = true
-acceptance.field_core_as_sole_engine = false
+acceptance.field_core_as_sole_engine = true
 acceptance.llm_ready = false
 acceptance.nonlinear_memory_proven = false
 ```
 
-The last three remain false intentionally: packed still has a hot-core
-exception, cognitive still has the LLM/chat claim boundary, and nonlinear memory
-still requires schema/residual density proof.
+The last two remain false intentionally: field-core sole-engine is an engine
+ownership claim, not a broad chat/LLM or nonlinear-memory proof.
 
 ## Refactor Queue
 

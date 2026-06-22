@@ -30,6 +30,7 @@ pub mod multi_schema_competition;
 pub mod open_surface_generation;
 pub mod operators;
 pub mod query_wave;
+pub mod readiness;
 pub mod reasoning_field;
 pub mod residuals;
 pub mod schema_memory_growth;
@@ -135,6 +136,12 @@ enum LlmwaveBigCommand {
     /// Run the v1841-v1900 core readiness gate.
     #[command(name = "core-eval")]
     CoreEval(LlmwaveBigCoreEvalArgs),
+    /// Show the LLMWave readiness ladder without claiming broad LLM readiness.
+    #[command(name = "readiness-ladder", alias = "readiness")]
+    ReadinessLadder(LlmwaveBigReadinessLadderArgs),
+    /// Gate a public claim such as llm-ready or nonlinear-memory.
+    #[command(name = "claim-gate")]
+    ClaimGate(LlmwaveBigClaimGateArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -392,6 +399,20 @@ struct LlmwaveBigRunArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreEvalArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigReadinessLadderArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigClaimGateArgs {
+    #[arg(long, value_enum)]
+    claim: readiness::ClaimGateKind,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -763,6 +784,21 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report = field_runtime::build_core_eval_report();
             report::print_core_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ReadinessLadder(args) => {
+            let report = readiness::build_readiness_ladder_report();
+            report::print_readiness_ladder_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ClaimGate(args) => {
+            let report = readiness::build_claim_gate_report(args.claim);
+            let exit = if report.allowed {
+                EXIT_PASS
+            } else {
+                super::EXIT_WATCH
+            };
+            report::print_claim_gate_report(&report, &args.format)?;
+            Ok(exit)
         }
         LlmwaveBigCommand::WordBirth(args) => {
             let report = lexical_birth::build_lexical_birth_report();

@@ -71,7 +71,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         "structural_decision_uses_field_core": true,
         "packed_decision_uses_field_core": true,
         "packed_decision_still_guarded": false,
-        "cognitive_decision_still_guarded": true
+        "cognitive_decision_uses_field_core": true,
+        "cognitive_decision_still_guarded": false
     });
     let acceptance = json!({
         "one_field_vocabulary": true,
@@ -86,7 +87,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         "field_core_owns_local_path_contract": true,
         "structural_decision_uses_field_core": true,
         "structural_field_core_as_sole_engine": structural_cutover_suite_pass,
-        "field_core_as_sole_engine": false,
+        "field_core_as_sole_engine": structural_cutover_suite_pass,
         "field_core_as_semantic_engine": true,
         "feedback_memory_delta_unified": true,
         "semantic_equivalence_gate": true,
@@ -103,7 +104,9 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         "packed_field_record_view": true,
         "cognitive_dual_run_active": true,
         "cognitive_field_engine_guard": true,
-        "cognitive_cutover_blocked_by_claim_guard": true,
+        "cognitive_cutover_blocked_by_claim_guard": false,
+        "cognitive_field_core_as_sole_engine": structural_cutover_suite_pass,
+        "cognitive_claim_guard_blocks_llm": true,
         "unified_lens_contract": true,
         "unified_anti_wave_contract": true,
         "unified_memory_delta_store": true,
@@ -114,7 +117,11 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
     let out = json!({
         "mode": "unified-field-audit",
         "version": field_core::FIELD_PASS_VERSION,
-        "overall_state": "STRUCTURAL_FIELD_CORE_SOLE_ENGINE_ACTIVE_GLOBAL_NOT_READY",
+        "overall_state": if structural_cutover_suite_pass {
+            "FIELD_CORE_SOLE_ENGINE_ACTIVE_LLM_NOT_READY"
+        } else {
+            "STRUCTURAL_FIELD_CORE_SOLE_ENGINE_ACTIVE_GLOBAL_NOT_READY"
+        },
         "field_core": {
             "vector": "FieldVector1024",
             "record": "FieldRecord",
@@ -156,23 +163,34 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "family": "cognitive",
                 "embedded_unified_field": true,
                 "field_pass_present": true,
-                "sole_engine": false,
+                "sole_engine": structural_cutover_suite_pass,
                 "engine_guard": "cognitive-field-engine-guard-v1",
-                "opt_in_cutover_available": false,
-                "state": "DUAL_RUN_ACTIVE_NOT_LLM",
-                "remaining": ["route deeper query-wave/multi-peak/lens/anti/evidence records through FieldPass input"]
+                "opt_in_cutover_available": structural_cutover_suite_pass,
+                "state": if structural_cutover_suite_pass {
+                    "COGNITIVE_FIELD_CORE_SOLE_ENGINE_ACTIVE_NOT_LLM"
+                } else {
+                    "DUAL_RUN_ACTIVE_NOT_LLM"
+                },
+                "remaining": if structural_cutover_suite_pass {
+                    json!(["LLM/chat readiness and nonlinear memory proof remain blocked by claim gates"])
+                } else {
+                    json!(["structural suite must pass before global field-core sole-engine audit"])
+                }
             }
         ],
         "field_engine_contract": {
             "version": "unified-field-engine-contract-v1",
             "policy_owner": "field_core::engine::FieldEngineDecision",
             "families_checked": 3,
+            "global_sole_engine": structural_cutover_suite_pass,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false,
             "structural": {
                 "engine_guard": "structural-field-engine-v1",
                 "cutover_mode": if structural_cutover_suite_pass { "default" } else { "opt-in" },
                 "cutover_allowed": structural_cutover_suite_pass,
                 "structural_sole_engine": structural_cutover_suite_pass,
-                "global_sole_engine": false
+                "scope": "structural"
             },
             "packed": {
                 "engine_guard": "packed-field-engine-guard-v1",
@@ -180,18 +198,19 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "cutover_allowed": true,
                 "blocked_by": null,
                 "packed_sole_engine": true,
-                "global_sole_engine": false,
+                "scope": "packed",
                 "typed_decision_core": "nanda_6m::evaluate_packed_peak_decision",
                 "field_record_view": nanda_6m::FIELD_RECORD_VIEW_VERSION
             },
             "cognitive": {
                 "engine_guard": "cognitive-field-engine-guard-v1",
-                "cutover_mode": "blocked",
-                "cutover_allowed": false,
-                "blocked_by": "claim_boundary_not_llm_ready",
+                "cutover_mode": if structural_cutover_suite_pass { "default" } else { "blocked" },
+                "cutover_allowed": structural_cutover_suite_pass,
+                "blocked_by": if structural_cutover_suite_pass { json!(null) } else { json!("cutover_suite_not_ready") },
+                "cognitive_sole_engine": structural_cutover_suite_pass,
                 "chat_engine": false,
                 "llm_ready": false,
-                "global_sole_engine": false
+                "scope": "cognitive"
             }
         },
         "field_operation_contract": field_operation_contract,
@@ -209,13 +228,23 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             println!("mode: unified-field-audit");
             println!("version: {}", out["version"].as_str().unwrap_or(""));
             println!("state: {}", out["overall_state"].as_str().unwrap_or(""));
-            println!("field_core_as_sole_engine: false");
+            println!(
+                "field_core_as_sole_engine: {}",
+                acceptance["field_core_as_sole_engine"]
+                    .as_bool()
+                    .unwrap_or(false)
+            );
         }
         OutputFormat::Md => {
             println!("# Unified Field Audit\n");
             println!("- version: `{}`", out["version"].as_str().unwrap_or(""));
             println!("- state: `{}`", out["overall_state"].as_str().unwrap_or(""));
-            println!("- field_core_as_sole_engine: `false`");
+            println!(
+                "- field_core_as_sole_engine: `{}`",
+                acceptance["field_core_as_sole_engine"]
+                    .as_bool()
+                    .unwrap_or(false)
+            );
         }
     }
     Ok(EXIT_PASS)

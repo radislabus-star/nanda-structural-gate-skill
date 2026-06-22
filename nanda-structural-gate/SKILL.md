@@ -201,6 +201,10 @@ scripts/nanda-llmwave-big learning-eval --format json
 scripts/nanda-llmwave-big memory-consolidate --format json
 scripts/nanda-llmwave-big run --evidence-mode release-confirmed --decision accept --format json
 scripts/nanda-llmwave-big core-eval --format json
+scripts/nanda-llmwave-big readiness-ladder --format json
+scripts/nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
+scripts/nanda-llmwave-big claim-gate --claim llm-ready --format json
+scripts/nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -528,28 +532,34 @@ sample Active Core verdict, and a typed microbenchmark. Treat the sample
 `ACTIVE_CORE_READY` as a hot-core cycle result, not as LLM readiness or
 nonlinear memory proof.
 Inspect `cognitive_field_engine` on LLMWave-Big JSON reports. It is the
-cognitive guard: field-core may be a semantic engine candidate, but
-`field_core_as_chat_engine=false`, `field_core_as_llm=false`, and
-`field_core_as_sole_engine=false` until broad cognition, corpus, and chat
-safety evals change the claim boundary.
+cognitive engine guard: field-core may be the cognitive-only semantic engine
+when the dual-run says it is not more permissive, but
+`field_core_as_chat_engine=false` and `field_core_as_llm=false` until broad
+cognition, corpus, and chat safety evals change the claim boundary. LLMWave-Big
+reports preserve their domain-specific top-level verdicts; the field-core
+selection is exposed in `cognitive_field_engine` and `cognitive_field_cutover`.
 Use `nanda-field-audit --format json` when the question is whether the unified
 field is coherent across structural, packed, and cognitive paths. Inspect
 `field_engine_contract`: structural cutover may be default when the structural
 suite passes, packed cutover is allowed only as an explicit packed-only path
-through the typed hot decision core, and cognitive cutover must remain blocked
-by the LLM/chat claim boundary. Inspect
+through the typed hot decision core, and cognitive cutover is cognitive-only
+while the LLM/chat claim stays blocked. Inspect
 `field_engine_contract.policy_owner`; it should be
 `field_core::engine::FieldEngineDecision`, meaning structural, packed, and
 cognitive engine decisions share one policy owner instead of three copied JSON
 builders.
 Structural search is allowed to be a structural-only field-core sole engine when
-`acceptance.structural_field_core_as_sole_engine=true`; this does not imply
-global `field_core_as_sole_engine`, `llm_ready`, or
-`nonlinear_memory_proven`. Packed is allowed to be a packed-only field-core sole
-engine when `acceptance.packed_field_core_as_sole_engine=true` and
-`field_engine_contract.packed.packed_sole_engine=true`; this also does not imply
-global `field_core_as_sole_engine`. Global sole-engine remains false while
-cognitive/LLMWave is blocked by claim boundaries.
+`acceptance.structural_field_core_as_sole_engine=true`; packed is allowed to be
+a packed-only field-core sole engine when
+`acceptance.packed_field_core_as_sole_engine=true`; and cognitive is allowed to
+be a cognitive-only field-core sole engine when
+`acceptance.cognitive_field_core_as_sole_engine=true`. When all three are true,
+`acceptance.field_core_as_sole_engine=true`. This still does not imply
+`llm_ready` or `nonlinear_memory_proven`.
+Use `nanda-llmwave-big readiness-ladder --format json` to inspect the readiness
+level, and `nanda-llmwave-big claim-gate --claim llm-ready --format json` or
+`--claim nonlinear-memory` before making public claims. Treat blocked claim
+gates as WATCH.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
 should point to `field_core::peak::FieldPeakResult`,
 `field_core::coherence::FieldCoherenceResult`, and

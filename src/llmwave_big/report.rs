@@ -29,6 +29,7 @@ use super::multi_peak_field::MultiPeakFieldReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
 use super::open_surface_generation::OpenSurfaceGenerationReport;
 use super::query_wave::QueryWaveReport;
+use super::readiness::{ClaimGateReport, ReadinessLadderReport};
 use super::reasoning_field::ReasoningFieldReport;
 use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
@@ -277,6 +278,7 @@ where
     let field_runtime = crate::field_core::cognitive_dual_run_value(&value);
     let cognitive_field_engine =
         crate::field_core::cognitive_field_engine_decision(&value, &unified_field, &field_runtime);
+    crate::field_core::apply_cognitive_field_cutover(&mut value, &cognitive_field_engine);
     if let Some(object) = value.as_object_mut() {
         object.insert("unified_field".to_string(), unified_field);
         object.insert("field_runtime".to_string(), field_runtime);
@@ -501,6 +503,64 @@ pub(crate) fn print_core_eval_report(report: &CoreEvalReport, format: &OutputFor
         ),
         OutputFormat::Text => print_runtime_line(report.roadmap_block, report.verdict),
         OutputFormat::Md => print_runtime_md("Core Eval", report.roadmap_block, report.verdict),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_readiness_ladder_report(
+    report: &ReadinessLadderReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("state: {}", report.current_state);
+            println!("current_level: {}", report.current_level);
+            println!(
+                "broad_chat_llm_ready: {}",
+                report.claim_boundary.broad_chat_llm_ready
+            );
+            println!(
+                "nonlinear_memory_proven: {}",
+                report.claim_boundary.nonlinear_memory_proven
+            );
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Readiness Ladder\n");
+            println!("- state: `{}`", report.current_state);
+            println!("- current level: `{}`", report.current_level);
+            println!(
+                "- broad chat LLM ready: `{}`",
+                report.claim_boundary.broad_chat_llm_ready
+            );
+            println!(
+                "- nonlinear memory proven: `{}`",
+                report.claim_boundary.nonlinear_memory_proven
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_claim_gate_report(
+    report: &ClaimGateReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("claim: {}", report.claim);
+            println!("verdict: {}", report.verdict);
+            println!("allowed: {}", report.allowed);
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Claim Gate\n");
+            println!("- claim: `{}`", report.claim);
+            println!("- verdict: `{}`", report.verdict);
+            println!("- allowed: `{}`", report.allowed);
+        }
     }
     Ok(())
 }

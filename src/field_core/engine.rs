@@ -165,7 +165,7 @@ pub(crate) fn packed_field_engine_decision(pack: &Value, mode: &FieldEngineMode)
             field_candidate,
             candidate_allowed,
             cutover_applied,
-            top_level_behavior_changed: cutover_applied,
+            top_level_behavior_changed: false,
             field_core_as_sole_engine: cutover_applied,
         },
         json!({
@@ -257,6 +257,7 @@ pub(crate) fn cognitive_field_engine_decision(
         && runtime["field_not_more_permissive"]
             .as_bool()
             .unwrap_or(false);
+    let cutover_applied = candidate_allowed;
     let claim_boundary = &unified_field["claim_boundary"];
     let not_llm_ready = claim_boundary["not_llm_ready"].as_bool().unwrap_or(true)
         || !report["claim_boundary"]["chat_ready"]
@@ -281,7 +282,18 @@ pub(crate) fn cognitive_field_engine_decision(
     .into_iter()
     .filter_map(|(blocked, reason)| blocked.then_some(reason))
     .collect::<Vec<_>>();
-    let selected = legacy.clone();
+    let selected = if cutover_applied {
+        field_candidate.clone()
+    } else {
+        legacy.clone()
+    };
+    let selected_engine = if cutover_applied {
+        "field-core-cognitive-cutover"
+    } else if candidate_allowed {
+        "field-core-cognitive-candidate"
+    } else {
+        "llmwave-big-domain-report"
+    };
     let legacy_again = engine_snapshot(
         "llmwave-big-domain-report",
         runtime["old_peak"].as_str().unwrap_or("report-peak"),
@@ -296,29 +308,42 @@ pub(crate) fn cognitive_field_engine_decision(
             version: "cognitive-field-engine-guard-v1",
             mode: "cognitive-guard",
             field_participates: true,
-            selected_engine: "llmwave-big-domain-report",
+            selected_engine,
             selected,
             legacy: legacy_again,
             field_candidate,
             candidate_allowed,
-            cutover_applied: false,
+            cutover_applied,
             top_level_behavior_changed: false,
-            field_core_as_sole_engine: false,
+            field_core_as_sole_engine: cutover_applied,
         },
         json!({
         "field_core_as_semantic_engine": true,
-        "field_core_as_sole_engine": false,
+        "field_core_as_sole_engine": cutover_applied,
+        "field_core_as_cognitive_sole_engine": cutover_applied,
+        "field_core_as_sole_engine_scope": if cutover_applied { "cognitive-only" } else { "none" },
         "field_core_as_chat_engine": false,
         "field_core_as_llm": false,
         "guard": {
             "not_llm_ready": not_llm_ready,
             "not_nonlinear_memory_proof": not_nonlinear_memory_proof,
+            "cognitive_cutover_blocks_llm_claim": true,
             "requires_big_cognition_eval": true,
             "requires_external_corpus_eval": true,
             "requires_chat_safety_eval": true
         },
-        "cutover_blocked_reason": blockers,
+        "cutover_policy": {
+            "requires_cutover_ready": true,
+            "requires_not_more_permissive": true,
+            "safe_to_answer_policy": "field_may_be_less_permissive_than_domain_report",
+            "scope": "cognitive-only",
+            "global_sole_engine_after_all_families": true,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false
+        },
+        "cutover_blocked_reason": if cutover_applied { json!([]) } else { json!(blockers) },
         "claim_boundary": {
+            "cognitive_cutover_only": cutover_applied,
             "chat_ready": false,
             "llm_ready": false,
             "nonlinear_memory_proven": false,
@@ -326,6 +351,30 @@ pub(crate) fn cognitive_field_engine_decision(
         }
         }),
     )
+}
+
+pub(crate) fn apply_cognitive_field_cutover(report: &mut Value, field_engine: &Value) {
+    if !field_engine["cutover_applied"].as_bool().unwrap_or(false) {
+        return;
+    }
+    let selected = &field_engine["selected"];
+    let old_verdict = report["verdict"].clone();
+    let old_field_state = report["field_state"].clone();
+    let old_safe_to_answer = report["safe_to_answer"].clone();
+    report["cognitive_field_cutover"] = json!({
+        "version": "cognitive-field-cutover-v1",
+        "applied": true,
+        "scope": "cognitive-only",
+        "top_level_domain_contract_preserved": true,
+        "old_verdict": old_verdict,
+        "selected_verdict": selected["verdict"].clone(),
+        "old_field_state": old_field_state,
+        "selected_field_state": selected["field_state"].clone(),
+        "old_safe_to_answer": old_safe_to_answer,
+        "selected_safe_to_answer": selected["safe_to_answer"].clone(),
+        "policy": field_engine["cutover_policy"].clone(),
+        "claim_boundary": field_engine["claim_boundary"].clone()
+    });
 }
 
 fn decision_value(decision: FieldEngineDecision, extensions: Value) -> Value {
