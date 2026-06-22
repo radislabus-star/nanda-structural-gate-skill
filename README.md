@@ -376,6 +376,7 @@ nanda-dogfood .
 nanda-map-code src/main.rs
 nanda-map-code .
 nanda-boundary-economics . --format json
+nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-display-flow --owner LayIbusEngine --format json
 nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
@@ -427,7 +428,11 @@ repository.
 `nanda-boundary-economics` is the refactor boundary layer. It does not suggest
 split/merge from file size. It applies `NO EVIDENCE => NO CUT` and returns a
 JSON `boundary_decision` with verdict, score components, evidence, allowed
-files, forbidden routes, required tests, and repair contract. Verdicts are
+files, forbidden routes, required tests, and repair contract. Use repo-wide
+mode to find possible split pressure; use route-scoped mode with `--atlas`,
+`--route`, and `--owner` before a concrete refactor. Route-scoped mode starts
+from `atlas.routes[route].allowed_files` and then narrows by owner/path so the
+contract does not drag unrelated routes into the evidence. Verdicts are
 `SPLIT_STRONG`, `SPLIT_WEAK`, `KEEP`, `MERGE_CANDIDATE`, `VETO`, and `WATCH`.
 `WATCH` means do not cut; `VETO` means stop; `KEEP` means do not touch the
 boundary; `SPLIT_STRONG` allows refactor only inside the returned contract;
@@ -1173,6 +1178,7 @@ nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
 nanda-boundary-economics . --format json
+nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-display-flow --owner LayIbusEngine --format json
 nanda-profile-guards . --iterations 50 --format json
 nanda-dogfood . --out-dir .nanda/
 nanda-dogfood . --refactor-plan --boundary-economics --format json

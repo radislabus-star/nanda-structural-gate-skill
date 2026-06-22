@@ -1295,6 +1295,10 @@ cat >"$tmp_boundary_repo/tests/mixed_test.rs" <<'EOF_BOUNDARY'
 EOF_BOUNDARY
 boundary_split_json="$("$boundary_economics" "$tmp_boundary_repo" --format json)"
 jq -e '.boundary_decision.verdict == "SPLIT_STRONG" and .boundary_decision.evidence.foreign_pull != []' <<<"$boundary_split_json" >/dev/null
+boundary_atlas_path="$tmp_boundary_repo/.nanda/route-atlas.json"
+"$build_atlas" "$tmp_boundary_repo" --out "$boundary_atlas_path" --format json >/dev/null
+boundary_scoped_json="$("$boundary_economics" "$tmp_boundary_repo" --atlas "$boundary_atlas_path" --route ime-display-flow --owner src::bin::lay_ibus_engine --format json || true)"
+jq -e '.scope == "route-scoped" and (.boundary_decision.verdict | IN("KEEP","MERGE_CANDIDATE")) and (.boundary_decision.evidence.files | all(contains("lay_ibus_engine"))) and .boundary_decision.evidence.foreign_pull == [] and (.boundary_decision.required_tests | length) <= 5' <<<"$boundary_scoped_json" >/dev/null
 boundary_veto_json="$("$boundary_economics" "$tmp_boundary_repo" --route ime-display-flow --owner src::bin::lay_ibus_engine --format json || true)"
 jq -e '.boundary_decision.verdict == "VETO"' <<<"$boundary_veto_json" >/dev/null
 tmp_watch_repo="$(mktemp -d)"

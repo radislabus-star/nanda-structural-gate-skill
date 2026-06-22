@@ -10,6 +10,8 @@ pub(crate) struct BoundaryEconomicsArgs {
     #[arg(default_value = ".")]
     pub(crate) input: PathBuf,
     #[arg(long)]
+    pub(crate) atlas: Option<PathBuf>,
+    #[arg(long)]
     pub(crate) route: Option<String>,
     #[arg(long)]
     pub(crate) owner: Option<String>,
@@ -30,15 +32,32 @@ struct BoundaryFacts {
     owners: BTreeSet<String>,
     thin_wrappers: Vec<String>,
     foreign_route_files: Vec<String>,
+    foreign_route_details: Vec<Value>,
+    runtime_checks: Vec<String>,
+    route_scoped: bool,
 }
 
 pub(crate) fn cmd(args: BoundaryEconomicsArgs) -> Result<u8> {
-    let out = report(&args.input, args.route.as_deref(), args.owner.as_deref())?;
+    let out = report_with_atlas(
+        &args.input,
+        args.atlas.as_deref(),
+        args.route.as_deref(),
+        args.owner.as_deref(),
+    )?;
     print_boundary_output(&out, &args.format)?;
     Ok(boundary_exit_code(&out))
 }
 
 pub(crate) fn report(input: &Path, route: Option<&str>, owner: Option<&str>) -> Result<Value> {
+    report_with_atlas(input, None, route, owner)
+}
+
+pub(crate) fn report_with_atlas(
+    input: &Path,
+    atlas_path: Option<&Path>,
+    route: Option<&str>,
+    owner: Option<&str>,
+) -> Result<Value> {
     let root = if input.is_dir() {
         input.to_path_buf()
     } else {
@@ -47,11 +66,44 @@ pub(crate) fn report(input: &Path, route: Option<&str>, owner: Option<&str>) -> 
             .map(Path::to_path_buf)
             .unwrap_or_else(|| PathBuf::from("."))
     };
+    let atlas = match atlas_path {
+        Some(path) => Some(commands::guard::load_atlas(path)?),
+        None => None,
+    };
+    let mut route_scoped = false;
+    let mut runtime_checks = vec![];
     let mut files = vec![];
-    if input.is_dir() {
+    if let (Some(atlas), Some(route)) = (atlas.as_ref(), route) {
+        if let Some(route_node) = atlas["routes"][route].as_object() {
+            route_scoped = true;
+            files = route_node["allowed_files"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect();
+            runtime_checks = route_node["runtime_checks"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect();
+        }
+    }
+    if files.is_empty() && input.is_dir() {
         collect_boundary_files(&root, input, &mut files)?;
-    } else if input.is_file() {
+    } else if files.is_empty() && input.is_file() {
         files.push(input.to_string_lossy().to_string());
+    }
+    if route_scoped {
+        if let Some(owner) = owner {
+            let filtered = filter_files_by_owner(&files, owner);
+            if !filtered.is_empty() {
+                files = filtered;
+            }
+        }
     }
     files.sort();
 
@@ -61,13 +113,17 @@ pub(crate) fn report(input: &Path, route: Option<&str>, owner: Option<&str>) -> 
     let target_owner = owner
         .map(str::to_string)
         .or_else(|| infer_single_owner(&files));
-    let facts = collect_facts(&root, &files, target_route.as_deref());
+    let mut facts = collect_facts(&root, &files, target_route.as_deref());
+    facts.runtime_checks = runtime_checks;
+    facts.route_scoped = route_scoped;
     let decision = boundary_decision(&facts, target_route.as_deref(), target_owner.as_deref());
 
     Ok(json!({
         "mode": "boundary-economics",
         "core_version": CORE_VERSION,
         "input": input.display().to_string(),
+        "atlas": atlas_path.map(|path| path.display().to_string()),
+        "scope": if route_scoped { "route-scoped" } else { "repo-wide" },
         "target_route": target_route,
         "target_owner": target_owner,
         "boundary_decision": decision,
@@ -214,6 +270,28 @@ fn infer_single_owner(files: &[String]) -> Option<String> {
         .flatten()
 }
 
+fn filter_files_by_owner(files: &[String], owner: &str) -> Vec<String> {
+    let owner_norm = normalize_owner_for_match(owner);
+    files
+        .iter()
+        .filter(|file| {
+            let file_norm = normalize_owner_for_match(file);
+            let auto_owner_norm =
+                normalize_owner_for_match(&commands::dogfood::auto_owner_for_path(file));
+            file_norm.contains(&owner_norm) || auto_owner_norm.contains(&owner_norm)
+        })
+        .cloned()
+        .collect()
+}
+
+fn normalize_owner_for_match(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
 fn collect_facts(root: &Path, files: &[String], target_route: Option<&str>) -> BoundaryFacts {
     let mut facts = BoundaryFacts {
         files: files.to_vec(),
@@ -229,6 +307,11 @@ fn collect_facts(root: &Path, files: &[String], target_route: Option<&str>) -> B
         facts.owners.insert(owner.clone());
         if target_route.is_some_and(|target| target != route) {
             facts.foreign_route_files.push(rel.clone());
+            facts.foreign_route_details.push(json!({
+                "file": rel,
+                "route": route,
+                "target_route": target_route
+            }));
         }
         if rel.contains("test") || rel.contains("spec") {
             facts.tests.push(rel.clone());
@@ -286,12 +369,24 @@ fn collect_facts(root: &Path, files: &[String], target_route: Option<&str>) -> B
                     .push(format!("{rel} -> {owner_file}::{name}"));
                 if other_route != route {
                     facts.foreign_route_files.push(owner_file.clone());
+                    facts.foreign_route_details.push(json!({
+                        "file": owner_file,
+                        "route": other_route,
+                        "pulled_by": rel,
+                        "call_edge": format!("{rel} -> {owner_file}::{name}")
+                    }));
                 }
             }
         }
     }
     facts.foreign_route_files.sort();
     facts.foreign_route_files.dedup();
+    facts
+        .foreign_route_details
+        .sort_by_key(|item| item["file"].as_str().unwrap_or("").to_string());
+    facts
+        .foreign_route_details
+        .dedup_by(|left, right| left["file"] == right["file"] && left["route"] == right["route"]);
     facts
 }
 
@@ -392,13 +487,14 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
             "call_edges": sample(&facts.call_edges, 24),
             "public_api_edges": sample(&facts.public_api, 24),
             "foreign_pull": facts.foreign_route_files,
+            "foreign_pull_details": sample_values(&facts.foreign_route_details, 16),
             "shared_state": sample(&facts.shared_state, 24),
             "runtime_side_effects": sample(&facts.runtime_side_effects, 24),
             "tests": facts.tests,
             "route_ids": facts.routes.iter().cloned().collect::<Vec<_>>(),
             "owner_ids": facts.owners.iter().cloned().collect::<Vec<_>>()
         },
-        "allowed_files": if matches!(verdict, "SPLIT_STRONG" | "SPLIT_WEAK" | "KEEP") { json!(facts.files) } else { json!([]) },
+        "allowed_files": if facts.route_scoped && matches!(verdict, "SPLIT_STRONG" | "SPLIT_WEAK" | "KEEP") { json!(facts.files) } else if matches!(verdict, "KEEP") { json!(sample(&facts.files, 12)) } else { json!([]) },
         "forbidden_routes": if let Some(route) = route { json!(facts.routes.iter().filter(|item| item.as_str() != route).cloned().collect::<Vec<_>>()) } else { json!([]) },
         "must_not_change": must_not_change(verdict),
         "required_tests": required_tests(facts),
@@ -499,6 +595,10 @@ fn sample(items: &[String], cap: usize) -> Vec<String> {
     items.iter().take(cap).cloned().collect()
 }
 
+fn sample_values(items: &[Value], cap: usize) -> Vec<Value> {
+    items.iter().take(cap).cloned().collect()
+}
+
 fn empty_components() -> Value {
     json!({
         "owner_clarity_gain": component(0, vec![]),
@@ -526,8 +626,13 @@ fn must_not_change(verdict: &str) -> Value {
 }
 
 fn required_tests(facts: &BoundaryFacts) -> Value {
-    if !facts.tests.is_empty() {
-        json!(facts.tests)
+    let mut tests = vec![];
+    tests.extend(facts.runtime_checks.iter().take(5).cloned());
+    tests.extend(facts.tests.iter().take(5).cloned());
+    tests.sort();
+    tests.dedup();
+    if !tests.is_empty() {
+        json!(tests)
     } else if !facts.runtime_side_effects.is_empty() {
         json!(["add route-specific runtime smoke before refactor"])
     } else {

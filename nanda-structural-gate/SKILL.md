@@ -94,6 +94,7 @@ scripts/nanda-map task.md --domain code --normalize-paths
 scripts/nanda-map-code src/main.rs --format json
 scripts/nanda-map-code . --format json
 scripts/nanda-boundary-economics . --format json
+scripts/nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-display-flow --owner LayIbusEngine --format json
 scripts/nanda-build-atlas . --out .nanda/route-atlas.json
 scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
@@ -272,7 +273,11 @@ count is small.
 Use `nanda-boundary-economics` before split/merge refactors. It enforces
 `NO EVIDENCE => NO CUT`: do not split or merge just because a file is large or
 small. Inspect `boundary_decision.verdict`, score components, evidence, and the
-refactor contract. `WATCH` means do not cut; `VETO` means stop;
+refactor contract. Use repo-wide mode only to find possible split pressure. Use
+route-scoped mode with `--atlas`, `--route`, and `--owner` before a concrete
+refactor; it starts from `atlas.routes[route].allowed_files` and narrows by
+owner/path so unrelated routes do not pollute the contract. `WATCH` means do
+not cut; `VETO` means stop;
 `SPLIT_WEAK` means only a small preparatory step plus human review;
 `SPLIT_STRONG` means refactor only inside `allowed_files` and after required
 tests; `MERGE_CANDIDATE` means prepare a separate merge plan; `KEEP` means do
@@ -843,6 +848,7 @@ scripts/nanda-build-atlas . --out .nanda/route-atlas.json
 scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
 scripts/nanda-boundary-economics . --format json
+scripts/nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-display-flow --owner LayIbusEngine --format json
 scripts/nanda-profile-guards . --iterations 50 --format json
 scripts/nanda-dogfood . --refactor-plan --boundary-economics --format json
 scripts/nanda-map-code . --format json
