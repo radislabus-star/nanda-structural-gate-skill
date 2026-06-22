@@ -523,6 +523,11 @@ split, schema/residual projection, focus competition, runtime operation list,
 sample Active Core verdict, and a typed microbenchmark. Treat the sample
 `ACTIVE_CORE_READY` as a hot-core cycle result, not as LLM readiness or
 nonlinear memory proof.
+Inspect `cognitive_field_engine` on LLMWave-Big JSON reports. It is the
+cognitive guard: field-core may be a semantic engine candidate, but
+`field_core_as_chat_engine=false`, `field_core_as_llm=false`, and
+`field_core_as_sole_engine=false` until broad cognition, corpus, and chat
+safety evals change the claim boundary.
 v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface
 slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
 L2/L3 sync policy, multilingual surface banks, L2 eval metrics, and

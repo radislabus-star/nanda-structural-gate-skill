@@ -727,6 +727,28 @@ This keeps packed as the zero-cost/hot-loop exception while still allowing the
 unified field to reason about packed readiness in the same engine vocabulary as
 structural search.
 
+### Phase 23: Cognitive Field Engine Guard
+
+Status: done as a cognitive claim firewall, not chat/LLM cutover.
+
+LLMWave-Big JSON reports emitted through the shared report layer now include
+`cognitive_field_engine`.
+
+The guard says:
+
+```text
+cognitive_field_engine.field_core_as_semantic_engine = true
+cognitive_field_engine.field_core_as_sole_engine = false
+cognitive_field_engine.field_core_as_chat_engine = false
+cognitive_field_engine.field_core_as_llm = false
+cognitive_field_engine.cutover_applied = false
+```
+
+This means the unified field is allowed to participate as a semantic/cognitive
+projection, but it cannot be interpreted as a general chat model, LLM, nonlinear
+memory proof, or global sole engine until separate broad evals and claim
+boundary changes explicitly permit that.
+
 ## Refactor Gates
 
 Before each phase:

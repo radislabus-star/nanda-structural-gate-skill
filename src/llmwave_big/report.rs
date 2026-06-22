@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use super::active_core::ActiveCoreReport;
 use super::answer_surface::AnswerSurfaceReport;
@@ -275,11 +275,104 @@ where
     let mut value = serde_json::to_value(report)?;
     let unified_field = crate::field_core::adapters::adapt_value(&value).to_value();
     let field_runtime = crate::field_core::cognitive_dual_run_value(&value);
+    let cognitive_field_engine =
+        cognitive_field_engine_decision(&value, &unified_field, &field_runtime);
     if let Some(object) = value.as_object_mut() {
         object.insert("unified_field".to_string(), unified_field);
         object.insert("field_runtime".to_string(), field_runtime);
+        object.insert("cognitive_field_engine".to_string(), cognitive_field_engine);
     }
     Ok(value)
+}
+
+fn cognitive_field_engine_decision(
+    report: &Value,
+    unified_field: &Value,
+    runtime: &Value,
+) -> Value {
+    let legacy = json!({
+        "engine": "llmwave-big-domain-report",
+        "peak": runtime["old_peak"].as_str().unwrap_or("report-peak"),
+        "verdict": runtime["old_verdict"].as_str().unwrap_or("WATCH"),
+        "field_state": runtime["old_field_state"].as_str().unwrap_or("COGNITIVE_UNKNOWN"),
+        "safe_to_answer": runtime["old_safe_to_answer"].as_bool().unwrap_or(false)
+    });
+    let field_candidate = json!({
+        "engine": "field-core",
+        "peak": runtime["field_peak"].as_str().unwrap_or(""),
+        "verdict": runtime["field_verdict"].as_str().unwrap_or("WATCH"),
+        "field_state": runtime["field_state"].as_str().unwrap_or("FIELD_UNKNOWN"),
+        "safe_to_answer": runtime["field_safe_to_answer"].as_bool().unwrap_or(false),
+        "cutover_ready": runtime["cutover_ready"].as_bool().unwrap_or(false),
+        "peak_matches": runtime["peak_matches"].as_bool().unwrap_or(false),
+        "state_family_matches": runtime["state_family_matches"].as_bool().unwrap_or(false),
+        "field_not_more_permissive": runtime["field_not_more_permissive"].as_bool().unwrap_or(false),
+        "mismatch_reason": runtime["mismatch_reason"].clone()
+    });
+    let candidate_allowed = runtime["cutover_ready"].as_bool().unwrap_or(false)
+        && runtime["field_not_more_permissive"]
+            .as_bool()
+            .unwrap_or(false);
+    let claim_boundary = &unified_field["claim_boundary"];
+    let not_llm_ready = claim_boundary["not_llm_ready"].as_bool().unwrap_or(true)
+        || !report["claim_boundary"]["chat_ready"]
+            .as_bool()
+            .unwrap_or(false);
+    let not_nonlinear_memory_proof = claim_boundary["not_nonlinear_memory_proof"]
+        .as_bool()
+        .unwrap_or(true)
+        || !report["claim_boundary"]["nonlinear_memory_proven"]
+            .as_bool()
+            .unwrap_or(false);
+    let blockers = [
+        (not_llm_ready, "claim_boundary_not_llm_ready"),
+        (not_nonlinear_memory_proof, "nonlinear_memory_not_proven"),
+        (
+            !report["claim_boundary"]["full_field_mature"]
+                .as_bool()
+                .unwrap_or(false),
+            "full_field_mature_not_proven",
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(blocked, reason)| blocked.then_some(reason))
+    .collect::<Vec<_>>();
+    json!({
+        "version": "cognitive-field-engine-guard-v1",
+        "mode": "cognitive-guard",
+        "field_participates": true,
+        "selected_engine": "llmwave-big-domain-report",
+        "selected": legacy,
+        "legacy": {
+            "engine": "llmwave-big-domain-report",
+            "peak": runtime["old_peak"].as_str().unwrap_or("report-peak"),
+            "verdict": runtime["old_verdict"].as_str().unwrap_or("WATCH"),
+            "field_state": runtime["old_field_state"].as_str().unwrap_or("COGNITIVE_UNKNOWN"),
+            "safe_to_answer": runtime["old_safe_to_answer"].as_bool().unwrap_or(false)
+        },
+        "field_candidate": field_candidate,
+        "candidate_allowed": candidate_allowed,
+        "cutover_applied": false,
+        "top_level_behavior_changed": false,
+        "field_core_as_semantic_engine": true,
+        "field_core_as_sole_engine": false,
+        "field_core_as_chat_engine": false,
+        "field_core_as_llm": false,
+        "guard": {
+            "not_llm_ready": not_llm_ready,
+            "not_nonlinear_memory_proof": not_nonlinear_memory_proof,
+            "requires_big_cognition_eval": true,
+            "requires_external_corpus_eval": true,
+            "requires_chat_safety_eval": true
+        },
+        "cutover_blocked_reason": blockers,
+        "claim_boundary": {
+            "chat_ready": false,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false,
+            "global_sole_engine": false
+        }
+    })
 }
 
 pub(crate) fn print_multi_peak_field_report(
