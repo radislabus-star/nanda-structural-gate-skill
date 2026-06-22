@@ -81,7 +81,13 @@ pub(crate) fn guard_action_cmd(args: GuardActionArgs) -> Result<u8> {
     };
     let mut out = guard_action(&atlas, &args.symptom, &args.action_id, &runtime_snapshot);
     if args.boundary_economics {
-        out["boundary_decision"] = commands::boundary::boundary_from_guard_action(&atlas, &out);
+        let boundary_decision = commands::boundary::boundary_from_guard_action(&atlas, &out);
+        out["boundary_decision"] = boundary_decision.clone();
+        out["boundary_economics"] = json!({
+            "mode": "boundary-economics",
+            "scope": "route-atlas-action",
+            "boundary_decision": boundary_decision
+        });
     }
     print_guard_output(&out, &args.format)?;
     Ok(guard_exit_code(&out))
@@ -98,7 +104,13 @@ pub(crate) fn guard_diff_cmd(args: GuardDiffArgs) -> Result<u8> {
     };
     let mut out = guard_diff(&atlas, &args.action_id, &diff);
     if args.boundary_economics {
-        out["boundary_decision"] = commands::boundary::boundary_from_guard_diff(&atlas, &out);
+        let boundary_decision = commands::boundary::boundary_from_guard_diff(&atlas, &out);
+        out["boundary_decision"] = boundary_decision.clone();
+        out["boundary_economics"] = json!({
+            "mode": "boundary-economics",
+            "scope": "route-atlas-diff",
+            "boundary_decision": boundary_decision
+        });
     }
     print_guard_output(&out, &args.format)?;
     Ok(guard_exit_code(&out))

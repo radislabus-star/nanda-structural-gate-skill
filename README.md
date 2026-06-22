@@ -432,7 +432,11 @@ files, forbidden routes, required tests, and repair contract. Use repo-wide
 mode to find possible split pressure; use route-scoped mode with `--atlas`,
 `--route`, and `--owner` before a concrete refactor. Route-scoped mode starts
 from `atlas.routes[route].allowed_files` and then narrows by owner/path so the
-contract does not drag unrelated routes into the evidence. Verdicts are
+contract does not drag unrelated routes into the evidence. If an explicit
+`--owner` does not match the selected route atlas, the verdict is `WATCH` and
+`safe_to_edit=false`; the command must not fall back to the whole route.
+Guard commands expose the same contract under `boundary_economics` while
+keeping top-level `boundary_decision` for compatibility. Verdicts are
 `SPLIT_STRONG`, `SPLIT_WEAK`, `KEEP`, `MERGE_CANDIDATE`, `VETO`, and `WATCH`.
 `WATCH` means do not cut; `VETO` means stop; `KEEP` means do not touch the
 boundary; `SPLIT_STRONG` allows refactor only inside the returned contract;

@@ -276,8 +276,12 @@ small. Inspect `boundary_decision.verdict`, score components, evidence, and the
 refactor contract. Use repo-wide mode only to find possible split pressure. Use
 route-scoped mode with `--atlas`, `--route`, and `--owner` before a concrete
 refactor; it starts from `atlas.routes[route].allowed_files` and narrows by
-owner/path so unrelated routes do not pollute the contract. `WATCH` means do
-not cut; `VETO` means stop;
+owner/path so unrelated routes do not pollute the contract. If explicit
+`--owner` does not match the selected route atlas, treat the `WATCH` verdict
+and `safe_to_edit=false` as a stop; do not fall back to the whole route.
+Guard commands expose boundary output under `boundary_economics` and also keep
+top-level `boundary_decision` for compatibility. `WATCH` means do not cut;
+`VETO` means stop;
 `SPLIT_WEAK` means only a small preparatory step plus human review;
 `SPLIT_STRONG` means refactor only inside `allowed_files` and after required
 tests; `MERGE_CANDIDATE` means prepare a separate merge plan; `KEEP` means do

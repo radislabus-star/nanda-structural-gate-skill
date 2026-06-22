@@ -35,6 +35,10 @@ struct BoundaryFacts {
     foreign_route_details: Vec<Value>,
     runtime_checks: Vec<String>,
     route_scoped: bool,
+    owner_filter_requested: bool,
+    owner_filter_matched: bool,
+    requested_owner: Option<String>,
+    route_files_considered: usize,
 }
 
 pub(crate) fn cmd(args: BoundaryEconomicsArgs) -> Result<u8> {
@@ -97,11 +101,18 @@ pub(crate) fn report_with_atlas(
     } else if files.is_empty() && input.is_file() {
         files.push(input.to_string_lossy().to_string());
     }
+    let route_files_considered = files.len();
+    let mut owner_filter_requested = false;
+    let mut owner_filter_matched = true;
     if route_scoped {
         if let Some(owner) = owner {
+            owner_filter_requested = true;
             let filtered = filter_files_by_owner(&files, owner);
             if !filtered.is_empty() {
                 files = filtered;
+            } else {
+                owner_filter_matched = false;
+                files.clear();
             }
         }
     }
@@ -116,6 +127,10 @@ pub(crate) fn report_with_atlas(
     let mut facts = collect_facts(&root, &files, target_route.as_deref());
     facts.runtime_checks = runtime_checks;
     facts.route_scoped = route_scoped;
+    facts.owner_filter_requested = owner_filter_requested;
+    facts.owner_filter_matched = owner_filter_matched;
+    facts.requested_owner = owner.map(str::to_string);
+    facts.route_files_considered = route_files_considered;
     let decision = boundary_decision(&facts, target_route.as_deref(), target_owner.as_deref());
 
     Ok(json!({
@@ -434,7 +449,9 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
     let negative = api_surface_growth + adapter_leak + runtime_risk + migration_cost;
     let score = positive - negative;
 
-    let verdict = if !has_owner || !has_route || evidence_count == 0 {
+    let owner_filter_failed = facts.owner_filter_requested && !facts.owner_filter_matched;
+
+    let verdict = if owner_filter_failed || !has_owner || !has_route || evidence_count == 0 {
         "WATCH"
     } else if !facts.foreign_route_files.is_empty() && route.is_some() {
         "VETO"
@@ -449,6 +466,9 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
     };
 
     let reason = match verdict {
+        "WATCH" if owner_filter_failed => {
+            "owner evidence not found in route atlas; explicit owner cannot fall back to whole route"
+        }
         "WATCH" => "insufficient route, owner, or evidence; NO EVIDENCE => NO CUT",
         "VETO" => "target route would cross foreign route files; split/merge is unsafe",
         "SPLIT_STRONG" => {
@@ -470,6 +490,7 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
         "reason": reason,
         "principle": "NO_EVIDENCE_NO_CUT",
         "score": score,
+        "safe_to_edit": matches!(verdict, "SPLIT_STRONG" | "KEEP"),
         "score_components": {
             "owner_clarity_gain": component(owner_clarity_gain, owner_evidence(facts)),
             "foreign_pull_reduction": component(foreign_pull_reduction, facts.foreign_route_files.clone()),
@@ -492,13 +513,20 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
             "runtime_side_effects": sample(&facts.runtime_side_effects, 24),
             "tests": facts.tests,
             "route_ids": facts.routes.iter().cloned().collect::<Vec<_>>(),
-            "owner_ids": facts.owners.iter().cloned().collect::<Vec<_>>()
+            "owner_ids": facts.owners.iter().cloned().collect::<Vec<_>>(),
+            "owner_filter": {
+                "requested": facts.owner_filter_requested,
+                "matched": facts.owner_filter_matched,
+                "requested_owner": facts.requested_owner.clone(),
+                "route_files_considered": facts.route_files_considered,
+                "matched_files": facts.files.len()
+            }
         },
         "allowed_files": if facts.route_scoped && matches!(verdict, "SPLIT_STRONG" | "SPLIT_WEAK" | "KEEP") { json!(facts.files) } else if matches!(verdict, "KEEP") { json!(sample(&facts.files, 12)) } else { json!([]) },
         "forbidden_routes": if let Some(route) = route { json!(facts.routes.iter().filter(|item| item.as_str() != route).cloned().collect::<Vec<_>>()) } else { json!([]) },
         "must_not_change": must_not_change(verdict),
         "required_tests": required_tests(facts),
-        "repair": repair_tasks(verdict)
+        "repair": repair_tasks(verdict, owner_filter_failed)
     })
 }
 
@@ -640,7 +668,14 @@ fn required_tests(facts: &BoundaryFacts) -> Value {
     }
 }
 
-fn repair_tasks(verdict: &str) -> Value {
+fn repair_tasks(verdict: &str, owner_filter_failed: bool) -> Value {
+    if owner_filter_failed {
+        return json!([
+            "use an owner that matches the selected route atlas",
+            "rebuild atlas if the owner map is stale",
+            "do not expand to the whole route after owner mismatch"
+        ]);
+    }
     match verdict {
         "WATCH" => json!(["collect owner, route, public API, state, runtime, and test evidence before split/merge"]),
         "VETO" => json!(["do not cut across foreign route", "split the refactor by route owner"]),

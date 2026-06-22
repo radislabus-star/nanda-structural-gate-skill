@@ -1258,6 +1258,7 @@ test "$release_status" -eq 3
 jq -e '.mode == "release-gate" and .verdict == "WATCH" and (.routes | index("ime-display-flow"))' <<<"$release_json" >/dev/null
 guard_boundary_json="$("$guard_action" "$atlas_path" --symptom "IME not visible" --action-id "ime.activate_engine" --boundary-economics --format json)"
 jq -e '.boundary_decision.verdict == "KEEP" and .boundary_decision.principle == "NO_EVIDENCE_NO_CUT"' <<<"$guard_boundary_json" >/dev/null
+jq -e '.boundary_economics.boundary_decision.verdict == .boundary_decision.verdict and .boundary_economics.scope == "route-atlas-action"' <<<"$guard_boundary_json" >/dev/null
 profile_json="$("$profile_guards" "$tmp_atlas_repo" --iterations 2 --build-iterations 1 --full-iterations 1 --format json)"
 jq -e '.mode == "guard-profile" and .avg_ms.build_atlas >= 0 and .avg_ms.guard_action >= 0 and .avg_ms.guard_diff >= 0 and .avg_ms.serve_guard_action >= 0 and .avg_ms.serve_guard_diff >= 0 and .avg_ms.serve_guard_combined_per_request >= 0 and .avg_ms.map_code_repo >= 0 and .avg_ms.dogfood_refactor >= 0' <<<"$profile_json" >/dev/null
 printf '{"command":"guard_action","atlas":"%s","symptom":"IME not visible","action_id":"ime.activate_engine"}\n{"command":"guard_diff","atlas":"%s","action_id":"ime.show_candidate","diff":"diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs\\n--- a/src/bin/lay_ibus_engine.rs\\n+++ b/src/bin/lay_ibus_engine.rs\\n"}\n' "$atlas_path" "$atlas_path" >"$tmp_atlas_repo/serve-guards.jsonl"
@@ -1299,6 +1300,8 @@ boundary_atlas_path="$tmp_boundary_repo/.nanda/route-atlas.json"
 "$build_atlas" "$tmp_boundary_repo" --out "$boundary_atlas_path" --format json >/dev/null
 boundary_scoped_json="$("$boundary_economics" "$tmp_boundary_repo" --atlas "$boundary_atlas_path" --route ime-display-flow --owner src::bin::lay_ibus_engine --format json || true)"
 jq -e '.scope == "route-scoped" and (.boundary_decision.verdict | IN("KEEP","MERGE_CANDIDATE")) and (.boundary_decision.evidence.files | all(contains("lay_ibus_engine"))) and .boundary_decision.evidence.foreign_pull == [] and (.boundary_decision.required_tests | length) <= 5' <<<"$boundary_scoped_json" >/dev/null
+boundary_wrong_owner_json="$("$boundary_economics" "$tmp_boundary_repo" --atlas "$boundary_atlas_path" --route ime-display-flow --owner WrongOwner --format json || true)"
+jq -e '.scope == "route-scoped" and .boundary_decision.verdict == "WATCH" and .boundary_decision.safe_to_edit == false and .boundary_decision.evidence.owner_filter.requested == true and .boundary_decision.evidence.owner_filter.matched == false and .boundary_decision.allowed_files == []' <<<"$boundary_wrong_owner_json" >/dev/null
 boundary_veto_json="$("$boundary_economics" "$tmp_boundary_repo" --route ime-display-flow --owner src::bin::lay_ibus_engine --format json || true)"
 jq -e '.boundary_decision.verdict == "VETO"' <<<"$boundary_veto_json" >/dev/null
 tmp_watch_repo="$(mktemp -d)"
