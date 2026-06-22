@@ -27,6 +27,7 @@ use super::mature_anti_wave::MatureAntiWaveReport;
 use super::mini_chat_eval::MiniChatEvalReport;
 use super::multi_peak_field::MultiPeakFieldReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
+use super::nonlinear_memory_eval::NonlinearMemoryEvalReport;
 use super::open_surface_generation::OpenSurfaceGenerationReport;
 use super::query_wave::QueryWaveReport;
 use super::readiness::{ClaimGateReport, ReadinessLadderReport};
@@ -561,6 +562,21 @@ pub(crate) fn print_claim_gate_report(
             println!("- verdict: `{}`", report.verdict);
             println!("- allowed: `{}`", report.allowed);
         }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_nonlinear_memory_eval_report(
+    report: &NonlinearMemoryEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_nonlinear_memory_eval_text(report),
+        OutputFormat::Md => print_nonlinear_memory_eval_md(report),
     }
     Ok(())
 }
@@ -1166,6 +1182,34 @@ fn print_schema_memory_growth_text(report: &SchemaMemoryGrowthReport) {
     );
     println!(
         "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_nonlinear_memory_eval_text(report: &NonlinearMemoryEvalReport) {
+    println!("mode: {}", report.mode);
+    println!("roadmap_block: {}", report.roadmap_block);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "median_bytes_per_useful_fact_gain: {:.4}",
+        report.aggregate.median_bytes_per_useful_fact_gain
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_nonlinear_memory_eval_md(report: &NonlinearMemoryEvalReport) {
+    println!("# LLMWave-Big Nonlinear Memory Eval\n");
+    println!("- roadmap_block: `{}`", report.roadmap_block);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- median_bytes_per_useful_fact_gain: `{:.4}`",
+        report.aggregate.median_bytes_per_useful_fact_gain
+    );
+    println!(
+        "- nonlinear_memory_proven: `{}`",
         report.claim_boundary.nonlinear_memory_proven
     );
 }

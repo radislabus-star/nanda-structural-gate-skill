@@ -249,6 +249,11 @@ big_nonlinear_claim_code=$?
 set -e
 test "$big_nonlinear_claim_code" -eq 3
 jq -e '.claim == "nonlinear-memory" and .verdict == "CLAIM_BLOCKED" and .allowed == false and (.missing_evidence | index("fixed-basis beats linear baseline under capacity"))' <<<"$big_nonlinear_claim_json" >/dev/null
+big_nonlinear_eval_json="$("$llmwave_big" nonlinear-memory-eval --format json)"
+jq -e '.mode == "llmwave-big-nonlinear-memory-eval" and .verdict == "NONLINEAR_MEMORY_SCALE_CANDIDATE_NOT_PROVEN" and .aggregate.state == "USEFUL_DENSITY_SCALE_CANDIDATE"' <<<"$big_nonlinear_eval_json" >/dev/null
+jq -e '.basis.fixed_across_sweep == true and .basis.wave_dim == 1024 and (.sweep | length) == 5 and .sweep[-1].facts == 15000 and .sweep[-1].verdict == "WAVE_DENSITY_WIN"' <<<"$big_nonlinear_eval_json" >/dev/null
+jq -e '.aggregate.large_scale_win_rate == 1 and .aggregate.large_scale_bytes_per_useful_fact_gain > 4 and .aggregate.max_role_error_rate <= 0.02 and .aggregate.max_false_positive_rate <= 0.02' <<<"$big_nonlinear_eval_json" >/dev/null
+jq -e '.claim_boundary.nonlinear_memory_eval_implemented == true and .claim_boundary.useful_density_candidate == true and .claim_boundary.nonlinear_memory_proven == false and (.claim_boundary.blocked_by | index("external_corpus_missing")) and (.claim_boundary.blocked_by | index("broad_noise_eval_missing"))' <<<"$big_nonlinear_eval_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null

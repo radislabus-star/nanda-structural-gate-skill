@@ -973,6 +973,35 @@ acceptance.nonlinear_memory_proven = false
 The last two remain false intentionally: field-core sole-engine is an engine
 ownership claim, not a broad chat/LLM or nonlinear-memory proof.
 
+## Latest Implemented Step: Nonlinear Memory Eval Harness
+
+`nanda llmwave-big nonlinear-memory-eval --format json` now compares a
+fixed-basis residual wave memory against a linear full-record baseline over the
+same synthetic capacity sweep.
+
+Current status:
+
+```text
+verdict = NONLINEAR_MEMORY_SCALE_CANDIDATE_NOT_PROVEN
+aggregate.state = USEFUL_DENSITY_SCALE_CANDIDATE
+aggregate.large_scale_win_rate = 1.0
+claim_boundary.useful_density_candidate = true
+claim_boundary.nonlinear_memory_proven = false
+```
+
+This is a deliberately narrow result. It says the fixed basis starts to win at
+larger scale after basis overhead is amortized. It does not prove nonlinear
+memory yet, because the external corpus and broad noise gates are still missing.
+
+The nonlinear-memory claim stays blocked until:
+
+- fixed-basis memory beats the linear baseline under the configured capacity
+  gates;
+- bytes per useful fact improves under held-out evaluation;
+- schema reuse and residual saving survive scale;
+- role error rate and false positive rate stay bounded;
+- external corpus and broad noise checks pass.
+
 ## Refactor Queue
 
 Priority order:

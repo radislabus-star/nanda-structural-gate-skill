@@ -27,6 +27,7 @@ pub mod mature_anti_wave;
 pub mod mini_chat_eval;
 pub mod multi_peak_field;
 pub mod multi_schema_competition;
+pub mod nonlinear_memory_eval;
 pub mod open_surface_generation;
 pub mod operators;
 pub mod query_wave;
@@ -142,6 +143,9 @@ enum LlmwaveBigCommand {
     /// Gate a public claim such as llm-ready or nonlinear-memory.
     #[command(name = "claim-gate")]
     ClaimGate(LlmwaveBigClaimGateArgs),
+    /// Compare fixed-basis residual memory against a linear fact baseline.
+    #[command(name = "nonlinear-memory-eval", alias = "density-proof")]
+    NonlinearMemoryEval(LlmwaveBigNonlinearMemoryEvalArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -413,6 +417,12 @@ struct LlmwaveBigReadinessLadderArgs {
 struct LlmwaveBigClaimGateArgs {
     #[arg(long, value_enum)]
     claim: readiness::ClaimGateKind,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigNonlinearMemoryEvalArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -799,6 +809,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             };
             report::print_claim_gate_report(&report, &args.format)?;
             Ok(exit)
+        }
+        LlmwaveBigCommand::NonlinearMemoryEval(args) => {
+            let report = nonlinear_memory_eval::build_nonlinear_memory_eval_report();
+            report::print_nonlinear_memory_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {
             let report = lexical_birth::build_lexical_birth_report();
