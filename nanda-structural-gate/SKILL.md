@@ -538,6 +538,12 @@ by the LLM/chat claim boundary. Inspect
 `field_core::engine::FieldEngineDecision`, meaning structural, packed, and
 cognitive engine decisions share one policy owner instead of three copied JSON
 builders.
+Structural search is allowed to be a structural-only field-core sole engine when
+`acceptance.structural_field_core_as_sole_engine=true`; this does not imply
+global `field_core_as_sole_engine`, `llm_ready`, or
+`nonlinear_memory_proven`. Global sole-engine remains false while packed is
+protected by the hot-core guard and cognitive/LLMWave is blocked by claim
+boundaries.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
 should point to `field_core::peak::FieldPeakResult`,
 `field_core::coherence::FieldCoherenceResult`, and

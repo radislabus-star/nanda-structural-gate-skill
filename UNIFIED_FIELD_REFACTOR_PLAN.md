@@ -898,6 +898,29 @@ acceptance.structural_decision_uses_field_core = true
 This is still not a global sole-engine claim. Packed and cognitive paths remain
 guarded by their hot-core and LLM/chat claim boundaries.
 
+## Latest Implemented Step: Structural Sole-Engine Cutover
+
+Structural search now defaults to field-core cutover. Legacy structural output is
+still available with `--field-engine legacy`, but the default structural CLI path
+uses the field-core candidate when the structural cutover suite proves it is not
+more permissive than the legacy route.
+
+`nanda field-audit --format json` now reports:
+
+```text
+overall_state = STRUCTURAL_FIELD_CORE_SOLE_ENGINE_ACTIVE_GLOBAL_NOT_READY
+acceptance.structural_field_core_as_sole_engine = true
+field_engine_contract.structural.cutover_mode = default
+field_engine_contract.structural.structural_sole_engine = true
+acceptance.field_core_as_sole_engine = false
+acceptance.llm_ready = false
+acceptance.nonlinear_memory_proven = false
+```
+
+The last three remain false intentionally: packed still has a hot-core
+exception, cognitive still has the LLM/chat claim boundary, and nonlinear memory
+still requires schema/residual density proof.
+
 ## Refactor Queue
 
 Priority order:

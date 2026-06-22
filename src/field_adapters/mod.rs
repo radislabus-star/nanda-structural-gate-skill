@@ -84,6 +84,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         "field_core_owns_readout_contract": true,
         "field_core_owns_local_path_contract": true,
         "structural_decision_uses_field_core": true,
+        "structural_field_core_as_sole_engine": structural_cutover_suite_pass,
         "field_core_as_sole_engine": false,
         "field_core_as_semantic_engine": true,
         "feedback_memory_delta_unified": true,
@@ -111,7 +112,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
     let out = json!({
         "mode": "unified-field-audit",
         "version": field_core::FIELD_PASS_VERSION,
-        "overall_state": "UNIFIED_FIELD_RUNTIME_DUAL_RUN_ACTIVE_NOT_SOLE_ENGINE",
+        "overall_state": "STRUCTURAL_FIELD_CORE_SOLE_ENGINE_ACTIVE_GLOBAL_NOT_READY",
         "field_core": {
             "vector": "FieldVector1024",
             "record": "FieldRecord",
@@ -125,15 +126,19 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "family": "structural",
                 "embedded_unified_field": true,
                 "field_pass_present": true,
-                "sole_engine": false,
+                "sole_engine": structural_cutover_suite_pass,
                 "engine_guard": "structural-field-engine-v1",
                 "opt_in_cutover_available": structural_cutover_suite_pass,
                 "state": if structural_cutover_suite_pass {
-                    "DUAL_RUN_CUTOVER_SUITE_PASS"
+                    "STRUCTURAL_FIELD_CORE_SOLE_ENGINE_ACTIVE"
                 } else {
                     "DUAL_RUN_CUTOVER_SUITE_WATCH"
                 },
-                "remaining": ["explicit follow-up cutover is still required before structural sole-engine mode"]
+                "remaining": if structural_cutover_suite_pass {
+                    json!([])
+                } else {
+                    json!(["structural cutover suite must pass before structural sole-engine mode"])
+                }
             },
             {
                 "family": "packed",
@@ -162,8 +167,9 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "families_checked": 3,
             "structural": {
                 "engine_guard": "structural-field-engine-v1",
-                "cutover_mode": "opt-in",
+                "cutover_mode": if structural_cutover_suite_pass { "default" } else { "opt-in" },
                 "cutover_allowed": structural_cutover_suite_pass,
+                "structural_sole_engine": structural_cutover_suite_pass,
                 "global_sole_engine": false
             },
             "packed": {
@@ -365,6 +371,9 @@ pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
             println!("state: {state}");
             println!("cases_checked: {cases_checked}");
             println!("structural_cutover_suite_pass: {structural_cutover_suite_pass}");
+            println!(
+                "field_core_as_structural_sole_engine_allowed: {structural_cutover_suite_pass}"
+            );
             println!("field_core_as_sole_engine_allowed: false");
         }
         OutputFormat::Md => {
@@ -374,6 +383,9 @@ pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
             println!("- state: `{state}`");
             println!("- cases_checked: `{cases_checked}`");
             println!("- structural_cutover_suite_pass: `{structural_cutover_suite_pass}`");
+            println!(
+                "- field_core_as_structural_sole_engine_allowed: `{structural_cutover_suite_pass}`"
+            );
             println!("- field_core_as_sole_engine_allowed: `false`");
         }
     }
@@ -418,6 +430,7 @@ fn field_cutover_report(cases: Vec<Value>, suite_label: &str) -> Value {
             "all_cutover_ready": all_cutover_ready,
             "structural_cutover_suite_pass": structural_cutover_suite_pass,
             "field_core_as_structural_engine_candidate": structural_cutover_suite_pass,
+            "field_core_as_structural_sole_engine_allowed": structural_cutover_suite_pass,
             "field_core_as_sole_engine_allowed": false,
             "packed_hot_core_exception": true,
             "llm_ready": false,
@@ -426,9 +439,10 @@ fn field_cutover_report(cases: Vec<Value>, suite_label: &str) -> Value {
         "claim_boundary": {
             "global_sole_engine": false,
             "structural_only_candidate": structural_cutover_suite_pass,
+            "structural_only_sole_engine": structural_cutover_suite_pass,
             "packed_hot_core_exception": true,
             "cognitive_not_llm": true,
-            "requires_explicit_follow_up_cutover": true
+            "requires_explicit_follow_up_cutover": !structural_cutover_suite_pass
         }
     })
 }

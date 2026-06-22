@@ -59,7 +59,7 @@ pub(crate) fn structural_field_engine_decision(search: &Value, mode: &FieldEngin
             candidate_allowed,
             cutover_applied,
             top_level_behavior_changed: cutover_applied,
-            field_core_as_sole_engine: false,
+            field_core_as_sole_engine: cutover_applied,
         },
         json!({
         "field_core_as_structural_sole_engine": cutover_applied,
