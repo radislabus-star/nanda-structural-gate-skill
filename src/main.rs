@@ -1089,6 +1089,8 @@ struct Pack6mArgs {
     query: String,
     #[arg(long, default_value_t = 8)]
     sample: usize,
+    #[arg(long, value_enum, default_value = "legacy")]
+    field_engine: FieldEngineMode,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
     #[arg(long)]

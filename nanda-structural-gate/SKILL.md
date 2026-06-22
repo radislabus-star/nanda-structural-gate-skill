@@ -113,6 +113,8 @@ scripts/nanda-dataset-doctor .nanda/index.json --input-format json
 scripts/nanda-aliases examples/triad-packet.canonical-alias-pass.json --input-format json
 scripts/nanda-budget .nanda/index.json --input-format json
 scripts/nanda-pack6m .nanda/index.json --input-format json
+scripts/nanda-pack6m .nanda/index.json --input-format json --field-engine candidate
+scripts/nanda-pack6m .nanda/index.json --input-format json --field-engine cutover
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
 scripts/nanda-bench6m --mode density --support-build-iterations 1000 --triads 15000 --format json
 scripts/nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
@@ -379,6 +381,10 @@ deterministic dictionaries, sample `PackedTriad32` records, and a fixed
 1024-dimensional candidate/query projection summary against memory/source
 route/group centroids, including a first packed candidate-query-vs-memory
 centroid peak score. It still does not execute full packed interference search.
+Use `--field-engine candidate` or `--field-engine cutover` only to inspect the
+packed field-engine guard. Packed `cutover` is deliberately blocked by the
+hot-core guard: `packed_field_engine.cutover_applied=false`,
+`selected_engine=packed-hot-core`, and `field_core_as_sole_engine=false`.
 Inspect `peak_decision.safe_to_answer`: `PACKED_THIN` is a weak honest peak,
 not a trustworthy answer route yet.
 Inspect `packed_support`: it splits the packed peak into supporting and

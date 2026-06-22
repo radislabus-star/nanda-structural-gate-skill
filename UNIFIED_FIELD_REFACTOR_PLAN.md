@@ -692,6 +692,41 @@ This means field-core is the opt-in sole structural engine for that search
 result. It is not global sole-engine permission: packed remains a protected
 hot-core exception and cognitive remains not-LLM/not-chat.
 
+### Phase 22: Packed Field Engine Guard
+
+Status: done as a protected hot-core bridge, not packed cutover.
+
+`nanda pack6m` now accepts the same field-engine vocabulary:
+
+```bash
+nanda pack6m packet.json --input-format json --field-engine legacy
+nanda pack6m packet.json --input-format json --field-engine candidate
+nanda pack6m packet.json --input-format json --field-engine cutover
+```
+
+The output includes `packed_field_engine`:
+
+- `legacy`: packed hot-core remains selected;
+- `candidate`: field-core can be reported as a packed engine candidate when
+  `field_runtime.cutover_ready=true`, but top-level packed behavior does not
+  change;
+- `cutover`: records the cutover request and blocks it through the hot-core
+  guard.
+
+Required invariant:
+
+```text
+packed_field_engine.selected_engine = packed-hot-core
+packed_field_engine.cutover_applied = false
+packed_field_engine.field_core_as_sole_engine = false
+packed_field_engine.field_core_as_packed_hot_engine = false
+packed_field_engine.hot_core_guard.packed_hot_core_exception = true
+```
+
+This keeps packed as the zero-cost/hot-loop exception while still allowing the
+unified field to reason about packed readiness in the same engine vocabulary as
+structural search.
+
 ## Refactor Gates
 
 Before each phase:
