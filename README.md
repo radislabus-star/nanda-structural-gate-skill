@@ -375,12 +375,13 @@ nanda-doctor
 nanda-dogfood .
 nanda-map-code src/main.rs
 nanda-map-code .
+nanda-boundary-economics . --format json
 nanda-build-atlas . --out .nanda/route-atlas.json
-nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
-nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
+nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
 nanda-profile-guards . --iterations 50 --format json
 nanda-release-gate .nanda/route-atlas.json
-nanda-dogfood . --refactor-plan --format json
+nanda-dogfood . --refactor-plan --boundary-economics --format json
 nanda-self-check
 ```
 
@@ -423,6 +424,15 @@ the normal structural verdict plus repository-level code-boundary
 recommendations in one packet. The dogfood refactor plan scans multiple Rust
 files and reports `risk_files`; it should not treat `src/main.rs` as the whole
 repository.
+`nanda-boundary-economics` is the refactor boundary layer. It does not suggest
+split/merge from file size. It applies `NO EVIDENCE => NO CUT` and returns a
+JSON `boundary_decision` with verdict, score components, evidence, allowed
+files, forbidden routes, required tests, and repair contract. Verdicts are
+`SPLIT_STRONG`, `SPLIT_WEAK`, `KEEP`, `MERGE_CANDIDATE`, `VETO`, and `WATCH`.
+`WATCH` means do not cut; `VETO` means stop; `KEEP` means do not touch the
+boundary; `SPLIT_STRONG` allows refactor only inside the returned contract;
+`SPLIT_WEAK` is a small preparatory step plus human review; `MERGE_CANDIDATE`
+needs a separate merge plan or review.
 `nanda-build-atlas` writes reusable route memory to `.nanda/route-atlas.json`.
 `nanda-guard-action` is the fast pre-edit check: symptom plus `action_id` must
 resolve to an atlas route. `nanda-guard-diff` is the post-edit check: changed
@@ -1160,11 +1170,12 @@ Atlas-first, gate-on-diff workflow:
 ```bash
 mkdir -p .nanda
 nanda-build-atlas . --out .nanda/route-atlas.json
-nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
-nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
+nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
+nanda-boundary-economics . --format json
 nanda-profile-guards . --iterations 50 --format json
 nanda-dogfood . --out-dir .nanda/
-nanda-dogfood . --refactor-plan --format json
+nanda-dogfood . --refactor-plan --boundary-economics --format json
 nanda-release-gate .nanda/route-atlas.json
 nanda-extract notes.raw.txt --out .nanda/notes.json
 nanda-index memory-a.json memory-b.md --out .nanda/index.json

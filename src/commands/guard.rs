@@ -25,6 +25,8 @@ pub(crate) struct GuardActionArgs {
     pub(crate) action_id: String,
     #[arg(long = "runtime-snapshot")]
     pub(crate) runtime_snapshot: Option<PathBuf>,
+    #[arg(long)]
+    pub(crate) boundary_economics: bool,
     #[arg(long, value_enum, default_value = "json")]
     pub(crate) format: OutputFormat,
 }
@@ -36,6 +38,8 @@ pub(crate) struct GuardDiffArgs {
     pub(crate) action_id: String,
     #[arg(long)]
     pub(crate) diff: PathBuf,
+    #[arg(long)]
+    pub(crate) boundary_economics: bool,
     #[arg(long, value_enum, default_value = "json")]
     pub(crate) format: OutputFormat,
 }
@@ -75,7 +79,10 @@ pub(crate) fn guard_action_cmd(args: GuardActionArgs) -> Result<u8> {
         Some(path) => serde_json::from_str::<Value>(&fs::read_to_string(&path)?)?,
         None => Value::Null,
     };
-    let out = guard_action(&atlas, &args.symptom, &args.action_id, &runtime_snapshot);
+    let mut out = guard_action(&atlas, &args.symptom, &args.action_id, &runtime_snapshot);
+    if args.boundary_economics {
+        out["boundary_decision"] = commands::boundary::boundary_from_guard_action(&atlas, &out);
+    }
     print_guard_output(&out, &args.format)?;
     Ok(guard_exit_code(&out))
 }
@@ -89,7 +96,10 @@ pub(crate) fn guard_diff_cmd(args: GuardDiffArgs) -> Result<u8> {
     } else {
         fs::read_to_string(&args.diff)?
     };
-    let out = guard_diff(&atlas, &args.action_id, &diff);
+    let mut out = guard_diff(&atlas, &args.action_id, &diff);
+    if args.boundary_economics {
+        out["boundary_decision"] = commands::boundary::boundary_from_guard_diff(&atlas, &out);
+    }
     print_guard_output(&out, &args.format)?;
     Ok(guard_exit_code(&out))
 }

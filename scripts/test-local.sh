@@ -45,6 +45,7 @@ split_md="$root/nanda-structural-gate/scripts/nanda-split-md"
 split_packet="$root/nanda-structural-gate/scripts/nanda-split"
 mapper="$root/nanda-structural-gate/scripts/nanda-map"
 code_mapper="$root/nanda-structural-gate/scripts/nanda-map-code"
+boundary_economics="$root/nanda-structural-gate/scripts/nanda-boundary-economics"
 build_atlas="$root/nanda-structural-gate/scripts/nanda-build-atlas"
 guard_action="$root/nanda-structural-gate/scripts/nanda-guard-action"
 guard_diff="$root/nanda-structural-gate/scripts/nanda-guard-diff"
@@ -1255,6 +1256,8 @@ release_status=$?
 set -e
 test "$release_status" -eq 3
 jq -e '.mode == "release-gate" and .verdict == "WATCH" and (.routes | index("ime-display-flow"))' <<<"$release_json" >/dev/null
+guard_boundary_json="$("$guard_action" "$atlas_path" --symptom "IME not visible" --action-id "ime.activate_engine" --boundary-economics --format json)"
+jq -e '.boundary_decision.verdict == "KEEP" and .boundary_decision.principle == "NO_EVIDENCE_NO_CUT"' <<<"$guard_boundary_json" >/dev/null
 profile_json="$("$profile_guards" "$tmp_atlas_repo" --iterations 2 --build-iterations 1 --full-iterations 1 --format json)"
 jq -e '.mode == "guard-profile" and .avg_ms.build_atlas >= 0 and .avg_ms.guard_action >= 0 and .avg_ms.guard_diff >= 0 and .avg_ms.serve_guard_action >= 0 and .avg_ms.serve_guard_diff >= 0 and .avg_ms.serve_guard_combined_per_request >= 0 and .avg_ms.map_code_repo >= 0 and .avg_ms.dogfood_refactor >= 0' <<<"$profile_json" >/dev/null
 printf '{"command":"guard_action","atlas":"%s","symptom":"IME not visible","action_id":"ime.activate_engine"}\n{"command":"guard_diff","atlas":"%s","action_id":"ime.show_candidate","diff":"diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs\\n--- a/src/bin/lay_ibus_engine.rs\\n+++ b/src/bin/lay_ibus_engine.rs\\n"}\n' "$atlas_path" "$atlas_path" >"$tmp_atlas_repo/serve-guards.jsonl"
@@ -1263,6 +1266,44 @@ grep -q '"mode":"guard-action"' <<<"$serve_guards_json"
 grep -q '"mode":"guard-diff"' <<<"$serve_guards_json"
 grep -q 'SERVE_ATLAS_HIT' <<<"$serve_guards_json"
 rm -rf "$tmp_atlas_repo"
+tmp_boundary_repo="$(mktemp -d)"
+mkdir -p "$tmp_boundary_repo/src/bin/lay_daemon" "$tmp_boundary_repo/src/bin/lay_ibus_engine" "$tmp_boundary_repo/src/nanda" "$tmp_boundary_repo/tests"
+cat >"$tmp_boundary_repo/src/runtime_one.rs" <<'EOF_BOUNDARY'
+static STATE: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+pub(crate) fn handle_manual_trigger_runtime() { let _ = STATE.get(); }
+fn route_private() {}
+fn route_private_two() {}
+EOF_BOUNDARY
+boundary_keep_json="$("$boundary_economics" "$tmp_boundary_repo/src/runtime_one.rs" --route runtime-flow --owner src::runtime_one.rs --format json)"
+jq -e '.boundary_decision.verdict == "KEEP"' <<<"$boundary_keep_json" >/dev/null
+cat >"$tmp_boundary_repo/src/bin/lay_daemon/thin_wrapper.rs" <<'EOF_BOUNDARY'
+pub fn forward_candidate() { owner_candidate(); }
+fn owner_candidate() {}
+EOF_BOUNDARY
+boundary_merge_json="$("$boundary_economics" "$tmp_boundary_repo/src/bin/lay_daemon/thin_wrapper.rs" --route runtime-flow --owner src::bin::lay_daemon --format json || true)"
+jq -e '.boundary_decision.verdict == "MERGE_CANDIDATE" and (.boundary_decision.repair | index("merge wrapper into owner module"))' <<<"$boundary_merge_json" >/dev/null
+cat >"$tmp_boundary_repo/src/bin/lay_ibus_engine/mixed.rs" <<'EOF_BOUNDARY'
+pub fn ime_display_candidate() { score_candidate(); }
+fn score_candidate() {}
+EOF_BOUNDARY
+cat >"$tmp_boundary_repo/src/nanda/scoring.rs" <<'EOF_BOUNDARY'
+pub fn nanda_score_candidate() { score_candidate(); }
+fn score_candidate() {}
+EOF_BOUNDARY
+cat >"$tmp_boundary_repo/tests/mixed_test.rs" <<'EOF_BOUNDARY'
+#[test] fn mixed_boundary_test() { assert!(true); }
+EOF_BOUNDARY
+boundary_split_json="$("$boundary_economics" "$tmp_boundary_repo" --format json)"
+jq -e '.boundary_decision.verdict == "SPLIT_STRONG" and .boundary_decision.evidence.foreign_pull != []' <<<"$boundary_split_json" >/dev/null
+boundary_veto_json="$("$boundary_economics" "$tmp_boundary_repo" --route ime-display-flow --owner src::bin::lay_ibus_engine --format json || true)"
+jq -e '.boundary_decision.verdict == "VETO"' <<<"$boundary_veto_json" >/dev/null
+tmp_watch_repo="$(mktemp -d)"
+touch "$tmp_watch_repo/README.md"
+boundary_watch_json="$("$boundary_economics" "$tmp_watch_repo" --format json || true)"
+jq -e '.boundary_decision.verdict == "WATCH"' <<<"$boundary_watch_json" >/dev/null
+dogfood_boundary_json="$("$dogfood" "$tmp_boundary_repo" --refactor-plan --boundary-economics --format json || true)"
+jq -e '.boundary_economics.boundary_decision.verdict | IN("SPLIT_STRONG","SPLIT_WEAK","VETO","KEEP","MERGE_CANDIDATE","WATCH")' <<<"$dogfood_boundary_json" >/dev/null
+rm -rf "$tmp_boundary_repo" "$tmp_watch_repo"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null
@@ -1401,6 +1442,7 @@ fi
 "$serve" --help | grep -q "Usage: nanda serve"
 "$dogfood" --help | grep -q "Usage: nanda dogfood"
 "$code_mapper" --help | grep -q "Usage: nanda map-code"
+"$boundary_economics" --help | grep -q "Usage: nanda boundary-economics"
 "$build_atlas" --help | grep -q "Usage: nanda build-atlas"
 "$guard_action" --help | grep -q "Usage: nanda guard-action"
 "$guard_diff" --help | grep -q "Usage: nanda guard-diff"

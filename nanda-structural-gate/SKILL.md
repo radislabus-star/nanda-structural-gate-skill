@@ -93,12 +93,13 @@ scripts/nanda-map task.md --domain general
 scripts/nanda-map task.md --domain code --normalize-paths
 scripts/nanda-map-code src/main.rs --format json
 scripts/nanda-map-code . --format json
+scripts/nanda-boundary-economics . --format json
 scripts/nanda-build-atlas . --out .nanda/route-atlas.json
-scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
-scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
+scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
 scripts/nanda-profile-guards . --iterations 50 --format json
 scripts/nanda-release-gate .nanda/route-atlas.json
-scripts/nanda-dogfood . --refactor-plan --format json
+scripts/nanda-dogfood . --refactor-plan --boundary-economics --format json
 scripts/nanda-comb task.json --input-format json --depth 2
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
 scripts/nanda-index memory-a.json memory-b.md --out .nanda/index.json
@@ -268,6 +269,14 @@ functions, reports cross-cluster dependencies, suggests target files, and marks
 extraction risk. On a directory, it returns a repo-level `repo-code-map`.
 Hotkey/FSM/event/state-machine code is route-critical even when dependency
 count is small.
+Use `nanda-boundary-economics` before split/merge refactors. It enforces
+`NO EVIDENCE => NO CUT`: do not split or merge just because a file is large or
+small. Inspect `boundary_decision.verdict`, score components, evidence, and the
+refactor contract. `WATCH` means do not cut; `VETO` means stop;
+`SPLIT_WEAK` means only a small preparatory step plus human review;
+`SPLIT_STRONG` means refactor only inside `allowed_files` and after required
+tests; `MERGE_CANDIDATE` means prepare a separate merge plan; `KEEP` means do
+not touch the boundary.
 Use `nanda-build-atlas` to write reusable route memory once. Use
 `nanda-guard-action` before editing and `nanda-guard-diff` after editing. Use
 `nanda-release-gate` only before publishing or merging. Do not run the full
@@ -831,10 +840,11 @@ Recommended repository workflow:
 
 ```bash
 scripts/nanda-build-atlas . --out .nanda/route-atlas.json
-scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
-scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
+scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
+scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
+scripts/nanda-boundary-economics . --format json
 scripts/nanda-profile-guards . --iterations 50 --format json
-scripts/nanda-dogfood . --refactor-plan --format json
+scripts/nanda-dogfood . --refactor-plan --boundary-economics --format json
 scripts/nanda-map-code . --format json
 scripts/nanda-release-gate .nanda/route-atlas.json
 scripts/nanda-dogfood . --out-dir .nanda/

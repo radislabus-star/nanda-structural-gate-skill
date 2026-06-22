@@ -41,6 +41,20 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
     } else {
         None
     };
+    let boundary_economics = if args.boundary_economics {
+        let repo_root = if requested_input.is_dir() {
+            requested_input.clone()
+        } else {
+            input
+                .parent()
+                .and_then(Path::parent)
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from("."))
+        };
+        Some(commands::boundary::report(&repo_root, None, None)?)
+    } else {
+        None
+    };
     let comb_tree = comb_node(
         "root",
         0,
@@ -68,7 +82,8 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
         "summary": summary,
         "codex_failure_field": failure_field,
         "agent_decision": decision,
-        "refactor_plan": refactor_plan
+        "refactor_plan": refactor_plan,
+        "boundary_economics": boundary_economics
     });
     if let Some(out_dir) = args.out_dir {
         fs::create_dir_all(&out_dir)?;

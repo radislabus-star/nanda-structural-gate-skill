@@ -118,6 +118,7 @@ enum Command {
     Serve(ServeArgs),
     Doctor(DoctorArgs),
     Dogfood(DogfoodArgs),
+    BoundaryEconomics(commands::boundary::BoundaryEconomicsArgs),
     MapCode(commands::code_map::MapCodeArgs),
     BuildAtlas(commands::guard::BuildAtlasArgs),
     GuardAction(commands::guard::GuardActionArgs),
@@ -1202,6 +1203,8 @@ struct DogfoodArgs {
     #[arg(long)]
     refactor_plan: bool,
     #[arg(long)]
+    boundary_economics: bool,
+    #[arg(long)]
     build_atlas: bool,
     #[arg(long)]
     atlas_out: Option<PathBuf>,
@@ -1274,6 +1277,7 @@ fn run() -> Result<u8> {
         Command::Serve(args) => serve_cmd(args),
         Command::Doctor(args) => doctor_cmd(args),
         Command::Dogfood(args) => commands::dogfood::dogfood_cmd(args),
+        Command::BoundaryEconomics(args) => commands::boundary::cmd(args),
         Command::MapCode(args) => commands::code_map::cmd(args),
         Command::BuildAtlas(args) => commands::guard::build_atlas_cmd(args),
         Command::GuardAction(args) => commands::guard::guard_action_cmd(args),
