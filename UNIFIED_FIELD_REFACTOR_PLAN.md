@@ -780,6 +780,41 @@ vocabulary/pass/engine contract now covers structural, packed, and cognitive
 reports, but only structural has an explicit opt-in cutover path. Packed and
 cognitive remain guarded.
 
+### Phase 25: Shared Field Engine Policy Owner
+
+Status: done.
+
+The engine-policy layer moved into `src/field_core/engine.rs`.
+
+The shared owner is:
+
+```text
+field_core::engine::FieldEngineDecision
+```
+
+It now owns the common decision shape for:
+
+- structural `field_engine`;
+- packed `packed_field_engine`;
+- cognitive `cognitive_field_engine`.
+
+Domain modules now call the shared policy instead of hand-building separate
+engine decisions:
+
+- `search.rs` calls `field_core::structural_field_engine_decision`;
+- `pack6m.rs` calls `field_core::packed_field_engine_decision`;
+- `llmwave_big/report.rs` calls `field_core::cognitive_field_engine_decision`.
+
+`nanda field-audit --format json` reports:
+
+```text
+field_engine_contract.policy_owner = field_core::engine::FieldEngineDecision
+acceptance.field_engine_policy_in_field_core = true
+```
+
+This closes the first "real shared physics" step: the engine decision contract
+is no longer copied across the three field families.
+
 ## Refactor Gates
 
 Before each phase:

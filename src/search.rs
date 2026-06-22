@@ -46,8 +46,8 @@ pub(crate) fn search_cmd(args: SearchArgs) -> Result<u8> {
     result["canonicalization"] = json!(packet.canonicalization);
     result["unified_field"] = field_core::adapters::adapt_value(&result).to_value();
     result["field_runtime"] = field_core::structural_dual_run_value(&result);
-    let field_engine = field_engine_decision(&result, &args.field_engine);
-    apply_structural_field_cutover(&mut result, &field_engine);
+    let field_engine = field_core::structural_field_engine_decision(&result, &args.field_engine);
+    field_core::apply_structural_field_cutover(&mut result, &field_engine);
     result["field_engine"] = field_engine;
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&result)?),
@@ -55,115 +55,6 @@ pub(crate) fn search_cmd(args: SearchArgs) -> Result<u8> {
         OutputFormat::Md => print_search_md(&result),
     }
     Ok(EXIT_PASS)
-}
-
-fn field_engine_decision(search: &Value, mode: &FieldEngineMode) -> Value {
-    let mode_label = match mode {
-        FieldEngineMode::Legacy => "legacy",
-        FieldEngineMode::Shadow => "shadow",
-        FieldEngineMode::Candidate => "candidate",
-        FieldEngineMode::Cutover => "cutover",
-    };
-    let legacy = json!({
-        "engine": "structural-domain",
-        "peak": search["top_peak"].as_str().unwrap_or(""),
-        "verdict": search["verdict"].as_str().unwrap_or("WATCH"),
-        "field_state": search["field_state"].as_str().unwrap_or("FIELD_UNKNOWN"),
-        "safe_to_answer": search["safe_to_answer"].as_bool().unwrap_or(false)
-    });
-    let runtime = &search["field_runtime"];
-    let field_candidate = json!({
-        "engine": "field-core",
-        "peak": runtime["field_peak"].as_str().unwrap_or(""),
-        "verdict": runtime["field_verdict"].as_str().unwrap_or("WATCH"),
-        "field_state": runtime["field_state"].as_str().unwrap_or("FIELD_UNKNOWN"),
-        "safe_to_answer": runtime["field_safe_to_answer"].as_bool().unwrap_or(false),
-        "cutover_ready": runtime["cutover_ready"].as_bool().unwrap_or(false),
-        "peak_matches": runtime["peak_matches"].as_bool().unwrap_or(false),
-        "state_family_matches": runtime["state_family_matches"].as_bool().unwrap_or(false),
-        "field_not_more_permissive": runtime["field_not_more_permissive"].as_bool().unwrap_or(false),
-        "mismatch_reason": runtime["mismatch_reason"].clone()
-    });
-    let runtime_cutover_ready = runtime["cutover_ready"].as_bool().unwrap_or(false);
-    let runtime_not_more_permissive = runtime["field_not_more_permissive"]
-        .as_bool()
-        .unwrap_or(false);
-    let candidate_requested = matches!(mode, FieldEngineMode::Candidate | FieldEngineMode::Cutover);
-    let candidate_allowed =
-        candidate_requested && runtime_cutover_ready && runtime_not_more_permissive;
-    let cutover_applied = matches!(mode, FieldEngineMode::Cutover) && candidate_allowed;
-    let selected_engine = if cutover_applied {
-        "field-core-cutover"
-    } else if candidate_allowed {
-        "field-core-candidate"
-    } else {
-        "structural-domain"
-    };
-    let selected = if candidate_allowed {
-        field_candidate.clone()
-    } else {
-        legacy.clone()
-    };
-    json!({
-        "version": "structural-field-engine-v1",
-        "mode": mode_label,
-        "field_participates": !matches!(mode, FieldEngineMode::Legacy),
-        "selected_engine": selected_engine,
-        "selected": selected,
-        "legacy": legacy,
-        "field_candidate": field_candidate,
-        "candidate_allowed": candidate_allowed,
-        "cutover_applied": cutover_applied,
-        "top_level_behavior_changed": cutover_applied,
-        "field_core_as_sole_engine": false,
-        "field_core_as_structural_sole_engine": cutover_applied,
-        "field_core_as_sole_engine_scope": if cutover_applied { "structural-only" } else { "none" },
-        "cutover_policy": {
-            "requires_cutover_ready": true,
-            "requires_not_more_permissive": true,
-            "safe_to_answer_policy": "field_may_be_less_permissive_than_legacy",
-            "global_sole_engine": false,
-            "packed_hot_core_exception": true,
-            "cognitive_not_llm": true
-        },
-        "claim_boundary": {
-            "structural_candidate_only": matches!(mode, FieldEngineMode::Candidate),
-            "structural_cutover_only": cutover_applied,
-            "requires_cutover_suite": true,
-            "packed_hot_core_exception": true,
-            "llm_ready": false,
-            "nonlinear_memory_proven": false
-        }
-    })
-}
-
-fn apply_structural_field_cutover(search: &mut Value, field_engine: &Value) {
-    if !field_engine["cutover_applied"].as_bool().unwrap_or(false) {
-        return;
-    }
-    let selected = &field_engine["selected"];
-    let old_top_peak = search["top_peak"].clone();
-    let old_verdict = search["verdict"].clone();
-    let old_field_state = search["field_state"].clone();
-    let old_safe_to_answer = search["safe_to_answer"].clone();
-    search["top_peak"] = selected["peak"].clone();
-    search["verdict"] = selected["verdict"].clone();
-    search["field_state"] = selected["field_state"].clone();
-    search["safe_to_answer"] = selected["safe_to_answer"].clone();
-    search["field_cutover"] = json!({
-        "version": "structural-field-cutover-v1",
-        "applied": true,
-        "scope": "structural-only",
-        "old_top_peak": old_top_peak,
-        "new_top_peak": search["top_peak"],
-        "old_verdict": old_verdict,
-        "new_verdict": search["verdict"],
-        "old_field_state": old_field_state,
-        "new_field_state": search["field_state"],
-        "old_safe_to_answer": old_safe_to_answer,
-        "new_safe_to_answer": search["safe_to_answer"],
-        "policy": field_engine["cutover_policy"].clone()
-    });
 }
 
 pub(crate) fn probe_search_summary(search: &Value) -> Value {

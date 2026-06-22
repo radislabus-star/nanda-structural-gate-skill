@@ -110,6 +110,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         ],
         "field_engine_contract": {
             "version": "unified-field-engine-contract-v1",
+            "policy_owner": "field_core::engine::FieldEngineDecision",
             "families_checked": 3,
             "structural": {
                 "engine_guard": "structural-field-engine-v1",
@@ -139,6 +140,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "one_field_pass": true,
             "all_json_reports_project_unified_field": true,
             "three_family_engine_contract": true,
+            "field_engine_policy_in_field_core": true,
             "field_core_as_sole_engine": false,
             "field_core_as_semantic_engine": true,
             "feedback_memory_delta_unified": true,

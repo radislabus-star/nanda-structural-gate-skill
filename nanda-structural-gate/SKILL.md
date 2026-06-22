@@ -533,7 +533,11 @@ Use `nanda-field-audit --format json` when the question is whether the unified
 field is coherent across structural, packed, and cognitive paths. Inspect
 `field_engine_contract`: structural cutover may be opt-in, packed cutover must
 remain blocked by the hot-core guard, and cognitive cutover must remain blocked
-by the LLM/chat claim boundary.
+by the LLM/chat claim boundary. Inspect
+`field_engine_contract.policy_owner`; it should be
+`field_core::engine::FieldEngineDecision`, meaning structural, packed, and
+cognitive engine decisions share one policy owner instead of three copied JSON
+builders.
 v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface
 slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
 L2/L3 sync policy, multilingual surface banks, L2 eval metrics, and

@@ -46,7 +46,7 @@ pub(crate) fn pack6m_cmd(args: Pack6mArgs) -> Result<u8> {
     let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
     let mut out = pack_report(&packet, &source, &candidates, args.sample);
     out["unified_field"] = field_core::adapters::adapt_value(&out).to_value();
-    out["packed_field_engine"] = packed_field_engine_decision(&out, &args.field_engine);
+    out["packed_field_engine"] = field_core::packed_field_engine_decision(&out, &args.field_engine);
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
         OutputFormat::Text => print_pack6m_text(&out),
@@ -508,84 +508,6 @@ pub(crate) fn pack_report(
     });
     out["field_runtime"] = field_core::packed_dual_run_value(&out);
     out
-}
-
-fn packed_field_engine_decision(pack: &Value, mode: &FieldEngineMode) -> Value {
-    let mode_label = match mode {
-        FieldEngineMode::Legacy => "legacy",
-        FieldEngineMode::Shadow => "shadow",
-        FieldEngineMode::Candidate => "candidate",
-        FieldEngineMode::Cutover => "cutover",
-    };
-    let runtime = &pack["field_runtime"];
-    let legacy = json!({
-        "engine": "packed-hot-core",
-        "peak": runtime["old_peak"].as_str().unwrap_or(""),
-        "verdict": runtime["old_verdict"].as_str().unwrap_or("WATCH"),
-        "field_state": runtime["old_field_state"].as_str().unwrap_or("PACKED_UNKNOWN"),
-        "safe_to_answer": runtime["old_safe_to_answer"].as_bool().unwrap_or(false)
-    });
-    let field_candidate = json!({
-        "engine": "field-core",
-        "peak": runtime["field_peak"].as_str().unwrap_or(""),
-        "verdict": runtime["field_verdict"].as_str().unwrap_or("WATCH"),
-        "field_state": runtime["field_state"].as_str().unwrap_or("FIELD_UNKNOWN"),
-        "safe_to_answer": runtime["field_safe_to_answer"].as_bool().unwrap_or(false),
-        "cutover_ready": runtime["cutover_ready"].as_bool().unwrap_or(false),
-        "peak_matches": runtime["peak_matches"].as_bool().unwrap_or(false),
-        "state_family_matches": runtime["state_family_matches"].as_bool().unwrap_or(false),
-        "field_not_more_permissive": runtime["field_not_more_permissive"].as_bool().unwrap_or(false),
-        "mismatch_reason": runtime["mismatch_reason"].clone()
-    });
-    let candidate_requested = matches!(mode, FieldEngineMode::Candidate | FieldEngineMode::Cutover);
-    let candidate_allowed = candidate_requested
-        && runtime["cutover_ready"].as_bool().unwrap_or(false)
-        && runtime["field_not_more_permissive"]
-            .as_bool()
-            .unwrap_or(false);
-    let cutover_requested = matches!(mode, FieldEngineMode::Cutover);
-    json!({
-        "version": "packed-field-engine-guard-v1",
-        "mode": mode_label,
-        "field_participates": !matches!(mode, FieldEngineMode::Legacy),
-        "selected_engine": "packed-hot-core",
-        "selected": legacy,
-        "legacy": {
-            "engine": "packed-hot-core",
-            "peak": runtime["old_peak"].as_str().unwrap_or(""),
-            "verdict": runtime["old_verdict"].as_str().unwrap_or("WATCH"),
-            "field_state": runtime["old_field_state"].as_str().unwrap_or("PACKED_UNKNOWN"),
-            "safe_to_answer": runtime["old_safe_to_answer"].as_bool().unwrap_or(false)
-        },
-        "field_candidate": field_candidate,
-        "candidate_allowed": candidate_allowed,
-        "cutover_requested": cutover_requested,
-        "cutover_applied": false,
-        "top_level_behavior_changed": false,
-        "field_core_as_sole_engine": false,
-        "field_core_as_packed_engine_candidate": candidate_allowed,
-        "field_core_as_packed_hot_engine": false,
-        "hot_core_guard": {
-            "packed_hot_core_exception": true,
-            "requires_zero_cost_view": true,
-            "requires_hot_bench_guard": true,
-            "requires_explicit_follow_up": true,
-            "no_json_string_heap_hashmap_inner_loop": true
-        },
-        "cutover_blocked_reason": if cutover_requested {
-            json!(["packed_hot_core_exception", "packed_cutover_requires_explicit_hot_loop_follow_up"])
-        } else {
-            json!([])
-        },
-        "claim_boundary": {
-            "packed_candidate_only": matches!(mode, FieldEngineMode::Candidate),
-            "packed_cutover_requested": cutover_requested,
-            "global_sole_engine": false,
-            "packed_hot_core_exception": true,
-            "llm_ready": false,
-            "nonlinear_memory_proven": false
-        }
-    })
 }
 
 #[derive(Clone, Copy)]
