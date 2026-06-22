@@ -41,7 +41,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
     let out = json!({
         "mode": "unified-field-audit",
         "version": field_core::FIELD_PASS_VERSION,
-        "overall_state": "FIELD_PASS_BRIDGE_ACTIVE_NOT_SOLE_ENGINE",
+        "overall_state": "UNIFIED_FIELD_BRIDGE_COMPLETE_NOT_SOLE_ENGINE",
         "field_core": {
             "vector": "FieldVector1024",
             "record": "FieldRecord",
@@ -83,12 +83,15 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "field_core_as_sole_engine": false,
             "feedback_memory_delta_unified": true,
             "semantic_equivalence_gate": true,
+            "route_scoped_extraction_required": false,
             "nonlinear_memory_proven": false,
             "llm_ready": false
         },
-        "next_required_steps": [
-            "route-scoped extraction of large report modules only after boundary audit"
-        ]
+        "boundary_economics": {
+            "report_module_extraction": "KEEP",
+            "reason": "route-scoped extraction is not required until boundary evidence shows reduced confusion"
+        },
+        "next_required_steps": []
     });
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),

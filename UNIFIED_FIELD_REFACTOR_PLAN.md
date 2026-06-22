@@ -415,6 +415,29 @@ nanda field-equivalence \
   --format json
 ```
 
+### Phase 10: Boundary Closure
+
+Status: done as `KEEP`.
+
+The route-scoped boundary check did not justify splitting the field adapter
+layer further. That is an accepted outcome:
+
+```text
+NO EVIDENCE => NO CUT
+```
+
+The current closure state is:
+
+- shared vocabulary exists;
+- shared compute primitives exist;
+- shared `FieldPass` exists;
+- feedback emits local replayable `FieldMemoryDelta`;
+- structural, packed, and cognitive reports pass the equivalence gate;
+- report-module extraction is not required until boundary evidence changes.
+
+This closes the unified-field bridge refactor. It does not claim that
+`field_core` is the sole runtime engine.
+
 ## Refactor Gates
 
 Before each phase:
