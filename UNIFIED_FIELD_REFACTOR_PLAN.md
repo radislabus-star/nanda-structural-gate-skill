@@ -1,6 +1,7 @@
 # Unified Field Refactor Plan
 
-Status: implemented as read-only unified field projection.
+Status: implemented as read-only unified field projection plus first shared
+compute primitives.
 
 This document prepares the migration from several field-like implementations to
 one shared field contract. It is not permission to rewrite the runtime in one
@@ -191,6 +192,34 @@ Acceptance:
 - unit tests for size/serialization where applicable;
 - no behavior diff in `nanda-search`, `nanda-pack6m`, `nanda-llmwave-big`.
 
+### Phase 1a: Shared Compute Primitives
+
+Status: done in `src/field_core/`.
+
+The first real compute layer exists without moving domain scoring yet:
+
+- `FieldVector1024`: deterministic 1024-dimensional sign projection;
+- triad projection: `subject/relation/object` plus optional `route/group`;
+- bind and bundle operations;
+- cosine, energy and signature helpers;
+- conservative peak detector;
+- route/group/role/polarity/evidence lens operation;
+- local anti-wave application with before/after alignment;
+- coherence summary over field, reference peak and foreign pull.
+
+Claim boundary:
+
+- this is not a full LLM;
+- this is not proof of nonlinear memory;
+- this does not yet replace structural, packed, or LLMWave scoring loops;
+- this is the shared physics substrate they can migrate toward.
+
+Acceptance:
+
+```bash
+cargo test field_core --all-targets --all-features
+```
+
 ### Phase 2: Structural Adapter
 
 Status: done as a read-only adapter in `src/field_core/adapters.rs`.
@@ -327,12 +356,14 @@ This creates the target seam without moving scoring logic.
 
 Priority order:
 
-1. Add real field-report fixtures from live command output, not only synthetic
+1. Move one small read-only adapter calculation onto `FieldVector1024` and prove
+   output compatibility.
+2. Add real field-report fixtures from live command output, not only synthetic
    shapes.
-2. Add `nanda-serve` support for `field_report`.
-3. Add optional `unified_field` sections to search/pack6m/llmwave-big outputs
+3. Add `nanda-serve` support for `field_report`.
+4. Add optional `unified_field` sections to search/pack6m/llmwave-big outputs
    after compatibility review.
-4. Only then consider splitting large reporting files.
+5. Only then consider splitting large reporting files.
 
 Files not to refactor first:
 
