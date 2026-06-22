@@ -44,7 +44,8 @@ pub(crate) fn pack6m_cmd(args: Pack6mArgs) -> Result<u8> {
     )?;
     let source = normalize_ids(packet.triads.clone(), "t");
     let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
-    let out = pack_report(&packet, &source, &candidates, args.sample);
+    let mut out = pack_report(&packet, &source, &candidates, args.sample);
+    out["unified_field"] = field_core::adapters::adapt_value(&out).to_value();
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
         OutputFormat::Text => print_pack6m_text(&out),
