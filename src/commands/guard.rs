@@ -276,7 +276,7 @@ fn action_prefixes() -> Value {
     })
 }
 
-fn load_atlas(path: &Path) -> Result<Value> {
+pub(crate) fn load_atlas(path: &Path) -> Result<Value> {
     let atlas: Value = serde_json::from_str(&fs::read_to_string(path)?)?;
     if atlas["mode"].as_str() != Some("route-atlas") {
         return Err(anyhow!("not a route atlas: {}", path.display()));
@@ -284,7 +284,12 @@ fn load_atlas(path: &Path) -> Result<Value> {
     Ok(atlas)
 }
 
-fn guard_action(atlas: &Value, symptom: &str, action_id: &str, runtime_snapshot: &Value) -> Value {
+pub(crate) fn guard_action(
+    atlas: &Value,
+    symptom: &str,
+    action_id: &str,
+    runtime_snapshot: &Value,
+) -> Value {
     let route = route_for_action(atlas, action_id);
     let route_exists = route
         .as_ref()
@@ -373,7 +378,7 @@ fn guard_action(atlas: &Value, symptom: &str, action_id: &str, runtime_snapshot:
     })
 }
 
-fn guard_diff(atlas: &Value, action_id: &str, diff: &str) -> Value {
+pub(crate) fn guard_diff(atlas: &Value, action_id: &str, diff: &str) -> Value {
     let route = route_for_action(atlas, action_id);
     let mut changed = diff_changed_files(diff);
     changed.sort();

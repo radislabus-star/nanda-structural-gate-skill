@@ -326,6 +326,7 @@ pub(crate) struct ServeState {
     token_cache: HashMap<ServeTokenKey, Value>,
     chat_cache: HashMap<ServeChatKey, Value>,
     answer_cache: HashMap<ServeAnswerKey, Value>,
+    atlas_cache: HashMap<PathBuf, Value>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -417,6 +418,52 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
                 &packet.query,
                 route_cap,
             ))
+        }
+        "guard_action" | "guard-action" => {
+            let atlas_path = request["atlas"]
+                .as_str()
+                .ok_or_else(|| anyhow!("guard_action request requires atlas"))?;
+            let symptom = request["symptom"].as_str().unwrap_or("");
+            let action_id = request["action_id"]
+                .as_str()
+                .or_else(|| request["action-id"].as_str())
+                .ok_or_else(|| anyhow!("guard_action request requires action_id"))?;
+            let runtime_snapshot = request
+                .get("runtime_snapshot")
+                .or_else(|| request.get("runtime-snapshot"))
+                .cloned()
+                .unwrap_or(Value::Null);
+            let (atlas, cache_hit) = load_serve_atlas(state, Path::new(atlas_path))?;
+            let mut out =
+                commands::guard::guard_action(atlas, symptom, action_id, &runtime_snapshot);
+            out["serve_cache"] = json!({
+                "enabled": true,
+                "state": if cache_hit { "SERVE_ATLAS_HIT" } else { "SERVE_ATLAS_WARMED" }
+            });
+            Ok(out)
+        }
+        "guard_diff" | "guard-diff" => {
+            let atlas_path = request["atlas"]
+                .as_str()
+                .ok_or_else(|| anyhow!("guard_diff request requires atlas"))?;
+            let action_id = request["action_id"]
+                .as_str()
+                .or_else(|| request["action-id"].as_str())
+                .ok_or_else(|| anyhow!("guard_diff request requires action_id"))?;
+            let diff = if let Some(diff) = request["diff"].as_str() {
+                diff.to_string()
+            } else if let Some(path) = request["diff_path"].as_str() {
+                std::fs::read_to_string(path)?
+            } else {
+                return Err(anyhow!("guard_diff request requires diff or diff_path"));
+            };
+            let (atlas, cache_hit) = load_serve_atlas(state, Path::new(atlas_path))?;
+            let mut out = commands::guard::guard_diff(atlas, action_id, &diff);
+            out["serve_cache"] = json!({
+                "enabled": true,
+                "state": if cache_hit { "SERVE_ATLAS_HIT" } else { "SERVE_ATLAS_WARMED" }
+            });
+            Ok(out)
         }
         "proof_cache_only" | "proof-cache-only" => {
             let manifest = request["manifest"]
@@ -639,6 +686,20 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
         }
         other => Err(anyhow!("unsupported serve command: {other}")),
     }
+}
+
+fn load_serve_atlas<'a>(state: &'a mut ServeState, path: &Path) -> Result<(&'a Value, bool)> {
+    let key = serve_manifest_key(path)?;
+    let cache_hit = state.atlas_cache.contains_key(&key);
+    if !cache_hit {
+        let atlas = commands::guard::load_atlas(&key)?;
+        state.atlas_cache.insert(key.clone(), atlas);
+    }
+    let atlas = state
+        .atlas_cache
+        .get(&key)
+        .ok_or_else(|| anyhow!("serve atlas cache did not retain {}", key.display()))?;
+    Ok((atlas, cache_hit))
 }
 
 fn serve_packet_hash(packet: &Value) -> Result<String> {

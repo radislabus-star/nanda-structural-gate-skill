@@ -274,7 +274,9 @@ Use `nanda-build-atlas` to write reusable route memory once. Use
 route-field gate on every small question.
 Use `nanda-profile-guards` before changing performance-sensitive guard
 workflow. Treat it as wall-clock CLI evidence for whether the fast guard path
-or the heavier full-field path is dominating the edit cycle.
+or the heavier full-field path is dominating the edit cycle. Inspect
+`serve_guard_*` metrics when the intended workflow can keep one `nanda-serve`
+process warm and reuse the cached route atlas.
 Use `nanda-index` to build a reusable memory packet from triad packets or
 worksheets.
 Use `nanda-extract` when the input is simple notes rather than JSON/Markdown

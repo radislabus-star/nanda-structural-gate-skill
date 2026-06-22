@@ -429,9 +429,11 @@ resolve to an atlas route. `nanda-guard-diff` is the post-edit check: changed
 files must stay inside the selected route capsule. `nanda-release-gate` is a
 checklist summary over the atlas before publishing.
 `nanda-profile-guards` measures the atlas-first workflow before optimization:
-build-atlas, guard-action, guard-diff, map-code, and dogfood wall-clock CLI
-time. Use it before making performance claims or moving full-field checks into
-the protected edit loop.
+build-atlas, guard-action, guard-diff, map-code, dogfood, and the warm
+`nanda-serve` guard path. Cold `guard-action`/`guard-diff` includes process
+startup and atlas JSON load; `serve_guard_*` keeps one process alive and caches
+the atlas. Use it before making performance claims or moving full-field checks
+into the protected edit loop.
 `nanda-report` is agent-first: it returns a JSON decision packet by default.
 Use `--format md` only when a human-facing report is explicitly needed.
 `nanda-map` exposes the core structural map: source/candidate group sizes,

@@ -1256,7 +1256,12 @@ set -e
 test "$release_status" -eq 3
 jq -e '.mode == "release-gate" and .verdict == "WATCH" and (.routes | index("ime-display-flow"))' <<<"$release_json" >/dev/null
 profile_json="$("$profile_guards" "$tmp_atlas_repo" --iterations 2 --build-iterations 1 --full-iterations 1 --format json)"
-jq -e '.mode == "guard-profile" and .avg_ms.build_atlas >= 0 and .avg_ms.guard_action >= 0 and .avg_ms.guard_diff >= 0 and .avg_ms.map_code_repo >= 0 and .avg_ms.dogfood_refactor >= 0' <<<"$profile_json" >/dev/null
+jq -e '.mode == "guard-profile" and .avg_ms.build_atlas >= 0 and .avg_ms.guard_action >= 0 and .avg_ms.guard_diff >= 0 and .avg_ms.serve_guard_action >= 0 and .avg_ms.serve_guard_diff >= 0 and .avg_ms.serve_guard_combined_per_request >= 0 and .avg_ms.map_code_repo >= 0 and .avg_ms.dogfood_refactor >= 0' <<<"$profile_json" >/dev/null
+printf '{"command":"guard_action","atlas":"%s","symptom":"IME not visible","action_id":"ime.activate_engine"}\n{"command":"guard_diff","atlas":"%s","action_id":"ime.show_candidate","diff":"diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs\\n--- a/src/bin/lay_ibus_engine.rs\\n+++ b/src/bin/lay_ibus_engine.rs\\n"}\n' "$atlas_path" "$atlas_path" >"$tmp_atlas_repo/serve-guards.jsonl"
+serve_guards_json="$(nanda-structural-gate/scripts/nanda-serve <"$tmp_atlas_repo/serve-guards.jsonl")"
+grep -q '"mode":"guard-action"' <<<"$serve_guards_json"
+grep -q '"mode":"guard-diff"' <<<"$serve_guards_json"
+grep -q 'SERVE_ATLAS_HIT' <<<"$serve_guards_json"
 rm -rf "$tmp_atlas_repo"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null

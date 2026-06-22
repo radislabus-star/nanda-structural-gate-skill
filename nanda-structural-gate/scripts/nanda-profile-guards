@@ -57,6 +57,8 @@ done
 
 if [[ -x "$script_dir/../bin/nanda" ]]; then
   nanda_cmd=("$script_dir/../bin/nanda")
+elif [[ -x "$root/target/release/nanda" ]]; then
+  nanda_cmd=("$root/target/release/nanda")
 else
   nanda_cmd=(cargo run --quiet --manifest-path "$root/Cargo.toml" --)
 fi
@@ -77,6 +79,15 @@ measure_ms() {
   for _ in $(seq 1 "$loops"); do
     "$@" >/dev/null
   done
+  end="$(now_ns)"
+  echo $(((end - start) / 1000000))
+}
+
+measure_serve_ms() {
+  local request_file="$1"
+  local start end
+  start="$(now_ns)"
+  run_nanda serve <"$request_file" >/dev/null
   end="$(now_ns)"
   echo $(((end - start) / 1000000))
 }
@@ -148,13 +159,28 @@ guard_diff_total_ms="$(measure_ms "$iterations" run_nanda guard-diff "$atlas" --
 map_code_total_ms="$(measure_ms "$full_iterations" run_nanda map-code "$repo" --format json)"
 dogfood_total_ms="$(measure_ms "$full_iterations" run_nanda dogfood "$repo" --refactor-plan --format json)"
 
+serve_action_requests="$tmp/serve-action.jsonl"
+serve_diff_requests="$tmp/serve-diff.jsonl"
+serve_combined_requests="$tmp/serve-combined.jsonl"
+action_request="$(jq -cn --arg atlas "$atlas" --arg symptom "$symptom" --arg action_id "$action_id" '{command:"guard_action", atlas:$atlas, symptom:$symptom, action_id:$action_id}')"
+diff_text="$(cat "$tmp/allowed.diff")"
+diff_request="$(jq -cn --arg atlas "$atlas" --arg action_id "$action_id" --arg diff "$diff_text" '{command:"guard_diff", atlas:$atlas, action_id:$action_id, diff:$diff}')"
+for _ in $(seq 1 "$iterations"); do
+  printf '%s\n' "$action_request" >>"$serve_action_requests"
+  printf '%s\n' "$diff_request" >>"$serve_diff_requests"
+  printf '%s\n%s\n' "$action_request" "$diff_request" >>"$serve_combined_requests"
+done
+serve_guard_action_total_ms="$(measure_serve_ms "$serve_action_requests")"
+serve_guard_diff_total_ms="$(measure_serve_ms "$serve_diff_requests")"
+serve_guard_combined_total_ms="$(measure_serve_ms "$serve_combined_requests")"
+
 avg() {
   local total="$1"
   local loops="$2"
   if [[ "$loops" -le 0 ]]; then
     echo 0
   else
-    echo $((total / loops))
+    awk -v total="$total" -v loops="$loops" 'BEGIN { printf "%.3f", total / loops }'
   fi
 }
 
@@ -163,6 +189,9 @@ guard_action_avg_ms="$(avg "$guard_action_total_ms" "$iterations")"
 guard_diff_avg_ms="$(avg "$guard_diff_total_ms" "$iterations")"
 map_code_avg_ms="$(avg "$map_code_total_ms" "$full_iterations")"
 dogfood_avg_ms="$(avg "$dogfood_total_ms" "$full_iterations")"
+serve_guard_action_avg_ms="$(avg "$serve_guard_action_total_ms" "$iterations")"
+serve_guard_diff_avg_ms="$(avg "$serve_guard_diff_total_ms" "$iterations")"
+serve_guard_combined_avg_ms="$(avg "$serve_guard_combined_total_ms" "$((iterations * 2))")"
 total_files="$(jq -r '.total_files // 0' "$atlas")"
 route_count="$(jq -r '.routes | keys | length' "$atlas")"
 
@@ -176,6 +205,9 @@ sample_route: $route
 build_atlas_avg_ms: $build_avg_ms
 guard_action_avg_ms: $guard_action_avg_ms
 guard_diff_avg_ms: $guard_diff_avg_ms
+serve_guard_action_avg_ms: $serve_guard_action_avg_ms
+serve_guard_diff_avg_ms: $serve_guard_diff_avg_ms
+serve_guard_combined_per_request_avg_ms: $serve_guard_combined_avg_ms
 map_code_repo_avg_ms: $map_code_avg_ms
 dogfood_refactor_avg_ms: $dogfood_avg_ms
 EOF
@@ -194,6 +226,9 @@ else
     --argjson guard_diff_avg_ms "$guard_diff_avg_ms" \
     --argjson map_code_repo_avg_ms "$map_code_avg_ms" \
     --argjson dogfood_refactor_avg_ms "$dogfood_avg_ms" \
+    --argjson serve_guard_action_avg_ms "$serve_guard_action_avg_ms" \
+    --argjson serve_guard_diff_avg_ms "$serve_guard_diff_avg_ms" \
+    --argjson serve_guard_combined_avg_ms "$serve_guard_combined_avg_ms" \
     '{
       mode: "guard-profile",
       repo: $repo,
@@ -210,9 +245,12 @@ else
         build_atlas: $build_atlas_avg_ms,
         guard_action: $guard_action_avg_ms,
         guard_diff: $guard_diff_avg_ms,
+        serve_guard_action: $serve_guard_action_avg_ms,
+        serve_guard_diff: $serve_guard_diff_avg_ms,
+        serve_guard_combined_per_request: $serve_guard_combined_avg_ms,
         map_code_repo: $map_code_repo_avg_ms,
         dogfood_refactor: $dogfood_refactor_avg_ms
       },
-      read_as: "Wall-clock CLI profile. Guard commands are intended for protected edit loops; dogfood/map-code are heavier route-field passes."
+      read_as: "Wall-clock profile. guard_action/guard_diff are cold CLI calls; serve_guard_* keeps one nanda process alive and caches the route atlas for protected edit loops."
     }'
 fi
