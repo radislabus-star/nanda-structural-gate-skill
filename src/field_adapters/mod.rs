@@ -78,6 +78,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "embedded_unified_field": true,
                 "field_pass_present": true,
                 "sole_engine": false,
+                "engine_guard": "structural-field-engine-v1",
+                "opt_in_cutover_available": structural_cutover_suite_pass,
                 "state": if structural_cutover_suite_pass {
                     "DUAL_RUN_CUTOVER_SUITE_PASS"
                 } else {
@@ -90,6 +92,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "embedded_unified_field": true,
                 "field_pass_present": true,
                 "sole_engine": false,
+                "engine_guard": "packed-field-engine-guard-v1",
+                "opt_in_cutover_available": false,
                 "state": "DUAL_RUN_READY_PROTECTED_HOT_CORE",
                 "remaining": ["bench before replacing hot summaries"]
             },
@@ -98,14 +102,43 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "embedded_unified_field": true,
                 "field_pass_present": true,
                 "sole_engine": false,
+                "engine_guard": "cognitive-field-engine-guard-v1",
+                "opt_in_cutover_available": false,
                 "state": "DUAL_RUN_ACTIVE_NOT_LLM",
                 "remaining": ["route deeper query-wave/multi-peak/lens/anti/evidence records through FieldPass input"]
             }
         ],
+        "field_engine_contract": {
+            "version": "unified-field-engine-contract-v1",
+            "families_checked": 3,
+            "structural": {
+                "engine_guard": "structural-field-engine-v1",
+                "cutover_mode": "opt-in",
+                "cutover_allowed": structural_cutover_suite_pass,
+                "global_sole_engine": false
+            },
+            "packed": {
+                "engine_guard": "packed-field-engine-guard-v1",
+                "cutover_mode": "blocked",
+                "cutover_allowed": false,
+                "blocked_by": "packed_hot_core_exception",
+                "global_sole_engine": false
+            },
+            "cognitive": {
+                "engine_guard": "cognitive-field-engine-guard-v1",
+                "cutover_mode": "blocked",
+                "cutover_allowed": false,
+                "blocked_by": "claim_boundary_not_llm_ready",
+                "chat_engine": false,
+                "llm_ready": false,
+                "global_sole_engine": false
+            }
+        },
         "acceptance": {
             "one_field_vocabulary": true,
             "one_field_pass": true,
             "all_json_reports_project_unified_field": true,
+            "three_family_engine_contract": true,
             "field_core_as_sole_engine": false,
             "field_core_as_semantic_engine": true,
             "feedback_memory_delta_unified": true,
@@ -114,10 +147,15 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "structural_cutover_eval_ready": true,
             "structural_cutover_suite_available": true,
             "structural_cutover_suite_pass": structural_cutover_suite_pass,
+            "structural_cutover_mode_available": structural_cutover_suite_pass,
             "packed_dual_run_active": true,
+            "packed_field_engine_guard": true,
+            "packed_cutover_blocked_by_hot_guard": true,
             "packed_hot_core_exception": true,
             "packed_field_record_view": true,
             "cognitive_dual_run_active": true,
+            "cognitive_field_engine_guard": true,
+            "cognitive_cutover_blocked_by_claim_guard": true,
             "unified_lens_contract": true,
             "unified_anti_wave_contract": true,
             "unified_memory_delta_store": true,

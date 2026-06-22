@@ -749,6 +749,37 @@ projection, but it cannot be interpreted as a general chat model, LLM, nonlinear
 memory proof, or global sole engine until separate broad evals and claim
 boundary changes explicitly permit that.
 
+### Phase 24: Three-Family Field Engine Audit
+
+Status: done as the current unified field closure.
+
+`nanda field-audit --format json` now reports `field_engine_contract` across
+all three families:
+
+- structural: `structural-field-engine-v1`, opt-in cutover may be allowed when
+  the structural standard suite passes;
+- packed: `packed-field-engine-guard-v1`, cutover is blocked by
+  `packed_hot_core_exception`;
+- cognitive: `cognitive-field-engine-guard-v1`, cutover is blocked by the
+  LLM/chat claim boundary.
+
+Acceptance fields:
+
+```text
+three_family_engine_contract = true
+structural_cutover_mode_available = true
+packed_field_engine_guard = true
+packed_cutover_blocked_by_hot_guard = true
+cognitive_field_engine_guard = true
+cognitive_cutover_blocked_by_claim_guard = true
+field_core_as_sole_engine = false
+```
+
+This is the present answer to "do we have one field?": yes, one field
+vocabulary/pass/engine contract now covers structural, packed, and cognitive
+reports, but only structural has an explicit opt-in cutover path. Packed and
+cognitive remain guarded.
+
 ## Refactor Gates
 
 Before each phase:

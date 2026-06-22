@@ -101,6 +101,7 @@ scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate 
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id shared.version_bump_contract --diff version.diff
 scripts/nanda-field-report --from search-result.json --format json
 scripts/nanda-field-equivalence --structural-from search-result.json --packed-from pack6m-result.json --cognitive-from llmwave-big-result.json --format json
+scripts/nanda-field-audit --format json
 scripts/nanda-field-cutover --suite structural-standard --format json
 scripts/nanda-field-cutover --structural-case focused-search.json --structural-case contested-search.json --format json
 scripts/nanda-profile-guards . --iterations 50 --format json
@@ -528,6 +529,11 @@ cognitive guard: field-core may be a semantic engine candidate, but
 `field_core_as_chat_engine=false`, `field_core_as_llm=false`, and
 `field_core_as_sole_engine=false` until broad cognition, corpus, and chat
 safety evals change the claim boundary.
+Use `nanda-field-audit --format json` when the question is whether the unified
+field is coherent across structural, packed, and cognitive paths. Inspect
+`field_engine_contract`: structural cutover may be opt-in, packed cutover must
+remain blocked by the hot-core guard, and cognitive cutover must remain blocked
+by the LLM/chat claim boundary.
 v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface
 slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
 L2/L3 sync policy, multilingual surface banks, L2 eval metrics, and
