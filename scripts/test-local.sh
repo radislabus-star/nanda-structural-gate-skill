@@ -579,6 +579,7 @@ jq -e '.hierarchical_decision.global_foreign_pull > 0' <<<"$hgate_splice_json" >
 search_json="$("$search" "$root/examples/triad-packet.interference-search.json" --input-format json --top-k 3)"
 grep -q '"mode": "interference-retrieval"' <<<"$search_json"
 jq -e '.unified_field.family == "structural" and .unified_field.compute_probe.version == "unified-field-compute-v1" and (.unified_field.query.signature | type == "string" and length == 16)' <<<"$search_json" >/dev/null
+jq -e '.unified_field.record.records == 10 and .unified_field.record.routes >= 1 and .unified_field.record.groups >= 1 and .unified_field.peak.support_count == 4 and .unified_field.peak.anti_support_count == 5' <<<"$search_json" >/dev/null
 
 tmp_focus_packet="$(mktemp)"
 focus_json="$("$focus" "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --max-triads 12 --route-cap 4 --route-triad-cap 4 --out "$tmp_focus_packet")"

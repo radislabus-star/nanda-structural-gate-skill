@@ -1,5 +1,6 @@
 use super::*;
 use serde_json::Value;
+use std::collections::BTreeSet;
 
 pub(crate) fn adapt_value(input: &Value) -> UnifiedFieldReport {
     if looks_packed(input) {
@@ -50,6 +51,10 @@ fn structural_report(input: &Value) -> UnifiedFieldReport {
     let field_state = &input["field_state_machine"];
     let peak_decision = &input["peak_decision"];
     let structural_map = &input["structural_map"];
+    let peak_routes = unique_peak_center_count(input, "route");
+    let peak_groups = unique_peak_center_count(input, "group");
+    let top_support_count = array_len(&peak["supporting_triads"]);
+    let top_anti_count = array_len(&peak["anti_triads"]);
     let source_mode = mode(input, "structural_result");
     let peak_target = peak["peak"]
         .as_str()
@@ -66,14 +71,18 @@ fn structural_report(input: &Value) -> UnifiedFieldReport {
         source_mode: source_mode.clone(),
         basis: FieldBasis::dynamic_1024(),
         record: FieldRecordSummary {
-            records: count_array(input, "triads") + count_array(input, "candidate_triads"),
+            records: count_array(input, "triads")
+                + count_array(input, "candidate_triads")
+                + usize_number(&input["memory_size"]).unwrap_or(0),
             routes: object_len(&structural_map["route_field"]["routes"])
-                .max(array_len(&input["route_balanced_focus"]["routes"])),
-            groups: object_len(&structural_map["group_centroids"]["source"])
-                + object_len(&structural_map["group_centroids"]["candidate"]),
+                .max(array_len(&input["route_balanced_focus"]["routes"]))
+                .max(peak_routes),
+            groups: (object_len(&structural_map["group_centroids"]["source"])
+                + object_len(&structural_map["group_centroids"]["candidate"]))
+            .max(peak_groups),
             schemas: 0,
             surfaces: 0,
-            evidence_refs: count_array(input, "supporting_triads"),
+            evidence_refs: count_array(input, "supporting_triads").max(top_support_count),
         },
         query: FieldQuerySummary {
             source: query_source(input),
@@ -101,8 +110,9 @@ fn structural_report(input: &Value) -> UnifiedFieldReport {
                 .unwrap_or("WATCH")
                 .to_string(),
             safe_to_answer: peak_decision["safe_to_answer"].as_bool().unwrap_or(false),
-            support_count: array_len(&input["supporting_triads"]),
-            anti_support_count: array_len(&input["destructive_interference"]["suppressed"]),
+            support_count: array_len(&input["supporting_triads"]).max(top_support_count),
+            anti_support_count: array_len(&input["destructive_interference"]["suppressed"])
+                .max(top_anti_count),
         },
         lens: FieldLensSummary {
             lenses: vec![
@@ -490,6 +500,20 @@ fn array_len_opt(value: &Value) -> Option<usize> {
 
 fn object_len(value: &Value) -> usize {
     value.as_object().map(serde_json::Map::len).unwrap_or(0)
+}
+
+fn unique_peak_center_count(input: &Value, key: &str) -> usize {
+    input["peaks"]
+        .as_array()
+        .map(|peaks| {
+            peaks
+                .iter()
+                .filter_map(|peak| peak["center"][key].as_str())
+                .filter(|value| !value.trim().is_empty())
+                .collect::<BTreeSet<_>>()
+                .len()
+        })
+        .unwrap_or(0)
 }
 
 fn string_array(value: &Value) -> Vec<String> {
