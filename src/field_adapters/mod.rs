@@ -54,6 +54,12 @@ pub(crate) fn field_report_cmd(args: FieldReportArgs) -> Result<u8> {
 }
 
 pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
+    let structural_cutover_suite =
+        field_cutover_report(structural_standard_cutover_cases()?, "structural-standard");
+    let structural_cutover_suite_pass = structural_cutover_suite["acceptance"]
+        ["structural_cutover_suite_pass"]
+        .as_bool()
+        .unwrap_or(false);
     let out = json!({
         "mode": "unified-field-audit",
         "version": field_core::FIELD_PASS_VERSION,
@@ -72,8 +78,12 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "embedded_unified_field": true,
                 "field_pass_present": true,
                 "sole_engine": false,
-                "state": "DUAL_RUN_CUTOVER_SUITE_AVAILABLE",
-                "remaining": ["run nanda-field-cutover before any explicit structural sole-engine cutover"]
+                "state": if structural_cutover_suite_pass {
+                    "DUAL_RUN_CUTOVER_SUITE_PASS"
+                } else {
+                    "DUAL_RUN_CUTOVER_SUITE_WATCH"
+                },
+                "remaining": ["explicit follow-up cutover is still required before structural sole-engine mode"]
             },
             {
                 "family": "packed",
@@ -103,6 +113,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "structural_dual_run_active": true,
             "structural_cutover_eval_ready": true,
             "structural_cutover_suite_available": true,
+            "structural_cutover_suite_pass": structural_cutover_suite_pass,
             "packed_dual_run_active": true,
             "packed_hot_core_exception": true,
             "packed_field_record_view": true,
@@ -114,6 +125,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "nonlinear_memory_proven": false,
             "llm_ready": false
         },
+        "structural_cutover_suite": structural_cutover_suite,
         "boundary_economics": {
             "report_module_extraction": "KEEP",
             "reason": "route-scoped extraction is not required until boundary evidence shows reduced confusion"
@@ -270,55 +282,19 @@ pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
             cases.push(case);
         }
     }
-
-    let cases_checked = cases.len();
-    let all_peak_match = nonempty_all(&cases, "peak_matches");
-    let all_state_family_match = nonempty_all(&cases, "state_family_matches");
-    let all_not_more_permissive = nonempty_all(&cases, "field_not_more_permissive");
-    let all_cutover_ready = nonempty_all(&cases, "cutover_ready");
-    let structural_cutover_suite_pass = cases_checked > 0
-        && all_peak_match
-        && all_state_family_match
-        && all_not_more_permissive
-        && all_cutover_ready;
-    let state = if structural_cutover_suite_pass {
-        "STRUCTURAL_FIELD_CUTOVER_SUITE_PASS"
-    } else if cases_checked == 0 {
-        "STRUCTURAL_FIELD_CUTOVER_SUITE_NO_CASES"
-    } else {
-        "STRUCTURAL_FIELD_CUTOVER_SUITE_WATCH"
+    let suite_label = match args.suite {
+        Some(FieldCutoverSuite::StructuralStandard) => "structural-standard",
+        None => "manual",
     };
-    let out = json!({
-        "mode": "unified-field-cutover-suite",
-        "version": field_core::FIELD_RUNTIME_VERSION,
-        "family": "structural",
-        "suite": match args.suite {
-            Some(FieldCutoverSuite::StructuralStandard) => "structural-standard",
-            None => "manual",
-        },
-        "state": state,
-        "cases": cases,
-        "acceptance": {
-            "cases_checked": cases_checked,
-            "all_peak_match": all_peak_match,
-            "all_state_family_match": all_state_family_match,
-            "all_not_more_permissive": all_not_more_permissive,
-            "all_cutover_ready": all_cutover_ready,
-            "structural_cutover_suite_pass": structural_cutover_suite_pass,
-            "field_core_as_structural_engine_candidate": structural_cutover_suite_pass,
-            "field_core_as_sole_engine_allowed": false,
-            "packed_hot_core_exception": true,
-            "llm_ready": false,
-            "nonlinear_memory_proven": false
-        },
-        "claim_boundary": {
-            "global_sole_engine": false,
-            "structural_only_candidate": structural_cutover_suite_pass,
-            "packed_hot_core_exception": true,
-            "cognitive_not_llm": true,
-            "requires_explicit_follow_up_cutover": true
-        }
-    });
+    let out = field_cutover_report(cases, suite_label);
+
+    let state = out["state"]
+        .as_str()
+        .unwrap_or("STRUCTURAL_FIELD_CUTOVER_SUITE_WATCH");
+    let cases_checked = out["acceptance"]["cases_checked"].as_u64().unwrap_or(0);
+    let structural_cutover_suite_pass = out["acceptance"]["structural_cutover_suite_pass"]
+        .as_bool()
+        .unwrap_or(false);
 
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
@@ -346,6 +322,54 @@ pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
         EXIT_PASS
     } else {
         EXIT_WATCH
+    })
+}
+
+fn field_cutover_report(cases: Vec<Value>, suite_label: &str) -> Value {
+    let cases_checked = cases.len();
+    let all_peak_match = nonempty_all(&cases, "peak_matches");
+    let all_state_family_match = nonempty_all(&cases, "state_family_matches");
+    let all_not_more_permissive = nonempty_all(&cases, "field_not_more_permissive");
+    let all_cutover_ready = nonempty_all(&cases, "cutover_ready");
+    let structural_cutover_suite_pass = cases_checked > 0
+        && all_peak_match
+        && all_state_family_match
+        && all_not_more_permissive
+        && all_cutover_ready;
+    let state = if structural_cutover_suite_pass {
+        "STRUCTURAL_FIELD_CUTOVER_SUITE_PASS"
+    } else if cases_checked == 0 {
+        "STRUCTURAL_FIELD_CUTOVER_SUITE_NO_CASES"
+    } else {
+        "STRUCTURAL_FIELD_CUTOVER_SUITE_WATCH"
+    };
+    json!({
+        "mode": "unified-field-cutover-suite",
+        "version": field_core::FIELD_RUNTIME_VERSION,
+        "family": "structural",
+        "suite": suite_label,
+        "state": state,
+        "cases": cases,
+        "acceptance": {
+            "cases_checked": cases_checked,
+            "all_peak_match": all_peak_match,
+            "all_state_family_match": all_state_family_match,
+            "all_not_more_permissive": all_not_more_permissive,
+            "all_cutover_ready": all_cutover_ready,
+            "structural_cutover_suite_pass": structural_cutover_suite_pass,
+            "field_core_as_structural_engine_candidate": structural_cutover_suite_pass,
+            "field_core_as_sole_engine_allowed": false,
+            "packed_hot_core_exception": true,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false
+        },
+        "claim_boundary": {
+            "global_sole_engine": false,
+            "structural_only_candidate": structural_cutover_suite_pass,
+            "packed_hot_core_exception": true,
+            "cognitive_not_llm": true,
+            "requires_explicit_follow_up_cutover": true
+        }
     })
 }
 

@@ -609,6 +609,26 @@ This is deliberately narrower than full sole-engine cutover. Packed remains a
 protected hot-core exception, and cognitive remains not-LLM/not-chat until
 separate eval evidence changes those claim boundaries.
 
+### Phase 19: Live Cutover Audit Snapshot
+
+Status: done.
+
+`nanda field-audit --format json` now embeds a live
+`structural_cutover_suite` snapshot built from the same `structural-standard`
+cases as `nanda field-cutover`. The audit no longer only says that the suite is
+available; it reports the current suite state and mirrors
+`structural_cutover_suite_pass` into top-level acceptance.
+
+This keeps the audit honest:
+
+```text
+structural_cutover_suite_pass = true
+field_core_as_sole_engine = false
+```
+
+The audit can therefore be used as a quick health report for the unified field,
+but still does not grant global cutover permission.
+
 ## Refactor Gates
 
 Before each phase:
