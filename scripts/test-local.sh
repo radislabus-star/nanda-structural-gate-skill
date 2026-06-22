@@ -1521,6 +1521,7 @@ jq -e '.benchmarks.support_bucket_build_compile_sweep.iterations == 100 and .ben
 jq -e '.benchmarks.hot_cycle.iterations == 100 and .benchmarks.hot_cycle.kernel == "run_packed_hot_cycle" and .benchmarks.hot_cycle.fields == 64 and .benchmarks.hot_cycle.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.hot_cycle.runtime_contract.state == "PACKED_RUNTIME_READY" and .benchmarks.hot_cycle.runtime_contract.ready == true and .benchmarks.hot_cycle.runtime_contract.workspace_fits == true' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.hot_cycle.runtime_contract.focus_triads_capacity == 15000 and .benchmarks.hot_cycle.runtime_contract.default_focus_field_requests == 64' <<<"$bench6m_json" >/dev/null
+jq -e '.field_runtime_cutover_guard.version == "packed-field-runtime-cutover-guard-v1" and .field_runtime_cutover_guard.packed_field_record_view == "packed-field-record-view-v1" and .field_runtime_cutover_guard.bench_evidence_present == true and .field_runtime_cutover_guard.field_core_as_sole_engine_allowed == false' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.density.iterations == 100 and .benchmarks.density.kernel == "packed_density_probe" and .benchmarks.density.triads_in_memory == 8 and .benchmarks.density.accuracy == 1 and .benchmarks.density.false_positive == 0' <<<"$bench6m_json" >/dev/null
 bench6m_lane_json="$("$bench6m" --mode lane --lane-iterations 1000 --format json)"
 jq -e '.benchmarks.replay == null and .benchmarks.projection == null' <<<"$bench6m_lane_json" >/dev/null
@@ -1548,8 +1549,10 @@ bench6m_support_bucket_build_compile_sweep_json="$("$bench6m" --mode support-buc
 jq -e '.benchmarks.support_bucket_build_compile_sweep.iterations == 10 and .benchmarks.support_bucket_build_compile_sweep.fields == 8 and .benchmarks.support_bucket_build_compile_sweep.triads_in_memory == 16 and .benchmarks.support_bucket_build_compile_sweep.ops_per_second > 0' <<<"$bench6m_support_bucket_build_compile_sweep_json" >/dev/null
 bench6m_hot_cycle_json="$("$bench6m" --mode hot-cycle --support-build-iterations 10 --lane-sweep-width 8 --triads 16 --format json)"
 jq -e '.benchmarks.hot_cycle.iterations == 10 and .benchmarks.hot_cycle.fields == 8 and .benchmarks.hot_cycle.triads_in_memory == 16 and .benchmarks.hot_cycle.ops_per_second > 0' <<<"$bench6m_hot_cycle_json" >/dev/null
+jq -e '.field_runtime_cutover_guard.bench_evidence_present == true and .field_runtime_cutover_guard.field_core_as_sole_engine_allowed == false' <<<"$bench6m_hot_cycle_json" >/dev/null
 bench6m_density_json="$("$bench6m" --mode density --support-build-iterations 10 --triads 16 --format json)"
 jq -e '.benchmarks.replay == null and .benchmarks.projection == null and .benchmarks.density.iterations == 10 and .benchmarks.density.triads_in_memory == 16 and .benchmarks.density.accuracy == 1 and .benchmarks.density.false_positive == 0' <<<"$bench6m_density_json" >/dev/null
+jq -e '.field_runtime_cutover_guard.bench_evidence_present == false and .field_runtime_cutover_guard.field_core_as_sole_engine_allowed == false' <<<"$bench6m_density_json" >/dev/null
 "$feedback" --help | grep -q "Usage: nanda feedback"
 NANDA_SELF_CHECK_RUNTIME_ONLY=1 "$self_check" | grep -q "verdict: PASS"
 

@@ -563,6 +563,20 @@ Status: done.
 `field_record_view`. This is a hot-core storage/readiness contract, not a hot
 cutover by itself.
 
+### Phase 17: Packed Cutover Bench Guard
+
+Status: done as a guard, not permission.
+
+`nanda bench6m --format json` now reports `field_runtime_cutover_guard`:
+
+- required packed view version;
+- whether this bench run contains hot-cycle or active-core evidence;
+- explicit blockers for sole-engine cutover;
+- `field_core_as_sole_engine_allowed = false`.
+
+This prevents the project from silently turning report-layer dual-run into a
+hot packed cutover without benchmark evidence and an explicit follow-up change.
+
 ## Refactor Gates
 
 Before each phase:

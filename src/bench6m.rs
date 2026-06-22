@@ -222,6 +222,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
+    let packed_cutover_bench_evidence = include_hot_cycle || include_active_core;
     let out = json!({
         "mode": "nanda-6m-hot-benchmark",
         "core_version": CORE_VERSION,
@@ -246,6 +247,22 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "write_density": write_density,
             "consolidate": consolidate,
             "density": density
+        },
+        "field_runtime_cutover_guard": {
+            "version": "packed-field-runtime-cutover-guard-v1",
+            "packed_field_record_view": nanda_6m::FIELD_RECORD_VIEW_VERSION,
+            "bench_evidence_present": packed_cutover_bench_evidence,
+            "requires_before_packed_cutover": [
+                "packed_field_record_view",
+                "hot_cycle_or_active_core_bench",
+                "no_json_string_heap_in_inner_loop"
+            ],
+            "field_core_as_sole_engine_allowed": false,
+            "reason": if packed_cutover_bench_evidence {
+                "bench evidence is present, but packed hot cutover still requires explicit follow-up"
+            } else {
+                "run --mode hot-cycle or --mode active-core before any packed hot cutover"
+            }
         },
         "interpretation": {
             "replay": "Pure typed replay firewall; no JSON, no file IO, no process spawn.",
