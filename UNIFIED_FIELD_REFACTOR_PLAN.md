@@ -281,7 +281,8 @@ Acceptance:
 
 ### Phase 5: Unified Field Report
 
-Status: done through `nanda field-report` and `scripts/nanda-field-report`.
+Status: done through `nanda field-report`, `scripts/nanda-field-report`, and
+serve `field_report`.
 
 The read-only command is:
 
@@ -304,6 +305,27 @@ Acceptance:
 
 - report works across all three adapters;
 - no source command behavior is broken.
+
+### Phase 6: Embedded Unified Field Outputs
+
+Status: started.
+
+The first source commands now embed `unified_field` directly in their JSON
+outputs:
+
+- `nanda search` -> structural unified field;
+- `nanda pack6m` -> packed unified field;
+- `nanda llmwave-big query-wave` -> cognitive unified field.
+
+The embedded field is report-layer only. It does not change original scoring,
+packed hot loops, or LLMWave claim boundaries.
+
+Acceptance:
+
+```bash
+scripts/test-local.sh
+scripts/test-edge-cases.sh
+```
 
 ## Refactor Gates
 
@@ -356,14 +378,15 @@ This creates the target seam without moving scoring logic.
 
 Priority order:
 
-1. Move one small read-only adapter calculation onto `FieldVector1024` and prove
-   output compatibility.
-2. Add real field-report fixtures from live command output, not only synthetic
-   shapes.
-3. Add `nanda-serve` support for `field_report`.
-4. Add optional `unified_field` sections to search/pack6m/llmwave-big outputs
-   after compatibility review.
-5. Only then consider splitting large reporting files.
+1. Extend embedded `unified_field` to the next cognitive outputs that already
+   represent field passes, without weakening claim boundaries.
+2. Move one bounded scoring explanation from structural report text into
+   `field_core` vocabulary.
+3. Move one bounded packed report summary into `field_core` vocabulary without
+   changing packed hot structs.
+4. Add a route-scoped refactor plan for any large reporting file before
+   splitting it.
+5. Only then consider extracting reporting submodules.
 
 Files not to refactor first:
 
