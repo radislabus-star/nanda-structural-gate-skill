@@ -74,6 +74,10 @@ core_version: sparse-triad-v2.5-probe-report
     `RESEARCH_DIRECTION.md`: HRR/VSA/SDM/Hopfield/superposition/Fourier
     mechanisms are mapped to NANDA imports, refusals, tests, and v47-v60
     milestones.
+40. Prepare the unified field refactor. Planned in
+    `UNIFIED_FIELD_REFACTOR_PLAN.md`: one shared field contract, separate
+    Structural Gate, Packed 6M, and LLMWave Big adapters, with no behavior
+    change in the first code phase.
 
 ## Engineering Constraints
 
