@@ -619,6 +619,17 @@ serve_cache_json="$(printf '{"command":"proof_cache_only","manifest":"%s"}\n{"co
 jq -e 'length == 2 and .[0].ok == true and .[0].elapsed_ms >= 0 and .[0].result.proof_mode == "cache-only-focused" and .[0].result.focus_cache.state == "CACHE_ONLY_HIT" and .[0].result.serve_cache.state == "SERVE_MEMORY_WARMED" and .[1].ok == true and .[1].result.serve_cache.state == "SERVE_PROOF_HIT"' <<<"$(jq -s . <<<"$serve_cache_json")" >/dev/null
 serve_compact_json="$(printf '{"command":"proof_cache_only","manifest":"%s","response":"compact"}\n{"command":"proof_cache_only","manifest":"%s","response":"compact"}\n' "$cache_manifest" "$cache_manifest" | "$serve")"
 jq -e 'length == 2 and .[0].ok == true and .[0].result.mode == "proof-cache-only-compact" and ((.[0].result.proof_state | length) > 0) and .[0].result.focused_search == null and .[1].result.serve_cache.state == "SERVE_PROOF_HIT"' <<<"$(jq -s . <<<"$serve_compact_json")" >/dev/null
+cat >"$tmp_cache/field-report.json" <<'EOF_FIELD_SERVE'
+{
+  "peak_decision": {"state": "PASS", "safe_to_answer": true},
+  "field_state_machine": {"state": "FIELD_FOCUSED", "action": "answer"},
+  "query": {"text": "serve field report"},
+  "peaks": [{"peak": "runtime", "score": 0.8}],
+  "supporting_triads": [{"id": "t1"}]
+}
+EOF_FIELD_SERVE
+serve_field_report_json="$(printf '{"command":"field_report","input":"%s"}\n{"command":"field_report","input":"%s"}\n' "$tmp_cache/field-report.json" "$tmp_cache/field-report.json" | "$serve")"
+jq -e 'length == 2 and .[0].ok == true and .[0].result.family == "structural" and .[0].result.compute_probe.version == "unified-field-compute-v1" and .[0].result.serve_cache.state == "SERVE_FIELD_REPORT_WARMED" and .[1].ok == true and .[1].result.serve_cache.state == "SERVE_FIELD_REPORT_HIT"' <<<"$(jq -s . <<<"$serve_field_report_json")" >/dev/null
 rm -rf "$tmp_cache"
 proof_suite_json="$("$proof" --suite "$root/examples/proof-corpus.json" --input-format json)"
 jq -e '.mode == "proof-suite"' <<<"$proof_suite_json" >/dev/null

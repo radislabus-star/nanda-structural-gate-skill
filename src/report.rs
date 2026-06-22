@@ -326,6 +326,7 @@ pub(crate) struct ServeState {
     token_cache: HashMap<ServeTokenKey, Value>,
     chat_cache: HashMap<ServeChatKey, Value>,
     answer_cache: HashMap<ServeAnswerKey, Value>,
+    field_report_cache: HashMap<String, Value>,
     atlas_cache: HashMap<PathBuf, Value>,
 }
 
@@ -418,6 +419,40 @@ pub(crate) fn handle_serve_request(line: &str, state: &mut ServeState) -> Result
                 &packet.query,
                 route_cap,
             ))
+        }
+        "field_report" | "field-report" => {
+            let (input, source) = if let Some(packet_value) = request.get("packet") {
+                (packet_value.clone(), serve_packet_hash(packet_value)?)
+            } else {
+                let input_path = request["input"]
+                    .as_str()
+                    .or_else(|| request["from"].as_str())
+                    .ok_or_else(|| anyhow!("field_report request requires packet or input"))?;
+                let source = serve_manifest_key(Path::new(input_path))?
+                    .display()
+                    .to_string();
+                let input = serde_json::from_str::<Value>(
+                    &std::fs::read_to_string(input_path)
+                        .with_context(|| format!("read field_report input {input_path}"))?,
+                )
+                .with_context(|| format!("parse field_report JSON input {input_path}"))?;
+                (input, source)
+            };
+            if let Some(cached) = state.field_report_cache.get(&source) {
+                let mut out = cached.clone();
+                out["serve_cache"] = json!({
+                    "enabled": true,
+                    "state": "SERVE_FIELD_REPORT_HIT"
+                });
+                return Ok(out);
+            }
+            let mut out = field_core::adapters::adapt_value(&input).to_value();
+            state.field_report_cache.insert(source, out.clone());
+            out["serve_cache"] = json!({
+                "enabled": true,
+                "state": "SERVE_FIELD_REPORT_WARMED"
+            });
+            Ok(out)
         }
         "guard_action" | "guard-action" => {
             let atlas_path = request["atlas"]
