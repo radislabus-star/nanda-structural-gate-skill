@@ -1580,7 +1580,7 @@ cat >"$tmp_field_report/structural.json" <<'EOF_FIELD'
 }
 EOF_FIELD
 field_structural_json="$("$field_report" --from "$tmp_field_report/structural.json" --format json)"
-jq -e '.version == "unified-field-v1-readonly" and .family == "structural" and .peak.target == "runtime" and .peak.safe_to_answer == true and .claim_boundary.no_behavior_change == true' <<<"$field_structural_json" >/dev/null
+jq -e '.version == "unified-field-v1-readonly" and .family == "structural" and .peak.target == "runtime" and .peak.safe_to_answer == true and .claim_boundary.no_behavior_change == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_structural_json" >/dev/null
 cat >"$tmp_field_report/packed.json" <<'EOF_FIELD'
 {
   "mode": "pack6m",
@@ -1592,7 +1592,7 @@ cat >"$tmp_field_report/packed.json" <<'EOF_FIELD'
 }
 EOF_FIELD
 field_packed_json="$("$field_report" --from "$tmp_field_report/packed.json" --format json)"
-jq -e '.family == "packed" and .basis.memory_budget_class == "hot_cache_budgeted" and .anti_wave.active == true and .compatibility.hot_loop_unchanged == true' <<<"$field_packed_json" >/dev/null
+jq -e '.family == "packed" and .basis.memory_budget_class == "hot_cache_budgeted" and .anti_wave.active == true and .compatibility.hot_loop_unchanged == true and (.query.signature | type == "string" and length == 16) and .compute_probe.dim == 1024' <<<"$field_packed_json" >/dev/null
 cat >"$tmp_field_report/cognitive.json" <<'EOF_FIELD'
 {
   "roadmap_block": "v-test",
@@ -1604,7 +1604,7 @@ cat >"$tmp_field_report/cognitive.json" <<'EOF_FIELD'
 }
 EOF_FIELD
 field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
-jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true' <<<"$field_cognitive_json" >/dev/null
+jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_cognitive_json" >/dev/null
 rm -rf "$tmp_field_report"
 "$gate_md" --help | grep -q "Usage: nanda gate-md"
 "$reporter" --help | grep -q "Usage: nanda report"

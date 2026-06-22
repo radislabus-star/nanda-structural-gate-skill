@@ -50,10 +50,20 @@ fn structural_report(input: &Value) -> UnifiedFieldReport {
     let field_state = &input["field_state_machine"];
     let peak_decision = &input["peak_decision"];
     let structural_map = &input["structural_map"];
+    let source_mode = mode(input, "structural_result");
+    let peak_target = peak["peak"]
+        .as_str()
+        .or_else(|| input["top_peak"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let query_text = input["query"]["text"]
+        .as_str()
+        .or_else(|| input["query"].as_str())
+        .map(str::to_string);
     UnifiedFieldReport {
         version: FIELD_CORE_VERSION,
         family: FieldFamily::Structural,
-        source_mode: mode(input, "structural_result"),
+        source_mode: source_mode.clone(),
         basis: FieldBasis::dynamic_1024(),
         record: FieldRecordSummary {
             records: count_array(input, "triads") + count_array(input, "candidate_triads"),
@@ -67,23 +77,21 @@ fn structural_report(input: &Value) -> UnifiedFieldReport {
         },
         query: FieldQuerySummary {
             source: query_source(input),
-            text: input["query"]["text"]
-                .as_str()
-                .or_else(|| input["query"].as_str())
-                .map(str::to_string),
+            text: query_text.clone(),
             requested_axes: vec![
                 "route".to_string(),
                 "group".to_string(),
                 "polarity".to_string(),
             ],
-            signature: None,
+            signature: Some(adapter_field_signature(
+                FieldFamily::Structural,
+                &source_mode,
+                &peak_target,
+                query_text.as_deref(),
+            )),
         },
         peak: FieldPeakSummary {
-            target: peak["peak"]
-                .as_str()
-                .or_else(|| input["top_peak"].as_str())
-                .unwrap_or("")
-                .to_string(),
+            target: peak_target,
             score: number(&peak["score"])
                 .or_else(|| number(&input["top_score"]))
                 .unwrap_or(0.0),
@@ -146,10 +154,17 @@ fn packed_report(input: &Value) -> UnifiedFieldReport {
     let packed_support = &input["packed_support"];
     let packed_runtime = &input["packed_runtime"];
     let peak_decision = &input["peak_decision"];
+    let source_mode = mode(input, "packed_result");
+    let peak_target = input["top_peak"]
+        .as_str()
+        .or_else(|| input["packed_peak"]["target"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let query_text = input["query"].as_str().map(str::to_string);
     UnifiedFieldReport {
         version: FIELD_CORE_VERSION,
         family: FieldFamily::Packed,
-        source_mode: mode(input, "packed_result"),
+        source_mode: source_mode.clone(),
         basis: FieldBasis::packed_1024(),
         record: FieldRecordSummary {
             records: usize_number(&input["records"])
@@ -164,18 +179,22 @@ fn packed_report(input: &Value) -> UnifiedFieldReport {
         },
         query: FieldQuerySummary {
             source: "packed_query_wave".to_string(),
-            text: input["query"].as_str().map(str::to_string),
+            text: query_text.clone(),
             requested_axes: vec!["route_id".to_string(), "group_id".to_string()],
             signature: input["query_wave"]["signature_hex"]
                 .as_str()
-                .map(str::to_string),
+                .map(str::to_string)
+                .or_else(|| {
+                    Some(adapter_field_signature(
+                        FieldFamily::Packed,
+                        &source_mode,
+                        &peak_target,
+                        query_text.as_deref(),
+                    ))
+                }),
         },
         peak: FieldPeakSummary {
-            target: input["top_peak"]
-                .as_str()
-                .or_else(|| input["packed_peak"]["target"].as_str())
-                .unwrap_or("")
-                .to_string(),
+            target: peak_target,
             score: number(&input["peak_score"])
                 .or_else(|| number(&input["packed_peak"]["score"]))
                 .unwrap_or(0.0),
@@ -234,10 +253,21 @@ fn packed_report(input: &Value) -> UnifiedFieldReport {
 fn cognitive_report(input: &Value) -> UnifiedFieldReport {
     let claim = &input["claim_boundary"];
     let metrics = &input["metrics"];
+    let source_mode = mode(input, "llmwave_big_result");
+    let peak_target = input["top_peak"]
+        .as_str()
+        .or_else(|| input["schema_peak"]["schema"].as_str())
+        .or_else(|| input["answer_state"].as_str())
+        .unwrap_or("")
+        .to_string();
+    let query_text = input["input_text"]
+        .as_str()
+        .or_else(|| input["text"].as_str())
+        .map(str::to_string);
     UnifiedFieldReport {
         version: FIELD_CORE_VERSION,
         family: FieldFamily::Cognitive,
-        source_mode: mode(input, "llmwave_big_result"),
+        source_mode: source_mode.clone(),
         basis: FieldBasis::cognitive_1024(),
         record: FieldRecordSummary {
             records: usize_number(&metrics["record_count"])
@@ -256,22 +286,22 @@ fn cognitive_report(input: &Value) -> UnifiedFieldReport {
         },
         query: FieldQuerySummary {
             source: "llmwave_big_query_or_fixture".to_string(),
-            text: input["input_text"]
-                .as_str()
-                .or_else(|| input["text"].as_str())
-                .map(str::to_string),
+            text: query_text.clone(),
             requested_axes: vec!["l2_surface".to_string(), "l3_schema".to_string()],
             signature: input["query_wave"]["signature_hex"]
                 .as_str()
-                .map(str::to_string),
+                .map(str::to_string)
+                .or_else(|| {
+                    Some(adapter_field_signature(
+                        FieldFamily::Cognitive,
+                        &source_mode,
+                        &peak_target,
+                        query_text.as_deref(),
+                    ))
+                }),
         },
         peak: FieldPeakSummary {
-            target: input["top_peak"]
-                .as_str()
-                .or_else(|| input["schema_peak"]["schema"].as_str())
-                .or_else(|| input["answer_state"].as_str())
-                .unwrap_or("")
-                .to_string(),
+            target: peak_target,
             score: number(&input["top_score"])
                 .or_else(|| number(&metrics["adjusted_top_score"]))
                 .or_else(|| number(&metrics["baseline_top_score"]))
@@ -377,6 +407,22 @@ fn feedback_summary(input: &Value) -> FeedbackSummary {
             || input.get("feedback_memory").is_some()
             || input.get("continuation_memory").is_some(),
     }
+}
+
+fn adapter_field_signature(
+    family: FieldFamily,
+    source_mode: &str,
+    peak_target: &str,
+    query_text: Option<&str>,
+) -> String {
+    let vector = FieldVector1024::project_record(&FieldTriadProjection {
+        subject: format!("adapter:{}", family.as_str()),
+        relation: source_mode.to_string(),
+        object: query_text.unwrap_or("no_query_text").to_string(),
+        route: Some(peak_target.to_string()),
+        group: Some("field_adapter".to_string()),
+    });
+    vector.signature_hex()
 }
 
 fn mode(input: &Value, default: &str) -> String {
