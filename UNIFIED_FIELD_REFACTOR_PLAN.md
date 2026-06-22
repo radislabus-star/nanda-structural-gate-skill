@@ -1,6 +1,6 @@
 # Unified Field Refactor Plan
 
-Status: planned refactor project.
+Status: implemented as read-only unified field projection.
 
 This document prepares the migration from several field-like implementations to
 one shared field contract. It is not permission to rewrite the runtime in one
@@ -148,6 +148,8 @@ The shared contract is semantic, not identical storage.
 
 ### Phase 0: Inventory and Invariants
 
+Status: done.
+
 Deliverables:
 
 - this plan;
@@ -169,6 +171,8 @@ nanda-self-check
 
 ### Phase 1: Type Shell
 
+Status: done in `src/field_core/`.
+
 Create neutral types only:
 
 - `FieldBasis`;
@@ -189,6 +193,8 @@ Acceptance:
 
 ### Phase 2: Structural Adapter
 
+Status: done as a read-only adapter in `src/field_core/adapters.rs`.
+
 Wrap existing `map_gate`/`search` outputs in `field_core` vocabulary:
 
 - map existing `peak_decision` to `FieldPeak`;
@@ -204,6 +210,8 @@ Acceptance:
 - output can include new compatibility section, but old fields remain.
 
 ### Phase 3: Packed 6M Adapter
+
+Status: done as a read-only adapter in `src/field_core/adapters.rs`.
 
 Map packed hot records without changing their memory layout:
 
@@ -226,6 +234,8 @@ Acceptance:
 
 ### Phase 4: LLMWave Big Adapter
 
+Status: done as a read-only adapter in `src/field_core/adapters.rs`.
+
 Map L2/L3/schema/surface/feedback reports to unified field language:
 
 - L2 word field -> surface/token projection;
@@ -242,7 +252,9 @@ Acceptance:
 
 ### Phase 5: Unified Field Report
 
-Add a read-only command or subreport:
+Status: done through `nanda field-report` and `scripts/nanda-field-report`.
+
+The read-only command is:
 
 ```bash
 nanda field-report --from search-result.json --format json
@@ -296,15 +308,16 @@ Guard-diff rules:
 - use `shared.version_bump_contract` only for pure version metadata;
 - no PASS if diff crosses routes without explicit shared contract.
 
-## First Safe Code Step
+## Implemented Code Step
 
-The first code step should be small:
+The first code step was intentionally small:
 
 ```text
-add src/field_core/mod.rs
-add src/field_core/{basis,peak,lens,anti_wave,coherence,feedback}.rs
-export module from src/main.rs or src/lib boundary if introduced
-no existing runtime behavior changed
+added src/field_core/*
+added src/field_adapters/mod.rs
+added nanda field-report
+added scripts/nanda-field-report
+kept existing runtime behavior unchanged
 tests: compile-only plus tiny type tests
 ```
 
@@ -314,12 +327,12 @@ This creates the target seam without moving scoring logic.
 
 Priority order:
 
-1. `field_core` type shell.
-2. Structural adapter for search/map outputs.
-3. Packed 6M adapter, preserving packed layouts.
-4. LLMWave Big adapter.
-5. Unified field-report surface.
-6. Only then consider splitting large reporting files.
+1. Add real field-report fixtures from live command output, not only synthetic
+   shapes.
+2. Add `nanda-serve` support for `field_report`.
+3. Add optional `unified_field` sections to search/pack6m/llmwave-big outputs
+   after compatibility review.
+4. Only then consider splitting large reporting files.
 
 Files not to refactor first:
 
@@ -340,4 +353,3 @@ The refactor is successful only if all are true:
 - agent-facing reports become clearer;
 - no project-specific hardcode is introduced;
 - no LLM/nonlinear/cache-only claim boundary is weakened.
-

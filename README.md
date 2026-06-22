@@ -1059,6 +1059,7 @@ nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine
 nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff
 nanda-guard-diff .nanda/route-atlas.json --action-id shared.version_bump_contract --diff version.diff
+nanda-field-report --from search-result.json --format json
 nanda-profile-guards . --iterations 50 --format json
 nanda-release-gate .nanda/route-atlas.json
 nanda-report --overall overall.md --route invoice:invoice.md

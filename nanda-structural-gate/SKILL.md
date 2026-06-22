@@ -99,6 +99,7 @@ scripts/nanda-build-atlas . --out .nanda/route-atlas.json
 scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id shared.version_bump_contract --diff version.diff
+scripts/nanda-field-report --from search-result.json --format json
 scripts/nanda-profile-guards . --iterations 50 --format json
 scripts/nanda-release-gate .nanda/route-atlas.json
 scripts/nanda-dogfood . --refactor-plan --boundary-economics --format json

@@ -51,6 +51,7 @@ guard_action="$root/nanda-structural-gate/scripts/nanda-guard-action"
 guard_diff="$root/nanda-structural-gate/scripts/nanda-guard-diff"
 profile_guards="$root/nanda-structural-gate/scripts/nanda-profile-guards"
 release_gate="$root/nanda-structural-gate/scripts/nanda-release-gate"
+field_report="$root/nanda-structural-gate/scripts/nanda-field-report"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
@@ -1560,6 +1561,51 @@ fi
 
 "$root/scripts/benchmark-v0.sh" >/dev/null
 "$root/scripts/test-edge-cases.sh" >/dev/null
+tmp_field_report="$(mktemp -d)"
+cat >"$tmp_field_report/structural.json" <<'EOF_FIELD'
+{
+  "mode": "search",
+  "query": {"source": "auto_query_triads", "text": "route check"},
+  "peaks": [{"peak": "runtime", "score": 0.88}],
+  "peak_margin": 0.22,
+  "peak_decision": {"state": "FOCUSED", "safe_to_answer": true},
+  "field_state_machine": {"state": "FIELD_FOCUSED", "action": "draft_with_evidence"},
+  "structural_map": {
+    "route_field": {"routes": {"runtime": {}}},
+    "group_centroids": {"source": {}, "candidate": {}},
+    "structural_energy": {"route_coherence": 0.91},
+    "foreign_pull": []
+  },
+  "supporting_triads": [{"id": "t1"}]
+}
+EOF_FIELD
+field_structural_json="$("$field_report" --from "$tmp_field_report/structural.json" --format json)"
+jq -e '.version == "unified-field-v1-readonly" and .family == "structural" and .peak.target == "runtime" and .peak.safe_to_answer == true and .claim_boundary.no_behavior_change == true' <<<"$field_structural_json" >/dev/null
+cat >"$tmp_field_report/packed.json" <<'EOF_FIELD'
+{
+  "mode": "pack6m",
+  "packed_runtime": {"triads": 15000, "routes": 12, "groups": 64},
+  "packed_support": {"support_count": 7, "anti_count": 2, "net_dot": 144},
+  "packed_lanes": {"count": 2, "delta": 64, "suppressed_peak": "false-route"},
+  "packed_peak": {"target": "route-7", "score": 0.77, "cosine": 0.41},
+  "peak_decision": {"state": "PACKED_FOCUSED", "safe_to_answer": false}
+}
+EOF_FIELD
+field_packed_json="$("$field_report" --from "$tmp_field_report/packed.json" --format json)"
+jq -e '.family == "packed" and .basis.memory_budget_class == "hot_cache_budgeted" and .anti_wave.active == true and .compatibility.hot_loop_unchanged == true' <<<"$field_packed_json" >/dev/null
+cat >"$tmp_field_report/cognitive.json" <<'EOF_FIELD'
+{
+  "roadmap_block": "v-test",
+  "verdict": "LLMWAVE_REVIEW",
+  "input_text": "what does declaration require",
+  "metrics": {"record_count": 3, "schema_count": 2, "coherence": 0.74},
+  "claim_boundary": {"llm_ready": false, "nonlinear_memory_proven": false, "cache_only_execution_proven": false, "safe_to_answer": false},
+  "field_after_anti": {"state": "review"}
+}
+EOF_FIELD
+field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
+jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true' <<<"$field_cognitive_json" >/dev/null
+rm -rf "$tmp_field_report"
 "$gate_md" --help | grep -q "Usage: nanda gate-md"
 "$reporter" --help | grep -q "Usage: nanda report"
 "$mapper" --help | grep -q "Usage: nanda map"
@@ -1577,6 +1623,7 @@ fi
 "$guard_diff" --help | grep -q "Usage: nanda guard-diff"
 "$profile_guards" --help | grep -q "Usage: nanda profile-guards"
 "$release_gate" --help | grep -q "Usage: nanda release-gate"
+"$field_report" --help | grep -q "Usage: nanda field-report"
 "$split_packet" --help | grep -q "Usage: nanda split"
 "$reporter" --format md --title "Smoke Markdown Report" --domain code --overall "$root/examples/triads.watch-large.md" --route code:"$root/examples/triads.code-flow.md" >/dev/null || test "$?" -eq 3
 

@@ -16,6 +16,8 @@ mod decode;
 mod encode;
 mod eval;
 mod feedback;
+mod field_adapters;
+mod field_core;
 mod focus;
 mod focus_cache;
 mod io;
@@ -124,6 +126,7 @@ enum Command {
     GuardAction(commands::guard::GuardActionArgs),
     GuardDiff(commands::guard::GuardDiffArgs),
     ReleaseGate(commands::guard::ReleaseGateArgs),
+    FieldReport(field_adapters::FieldReportArgs),
     Report(ReportArgs),
     SelfCheck,
     Bench6m(bench6m::Bench6mArgs),
@@ -1283,6 +1286,7 @@ fn run() -> Result<u8> {
         Command::GuardAction(args) => commands::guard::guard_action_cmd(args),
         Command::GuardDiff(args) => commands::guard::guard_diff_cmd(args),
         Command::ReleaseGate(args) => commands::guard::release_gate_cmd(args),
+        Command::FieldReport(args) => field_adapters::field_report_cmd(args),
         Command::Report(args) => report_cmd(args),
         Command::SelfCheck => self_check(),
         Command::Bench6m(args) => bench6m::cmd(args),
