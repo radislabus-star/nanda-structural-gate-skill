@@ -10,6 +10,7 @@ pub(crate) mod lens;
 pub(crate) mod pass;
 pub(crate) mod peak;
 pub(crate) mod record;
+pub(crate) mod runtime;
 pub(crate) mod vector;
 
 pub(crate) use anti_wave::*;
@@ -20,6 +21,7 @@ pub(crate) use lens::*;
 pub(crate) use pass::*;
 pub(crate) use peak::*;
 pub(crate) use record::*;
+pub(crate) use runtime::*;
 pub(crate) use vector::*;
 
 pub(crate) const FIELD_CORE_VERSION: &str = "unified-field-v1-readonly";
@@ -83,9 +85,15 @@ impl UnifiedFieldReport {
                 serde_json::to_value(&memory_delta)
                     .unwrap_or_else(|_| json!({"state": "FIELD_MEMORY_DELTA_FAILED"})),
             );
+            let field_pass = FieldPassProjection::from_report(self, &memory_delta.deltas);
+            object.insert(
+                "runtime_contract".to_string(),
+                serde_json::to_value(runtime_contract_from_report(self, &field_pass))
+                    .unwrap_or_else(|_| json!({"state": "FIELD_RUNTIME_CONTRACT_FAILED"})),
+            );
             object.insert(
                 "field_pass".to_string(),
-                serde_json::to_value(FieldPassProjection::from_report(self, &memory_delta.deltas))
+                serde_json::to_value(field_pass)
                     .unwrap_or_else(|_| json!({"state": "FIELD_PASS_FAILED"})),
             );
         }
@@ -105,13 +113,9 @@ impl FieldPassProjection {
                 FieldFamily::Cognitive => FieldRecordKind::L3Schema,
                 FieldFamily::Unknown => FieldRecordKind::StructuralTriad,
             },
-            "unified_field",
-            "queries",
-            report
-                .query
-                .text
-                .as_deref()
-                .unwrap_or(report.family.as_str()),
+            report.family.as_str(),
+            "has_peak",
+            report.peak.target.clone(),
             Some(report.peak.target.clone()),
             Some(report.source_mode.clone()),
         );
@@ -158,6 +162,11 @@ impl FieldPassProjection {
                 strength: 1,
             }],
             anti_waves,
+            state_hint: Some(if report.coherence.field_state.trim().is_empty() {
+                report.peak.state.clone()
+            } else {
+                report.coherence.field_state.clone()
+            }),
             claim_boundary: report.claim_boundary.clone(),
         };
         let input = apply_memory_deltas_to_pass(&input, deltas);
@@ -450,6 +459,7 @@ mod tests {
             ],
             lenses: vec![],
             anti_waves: vec![],
+            state_hint: None,
             claim_boundary: FieldClaimBoundary {
                 not_llm_ready: false,
                 not_nonlinear_memory_proof: false,

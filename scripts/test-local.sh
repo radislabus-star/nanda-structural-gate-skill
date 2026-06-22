@@ -584,6 +584,8 @@ search_json="$("$search" "$root/examples/triad-packet.interference-search.json" 
 grep -q '"mode": "interference-retrieval"' <<<"$search_json"
 jq -e '.unified_field.family == "structural" and .unified_field.compute_probe.version == "unified-field-compute-v1" and (.unified_field.query.signature | type == "string" and length == 16)' <<<"$search_json" >/dev/null
 jq -e '.unified_field.field_pass.version == "unified-field-pass-v1" and .unified_field.field_pass.family == "structural" and .unified_field.field_pass.safe_to_answer == false' <<<"$search_json" >/dev/null
+jq -e '.unified_field.runtime_contract.version == "unified-field-runtime-v1" and .unified_field.runtime_contract.input_contract == "FieldPassInput" and .unified_field.runtime_contract.output_contract == "FieldPassReport" and .unified_field.runtime_contract.field_core_as_sole_engine == false' <<<"$search_json" >/dev/null
+jq -e '.field_runtime.version == "unified-field-runtime-v1" and .field_runtime.mode == "structural-dual-run" and .field_runtime.peak_matches == true and .field_runtime.field_not_more_permissive == true' <<<"$search_json" >/dev/null
 jq -e '.unified_field.memory_delta.replayable_into_next_pass | type == "boolean"' <<<"$search_json" >/dev/null
 jq -e '.unified_field.record.records == 10 and .unified_field.record.routes >= 1 and .unified_field.record.groups >= 1 and .unified_field.peak.support_count == 4 and .unified_field.peak.anti_support_count == 5' <<<"$search_json" >/dev/null
 
@@ -709,6 +711,7 @@ jq -e '.peak_decision.state == "WATCH"' <<<"$noisy_search_json" >/dev/null
 jq -e '.peak_decision.safe_to_answer == false' <<<"$noisy_search_json" >/dev/null
 jq -e '.field_state_machine.state == "FIELD_CONTESTED" and .field_state_machine.safe_to_answer == false' <<<"$noisy_search_json" >/dev/null
 jq -e '.field_state_machine.action == "SPLIT_OR_QUERY"' <<<"$noisy_search_json" >/dev/null
+jq -e '.field_runtime.mode == "structural-dual-run" and .field_runtime.peak_matches == true and .field_runtime.state_family_matches == true and .field_runtime.field_not_more_permissive == true and .field_runtime.cutover_ready == true' <<<"$noisy_search_json" >/dev/null
 eval_json="$("$evaler" \
   --case "$root/examples/triad-packet.interference-search-route-trap.json:certification:FOCUSED" \
   --case "$root/examples/triad-packet.interference-search-noisy.json:certification:WATCH")"
@@ -818,6 +821,7 @@ jq -e '.noisy.state == "WATCH" and .noisy.safe_to_answer == false' <<<"$doctor_j
 jq -e '.noisy.field_state == "FIELD_CONTESTED" and .noisy.field_safe_to_answer == false' <<<"$doctor_json" >/dev/null
 trap_search_json="$("$search" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json --top-k 3)"
 jq -e '.verdict == "PASS" and .field_state == "FIELD_FOCUSED" and .safe_to_answer == true and .top_peak == "certification"' <<<"$trap_search_json" >/dev/null
+jq -e '.field_runtime.mode == "structural-dual-run" and .field_runtime.cutover_ready == true and .field_runtime.field_safe_to_answer == false' <<<"$trap_search_json" >/dev/null
 trap_first_peak="$(jq -r '.peaks[0].peak' <<<"$trap_search_json")"
 trap_lexical_peak="$(jq -r '.lexical_baseline.top_peak' <<<"$trap_search_json")"
 trap_wins="$(jq -r '.wins_over_lexical_baseline' <<<"$trap_search_json")"
@@ -1634,7 +1638,7 @@ EOF_FIELD
 field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_cognitive_json" >/dev/null
 field_audit_json="$("$field_audit" --format json)"
-jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .overall_state == "UNIFIED_FIELD_BRIDGE_COMPLETE_NOT_SOLE_ENGINE" and .acceptance.one_field_pass == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.semantic_equivalence_gate == true and .acceptance.route_scoped_extraction_required == false and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false and (.next_required_steps | length) == 0' <<<"$field_audit_json" >/dev/null
+jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .overall_state == "UNIFIED_FIELD_BRIDGE_COMPLETE_NOT_SOLE_ENGINE" and .acceptance.one_field_pass == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.semantic_equivalence_gate == true and .acceptance.structural_dual_run_active == true and .acceptance.structural_cutover_eval_ready == true and .acceptance.route_scoped_extraction_required == false and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false and (.next_required_steps | length) == 0' <<<"$field_audit_json" >/dev/null
 field_equivalence_json="$("$field_equivalence" --structural-from "$tmp_field_report/structural.json" --packed-from "$tmp_field_report/packed.json" --cognitive-from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.mode == "unified-field-equivalence" and .version == "unified-field-pass-v1" and .acceptance.equivalent_contract == true and .acceptance.all_have_field_pass == true and .acceptance.all_have_memory_delta == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_equivalence_json" >/dev/null
 

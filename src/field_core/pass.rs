@@ -51,6 +51,7 @@ pub(crate) struct FieldPassInput {
     pub records: Vec<FieldRecord>,
     pub lenses: Vec<FieldLensOperation>,
     pub anti_waves: Vec<FieldAntiWaveLane>,
+    pub state_hint: Option<String>,
     pub claim_boundary: FieldClaimBoundary,
 }
 
@@ -140,17 +141,28 @@ pub(crate) fn run_field_pass(input: &FieldPassInput) -> FieldPassReport {
         })
         .collect::<Vec<_>>();
     let peak = detect_field_peak(&scoring_query, &candidates);
-    let coherence = summarize_field_coherence(
+    let mut coherence = summarize_field_coherence(
         &scoring_query,
         Some(&focused),
         &peak,
         input.anti_waves.len(),
     );
+    if let Some(hint) = input.state_hint.as_deref().and_then(normalize_state_hint) {
+        coherence.field_state = hint.to_string();
+        coherence.field_action = match hint {
+            "FIELD_REVERSED" => "repair_polarity".to_string(),
+            "FIELD_CONTESTED" => "split_or_query".to_string(),
+            "FIELD_THIN" => "collect_more_support".to_string(),
+            _ => coherence.field_action,
+        };
+    }
     let safe_to_answer = peak.safe_to_answer
         && !input.claim_boundary.not_llm_ready
         && !input.claim_boundary.not_nonlinear_memory_proof
         && input.anti_waves.is_empty();
-    let verdict = if safe_to_answer {
+    let verdict = if coherence.field_state == "FIELD_REVERSED" {
+        "VETO"
+    } else if safe_to_answer {
         "PASS"
     } else if coherence.field_state == "FIELD_CONTESTED" {
         "VETO"
@@ -171,5 +183,14 @@ pub(crate) fn run_field_pass(input: &FieldPassInput) -> FieldPassReport {
         verdict: verdict.to_string(),
         safe_to_answer,
         claim_boundary: input.claim_boundary.clone(),
+    }
+}
+
+fn normalize_state_hint(state: &str) -> Option<&'static str> {
+    match state {
+        "FIELD_REVERSED" | "POLARITY_REVERSED" => Some("FIELD_REVERSED"),
+        "FIELD_CONTESTED" => Some("FIELD_CONTESTED"),
+        "FIELD_THIN" | "PACKED_THIN" => Some("FIELD_THIN"),
+        _ => None,
     }
 }

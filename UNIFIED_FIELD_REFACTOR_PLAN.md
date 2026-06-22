@@ -438,6 +438,55 @@ The current closure state is:
 This closes the unified-field bridge refactor. It does not claim that
 `field_core` is the sole runtime engine.
 
+## Level 2 Runtime Migration
+
+Level 2 starts the migration from a shared bridge to a shared compute runtime.
+The rule is:
+
+```text
+adapter -> dual-run -> equivalence eval -> cutover -> audit
+```
+
+### Phase 11: Field Runtime Contract
+
+Status: active.
+
+Every unified field report now exposes `runtime_contract`:
+
+- input: `FieldPassInput`;
+- output: `FieldPassReport`;
+- role: shared semantic pass;
+- `field_core_as_sole_engine = false`;
+- domain engine preserved until cutover evidence exists.
+
+This is the runtime contract, not yet the runtime cutover.
+
+### Phase 12: Structural Dual-Run
+
+Status: active for `nanda search`.
+
+`nanda search --format json` now emits `field_runtime`:
+
+- old structural peak/verdict/state/safe flag;
+- field-core peak/verdict/state/safe flag;
+- peak match;
+- state-family match;
+- not-more-permissive check;
+- `cutover_ready`.
+
+Current expected behavior:
+
+- focused route-trap can be `cutover_ready=true`;
+- noisy/contested/reversed/thin cases can be `cutover_ready=true` only when
+  `state_hint` preserves the unsafe state family and the field pass is not more
+  permissive than the domain engine.
+
+Claim boundary:
+
+- field runtime dual-run must never make the field more permissive than the
+  existing domain engine;
+- `field_safe_to_answer` remains blocked by claim boundary.
+
 ## Refactor Gates
 
 Before each phase:

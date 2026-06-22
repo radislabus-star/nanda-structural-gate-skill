@@ -45,6 +45,7 @@ pub(crate) fn search_cmd(args: SearchArgs) -> Result<u8> {
     let mut result = result;
     result["canonicalization"] = json!(packet.canonicalization);
     result["unified_field"] = field_core::adapters::adapt_value(&result).to_value();
+    result["field_runtime"] = field_core::structural_dual_run_value(&result);
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&result)?),
         OutputFormat::Text => print_search_text(&result),

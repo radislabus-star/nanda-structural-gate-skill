@@ -56,8 +56,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "embedded_unified_field": true,
                 "field_pass_present": true,
                 "sole_engine": false,
-                "state": "REPORT_LAYER_FIELD_PASS",
-                "remaining": ["move bounded structural scoring into field_core pass"]
+                "state": "DUAL_RUN_CUTOVER_EVAL_READY",
+                "remaining": ["run structural cutover suite before using field_core as sole structural engine"]
             },
             {
                 "family": "packed",
@@ -83,6 +83,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "field_core_as_sole_engine": false,
             "feedback_memory_delta_unified": true,
             "semantic_equivalence_gate": true,
+            "structural_dual_run_active": true,
+            "structural_cutover_eval_ready": true,
             "route_scoped_extraction_required": false,
             "nonlinear_memory_proven": false,
             "llm_ready": false
