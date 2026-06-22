@@ -52,6 +52,7 @@ guard_diff="$root/nanda-structural-gate/scripts/nanda-guard-diff"
 profile_guards="$root/nanda-structural-gate/scripts/nanda-profile-guards"
 release_gate="$root/nanda-structural-gate/scripts/nanda-release-gate"
 field_report="$root/nanda-structural-gate/scripts/nanda-field-report"
+field_audit="$root/nanda-structural-gate/scripts/nanda-field-audit"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
@@ -62,6 +63,7 @@ grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
 grep -q 'nanda_6m:' <<<"$version_text"
 big_contract_json="$("$llmwave_big" contract --format json)"
 jq -e '.roadmap_block == "v158-v160"' <<<"$big_contract_json" >/dev/null
+jq -e '.unified_field.field_pass.version == "unified-field-pass-v1"' <<<"$big_contract_json" >/dev/null
 jq -e '.contract.layers[] | select(.name == "L2 Word Field" and (.must_not_contain | index("schema_route_authority")))' <<<"$big_contract_json" >/dev/null
 jq -e '.contract.layers[] | select(.name == "L3 Schema Field" and (.must_not_contain | index("surface_token_storage")))' <<<"$big_contract_json" >/dev/null
 jq -e '.bigness_metrics.measured_baseline.status == "CONTRACT_BASELINE_ONLY_UNMEASURED_CORPUS"' <<<"$big_contract_json" >/dev/null
@@ -149,6 +151,7 @@ jq -e '.claim_boundary.fixed_eval_case_records == true and .claim_boundary.full_
 big_query_wave_json="$("$llmwave_big" query-wave --text "Has customs cleared the goods?" --format json)"
 jq -e '.roadmap_block == "v951-v1000" and .verdict == "QUERY_WAVE_READY_NOT_FIELD_MATURE"' <<<"$big_query_wave_json" >/dev/null
 jq -e '.unified_field.family == "cognitive" and .unified_field.compute_probe.version == "unified-field-compute-v1" and .unified_field.claim_boundary.not_llm_ready == true' <<<"$big_query_wave_json" >/dev/null
+jq -e '.unified_field.field_pass.version == "unified-field-pass-v1" and .unified_field.field_pass.family == "cognitive" and .unified_field.field_pass.safe_to_answer == false' <<<"$big_query_wave_json" >/dev/null
 jq -e '.top_route_hint == "customs-clearance-status" and .question_polarity == "question_status" and .record.l3_schema_hint_id == 203' <<<"$big_query_wave_json" >/dev/null
 jq -e '.metrics.paraphrase_route_recall == 1 and .metrics.role_hint_accuracy == 1 and .metrics.operator_hint_accuracy == 1 and .metrics.assertion_reject_rate == 1' <<<"$big_query_wave_json" >/dev/null
 jq -e '([.paraphrase_eval[].case_id] | index("en_has_cleared") and index("en_is_cleared") and index("ru_released") and index("assertion_trap"))' <<<"$big_query_wave_json" >/dev/null
@@ -579,6 +582,7 @@ jq -e '.hierarchical_decision.global_foreign_pull > 0' <<<"$hgate_splice_json" >
 search_json="$("$search" "$root/examples/triad-packet.interference-search.json" --input-format json --top-k 3)"
 grep -q '"mode": "interference-retrieval"' <<<"$search_json"
 jq -e '.unified_field.family == "structural" and .unified_field.compute_probe.version == "unified-field-compute-v1" and (.unified_field.query.signature | type == "string" and length == 16)' <<<"$search_json" >/dev/null
+jq -e '.unified_field.field_pass.version == "unified-field-pass-v1" and .unified_field.field_pass.family == "structural" and .unified_field.field_pass.safe_to_answer == false' <<<"$search_json" >/dev/null
 jq -e '.unified_field.record.records == 10 and .unified_field.record.routes >= 1 and .unified_field.record.groups >= 1 and .unified_field.peak.support_count == 4 and .unified_field.peak.anti_support_count == 5' <<<"$search_json" >/dev/null
 
 tmp_focus_packet="$(mktemp)"
@@ -736,6 +740,7 @@ jq -e '.capacity.triads == 65536' <<<"$budget_json" >/dev/null
 pack6m_json="$("$pack6m" "$root/examples/triad-packet.interference-search-route-trap.json" --input-format json)"
 jq -e '.mode == "nanda-6m-pack-skeleton"' <<<"$pack6m_json" >/dev/null
 jq -e '.unified_field.family == "packed" and .unified_field.compute_probe.version == "unified-field-compute-v1" and (.unified_field.query.signature | type == "string" and length == 16)' <<<"$pack6m_json" >/dev/null
+jq -e '.unified_field.field_pass.version == "unified-field-pass-v1" and .unified_field.field_pass.family == "packed" and .unified_field.field_pass.safe_to_answer == false' <<<"$pack6m_json" >/dev/null
 jq -e '.unified_field.record.records == 10 and .unified_field.record.routes == 3 and .unified_field.record.groups == 3 and .unified_field.peak.target == "route:2" and .unified_field.peak.support_count == 1 and .unified_field.peak.anti_support_count == 2 and .unified_field.anti_wave.suppression_energy == 256' <<<"$pack6m_json" >/dev/null
 jq -e '.state == "PACKED_FITS_L3" and .packed_ok == true' <<<"$pack6m_json" >/dev/null
 jq -e '.packed_records.count == 10 and .packed_records.memory_count == 8 and .packed_records.query_count == 2 and .packed_records.record_bytes == 32' <<<"$pack6m_json" >/dev/null
@@ -1626,6 +1631,8 @@ cat >"$tmp_field_report/cognitive.json" <<'EOF_FIELD'
 EOF_FIELD
 field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_cognitive_json" >/dev/null
+field_audit_json="$("$field_audit" --format json)"
+jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .acceptance.one_field_pass == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_audit_json" >/dev/null
 
 "$search" "$root/examples/triad-packet.interference-search.json" --query "runtime route" --format json >"$tmp_field_report/live-search.json"
 live_structural_field="$("$field_report" --from "$tmp_field_report/live-search.json" --format json)"
@@ -1657,6 +1664,7 @@ rm -rf "$tmp_field_report"
 "$profile_guards" --help | grep -q "Usage: nanda profile-guards"
 "$release_gate" --help | grep -q "Usage: nanda release-gate"
 "$field_report" --help | grep -q "Usage: nanda field-report"
+"$field_audit" --help | grep -q "Usage: nanda field-audit"
 "$split_packet" --help | grep -q "Usage: nanda split"
 "$reporter" --format md --title "Smoke Markdown Report" --domain code --overall "$root/examples/triads.watch-large.md" --route code:"$root/examples/triads.code-flow.md" >/dev/null || test "$?" -eq 3
 

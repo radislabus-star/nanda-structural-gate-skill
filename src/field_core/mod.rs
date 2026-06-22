@@ -7,6 +7,7 @@ pub(crate) mod basis;
 pub(crate) mod coherence;
 pub(crate) mod feedback;
 pub(crate) mod lens;
+pub(crate) mod pass;
 pub(crate) mod peak;
 pub(crate) mod record;
 pub(crate) mod vector;
@@ -16,6 +17,7 @@ pub(crate) use basis::*;
 pub(crate) use coherence::*;
 pub(crate) use feedback::*;
 pub(crate) use lens::*;
+pub(crate) use pass::*;
 pub(crate) use peak::*;
 pub(crate) use record::*;
 pub(crate) use vector::*;
@@ -75,8 +77,83 @@ impl UnifiedFieldReport {
                 serde_json::to_value(FieldComputeProbe::from_report(self))
                     .unwrap_or_else(|_| json!({"state": "FIELD_PROBE_FAILED"})),
             );
+            object.insert(
+                "field_pass".to_string(),
+                serde_json::to_value(FieldPassProjection::from_report(self))
+                    .unwrap_or_else(|_| json!({"state": "FIELD_PASS_FAILED"})),
+            );
         }
         value
+    }
+}
+
+struct FieldPassProjection;
+
+impl FieldPassProjection {
+    fn from_report(report: &UnifiedFieldReport) -> FieldPassReport {
+        let query = FieldRecord::synthetic(
+            "report-query",
+            match report.family {
+                FieldFamily::Structural => FieldRecordKind::StructuralTriad,
+                FieldFamily::Packed => FieldRecordKind::PackedRecord,
+                FieldFamily::Cognitive => FieldRecordKind::L3Schema,
+                FieldFamily::Unknown => FieldRecordKind::StructuralTriad,
+            },
+            "unified_field",
+            "queries",
+            report
+                .query
+                .text
+                .as_deref()
+                .unwrap_or(report.family.as_str()),
+            Some(report.peak.target.clone()),
+            Some(report.source_mode.clone()),
+        );
+        let records = vec![FieldRecord::synthetic(
+            "report-peak",
+            match report.family {
+                FieldFamily::Structural => FieldRecordKind::StructuralTriad,
+                FieldFamily::Packed => FieldRecordKind::PackedRecord,
+                FieldFamily::Cognitive => FieldRecordKind::L3Schema,
+                FieldFamily::Unknown => FieldRecordKind::StructuralTriad,
+            },
+            report.family.as_str(),
+            "has_peak",
+            report.peak.target.clone(),
+            Some(report.peak.target.clone()),
+            Some(report.source_mode.clone()),
+        )];
+        let anti_waves = if report.anti_wave.lanes > 0 || report.coherence.foreign_pull > 0 {
+            vec![FieldAntiWaveLane {
+                id: "report-anti-wave".to_string(),
+                target: report
+                    .anti_wave
+                    .suppressed_target
+                    .clone()
+                    .unwrap_or_else(|| "report-noise".to_string()),
+                subject: "unified_field".to_string(),
+                relation: "suppresses".to_string(),
+                object: report.peak.target.clone(),
+                route: Some(report.peak.target.clone()),
+                group: Some(report.source_mode.clone()),
+                strength: report.anti_wave.lanes.max(1) as i32,
+            }]
+        } else {
+            vec![]
+        };
+
+        run_field_pass(&FieldPassInput {
+            family: report.family.clone(),
+            query,
+            records,
+            lenses: vec![FieldLensOperation {
+                kind: FieldLensKind::Route,
+                label: report.peak.target.clone(),
+                strength: 1,
+            }],
+            anti_waves,
+            claim_boundary: report.claim_boundary.clone(),
+        })
     }
 }
 
@@ -328,5 +405,89 @@ mod tests {
 
         assert_ne!(field.signature_hex(), focused.signature_hex());
         assert!(field.cosine(&focused) > 0.2);
+    }
+
+    #[test]
+    fn field_pass_focuses_matching_record() {
+        let report = run_field_pass(&FieldPassInput {
+            family: FieldFamily::Structural,
+            query: FieldRecord::synthetic(
+                "q1",
+                FieldRecordKind::StructuralTriad,
+                "ime",
+                "displays",
+                "candidate",
+                Some("ime-display-flow".to_string()),
+                Some("runtime".to_string()),
+            ),
+            records: vec![
+                FieldRecord::synthetic(
+                    "r1",
+                    FieldRecordKind::StructuralTriad,
+                    "ime",
+                    "displays",
+                    "candidate",
+                    Some("ime-display-flow".to_string()),
+                    Some("runtime".to_string()),
+                ),
+                FieldRecord::synthetic(
+                    "r2",
+                    FieldRecordKind::StructuralTriad,
+                    "nanda",
+                    "scores",
+                    "candidate",
+                    Some("nanda-field-flow".to_string()),
+                    Some("core".to_string()),
+                ),
+            ],
+            lenses: vec![],
+            anti_waves: vec![],
+            claim_boundary: FieldClaimBoundary {
+                not_llm_ready: false,
+                not_nonlinear_memory_proof: false,
+                ..FieldClaimBoundary::default()
+            },
+        });
+
+        assert_eq!(report.version, FIELD_PASS_VERSION);
+        assert_eq!(report.peak.target, "ime-display-flow");
+        assert_eq!(report.verdict, "PASS");
+        assert!(report.safe_to_answer);
+    }
+
+    #[test]
+    fn unified_report_exports_field_pass() {
+        let report = UnifiedFieldReport {
+            version: FIELD_CORE_VERSION,
+            family: FieldFamily::Structural,
+            source_mode: "test".to_string(),
+            basis: FieldBasis::dynamic_1024(),
+            record: FieldRecordSummary::default(),
+            query: FieldQuerySummary {
+                source: "test".to_string(),
+                text: Some("ime displays candidate".to_string()),
+                requested_axes: vec!["route".to_string()],
+                signature: None,
+            },
+            peak: FieldPeakSummary {
+                target: "ime-display-flow".to_string(),
+                score: 1.0,
+                margin: 1.0,
+                state: "FIELD_FOCUSED".to_string(),
+                safe_to_answer: true,
+                support_count: 1,
+                anti_support_count: 0,
+            },
+            lens: FieldLensSummary::default(),
+            anti_wave: AntiWaveSummary::default(),
+            coherence: FieldCoherenceSummary::default(),
+            feedback: FeedbackSummary::default(),
+            compatibility: FieldCompatibility::default(),
+            claim_boundary: FieldClaimBoundary::default(),
+        };
+
+        let value = report.to_value();
+        assert_eq!(value["field_pass"]["version"], FIELD_PASS_VERSION);
+        assert_eq!(value["field_pass"]["family"], "structural");
     }
 }
