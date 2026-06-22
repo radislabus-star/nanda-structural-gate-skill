@@ -148,6 +148,7 @@ jq -e '([.eval_cases[].case_id] | index("grounded_clearance_answer") and index("
 jq -e '.claim_boundary.fixed_eval_case_records == true and .claim_boundary.full_llm_ready == false and .claim_boundary.multi_turn_chat_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_mini_chat_eval_json" >/dev/null
 big_query_wave_json="$("$llmwave_big" query-wave --text "Has customs cleared the goods?" --format json)"
 jq -e '.roadmap_block == "v951-v1000" and .verdict == "QUERY_WAVE_READY_NOT_FIELD_MATURE"' <<<"$big_query_wave_json" >/dev/null
+jq -e '.unified_field.family == "cognitive" and .unified_field.compute_probe.version == "unified-field-compute-v1" and .unified_field.claim_boundary.not_llm_ready == true' <<<"$big_query_wave_json" >/dev/null
 jq -e '.top_route_hint == "customs-clearance-status" and .question_polarity == "question_status" and .record.l3_schema_hint_id == 203' <<<"$big_query_wave_json" >/dev/null
 jq -e '.metrics.paraphrase_route_recall == 1 and .metrics.role_hint_accuracy == 1 and .metrics.operator_hint_accuracy == 1 and .metrics.assertion_reject_rate == 1' <<<"$big_query_wave_json" >/dev/null
 jq -e '([.paraphrase_eval[].case_id] | index("en_has_cleared") and index("en_is_cleared") and index("ru_released") and index("assertion_trap"))' <<<"$big_query_wave_json" >/dev/null

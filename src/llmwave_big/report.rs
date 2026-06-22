@@ -1,4 +1,6 @@
 use anyhow::Result;
+use serde::Serialize;
+use serde_json::Value;
 
 use super::active_core::ActiveCoreReport;
 use super::answer_surface::AnswerSurfaceReport;
@@ -214,11 +216,26 @@ pub(crate) fn print_query_wave_report(
     format: &OutputFormat,
 ) -> Result<()> {
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
         OutputFormat::Text => print_query_wave_text(report),
         OutputFormat::Md => print_query_wave_md(report),
     }
     Ok(())
+}
+
+fn with_unified_field<T>(report: &T) -> Result<Value>
+where
+    T: Serialize,
+{
+    let mut value = serde_json::to_value(report)?;
+    let unified_field = crate::field_core::adapters::adapt_value(&value).to_value();
+    if let Some(object) = value.as_object_mut() {
+        object.insert("unified_field".to_string(), unified_field);
+    }
+    Ok(value)
 }
 
 pub(crate) fn print_multi_peak_field_report(
