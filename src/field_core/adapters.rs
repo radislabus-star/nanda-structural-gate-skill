@@ -153,13 +153,18 @@ fn structural_report(input: &Value) -> UnifiedFieldReport {
 fn packed_report(input: &Value) -> UnifiedFieldReport {
     let packed_support = &input["packed_support"];
     let packed_runtime = &input["packed_runtime"];
+    let packed_records = &input["packed_records"];
+    let centroids = &input["centroids"];
+    let route_peak = &input["peaks"]["route"];
+    let route_support = &packed_support["route"];
     let peak_decision = &input["peak_decision"];
     let source_mode = mode(input, "packed_result");
     let peak_target = input["top_peak"]
         .as_str()
         .or_else(|| input["packed_peak"]["target"].as_str())
-        .unwrap_or("")
-        .to_string();
+        .map(str::to_string)
+        .or_else(|| usize_number(&route_peak["top_id"]).map(|id| format!("route:{id}")))
+        .unwrap_or_default();
     let query_text = input["query"].as_str().map(str::to_string);
     UnifiedFieldReport {
         version: FIELD_CORE_VERSION,
@@ -170,12 +175,19 @@ fn packed_report(input: &Value) -> UnifiedFieldReport {
             records: usize_number(&input["records"])
                 .or_else(|| usize_number(&input["memory_records"]))
                 .or_else(|| usize_number(&packed_runtime["triads"]))
+                .or_else(|| usize_number(&packed_records["count"]))
                 .unwrap_or(0),
-            routes: usize_number(&packed_runtime["routes"]).unwrap_or(0),
-            groups: usize_number(&packed_runtime["groups"]).unwrap_or(0),
+            routes: usize_number(&packed_runtime["routes"])
+                .or_else(|| usize_number(&centroids["route_count"]))
+                .unwrap_or(0),
+            groups: usize_number(&packed_runtime["groups"])
+                .or_else(|| usize_number(&centroids["group_count"]))
+                .unwrap_or(0),
             schemas: 0,
             surfaces: 0,
-            evidence_refs: usize_number(&packed_support["support_count"]).unwrap_or(0),
+            evidence_refs: usize_number(&packed_support["support_count"])
+                .or_else(|| usize_number(&route_support["support_count"]))
+                .unwrap_or(0),
         },
         query: FieldQuerySummary {
             source: "packed_query_wave".to_string(),
@@ -197,16 +209,23 @@ fn packed_report(input: &Value) -> UnifiedFieldReport {
             target: peak_target,
             score: number(&input["peak_score"])
                 .or_else(|| number(&input["packed_peak"]["score"]))
+                .or_else(|| number(&route_peak["top_score"]))
                 .unwrap_or(0.0),
-            margin: number(&input["peak_margin"]).unwrap_or(0.0),
+            margin: number(&input["peak_margin"])
+                .or_else(|| number(&route_peak["margin"]))
+                .unwrap_or(0.0),
             state: peak_decision["state"]
                 .as_str()
                 .or_else(|| input["packed_decision"]["state"].as_str())
                 .unwrap_or("WATCH")
                 .to_string(),
             safe_to_answer: peak_decision["safe_to_answer"].as_bool().unwrap_or(false),
-            support_count: usize_number(&packed_support["support_count"]).unwrap_or(0),
-            anti_support_count: usize_number(&packed_support["anti_count"]).unwrap_or(0),
+            support_count: usize_number(&packed_support["support_count"])
+                .or_else(|| usize_number(&route_support["support_count"]))
+                .unwrap_or(0),
+            anti_support_count: usize_number(&packed_support["anti_count"])
+                .or_else(|| usize_number(&route_support["anti_count"]))
+                .unwrap_or(0),
         },
         lens: FieldLensSummary {
             lenses: vec!["packed_axis".to_string(), "support_field".to_string()],
@@ -217,19 +236,25 @@ fn packed_report(input: &Value) -> UnifiedFieldReport {
         anti_wave: AntiWaveSummary {
             active: input.get("packed_lanes").is_some(),
             lanes: usize_number(&input["packed_lanes"]["count"])
+                .or_else(|| usize_number(&input["packed_lane_keys"]["route"]["anti_count"]))
                 .or_else(|| array_len_opt(&input["packed_lanes"]["lanes"]))
                 .unwrap_or(0),
             suppressed_target: input["packed_lanes"]["suppressed_peak"]
                 .as_str()
                 .map(str::to_string),
-            suppression_energy: number(&input["packed_lanes"]["delta"]).unwrap_or(0.0),
+            suppression_energy: number(&input["packed_lanes"]["delta"])
+                .or_else(|| number(&input["packed_lanes"]["route"]["delta_dot"]))
+                .unwrap_or(0.0),
             local_only: true,
         },
         coherence: FieldCoherenceSummary {
             coherence: number(&input["coherence"])
                 .or_else(|| number(&input["packed_peak"]["cosine"]))
+                .or_else(|| number(&route_peak["top_score"]))
                 .unwrap_or(0.0),
-            energy: number(&packed_support["net_dot"]).unwrap_or(0.0),
+            energy: number(&packed_support["net_dot"])
+                .or_else(|| number(&route_support["net_dot"]))
+                .unwrap_or(0.0),
             foreign_pull: usize_number(&input["foreign_pull"]).unwrap_or(0),
             field_state: input["field_state"]
                 .as_str()
