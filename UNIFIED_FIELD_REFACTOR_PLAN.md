@@ -661,6 +661,37 @@ This is the first step where the field becomes an explicit structural compute
 participant. It still does not replace the structural search top-level verdict
 or peak until a separate structural cutover phase changes that contract.
 
+### Phase 21: Structural-Only Field Cutover Mode
+
+Status: done as explicit opt-in cutover.
+
+`nanda search` now also accepts:
+
+```bash
+nanda search packet.json --input-format json --field-engine cutover
+```
+
+If `field_runtime.cutover_ready=true` and
+`field_runtime.field_not_more_permissive=true`, the top-level structural search
+contract is rewritten from the field-core candidate:
+
+- `top_peak`;
+- `verdict`;
+- `field_state`;
+- `safe_to_answer`.
+
+The output includes `field_cutover` with the old and new values:
+
+```text
+field_cutover.applied = true
+field_core_as_structural_sole_engine = true
+field_core_as_sole_engine = false
+```
+
+This means field-core is the opt-in sole structural engine for that search
+result. It is not global sole-engine permission: packed remains a protected
+hot-core exception and cognitive remains not-LLM/not-chat.
+
 ## Refactor Gates
 
 Before each phase:

@@ -2682,6 +2682,7 @@ pub(crate) enum FieldEngineMode {
     Legacy,
     Shadow,
     Candidate,
+    Cutover,
 }
 
 #[derive(Clone, ValueEnum)]
