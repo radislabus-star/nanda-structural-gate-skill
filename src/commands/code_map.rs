@@ -189,12 +189,29 @@ pub(crate) fn repo_report(
 ) -> Result<Value> {
     let mut files = vec![];
     collect_rust_files(repo_root, repo_root, &mut files)?;
+    let total_files = files.len();
+    let mut route_counts = BTreeMap::<String, usize>::new();
+    for rel in &files {
+        let route = super::dogfood::auto_route_for_path(&rel.to_string_lossy());
+        *route_counts.entry(route).or_insert(0) += 1;
+    }
+    let routes = route_counts.keys().cloned().collect::<Vec<_>>();
+    let route_distribution = route_counts
+        .iter()
+        .map(|(route, count)| {
+            json!({
+                "route": route,
+                "files": count
+            })
+        })
+        .collect::<Vec<_>>();
     files.sort_by(|left, right| {
         risk_file_rank(left)
             .cmp(&risk_file_rank(right))
             .then_with(|| left.cmp(right))
     });
     files.truncate(12);
+    let selected_files = files.len();
 
     let mut file_reports = vec![];
     let mut clusters = vec![];
@@ -244,7 +261,12 @@ pub(crate) fn repo_report(
 
     Ok(json!({
         "mode": "repo-code-map",
+        "input": repo_root.display().to_string(),
         "root": repo_root.display().to_string(),
+        "total_files": total_files,
+        "selected_files": selected_files,
+        "routes": routes,
+        "route_distribution": route_distribution,
         "files": file_reports,
         "clusters": clusters,
         "next_refactors": next_refactors,

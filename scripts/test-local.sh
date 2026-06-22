@@ -1103,7 +1103,7 @@ jq -e '.mode == "code-map"' <<<"$code_map_json" >/dev/null
 jq -e '.clusters | length > 0' <<<"$code_map_json" >/dev/null
 jq -e '.clusters[] | select(.cluster == "cli-router")' <<<"$code_map_json" >/dev/null
 code_map_repo_json="$("$code_mapper" "$root" --format json)"
-jq -e '.mode == "repo-code-map" and (.risk_files | length) > 0' <<<"$code_map_repo_json" >/dev/null
+jq -e '.mode == "repo-code-map" and (.input | length) > 0 and .total_files > 0 and (.routes | length) > 0 and (.risk_files | length) > 0' <<<"$code_map_repo_json" >/dev/null
 route_field_json="$("$mapper" "$root/examples/triad-packet.route-field-owner-conflict.json" --input-format json --format json)"
 jq -e '.route_field.routes.correction.owners | index("core-correction-owner")' <<<"$route_field_json" >/dev/null
 jq -e '.owner_gravity.conflicts[] | select(.kind == "duplicate_decision_owner" and .route == "correction")' <<<"$route_field_json" >/dev/null
