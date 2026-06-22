@@ -525,6 +525,27 @@ The cognitive path remains not-LLM:
   are mapped to review-only field state;
 - local answer candidates may be focused but still not broad chat readiness.
 
+### Phase 15: Runtime Audit Closure
+
+Status: done as semantic runtime, not sole engine.
+
+The current audit target is:
+
+```text
+field_core_as_semantic_engine = true
+field_core_as_sole_engine = false
+packed_hot_core_exception = true
+```
+
+This is the honest Level 2 closure:
+
+- structural outputs run shared dual-run;
+- packed outputs run shared dual-run without changing the packed hot loop;
+- cognitive outputs run shared dual-run without claiming LLM/chat readiness;
+- lens, anti-wave, and memory delta contracts are unified at `field_core`;
+- full sole-engine cutover is blocked until packed zero-cost views and
+  benchmark guards exist.
+
 ## Refactor Gates
 
 Before each phase:

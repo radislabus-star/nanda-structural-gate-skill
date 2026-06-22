@@ -41,7 +41,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
     let out = json!({
         "mode": "unified-field-audit",
         "version": field_core::FIELD_PASS_VERSION,
-        "overall_state": "UNIFIED_FIELD_BRIDGE_COMPLETE_NOT_SOLE_ENGINE",
+        "overall_state": "UNIFIED_FIELD_RUNTIME_DUAL_RUN_ACTIVE_NOT_SOLE_ENGINE",
         "field_core": {
             "vector": "FieldVector1024",
             "record": "FieldRecord",
@@ -81,6 +81,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "one_field_pass": true,
             "all_json_reports_project_unified_field": true,
             "field_core_as_sole_engine": false,
+            "field_core_as_semantic_engine": true,
             "feedback_memory_delta_unified": true,
             "semantic_equivalence_gate": true,
             "structural_dual_run_active": true,
@@ -88,6 +89,9 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "packed_dual_run_active": true,
             "packed_hot_core_exception": true,
             "cognitive_dual_run_active": true,
+            "unified_lens_contract": true,
+            "unified_anti_wave_contract": true,
+            "unified_memory_delta_store": true,
             "route_scoped_extraction_required": false,
             "nonlinear_memory_proven": false,
             "llm_ready": false
