@@ -694,7 +694,7 @@ hot-core exception and cognitive remains not-LLM/not-chat.
 
 ### Phase 22: Packed Field Engine Guard
 
-Status: done as a protected hot-core bridge, not packed cutover.
+Status: superseded by the packed-only field-core cutover step below.
 
 `nanda pack6m` now accepts the same field-engine vocabulary:
 
@@ -713,7 +713,7 @@ The output includes `packed_field_engine`:
 - `cutover`: records the cutover request and blocks it through the hot-core
   guard.
 
-Required invariant:
+Historical invariant before the packed-only cutover superseded this phase:
 
 ```text
 packed_field_engine.selected_engine = packed-hot-core
@@ -723,9 +723,34 @@ packed_field_engine.field_core_as_packed_hot_engine = false
 packed_field_engine.hot_core_guard.packed_hot_core_exception = true
 ```
 
-This keeps packed as the zero-cost/hot-loop exception while still allowing the
-unified field to reason about packed readiness in the same engine vocabulary as
-structural search.
+That older invariant kept packed as the zero-cost/hot-loop exception while the
+unified field learned to reason about packed readiness in the same engine
+vocabulary as structural search.
+
+### Latest Implemented Step: Packed-Only Field-Core Cutover
+
+Packed runtime now has an explicit field-core cutover path. The cutover is
+still scoped to the packed family only; it does not claim global
+`field_core_as_sole_engine`, LLM readiness, or nonlinear memory proof.
+
+`nanda pack6m packet.json --input-format json --field-engine cutover` now
+reports:
+
+```text
+packed_field_engine.selected_engine = field-core-packed-cutover
+packed_field_engine.cutover_applied = true
+packed_field_engine.field_core_as_packed_hot_engine = true
+packed_field_engine.field_core_as_packed_sole_engine = true
+packed_field_engine.hot_core_guard.satisfied_by_typed_packed_decision = true
+packed_field_engine.claim_boundary.global_sole_engine = false
+packed_field_engine.claim_boundary.llm_ready = false
+packed_field_engine.claim_boundary.nonlinear_memory_proven = false
+```
+
+The top-level packed peak decision is updated only through
+`field_core::apply_packed_field_cutover`, using the typed hot-safe
+`nanda_6m::evaluate_packed_peak_decision` contract. A thin packed peak remains
+`WATCH` and `safe_to_answer=false`.
 
 ### Phase 23: Cognitive Field Engine Guard
 
@@ -758,8 +783,8 @@ all three families:
 
 - structural: `structural-field-engine-v1`, opt-in cutover may be allowed when
   the structural standard suite passes;
-- packed: `packed-field-engine-guard-v1`, cutover is blocked by
-  `packed_hot_core_exception`;
+- packed: `packed-field-engine-guard-v1`, explicit packed-only cutover is
+  allowed through the typed packed decision core;
 - cognitive: `cognitive-field-engine-guard-v1`, cutover is blocked by the
   LLM/chat claim boundary.
 
@@ -769,7 +794,8 @@ Acceptance fields:
 three_family_engine_contract = true
 structural_cutover_mode_available = true
 packed_field_engine_guard = true
-packed_cutover_blocked_by_hot_guard = true
+packed_cutover_blocked_by_hot_guard = false
+packed_field_core_as_sole_engine = true
 cognitive_field_engine_guard = true
 cognitive_cutover_blocked_by_claim_guard = true
 field_core_as_sole_engine = false
@@ -777,8 +803,9 @@ field_core_as_sole_engine = false
 
 This is the present answer to "do we have one field?": yes, one field
 vocabulary/pass/engine contract now covers structural, packed, and cognitive
-reports, but only structural has an explicit opt-in cutover path. Packed and
-cognitive remain guarded.
+reports. Structural and packed now have family-scoped field-core sole-engine
+paths; cognitive remains guarded by the LLM/chat claim boundary, so global
+sole-engine remains false.
 
 ### Phase 25: Shared Field Engine Policy Owner
 

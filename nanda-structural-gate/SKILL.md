@@ -383,9 +383,13 @@ deterministic dictionaries, sample `PackedTriad32` records, and a fixed
 route/group centroids, including a first packed candidate-query-vs-memory
 centroid peak score. It still does not execute full packed interference search.
 Use `--field-engine candidate` or `--field-engine cutover` only to inspect the
-packed field-engine guard. Packed `cutover` is deliberately blocked by the
-hot-core guard: `packed_field_engine.cutover_applied=false`,
-`selected_engine=packed-hot-core`, and `field_core_as_sole_engine=false`.
+packed field-engine guard. Packed `candidate` reports the field-core view
+without changing top-level packed behavior. Packed `cutover` is an explicit
+packed-only field-core path when the typed packed decision is cutover-ready:
+`packed_field_engine.cutover_applied=true`,
+`selected_engine=field-core-packed-cutover`, and
+`field_core_as_packed_sole_engine=true`. This is not a global sole-engine or
+LLM readiness claim.
 Inspect `peak_decision.safe_to_answer`: `PACKED_THIN` is a weak honest peak,
 not a trustworthy answer route yet.
 Inspect `packed_support`: it splits the packed peak into supporting and
@@ -416,8 +420,7 @@ In v3.0, require `packed_replay_decision.hot_compatible=true` and
 replay firewall as the hot-core contract.
 Inspect `packed_lane_application`: it runs a single applied lane pass over the
 support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
-ready for a real hot-loop implementation, but it still keeps
-`safe_to_answer=false`.
+ready for typed hot-loop use, but it still keeps `safe_to_answer=false`.
 Use `nanda-bench6m` when you need hot-core speed rather than wrapper timing.
 It excludes process startup, JSON parsing, dictionary packing, file I/O, and
 report serialization. It measures `nanda_6m::evaluate_replay` and the
@@ -531,8 +534,9 @@ cognitive guard: field-core may be a semantic engine candidate, but
 safety evals change the claim boundary.
 Use `nanda-field-audit --format json` when the question is whether the unified
 field is coherent across structural, packed, and cognitive paths. Inspect
-`field_engine_contract`: structural cutover may be opt-in, packed cutover must
-remain blocked by the hot-core guard, and cognitive cutover must remain blocked
+`field_engine_contract`: structural cutover may be default when the structural
+suite passes, packed cutover is allowed only as an explicit packed-only path
+through the typed hot decision core, and cognitive cutover must remain blocked
 by the LLM/chat claim boundary. Inspect
 `field_engine_contract.policy_owner`; it should be
 `field_core::engine::FieldEngineDecision`, meaning structural, packed, and
@@ -541,9 +545,11 @@ builders.
 Structural search is allowed to be a structural-only field-core sole engine when
 `acceptance.structural_field_core_as_sole_engine=true`; this does not imply
 global `field_core_as_sole_engine`, `llm_ready`, or
-`nonlinear_memory_proven`. Global sole-engine remains false while packed is
-protected by the hot-core guard and cognitive/LLMWave is blocked by claim
-boundaries.
+`nonlinear_memory_proven`. Packed is allowed to be a packed-only field-core sole
+engine when `acceptance.packed_field_core_as_sole_engine=true` and
+`field_engine_contract.packed.packed_sole_engine=true`; this also does not imply
+global `field_core_as_sole_engine`. Global sole-engine remains false while
+cognitive/LLMWave is blocked by claim boundaries.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
 should point to `field_core::peak::FieldPeakResult`,
 `field_core::coherence::FieldCoherenceResult`, and

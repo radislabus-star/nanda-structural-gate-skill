@@ -132,7 +132,19 @@ pub(crate) fn packed_field_engine_decision(pack: &Value, mode: &FieldEngineMode)
             .as_bool()
             .unwrap_or(false);
     let cutover_requested = matches!(mode, FieldEngineMode::Cutover);
-    let selected = legacy.clone();
+    let cutover_applied = cutover_requested && candidate_allowed;
+    let selected_engine = if cutover_applied {
+        "field-core-packed-cutover"
+    } else if candidate_allowed {
+        "field-core-packed-candidate"
+    } else {
+        "packed-hot-core"
+    };
+    let selected = if cutover_applied {
+        field_candidate.clone()
+    } else {
+        legacy.clone()
+    };
     let legacy_again = engine_snapshot(
         "packed-hot-core",
         runtime["old_peak"].as_str().unwrap_or(""),
@@ -147,44 +159,83 @@ pub(crate) fn packed_field_engine_decision(pack: &Value, mode: &FieldEngineMode)
             version: "packed-field-engine-guard-v1",
             mode: field_engine_mode_label(mode),
             field_participates: !matches!(mode, FieldEngineMode::Legacy),
-            selected_engine: "packed-hot-core",
+            selected_engine,
             selected,
             legacy: legacy_again,
             field_candidate,
             candidate_allowed,
-            cutover_applied: false,
-            top_level_behavior_changed: false,
-            field_core_as_sole_engine: false,
+            cutover_applied,
+            top_level_behavior_changed: cutover_applied,
+            field_core_as_sole_engine: cutover_applied,
         },
         json!({
         "cutover_requested": cutover_requested,
-        "cutover_applied": false,
-        "top_level_behavior_changed": false,
-        "field_core_as_sole_engine": false,
+        "cutover_applied": cutover_applied,
+        "top_level_behavior_changed": cutover_applied,
+        "field_core_as_sole_engine": cutover_applied,
+        "field_core_as_sole_engine_scope": if cutover_applied { "packed-only" } else { "none" },
         "field_core_as_packed_engine_candidate": candidate_allowed,
-        "field_core_as_packed_hot_engine": false,
+        "field_core_as_packed_hot_engine": cutover_applied,
+        "field_core_as_packed_sole_engine": cutover_applied,
         "hot_core_guard": {
-            "packed_hot_core_exception": true,
+            "packed_hot_core_exception": !cutover_applied,
+            "satisfied_by_typed_packed_decision": cutover_applied,
+            "typed_decision_core": "nanda_6m::evaluate_packed_peak_decision",
+            "field_record_view": pack["field_record_view"]["version"].as_str().unwrap_or("packed-field-record-view-v1"),
             "requires_zero_cost_view": true,
             "requires_hot_bench_guard": true,
-            "requires_explicit_follow_up": true,
+            "requires_explicit_follow_up": false,
             "no_json_string_heap_hashmap_inner_loop": true
         },
         "cutover_blocked_reason": if cutover_requested {
-            json!(["packed_hot_core_exception", "packed_cutover_requires_explicit_hot_loop_follow_up"])
+            if cutover_applied {
+                json!([])
+            } else {
+                json!(["packed_candidate_not_cutover_ready"])
+            }
         } else {
             json!([])
         },
         "claim_boundary": {
             "packed_candidate_only": matches!(mode, FieldEngineMode::Candidate),
             "packed_cutover_requested": cutover_requested,
+            "packed_cutover_only": cutover_applied,
             "global_sole_engine": false,
-            "packed_hot_core_exception": true,
+            "packed_hot_core_exception": !cutover_applied,
             "llm_ready": false,
             "nonlinear_memory_proven": false
         }
         }),
     )
+}
+
+pub(crate) fn apply_packed_field_cutover(pack: &mut Value, field_engine: &Value) {
+    if !field_engine["cutover_applied"].as_bool().unwrap_or(false) {
+        return;
+    }
+    let selected = &field_engine["selected"];
+    let old_state = pack["peak_decision"]["state"].clone();
+    let old_verdict = pack["peak_decision"]["verdict"].clone();
+    let old_safe_to_answer = pack["peak_decision"]["safe_to_answer"].clone();
+    let old_peak = pack["field_runtime"]["old_peak"].clone();
+    pack["peak_decision"]["state"] = selected["field_state"].clone();
+    pack["peak_decision"]["verdict"] = selected["verdict"].clone();
+    pack["peak_decision"]["safe_to_answer"] = selected["safe_to_answer"].clone();
+    pack["packed_field_cutover"] = json!({
+        "version": "packed-field-cutover-v1",
+        "applied": true,
+        "scope": "packed-only",
+        "old_peak": old_peak,
+        "new_peak": selected["peak"].clone(),
+        "old_state": old_state,
+        "new_state": pack["peak_decision"]["state"].clone(),
+        "old_verdict": old_verdict,
+        "new_verdict": pack["peak_decision"]["verdict"].clone(),
+        "old_safe_to_answer": old_safe_to_answer,
+        "new_safe_to_answer": pack["peak_decision"]["safe_to_answer"].clone(),
+        "policy": field_engine["hot_core_guard"].clone(),
+        "claim_boundary": field_engine["claim_boundary"].clone()
+    });
 }
 
 pub(crate) fn cognitive_field_engine_decision(

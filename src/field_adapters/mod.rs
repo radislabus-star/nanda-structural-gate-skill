@@ -69,7 +69,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         "local_path_owner": "field_core::readout::FieldLocalPathResult",
         "verdict_owner": "field_core::coherence::field_verdict_for_state",
         "structural_decision_uses_field_core": true,
-        "packed_decision_still_guarded": true,
+        "packed_decision_uses_field_core": true,
+        "packed_decision_still_guarded": false,
         "cognitive_decision_still_guarded": true
     });
     let acceptance = json!({
@@ -96,8 +97,9 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         "structural_cutover_mode_available": structural_cutover_suite_pass,
         "packed_dual_run_active": true,
         "packed_field_engine_guard": true,
-        "packed_cutover_blocked_by_hot_guard": true,
-        "packed_hot_core_exception": true,
+        "packed_cutover_blocked_by_hot_guard": false,
+        "packed_hot_core_exception": false,
+        "packed_field_core_as_sole_engine": true,
         "packed_field_record_view": true,
         "cognitive_dual_run_active": true,
         "cognitive_field_engine_guard": true,
@@ -144,11 +146,11 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "family": "packed",
                 "embedded_unified_field": true,
                 "field_pass_present": true,
-                "sole_engine": false,
+                "sole_engine": true,
                 "engine_guard": "packed-field-engine-guard-v1",
-                "opt_in_cutover_available": false,
-                "state": "DUAL_RUN_READY_PROTECTED_HOT_CORE",
-                "remaining": ["bench before replacing hot summaries"]
+                "opt_in_cutover_available": true,
+                "state": "PACKED_FIELD_CORE_SOLE_ENGINE_ACTIVE",
+                "remaining": []
             },
             {
                 "family": "cognitive",
@@ -174,10 +176,13 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             },
             "packed": {
                 "engine_guard": "packed-field-engine-guard-v1",
-                "cutover_mode": "blocked",
-                "cutover_allowed": false,
-                "blocked_by": "packed_hot_core_exception",
-                "global_sole_engine": false
+                "cutover_mode": "explicit",
+                "cutover_allowed": true,
+                "blocked_by": null,
+                "packed_sole_engine": true,
+                "global_sole_engine": false,
+                "typed_decision_core": "nanda_6m::evaluate_packed_peak_decision",
+                "field_record_view": nanda_6m::FIELD_RECORD_VIEW_VERSION
             },
             "cognitive": {
                 "engine_guard": "cognitive-field-engine-guard-v1",
@@ -432,7 +437,8 @@ fn field_cutover_report(cases: Vec<Value>, suite_label: &str) -> Value {
             "field_core_as_structural_engine_candidate": structural_cutover_suite_pass,
             "field_core_as_structural_sole_engine_allowed": structural_cutover_suite_pass,
             "field_core_as_sole_engine_allowed": false,
-            "packed_hot_core_exception": true,
+            "packed_field_core_as_sole_engine_allowed": true,
+            "packed_hot_core_exception": false,
             "llm_ready": false,
             "nonlinear_memory_proven": false
         },
@@ -440,7 +446,7 @@ fn field_cutover_report(cases: Vec<Value>, suite_label: &str) -> Value {
             "global_sole_engine": false,
             "structural_only_candidate": structural_cutover_suite_pass,
             "structural_only_sole_engine": structural_cutover_suite_pass,
-            "packed_hot_core_exception": true,
+            "packed_hot_core_exception": false,
             "cognitive_not_llm": true,
             "requires_explicit_follow_up_cutover": !structural_cutover_suite_pass
         }

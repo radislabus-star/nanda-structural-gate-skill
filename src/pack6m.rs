@@ -47,6 +47,8 @@ pub(crate) fn pack6m_cmd(args: Pack6mArgs) -> Result<u8> {
     let mut out = pack_report(&packet, &source, &candidates, args.sample);
     out["unified_field"] = field_core::adapters::adapt_value(&out).to_value();
     out["packed_field_engine"] = field_core::packed_field_engine_decision(&out, &args.field_engine);
+    let packed_field_engine = out["packed_field_engine"].clone();
+    field_core::apply_packed_field_cutover(&mut out, &packed_field_engine);
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),
         OutputFormat::Text => print_pack6m_text(&out),

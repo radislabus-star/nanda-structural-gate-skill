@@ -257,9 +257,10 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
                 "hot_cycle_or_active_core_bench",
                 "no_json_string_heap_in_inner_loop"
             ],
+            "field_core_as_packed_sole_engine_allowed": packed_cutover_bench_evidence,
             "field_core_as_sole_engine_allowed": false,
             "reason": if packed_cutover_bench_evidence {
-                "bench evidence is present, but packed hot cutover still requires explicit follow-up"
+                "bench evidence is present; packed-only field-core cutover is allowed while global sole-engine remains blocked"
             } else {
                 "run --mode hot-cycle or --mode active-core before any packed hot cutover"
             }
