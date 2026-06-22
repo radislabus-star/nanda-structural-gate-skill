@@ -583,6 +583,7 @@ search_json="$("$search" "$root/examples/triad-packet.interference-search.json" 
 grep -q '"mode": "interference-retrieval"' <<<"$search_json"
 jq -e '.unified_field.family == "structural" and .unified_field.compute_probe.version == "unified-field-compute-v1" and (.unified_field.query.signature | type == "string" and length == 16)' <<<"$search_json" >/dev/null
 jq -e '.unified_field.field_pass.version == "unified-field-pass-v1" and .unified_field.field_pass.family == "structural" and .unified_field.field_pass.safe_to_answer == false' <<<"$search_json" >/dev/null
+jq -e '.unified_field.memory_delta.replayable_into_next_pass | type == "boolean"' <<<"$search_json" >/dev/null
 jq -e '.unified_field.record.records == 10 and .unified_field.record.routes >= 1 and .unified_field.record.groups >= 1 and .unified_field.peak.support_count == 4 and .unified_field.peak.anti_support_count == 5' <<<"$search_json" >/dev/null
 
 tmp_focus_packet="$(mktemp)"
@@ -1632,7 +1633,7 @@ EOF_FIELD
 field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_cognitive_json" >/dev/null
 field_audit_json="$("$field_audit" --format json)"
-jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .acceptance.one_field_pass == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_audit_json" >/dev/null
+jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .acceptance.one_field_pass == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_audit_json" >/dev/null
 
 "$search" "$root/examples/triad-packet.interference-search.json" --query "runtime route" --format json >"$tmp_field_report/live-search.json"
 live_structural_field="$("$field_report" --from "$tmp_field_report/live-search.json" --format json)"

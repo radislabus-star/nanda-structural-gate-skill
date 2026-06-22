@@ -35,8 +35,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "record": "FieldRecord",
             "pass": "FieldPass",
             "verdict": "FieldPassReport",
-            "feedback_delta": "planned",
-            "memory_delta": "planned"
+            "feedback_delta": "FieldMemoryDelta",
+            "memory_delta": "FieldMemoryDeltaSummary"
         },
         "families": [
             {
@@ -69,12 +69,11 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "one_field_pass": true,
             "all_json_reports_project_unified_field": true,
             "field_core_as_sole_engine": false,
-            "feedback_memory_delta_unified": false,
+            "feedback_memory_delta_unified": true,
             "nonlinear_memory_proven": false,
             "llm_ready": false
         },
         "next_required_steps": [
-            "FieldFeedback -> FieldMemoryDelta -> next FieldPass",
             "semantic equivalence tests across structural/packed/cognitive",
             "route-scoped extraction of large report modules only after boundary audit"
         ]

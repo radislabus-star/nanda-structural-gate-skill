@@ -72,14 +72,20 @@ impl UnifiedFieldReport {
             })
         });
         if let Some(object) = value.as_object_mut() {
+            let memory_delta = summarize_memory_deltas(&self.feedback, &self.peak.target);
             object.insert(
                 "compute_probe".to_string(),
                 serde_json::to_value(FieldComputeProbe::from_report(self))
                     .unwrap_or_else(|_| json!({"state": "FIELD_PROBE_FAILED"})),
             );
             object.insert(
+                "memory_delta".to_string(),
+                serde_json::to_value(&memory_delta)
+                    .unwrap_or_else(|_| json!({"state": "FIELD_MEMORY_DELTA_FAILED"})),
+            );
+            object.insert(
                 "field_pass".to_string(),
-                serde_json::to_value(FieldPassProjection::from_report(self))
+                serde_json::to_value(FieldPassProjection::from_report(self, &memory_delta.deltas))
                     .unwrap_or_else(|_| json!({"state": "FIELD_PASS_FAILED"})),
             );
         }
@@ -90,7 +96,7 @@ impl UnifiedFieldReport {
 struct FieldPassProjection;
 
 impl FieldPassProjection {
-    fn from_report(report: &UnifiedFieldReport) -> FieldPassReport {
+    fn from_report(report: &UnifiedFieldReport, deltas: &[FieldMemoryDelta]) -> FieldPassReport {
         let query = FieldRecord::synthetic(
             "report-query",
             match report.family {
@@ -142,7 +148,7 @@ impl FieldPassProjection {
             vec![]
         };
 
-        run_field_pass(&FieldPassInput {
+        let input = FieldPassInput {
             family: report.family.clone(),
             query,
             records,
@@ -153,7 +159,9 @@ impl FieldPassProjection {
             }],
             anti_waves,
             claim_boundary: report.claim_boundary.clone(),
-        })
+        };
+        let input = apply_memory_deltas_to_pass(&input, deltas);
+        run_field_pass(&input)
     }
 }
 
@@ -489,5 +497,48 @@ mod tests {
         let value = report.to_value();
         assert_eq!(value["field_pass"]["version"], FIELD_PASS_VERSION);
         assert_eq!(value["field_pass"]["family"], "structural");
+    }
+
+    #[test]
+    fn feedback_exports_memory_delta_into_next_pass() {
+        let report = UnifiedFieldReport {
+            version: FIELD_CORE_VERSION,
+            family: FieldFamily::Structural,
+            source_mode: "test".to_string(),
+            basis: FieldBasis::dynamic_1024(),
+            record: FieldRecordSummary::default(),
+            query: FieldQuerySummary {
+                source: "test".to_string(),
+                text: Some("false shortcut".to_string()),
+                requested_axes: vec!["route".to_string()],
+                signature: None,
+            },
+            peak: FieldPeakSummary {
+                target: "false-route".to_string(),
+                score: 0.2,
+                margin: 0.1,
+                state: "FIELD_WATCH".to_string(),
+                safe_to_answer: false,
+                support_count: 1,
+                anti_support_count: 0,
+            },
+            lens: FieldLensSummary::default(),
+            anti_wave: AntiWaveSummary::default(),
+            coherence: FieldCoherenceSummary::default(),
+            feedback: FeedbackSummary {
+                feedback_present: true,
+                accepted: 0,
+                rejected: 1,
+                watched: 0,
+                replayable: true,
+            },
+            compatibility: FieldCompatibility::default(),
+            claim_boundary: FieldClaimBoundary::default(),
+        };
+
+        let value = report.to_value();
+        assert_eq!(value["memory_delta"]["rejected"], 1);
+        assert_eq!(value["field_pass"]["anti_wave_count"], 1);
+        assert_eq!(value["field_pass"]["verdict"], "VETO");
     }
 }

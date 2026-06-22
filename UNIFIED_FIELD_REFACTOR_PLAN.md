@@ -1,7 +1,7 @@
 # Unified Field Refactor Plan
 
-Status: implemented as read-only unified field projection plus first shared
-compute primitives.
+Status: implemented as unified field projection, shared compute primitives,
+first shared `FieldPass`, and local feedback-to-memory-delta replay.
 
 This document prepares the migration from several field-like implementations to
 one shared field contract. It is not permission to rewrite the runtime in one
@@ -328,6 +328,66 @@ scripts/test-local.sh
 scripts/test-edge-cases.sh
 ```
 
+### Phase 7: Shared Field Pass
+
+Status: done in `src/field_core/pass.rs` and exposed through
+`nanda field-audit`.
+
+The unified report now projects each family into one shared pass contract:
+
+- `FieldRecord`;
+- `FieldPassInput`;
+- `FieldAntiWaveLane`;
+- `FieldPassReport`;
+- one conservative PASS/WATCH/VETO decision shape.
+
+This is not yet the only engine in the repository. Structural, packed, and
+LLMWave modules still own their domain-specific scoring/runtime paths. The
+field pass is the shared bridge and audit target.
+
+Acceptance:
+
+```bash
+nanda field-audit --format json
+```
+
+must report:
+
+```text
+one_field_pass = true
+field_core_as_sole_engine = false
+llm_ready = false
+```
+
+### Phase 8: Feedback Memory Delta
+
+Status: done locally in `src/field_core/feedback.rs`.
+
+Feedback is now represented as a replayable memory delta before the next
+field pass:
+
+- accepted feedback emits a local reinforcement delta;
+- rejected feedback emits a local suppression/anti-wave delta;
+- WATCH feedback is preserved as observation only;
+- deltas are local unless explicitly promoted by a higher-level memory store.
+
+The output field is `unified_field.memory_delta`, and the same deltas are
+applied before `unified_field.field_pass` is computed.
+
+Claim boundary:
+
+- this is feedback replay, not gradient training;
+- this is local field memory, not proof of nonlinear memory;
+- this does not make the system a chat LLM.
+
+Acceptance:
+
+```bash
+cargo test field_core --all-targets --all-features
+scripts/test-local.sh
+nanda field-audit --format json
+```
+
 ## Refactor Gates
 
 Before each phase:
@@ -379,11 +439,13 @@ This creates the target seam without moving scoring logic.
 
 Priority order:
 
-1. Move one bounded scoring explanation from structural report text into
+1. Add semantic equivalence tests across structural, packed, and cognitive
+   report projections.
+2. Move one bounded scoring explanation from structural report text into
    `field_core` vocabulary.
-2. Add a route-scoped refactor plan for any large reporting file before
+3. Add a route-scoped refactor plan for any large reporting file before
    splitting it.
-3. Only then consider extracting reporting submodules.
+4. Only then consider extracting reporting submodules.
 
 Files not to refactor first:
 
@@ -399,6 +461,8 @@ The refactor is successful only if all are true:
 
 - one shared field vocabulary exists in code;
 - three adapters can project into it;
+- one shared field pass exists and is visible in report outputs;
+- feedback can emit a local memory delta that changes the next field pass;
 - packed hot-loop constraints are preserved;
 - old outputs and tests remain compatible;
 - agent-facing reports become clearer;
