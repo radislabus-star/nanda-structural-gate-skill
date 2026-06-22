@@ -274,8 +274,10 @@ where
 {
     let mut value = serde_json::to_value(report)?;
     let unified_field = crate::field_core::adapters::adapt_value(&value).to_value();
+    let field_runtime = crate::field_core::cognitive_dual_run_value(&value);
     if let Some(object) = value.as_object_mut() {
         object.insert("unified_field".to_string(), unified_field);
+        object.insert("field_runtime".to_string(), field_runtime);
     }
     Ok(value)
 }

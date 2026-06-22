@@ -191,6 +191,13 @@ fn normalize_state_hint(state: &str) -> Option<&'static str> {
         "FIELD_REVERSED" | "POLARITY_REVERSED" => Some("FIELD_REVERSED"),
         "FIELD_CONTESTED" => Some("FIELD_CONTESTED"),
         "FIELD_THIN" | "PACKED_THIN" => Some("FIELD_THIN"),
+        _ if state.contains("NOT_ANSWER")
+            || state.contains("NOT_CHAT")
+            || state.contains("NOT_LLM")
+            || state.contains("NOT_FIELD_MATURE") =>
+        {
+            Some("FIELD_THIN")
+        }
         _ => None,
     }
 }

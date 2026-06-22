@@ -244,12 +244,112 @@ pub(crate) fn packed_dual_run_value(pack: &Value) -> Value {
     })
 }
 
+pub(crate) fn cognitive_dual_run_from_report(value: &Value) -> FieldRuntimeDualRun {
+    let report = adapters::adapt_value(value);
+    let unified = report.to_value();
+    let field_pass = &unified["field_pass"];
+    let old_peak = value["schema_peak"]["id"]
+        .as_u64()
+        .map(|id| format!("schema:{id}"))
+        .or_else(|| value["peak"]["target"].as_str().map(str::to_string))
+        .unwrap_or_else(|| "report-peak".to_string());
+    let field_peak = field_pass["peak"]["target"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let old_verdict = value["verdict"].as_str().unwrap_or("WATCH").to_string();
+    let field_verdict = field_pass["verdict"]
+        .as_str()
+        .unwrap_or("WATCH")
+        .to_string();
+    let old_field_state = value["field_after_anti"]["state"]
+        .as_str()
+        .or_else(|| value["field_after_anti"]["anti_field_state"].as_str())
+        .or_else(|| value["field"]["state"].as_str())
+        .or_else(|| value["state"].as_str())
+        .or_else(|| value["verdict"].as_str())
+        .unwrap_or("LLMWAVE_FIELD")
+        .to_string();
+    let field_state = field_pass["coherence_state"]
+        .as_str()
+        .or_else(|| field_pass["peak"]["state"].as_str())
+        .unwrap_or("FIELD_UNKNOWN")
+        .to_string();
+    let old_safe_to_answer = value["safe_to_answer"]
+        .as_bool()
+        .or_else(|| value["claim_boundary"]["safe_to_answer"].as_bool())
+        .or_else(|| value["answer"]["safe_to_answer"].as_bool())
+        .unwrap_or(false);
+    let field_safe_to_answer = field_pass["safe_to_answer"].as_bool().unwrap_or(false);
+    let peak_matches = old_peak == "report-peak" || old_peak == field_peak;
+    let state_family_matches = state_family(&old_field_state) == state_family(&field_state);
+    let field_not_more_permissive = !field_safe_to_answer || old_safe_to_answer;
+    let mut mismatch_reason = vec![];
+    if !peak_matches {
+        mismatch_reason.push("peak_mismatch".to_string());
+    }
+    if !state_family_matches {
+        mismatch_reason.push("state_family_mismatch".to_string());
+    }
+    if !field_not_more_permissive {
+        mismatch_reason.push("field_more_permissive_than_cognitive_engine".to_string());
+    }
+    if field_pass["version"].as_str() != Some(FIELD_PASS_VERSION) {
+        mismatch_reason.push("field_pass_version_mismatch".to_string());
+    }
+    let cutover_ready = peak_matches
+        && state_family_matches
+        && field_not_more_permissive
+        && mismatch_reason.is_empty();
+
+    FieldRuntimeDualRun {
+        version: FIELD_RUNTIME_VERSION,
+        family: FieldFamily::Cognitive,
+        mode: "cognitive-dual-run",
+        old_peak,
+        field_peak,
+        old_verdict,
+        field_verdict,
+        old_field_state,
+        field_state,
+        old_safe_to_answer,
+        field_safe_to_answer,
+        peak_matches,
+        state_family_matches,
+        field_not_more_permissive,
+        cutover_ready,
+        mismatch_reason,
+    }
+}
+
+pub(crate) fn cognitive_dual_run_value(value: &Value) -> Value {
+    serde_json::to_value(cognitive_dual_run_from_report(value)).unwrap_or_else(|_| {
+        json!({
+            "version": FIELD_RUNTIME_VERSION,
+            "family": "cognitive",
+            "mode": "cognitive-dual-run",
+            "cutover_ready": false,
+            "mismatch_reason": ["serialization_failed"]
+        })
+    })
+}
+
 fn state_family(state: &str) -> &'static str {
     match state {
         "PASS" | "FOCUSED" | "FIELD_FOCUSED" | "FIELD_SAFE" | "PACKED_FOCUSED" => "focused",
+        _ if state.contains("LOCAL_CANDIDATE") || state.contains("LOCAL_ANSWER_CANDIDATE") => {
+            "focused"
+        }
         "VETO" | "FIELD_REVERSED" | "POLARITY_REVERSED" => "veto",
         "FIELD_CONTESTED" => "contested",
         "FIELD_THIN" | "PACKED_THIN" => "thin",
+        _ if state.contains("NOT_ANSWER")
+            || state.contains("NOT_CHAT")
+            || state.contains("NOT_LLM")
+            || state.contains("NOT_FIELD_MATURE") =>
+        {
+            "thin"
+        }
         _ => "watch",
     }
 }

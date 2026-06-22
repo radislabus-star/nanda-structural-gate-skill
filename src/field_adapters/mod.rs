@@ -72,8 +72,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                 "embedded_unified_field": true,
                 "field_pass_present": true,
                 "sole_engine": false,
-                "state": "REPORT_LAYER_FIELD_PASS",
-                "remaining": ["route query-wave/multi-peak/lens/anti/evidence through FieldPass input"]
+                "state": "DUAL_RUN_ACTIVE_NOT_LLM",
+                "remaining": ["route deeper query-wave/multi-peak/lens/anti/evidence records through FieldPass input"]
             }
         ],
         "acceptance": {
@@ -87,6 +87,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "structural_cutover_eval_ready": true,
             "packed_dual_run_active": true,
             "packed_hot_core_exception": true,
+            "cognitive_dual_run_active": true,
             "route_scoped_extraction_required": false,
             "nonlinear_memory_proven": false,
             "llm_ready": false

@@ -505,6 +505,26 @@ Packed remains a protected hot-core exception:
 - `packed_hot_core_exception = true` remains in audit until a zero-cost
   `FieldRecordView` and benchmark guard exist.
 
+### Phase 14: Cognitive Dual-Run
+
+Status: active for `nanda llmwave-big * --format json`.
+
+The shared LLMWave report printer now emits `field_runtime` for cognitive
+reports:
+
+- cognitive verdict/state/safe flag;
+- shared field pass peak/state/safe flag;
+- not-more-permissive check;
+- `cutover_ready`.
+
+The cognitive path remains not-LLM:
+
+- `field_safe_to_answer` stays false unless claim boundaries change through
+  future eval evidence;
+- `*_NOT_ANSWER`, `*_NOT_CHAT`, `*_NOT_LLM`, and `*_NOT_FIELD_MATURE` states
+  are mapped to review-only field state;
+- local answer candidates may be focused but still not broad chat readiness.
+
 ## Refactor Gates
 
 Before each phase:
