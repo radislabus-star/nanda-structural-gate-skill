@@ -207,6 +207,7 @@ scripts/nanda-llmwave-big claim-gate --claim llm-ready --format json
 scripts/nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
+scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json

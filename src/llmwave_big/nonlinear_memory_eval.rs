@@ -11,18 +11,37 @@ use super::write;
 
 pub(crate) const NONLINEAR_MEMORY_EVAL_VERSION: &str = "llmwave-big-v-next-nonlinear-memory-eval";
 
+#[derive(clap::ValueEnum, Clone, Copy, Debug)]
+pub(crate) enum NonlinearProofPolicyKind {
+    #[value(name = "strict-full-sweep")]
+    StrictFullSweep,
+    #[value(name = "scale-amortized")]
+    ScaleAmortized,
+}
+
 #[derive(Serialize, Clone)]
 pub(crate) struct NonlinearMemoryEvalReport {
     pub mode: &'static str,
     pub version: &'static str,
     pub roadmap_block: &'static str,
     pub verdict: &'static str,
+    pub proof_policy: NonlinearProofPolicyReport,
     pub basis: FixedBasisReport,
     pub external_corpus: ExternalCorpusEvalReport,
     pub sweep: Vec<CapacitySweepPoint>,
     pub aggregate: NonlinearAggregateMetrics,
     pub gates: NonlinearProofGates,
     pub claim_boundary: NonlinearClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct NonlinearProofPolicyReport {
+    pub selected: &'static str,
+    pub selected_policy_proven: bool,
+    pub strict_full_sweep_nonlinear_memory_proven: bool,
+    pub scale_amortized_nonlinear_memory_proven: bool,
+    pub general_claim_unlocked: bool,
+    pub read_as: &'static str,
 }
 
 #[derive(Serialize, Clone)]
@@ -121,6 +140,8 @@ pub(crate) struct NonlinearClaimBoundary {
     pub linear_baseline_compared: bool,
     pub useful_density_candidate: bool,
     pub scale_amortized_nonlinear_memory_proven: bool,
+    pub selected_policy_proven: bool,
+    pub selected_policy: &'static str,
     pub nonlinear_memory_proven: bool,
     pub safe_claim: &'static str,
     pub blocked_by: Vec<&'static str>,
@@ -167,6 +188,7 @@ struct ExternalNegative {
 
 pub(crate) fn build_nonlinear_memory_eval_report(
     corpus_path: Option<&Path>,
+    proof_policy: NonlinearProofPolicyKind,
 ) -> Result<NonlinearMemoryEvalReport> {
     let basis = FixedBasisReport {
         wave_dim: super::super::WAVE_DIM,
@@ -211,6 +233,11 @@ pub(crate) fn build_nonlinear_memory_eval_report(
         && gates.external_corpus_present
         && gates.broad_noise_eval_present;
     let scale_amortized_nonlinear_memory_proven = gates.scale_amortized_nonlinear_memory_proven;
+    let proof_policy_report = proof_policy_report(
+        proof_policy,
+        nonlinear_memory_proven,
+        scale_amortized_nonlinear_memory_proven,
+    );
     let blocked_by = blocked_reasons(&gates);
     let scale_candidate = aggregate.large_scale_win_rate >= 1.0
         && aggregate.large_scale_bytes_per_useful_fact_gain > 1.2
@@ -229,6 +256,7 @@ pub(crate) fn build_nonlinear_memory_eval_report(
         version: NONLINEAR_MEMORY_EVAL_VERSION,
         roadmap_block: "v-next-nonlinear-memory-proof",
         verdict,
+        proof_policy: proof_policy_report.clone(),
         basis,
         external_corpus,
         sweep,
@@ -242,6 +270,8 @@ pub(crate) fn build_nonlinear_memory_eval_report(
                 || verdict == "NONLINEAR_MEMORY_SCALE_CANDIDATE_NOT_PROVEN"
                 || verdict == "NONLINEAR_MEMORY_PROOF_PASS",
             scale_amortized_nonlinear_memory_proven,
+            selected_policy_proven: proof_policy_report.selected_policy_proven,
+            selected_policy: proof_policy_report.selected,
             nonlinear_memory_proven,
             safe_claim: if nonlinear_memory_proven {
                 "Fixed-basis residual memory passed the configured nonlinear proof gates"
@@ -306,6 +336,31 @@ fn load_external_corpus(path: &Path) -> Result<ExternalCorpusEvalReport> {
         broad_noise_eval_present,
         state,
     })
+}
+
+fn proof_policy_report(
+    policy: NonlinearProofPolicyKind,
+    strict_full_sweep_nonlinear_memory_proven: bool,
+    scale_amortized_nonlinear_memory_proven: bool,
+) -> NonlinearProofPolicyReport {
+    match policy {
+        NonlinearProofPolicyKind::StrictFullSweep => NonlinearProofPolicyReport {
+            selected: "strict-full-sweep",
+            selected_policy_proven: strict_full_sweep_nonlinear_memory_proven,
+            strict_full_sweep_nonlinear_memory_proven,
+            scale_amortized_nonlinear_memory_proven,
+            general_claim_unlocked: strict_full_sweep_nonlinear_memory_proven,
+            read_as: "strict proof requires the fixed basis to beat the linear baseline across the configured sweep, including small sizes where basis overhead is still paid",
+        },
+        NonlinearProofPolicyKind::ScaleAmortized => NonlinearProofPolicyReport {
+            selected: "scale-amortized",
+            selected_policy_proven: scale_amortized_nonlinear_memory_proven,
+            strict_full_sweep_nonlinear_memory_proven,
+            scale_amortized_nonlinear_memory_proven,
+            general_claim_unlocked: false,
+            read_as: "scale-amortized proof accepts large-scale wins after fixed-basis overhead is amortized; it is a local density result and does not unlock the general nonlinear-memory claim",
+        },
+    }
 }
 
 fn sweep_point(facts: usize, basis: &FixedBasisReport) -> CapacitySweepPoint {

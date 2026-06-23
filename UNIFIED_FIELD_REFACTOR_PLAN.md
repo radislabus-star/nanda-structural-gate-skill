@@ -1008,6 +1008,21 @@ claim_boundary.scale_amortized_nonlinear_memory_proven = true
 claim_boundary.nonlinear_memory_proven = false
 ```
 
+The eval now has two explicit proof policies:
+
+```text
+--proof-policy strict-full-sweep
+  selected_policy_proven = false
+  nonlinear_memory_proven = false
+
+--proof-policy scale-amortized
+  selected_policy_proven = true
+  nonlinear_memory_proven = false
+```
+
+The scale-amortized policy is a local density result after fixed-basis overhead
+is amortized. It does not unlock the general nonlinear-memory claim.
+
 This is a deliberately narrow result. It says the fixed basis starts to win at
 larger scale after basis overhead is amortized. It does not prove nonlinear
 memory yet, because the full-sweep baseline gates are still stricter than the
