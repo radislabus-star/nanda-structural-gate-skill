@@ -1045,6 +1045,29 @@ general_dialogue_ready = false
 
 This is a local multi-turn memory-lift result, not a general chat claim.
 
+## Latest Implemented Step: Small-Domain LLMWave Eval
+
+`nanda llmwave-big domain-eval` now combines three independently checked
+components:
+
+```text
+artifact ask eval
+scripted hot-memory chat eval
+scale-amortized nonlinear-memory eval
+```
+
+Current boundary:
+
+```text
+small_domain_llmwave_ready = true
+broad_chat_llm_ready = false
+general_llm_ready = false
+nonlinear_memory_proven = false
+```
+
+This is the first honest "small-domain LLMWave" readiness level. It is not a
+claim that the model is a broad chat LLM.
+
 This is a deliberately narrow result. It says the fixed basis starts to win at
 larger scale after basis overhead is amortized. It does not prove nonlinear
 memory yet, because the full-sweep baseline gates are still stricter than the

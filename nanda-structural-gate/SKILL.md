@@ -226,6 +226,7 @@ scripts/nanda-llmwave-big ask --artifact .nanda/llmwave-big-training/project-art
 scripts/nanda-llmwave-big ask-eval --artifact .nanda/llmwave-big-training/project-artifact.json --suite examples/llmwave-big-ask-eval.json --top-k 5 --format json
 scripts/nanda-llmwave-big write --format json
 scripts/nanda-llmwave-big chat-hot-eval --hot-pack .nanda/llmwave-big-training/project.hot.bin --artifact .nanda/llmwave-big-training/project-artifact.json --memory .nanda/llmwave-big-training/chat-eval-memory.json --script .nanda/llmwave-big-training/chat.script --format json
+scripts/nanda-llmwave-big domain-eval --artifact .nanda/llmwave-big-training/project-artifact.json --ask-suite examples/llmwave-big-ask-eval.json --hot-pack .nanda/llmwave-big-training/project.hot.bin --chat-script .nanda/llmwave-big-training/chat.script --chat-memory .nanda/llmwave-big-training/domain-chat-memory.json --nonlinear-corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big consolidate --format json
 scripts/nanda-llmwave-big eval --format json
 scripts/nanda-llmwave-big query --text "supplier invoice payment customs" --format json

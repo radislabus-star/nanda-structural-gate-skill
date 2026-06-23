@@ -11,6 +11,7 @@ pub mod atlas;
 pub mod consolidation;
 pub mod coupled_decode_loop;
 pub mod dialogue_state;
+pub mod domain_eval;
 pub mod eval;
 pub mod evidence_proof;
 pub mod field_feedback;
@@ -192,6 +193,9 @@ enum LlmwaveBigCommand {
     /// Evaluate scripted hot chat learning and answer lift.
     #[command(name = "chat-hot-eval")]
     ChatHotEval(LlmwaveBigChatHotEvalArgs),
+    /// Evaluate the small-domain LLMWave path end-to-end.
+    #[command(name = "domain-eval")]
+    DomainEval(LlmwaveBigDomainEvalArgs),
 }
 
 #[derive(Parser)]
@@ -608,6 +612,26 @@ struct LlmwaveBigChatHotEvalArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigDomainEvalArgs {
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long)]
+    ask_suite: PathBuf,
+    #[arg(long)]
+    hot_pack: PathBuf,
+    #[arg(long)]
+    chat_script: PathBuf,
+    #[arg(long)]
+    chat_memory: PathBuf,
+    #[arg(long)]
+    nonlinear_corpus: PathBuf,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigAskArgs {
     #[arg(long)]
     artifact: PathBuf,
@@ -967,6 +991,19 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 args.top_k,
             )?;
             report::print_hot_chat_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::DomainEval(args) => {
+            let report = domain_eval::build_domain_eval_report(
+                &args.artifact,
+                &args.ask_suite,
+                &args.hot_pack,
+                &args.chat_script,
+                &args.chat_memory,
+                &args.nonlinear_corpus,
+                args.top_k,
+            )?;
+            report::print_domain_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }

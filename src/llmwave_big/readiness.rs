@@ -25,6 +25,7 @@ pub(crate) struct ReadinessClaims {
     pub artifact_grounded_qa_ready: bool,
     pub constrained_answer_generation_ready: bool,
     pub scripted_hot_multi_turn_ready: bool,
+    pub small_domain_llmwave_ready: bool,
     pub scale_amortized_nonlinear_memory_ready: bool,
     pub broad_chat_llm_ready: bool,
     pub nonlinear_memory_proven: bool,
@@ -118,10 +119,10 @@ pub(crate) fn build_readiness_ladder_report() -> ReadinessLadderReport {
             ReadinessLevel {
                 level: 5,
                 name: "small domain LLMWave ready",
-                state: "WATCH",
+                state: "LOCAL_PASS_GENERAL_BLOCKED",
                 evidence: vec![
-                    "domain artifact path exists",
-                    "domain corpus eval threshold missing",
+                    "domain-eval combines artifact QA, hot chat, and scale memory",
+                    "broad chat/general LLM eval missing",
                 ],
             },
             ReadinessLevel {
@@ -246,6 +247,7 @@ fn readiness_claims() -> ReadinessClaims {
         artifact_grounded_qa_ready: true,
         constrained_answer_generation_ready: true,
         scripted_hot_multi_turn_ready: true,
+        small_domain_llmwave_ready: true,
         scale_amortized_nonlinear_memory_ready: true,
         broad_chat_llm_ready: false,
         nonlinear_memory_proven: false,

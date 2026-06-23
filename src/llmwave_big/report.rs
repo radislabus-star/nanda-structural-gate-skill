@@ -8,6 +8,7 @@ use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::dialogue_state::DialogueStateReport;
+use super::domain_eval::DomainEvalReport;
 use super::eval::BigEvalReport;
 use super::evidence_proof::EvidenceProofReport;
 use super::field_feedback::FieldFeedbackReport;
@@ -873,6 +874,50 @@ pub(crate) fn print_hot_chat_eval_report(
         OutputFormat::Md => print_hot_chat_eval_md(report),
     }
     Ok(())
+}
+
+pub(crate) fn print_domain_eval_report(
+    report: &DomainEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_domain_eval_text(report),
+        OutputFormat::Md => print_domain_eval_md(report),
+    }
+    Ok(())
+}
+
+fn print_domain_eval_text(report: &DomainEvalReport) {
+    println!("LLMWave-Big Domain Eval");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "small_domain_llmwave_ready: {}",
+        report.claim_boundary.small_domain_llmwave_ready
+    );
+    println!(
+        "broad_chat_llm_ready: {}",
+        report.claim_boundary.broad_chat_llm_ready
+    );
+}
+
+fn print_domain_eval_md(report: &DomainEvalReport) {
+    println!("# LLMWave-Big Domain Eval");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- small_domain_llmwave_ready: `{}`",
+        report.claim_boundary.small_domain_llmwave_ready
+    );
+    println!(
+        "- broad_chat_llm_ready: `{}`",
+        report.claim_boundary.broad_chat_llm_ready
+    );
 }
 
 fn print_hot_chat_eval_text(report: &HotChatEvalReport) {

@@ -234,7 +234,7 @@ jq -e '.roadmap_block == "v1841-v1900" and .verdict == "CORE_RUNTIME_READY_FIXTU
 jq -e '.criteria.feedback_applied_to_next_run == true and .criteria.memory_persists_across_process_restart == true and .claim_boundary.core_runtime_ready == true and .claim_boundary.full_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_core_eval_json" >/dev/null
 big_readiness_json="$("$llmwave_big" readiness-ladder --format json)"
 jq -e '.mode == "llmwave-big-readiness-ladder" and .current_level == 3 and .current_state == "CONSTRAINED_FIELD_ENGINE_READY_NOT_GENERAL_LLM"' <<<"$big_readiness_json" >/dev/null
-jq -e '.claim_boundary.field_core_as_sole_engine == true and .claim_boundary.fixture_reasoning_ready == true and .claim_boundary.artifact_grounded_qa_ready == true and .claim_boundary.scripted_hot_multi_turn_ready == true and .claim_boundary.scale_amortized_nonlinear_memory_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_readiness_json" >/dev/null
+jq -e '.claim_boundary.field_core_as_sole_engine == true and .claim_boundary.fixture_reasoning_ready == true and .claim_boundary.artifact_grounded_qa_ready == true and .claim_boundary.scripted_hot_multi_turn_ready == true and .claim_boundary.small_domain_llmwave_ready == true and .claim_boundary.scale_amortized_nonlinear_memory_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_readiness_json" >/dev/null
 jq -e '([.levels[].name] | index("scale-amortized nonlinear memory"))' <<<"$big_readiness_json" >/dev/null
 big_field_claim_json="$("$llmwave_big" claim-gate --claim field-core-sole-engine --format json)"
 jq -e '.mode == "llmwave-big-claim-gate" and .claim == "field-core-sole-engine" and .verdict == "CLAIM_ALLOWED" and .allowed == true' <<<"$big_field_claim_json" >/dev/null
@@ -377,6 +377,10 @@ big_chat_hot_eval_json="$("$llmwave_big" chat-hot-eval --hot-pack "$tmp_big_trai
 jq -e '.version == "llmwave-big-v1908-hot-chat-eval" and .verdict == "HOT_CHAT_EVAL_PASS_NOT_GENERAL_LLM" and .metrics.memory_lift_observed == true and .metrics.false_safe_before_learning == false and .metrics.pass_rate == 1' <<<"$big_chat_hot_eval_json" >/dev/null
 jq -e '.claim_boundary.scripted_hot_chat_eval_implemented == true and .claim_boundary.multi_turn_memory_lift_observed == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.general_dialogue_ready == false' <<<"$big_chat_hot_eval_json" >/dev/null
 test -s "$tmp_big_train/chat-eval-memory.json"
+big_domain_eval_json="$("$llmwave_big" domain-eval --artifact "$tmp_big_train/artifact.json" --ask-suite "$tmp_big_train/ask-eval.json" --hot-pack "$tmp_big_train/artifact.hot.bin" --chat-script "$tmp_big_train/chat.script" --chat-memory "$tmp_big_train/domain-chat-memory.json" --nonlinear-corpus "$root/examples/llmwave-big-nonlinear-memory-corpus.json" --top-k 3 --format json)"
+jq -e '.version == "llmwave-big-v1909-domain-eval" and .verdict == "SMALL_DOMAIN_LLMWAVE_EVAL_PASS_NOT_BROAD_LLM" and .metrics.passed_components == 3 and .metrics.pass_rate == 1' <<<"$big_domain_eval_json" >/dev/null
+jq -e '.claim_boundary.small_domain_llmwave_ready == true and .claim_boundary.artifact_grounded_qa_ready == true and .claim_boundary.scripted_hot_multi_turn_ready == true and .claim_boundary.scale_amortized_nonlinear_memory_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.general_llm_ready == false' <<<"$big_domain_eval_json" >/dev/null
+test -s "$tmp_big_train/domain-chat-memory.json"
 rm -rf "$tmp_big_train"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
