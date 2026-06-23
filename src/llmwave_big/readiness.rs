@@ -207,10 +207,17 @@ pub(crate) fn build_claim_gate_report(claim: ClaimGateKind) -> ClaimGateReport {
             claim: "nonlinear-memory",
             verdict: "CLAIM_BLOCKED",
             allowed: false,
-            evidence: vec!["fixed-basis probes", "residual saving samples"],
+            evidence: vec![
+                "nonlinear-memory-eval harness implemented",
+                "fixed basis compared to linear full-record baseline",
+                "large-scale sweep shows useful density candidate",
+                "residual saving samples",
+            ],
             missing_evidence: vec![
                 "fixed-basis beats linear baseline under capacity",
                 "bytes_per_useful_fact improves under held-out eval",
+                "external corpus nonlinear-memory eval",
+                "broad noise eval",
                 "role_error_rate stays low under noise",
                 "false_positive_rate stays low under packed pressure",
             ],
