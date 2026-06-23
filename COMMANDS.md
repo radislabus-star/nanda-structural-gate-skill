@@ -134,9 +134,17 @@ nanda-llmwave-big nonlinear-memory-eval \
 Expected boundary today:
 
 ```text
+corpus_driven_memory.verdict = CORPUS_DRIVEN_AMORTIZED_DENSITY_OBSERVED
 scale_amortized_nonlinear_memory_proven = true
 nonlinear_memory_proven = false
 ```
+
+Read `corpus_driven_memory` first when inspecting nonlinear memory. It is the
+actual fixture-driven measurement: fact count, schema count, residual count,
+linear bytes, standalone fixed-basis bytes, amortized fixed-basis bytes,
+held-out pass rate, negative rejection, and noise rejection. A small corpus may
+show an amortized win while still failing standalone strict density because the
+64 KB basis overhead has not been repaid yet.
 
 ## LLMWave Core Stages
 

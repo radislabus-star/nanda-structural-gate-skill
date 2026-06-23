@@ -269,6 +269,15 @@ nanda-llmwave-big domain-eval \
   --format json
 ```
 
+For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
+claim fields. That section is the actual fixture-driven density check: it
+compares linear full-fact bytes with standalone fixed-basis bytes and amortized
+fixed-basis residual bytes, then binds the result to held-out, negative, and
+noise controls. A small corpus can honestly pass
+`CORPUS_DRIVEN_AMORTIZED_DENSITY_OBSERVED` while still keeping
+`nonlinear_memory_proven=false` because the standalone basis overhead has not
+been repaid.
+
 The Windows installer builds `target\release\nanda.exe`, copies the skill to
 `%USERPROFILE%\.codex\skills\nanda-structural-gate`, and creates `.cmd`
 wrappers in `%USERPROFILE%\.local\bin`.

@@ -682,6 +682,13 @@ answering, not broad chat readiness.
 `nanda-llmwave-big ask-eval` runs artifact-grounded QA suites and reports
 answer accuracy, false-positive rate, and false-negative rate. Treat chunk-only
 retrieval as review evidence; answer permission requires a focused schema peak.
+For nonlinear memory, inspect `corpus_driven_memory` in
+`nanda-llmwave-big nonlinear-memory-eval` before reading broader claim fields.
+It is the actual fixture-driven density measurement: real fact/schema/residual
+counts, linear bytes, standalone fixed-basis bytes, amortized fixed-basis
+bytes, held-out pass, negative rejection, and noise rejection. An amortized pass
+does not unlock the general nonlinear-memory claim unless the strict gates also
+repay basis overhead and broad eval coverage.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a

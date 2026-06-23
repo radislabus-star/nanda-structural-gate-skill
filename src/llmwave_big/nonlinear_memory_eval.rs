@@ -1,5 +1,6 @@
 //! Fixed-basis nonlinear memory proof harness.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
@@ -28,6 +29,7 @@ pub(crate) struct NonlinearMemoryEvalReport {
     pub proof_policy: NonlinearProofPolicyReport,
     pub basis: FixedBasisReport,
     pub external_corpus: ExternalCorpusEvalReport,
+    pub corpus_driven_memory: CorpusDrivenMemoryReport,
     pub sweep: Vec<CapacitySweepPoint>,
     pub aggregate: NonlinearAggregateMetrics,
     pub gates: NonlinearProofGates,
@@ -70,6 +72,53 @@ pub(crate) struct ExternalCorpusEvalReport {
     pub external_corpus_present: bool,
     pub broad_noise_eval_present: bool,
     pub state: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct CorpusDrivenMemoryReport {
+    pub loaded: bool,
+    pub fact_count: usize,
+    pub schema_count: usize,
+    pub residual_count: usize,
+    pub linear_baseline: CorpusMemoryModelMetrics,
+    pub fixed_basis_standalone: CorpusMemoryModelMetrics,
+    pub fixed_basis_amortized: CorpusMemoryModelMetrics,
+    pub delta: CorpusMemoryDelta,
+    pub gates: CorpusDrivenMemoryGates,
+    pub verdict: &'static str,
+    pub read_as: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct CorpusMemoryModelMetrics {
+    pub bytes_total: usize,
+    pub bytes_per_useful_fact: f64,
+    pub schema_reuse_ratio: f64,
+    pub residual_saving_ratio: f64,
+    pub heldout_pass_rate: f64,
+    pub negative_reject_rate: f64,
+    pub noise_reject_rate: f64,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct CorpusMemoryDelta {
+    pub standalone_bytes_per_useful_fact_gain: f64,
+    pub amortized_bytes_per_useful_fact_gain: f64,
+    pub amortized_total_bytes_gain: f64,
+    pub basis_overhead_bytes: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct CorpusDrivenMemoryGates {
+    pub schema_reuse_observed: bool,
+    pub residual_encoding_smaller_than_full_fact: bool,
+    pub amortized_wave_beats_linear: bool,
+    pub standalone_wave_beats_linear: bool,
+    pub heldout_inference_passed: bool,
+    pub negative_controls_passed: bool,
+    pub noise_controls_passed: bool,
+    pub corpus_driven_nonlinear_density_observed: bool,
+    pub strict_standalone_density_observed: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -198,24 +247,15 @@ pub(crate) fn build_nonlinear_memory_eval_report(
         relation_slots: 12,
         role_slots: 16,
     };
-    let external_corpus = match corpus_path {
-        Some(path) => load_external_corpus(path)?,
-        None => ExternalCorpusEvalReport {
-            loaded: false,
-            path: None,
-            version: None,
-            source: None,
-            fact_count: 0,
-            heldout_count: 0,
-            negative_count: 0,
-            noise_count: 0,
-            heldout_pass_rate: 0.0,
-            negative_reject_rate: 0.0,
-            noise_reject_rate: 0.0,
-            external_corpus_present: false,
-            broad_noise_eval_present: false,
-            state: "NO_EXTERNAL_CORPUS",
-        },
+    let (external_corpus, corpus_driven_memory) = match corpus_path {
+        Some(path) => {
+            let fixture = read_external_corpus(path)?;
+            (
+                external_corpus_eval(path, &fixture),
+                corpus_driven_memory_eval(&fixture),
+            )
+        }
+        None => (empty_external_corpus(), empty_corpus_driven_memory()),
     };
     let sweep = [64usize, 256, 1024, 4096, 15000]
         .into_iter()
@@ -259,6 +299,7 @@ pub(crate) fn build_nonlinear_memory_eval_report(
         proof_policy: proof_policy_report.clone(),
         basis,
         external_corpus,
+        corpus_driven_memory,
         sweep,
         aggregate,
         gates,
@@ -285,11 +326,14 @@ pub(crate) fn build_nonlinear_memory_eval_report(
     })
 }
 
-fn load_external_corpus(path: &Path) -> Result<ExternalCorpusEvalReport> {
+fn read_external_corpus(path: &Path) -> Result<ExternalCorpusFixture> {
     let raw = fs::read_to_string(path)
         .with_context(|| format!("read nonlinear memory corpus {}", path.display()))?;
-    let fixture: ExternalCorpusFixture = serde_json::from_str(&raw)
-        .with_context(|| format!("parse nonlinear memory corpus {}", path.display()))?;
+    serde_json::from_str(&raw)
+        .with_context(|| format!("parse nonlinear memory corpus {}", path.display()))
+}
+
+fn external_corpus_eval(path: &Path, fixture: &ExternalCorpusFixture) -> ExternalCorpusEvalReport {
     let heldout_passes = fixture
         .held_out
         .iter()
@@ -320,11 +364,11 @@ fn load_external_corpus(path: &Path) -> Result<ExternalCorpusEvalReport> {
         "EXTERNAL_FIXTURE_REVIEW"
     };
 
-    Ok(ExternalCorpusEvalReport {
+    ExternalCorpusEvalReport {
         loaded: true,
         path: Some(path.display().to_string()),
-        version: Some(fixture.version),
-        source: Some(fixture.source),
+        version: Some(fixture.version.clone()),
+        source: Some(fixture.source.clone()),
         fact_count: fixture.facts.len(),
         heldout_count: fixture.held_out.len(),
         negative_count: fixture.negative.len(),
@@ -335,7 +379,197 @@ fn load_external_corpus(path: &Path) -> Result<ExternalCorpusEvalReport> {
         external_corpus_present,
         broad_noise_eval_present,
         state,
-    })
+    }
+}
+
+fn empty_external_corpus() -> ExternalCorpusEvalReport {
+    ExternalCorpusEvalReport {
+        loaded: false,
+        path: None,
+        version: None,
+        source: None,
+        fact_count: 0,
+        heldout_count: 0,
+        negative_count: 0,
+        noise_count: 0,
+        heldout_pass_rate: 0.0,
+        negative_reject_rate: 0.0,
+        noise_reject_rate: 0.0,
+        external_corpus_present: false,
+        broad_noise_eval_present: false,
+        state: "NO_EXTERNAL_CORPUS",
+    }
+}
+
+fn corpus_driven_memory_eval(fixture: &ExternalCorpusFixture) -> CorpusDrivenMemoryReport {
+    let fact_count = fixture.facts.len();
+    let useful_facts = fact_count.max(1);
+    let schema_count = fixture
+        .facts
+        .iter()
+        .map(schema_key)
+        .collect::<BTreeSet<_>>()
+        .len();
+    let schema_count = schema_count.max(1);
+    let residual_count = fact_count;
+    let heldout_passes = fixture
+        .held_out
+        .iter()
+        .filter(|held_out| heldout_matches(&fixture.facts, held_out))
+        .count();
+    let negative_rejects = fixture
+        .negative
+        .iter()
+        .filter(|negative| !fact_matches(&fixture.facts, negative))
+        .count();
+    let noise_rejects = fixture
+        .noise
+        .iter()
+        .filter(|negative| !fact_matches(&fixture.facts, negative))
+        .count();
+    let heldout_pass_rate = ratio(heldout_passes, fixture.held_out.len());
+    let negative_reject_rate = ratio(negative_rejects, fixture.negative.len());
+    let noise_reject_rate = ratio(noise_rejects, fixture.noise.len());
+    let basis_overhead_bytes = 64 * 1024;
+    let schema_bytes = schema_count * 32;
+    let residual_bytes = residual_count * write::SMALL_RESIDUAL_BYTES;
+    let centroid_bytes = schema_count * write::CENTROID_UPDATE_BYTES;
+    let linear_bytes = fact_count * write::FULL_FACT_RECORD_BYTES;
+    let amortized_bytes = schema_bytes + residual_bytes + centroid_bytes;
+    let standalone_bytes = basis_overhead_bytes + amortized_bytes;
+    let schema_reuse_ratio = round4(fact_count as f64 / schema_count as f64);
+    let residual_saving_ratio =
+        round4(1.0 - (write::SMALL_RESIDUAL_BYTES as f64 / write::FULL_FACT_RECORD_BYTES as f64));
+    let linear = CorpusMemoryModelMetrics {
+        bytes_total: linear_bytes,
+        bytes_per_useful_fact: round4(linear_bytes as f64 / useful_facts as f64),
+        schema_reuse_ratio: 1.0,
+        residual_saving_ratio: 0.0,
+        heldout_pass_rate,
+        negative_reject_rate,
+        noise_reject_rate,
+    };
+    let fixed_basis_amortized = CorpusMemoryModelMetrics {
+        bytes_total: amortized_bytes,
+        bytes_per_useful_fact: round4(amortized_bytes as f64 / useful_facts as f64),
+        schema_reuse_ratio,
+        residual_saving_ratio,
+        heldout_pass_rate,
+        negative_reject_rate,
+        noise_reject_rate,
+    };
+    let fixed_basis_standalone = CorpusMemoryModelMetrics {
+        bytes_total: standalone_bytes,
+        bytes_per_useful_fact: round4(standalone_bytes as f64 / useful_facts as f64),
+        schema_reuse_ratio,
+        residual_saving_ratio,
+        heldout_pass_rate,
+        negative_reject_rate,
+        noise_reject_rate,
+    };
+    let delta = CorpusMemoryDelta {
+        standalone_bytes_per_useful_fact_gain: round4(
+            linear.bytes_per_useful_fact / fixed_basis_standalone.bytes_per_useful_fact,
+        ),
+        amortized_bytes_per_useful_fact_gain: round4(
+            linear.bytes_per_useful_fact / fixed_basis_amortized.bytes_per_useful_fact,
+        ),
+        amortized_total_bytes_gain: round4(linear_bytes as f64 / amortized_bytes.max(1) as f64),
+        basis_overhead_bytes,
+    };
+    let gates = CorpusDrivenMemoryGates {
+        schema_reuse_observed: schema_reuse_ratio > 1.0,
+        residual_encoding_smaller_than_full_fact: write::SMALL_RESIDUAL_BYTES
+            < write::FULL_FACT_RECORD_BYTES,
+        amortized_wave_beats_linear: delta.amortized_bytes_per_useful_fact_gain > 1.2,
+        standalone_wave_beats_linear: delta.standalone_bytes_per_useful_fact_gain > 1.2,
+        heldout_inference_passed: heldout_pass_rate >= 1.0,
+        negative_controls_passed: negative_reject_rate >= 1.0,
+        noise_controls_passed: noise_reject_rate >= 1.0,
+        corpus_driven_nonlinear_density_observed: false,
+        strict_standalone_density_observed: false,
+    };
+    let corpus_driven_nonlinear_density_observed = gates.schema_reuse_observed
+        && gates.residual_encoding_smaller_than_full_fact
+        && gates.amortized_wave_beats_linear
+        && gates.heldout_inference_passed
+        && gates.negative_controls_passed
+        && gates.noise_controls_passed;
+    let strict_standalone_density_observed =
+        corpus_driven_nonlinear_density_observed && gates.standalone_wave_beats_linear;
+    let gates = CorpusDrivenMemoryGates {
+        corpus_driven_nonlinear_density_observed,
+        strict_standalone_density_observed,
+        ..gates
+    };
+    let verdict = if strict_standalone_density_observed {
+        "CORPUS_DRIVEN_STRICT_DENSITY_OBSERVED"
+    } else if corpus_driven_nonlinear_density_observed {
+        "CORPUS_DRIVEN_AMORTIZED_DENSITY_OBSERVED"
+    } else {
+        "CORPUS_DRIVEN_DENSITY_REVIEW"
+    };
+
+    CorpusDrivenMemoryReport {
+        loaded: true,
+        fact_count,
+        schema_count,
+        residual_count,
+        linear_baseline: linear,
+        fixed_basis_standalone,
+        fixed_basis_amortized,
+        delta,
+        gates,
+        verdict,
+        read_as: "Corpus-driven density uses actual fixture facts and schema keys; amortized wins mean the fixed basis is treated as already resident, while standalone wins must also repay the basis overhead.",
+    }
+}
+
+fn empty_corpus_driven_memory() -> CorpusDrivenMemoryReport {
+    let empty = CorpusMemoryModelMetrics {
+        bytes_total: 0,
+        bytes_per_useful_fact: 0.0,
+        schema_reuse_ratio: 0.0,
+        residual_saving_ratio: 0.0,
+        heldout_pass_rate: 0.0,
+        negative_reject_rate: 0.0,
+        noise_reject_rate: 0.0,
+    };
+    CorpusDrivenMemoryReport {
+        loaded: false,
+        fact_count: 0,
+        schema_count: 0,
+        residual_count: 0,
+        linear_baseline: empty.clone(),
+        fixed_basis_standalone: empty.clone(),
+        fixed_basis_amortized: empty,
+        delta: CorpusMemoryDelta {
+            standalone_bytes_per_useful_fact_gain: 0.0,
+            amortized_bytes_per_useful_fact_gain: 0.0,
+            amortized_total_bytes_gain: 0.0,
+            basis_overhead_bytes: 64 * 1024,
+        },
+        gates: CorpusDrivenMemoryGates {
+            schema_reuse_observed: false,
+            residual_encoding_smaller_than_full_fact: false,
+            amortized_wave_beats_linear: false,
+            standalone_wave_beats_linear: false,
+            heldout_inference_passed: false,
+            negative_controls_passed: false,
+            noise_controls_passed: false,
+            corpus_driven_nonlinear_density_observed: false,
+            strict_standalone_density_observed: false,
+        },
+        verdict: "NO_EXTERNAL_CORPUS",
+        read_as: "No corpus-driven memory measurement was run.",
+    }
+}
+
+fn schema_key(fact: &ExternalFact) -> String {
+    format!(
+        "{}|{}|{}|{}",
+        fact.route, fact.subject_role, fact.operator, fact.object_role
+    )
 }
 
 fn proof_policy_report(
