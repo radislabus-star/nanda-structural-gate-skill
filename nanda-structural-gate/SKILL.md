@@ -212,6 +212,7 @@ scripts/nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
+scripts/nanda-llmwave-big demo-domain --format json
 scripts/nanda-llmwave-big word-birth --format json
 scripts/nanda-llmwave-big surface-production --format json
 scripts/nanda-llmwave-big surface-reconstruct --format json
@@ -700,6 +701,12 @@ retrieval feedback learning, not gradient training or broad chat readiness.
 and hot learning. It accepts `ask <text>`, `learn accept: subject | relation |
 object`, and `learn reject: subject | relation | object`; use `--script` for
 repeatable tests and stdin for interactive use.
+`nanda-llmwave-big demo-domain` is the one-command small-domain smoke path. It
+writes a bundled tiny corpus under `.nanda/llmwave-big-demo`, compiles the
+artifact, packs the hot core, runs scripted hot-chat eval, runs small-domain
+domain eval, and keeps the claim boundary explicit:
+`DEMO_DOMAIN_PASS_NOT_BROAD_LLM` is local demo readiness only, not broad chat,
+not a general LLM, and not a general nonlinear-memory proof.
 v246-v252 add `nanda-llmwave-big word-birth`: a literature-grounded lexical
 birth mechanism. Inspect it when the agent needs to distinguish a real word
 candidate from a surface fragment: segmentation, fast mapping,

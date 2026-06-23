@@ -384,6 +384,14 @@ jq -e '.version == "llmwave-big-v1909-domain-eval" and .verdict == "SMALL_DOMAIN
 jq -e '.claim_boundary.small_domain_llmwave_ready == true and .claim_boundary.artifact_grounded_qa_ready == true and .claim_boundary.scripted_hot_multi_turn_ready == true and .claim_boundary.scale_amortized_nonlinear_memory_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.general_llm_ready == false' <<<"$big_domain_eval_json" >/dev/null
 test -s "$tmp_big_train/domain-chat-memory.json"
 rm -rf "$tmp_big_train"
+tmp_big_demo="$(mktemp -d)"
+big_demo_domain_json="$("$llmwave_big" demo-domain --out-dir "$tmp_big_demo/demo" --nonlinear-corpus "$root/examples/llmwave-big-nonlinear-memory-corpus.json" --format json)"
+jq -e '.version == "llmwave-big-v1910-demo-domain" and .verdict == "DEMO_DOMAIN_PASS_NOT_BROAD_LLM" and .metrics.passed_components == 5 and .metrics.pass_rate == 1' <<<"$big_demo_domain_json" >/dev/null
+jq -e '.claim_boundary.demo_domain_command_ready == true and .claim_boundary.small_domain_llmwave_ready == true and .claim_boundary.scripted_hot_multi_turn_ready == true and .claim_boundary.scale_amortized_nonlinear_memory_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.general_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_demo_domain_json" >/dev/null
+jq -e '.steps.training.passed == true and .steps.hot_pack.passed == true and .steps.hot_chat_eval.memory_lift_observed == true and .steps.nonlinear_memory_eval.selected_policy_proven == true and .steps.domain_eval.verdict == "SMALL_DOMAIN_LLMWAVE_EVAL_PASS_NOT_BROAD_LLM"' <<<"$big_demo_domain_json" >/dev/null
+test -s "$tmp_big_demo/demo/project-artifact.json"
+test -s "$tmp_big_demo/demo/project.hot.bin"
+rm -rf "$tmp_big_demo"
 big_write_json="$("$llmwave_big" write --format json)"
 jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big_write_json" >/dev/null
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null

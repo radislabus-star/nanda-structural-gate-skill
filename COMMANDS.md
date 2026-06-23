@@ -97,6 +97,7 @@ nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
 nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
 nanda-llmwave-big claim-gate --claim llm-ready --format json
+nanda-llmwave-big demo-domain --format json
 ```
 
 Expected boundary today:
@@ -188,6 +189,15 @@ nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-c
 ```
 
 ## Training, Hot Pack, And Small-Domain Eval
+
+One-command local demo. It writes a tiny reproducible corpus and eval packet
+under `.nanda/llmwave-big-demo`, then runs training, hot packing, scripted hot
+chat eval, domain eval, and scale-amortized density eval. The expected verdict
+is `DEMO_DOMAIN_PASS_NOT_BROAD_LLM`; this is not broad LLM readiness.
+
+```bash
+nanda-llmwave-big demo-domain --format json
+```
 
 Build a small project artifact:
 
@@ -282,4 +292,3 @@ nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
 nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json
 nanda-bench6m --mode density --support-build-iterations 1000 --triads 15000 --format json
 ```
-

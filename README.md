@@ -237,6 +237,7 @@ nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
 nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
 nanda-llmwave-big claim-gate --claim llm-ready --format json
+nanda-llmwave-big demo-domain --format json
 ```
 
 Current intended claim boundary:
@@ -251,6 +252,8 @@ llm_ready                 = CLAIM_BLOCKED
 For the latest LLMWave-Big eval path, use:
 
 ```bash
+nanda-llmwave-big demo-domain --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -395,6 +398,7 @@ nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-cor
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
 nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
+nanda-llmwave-big demo-domain --format json
 nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples --out .nanda/llmwave-big-training/project-artifact.json --format json
 nanda-llmwave-big ask --artifact .nanda/llmwave-big-training/project-artifact.json --text "what does declaration require" --top-k 5 --format json
 nanda-llmwave-big ask-eval --artifact .nanda/llmwave-big-training/project-artifact.json --suite examples/llmwave-big-ask-eval.json --top-k 5 --format json
@@ -953,6 +957,12 @@ learning for the hot retrieval layer, not transformer-style training.
 `learn reject: subject | relation | object` for corrections. In scripted mode
 with `--script`, it is regression-testable; in stdin mode, it is the first
 usable conversation loop over the hot memory.
+`nanda-llmwave-big demo-domain` is the one-command smoke for that whole narrow
+path. It writes a bundled tiny corpus, compiles it, packs the binary hot core,
+runs scripted hot-chat eval, runs the small-domain eval, and reports
+`DEMO_DOMAIN_PASS_NOT_BROAD_LLM` only when all local components pass. Treat it
+as proof that the demo route works, not proof of broad LLM or general nonlinear
+memory readiness.
 `nanda-demo` is the v62 weak-spot surface: it compresses the v60 JSON into a
 short state/top-pattern/proof/signals/weak-spots report for humans and agents.
 It can also start from raw relation notes via `--from-text`: explicit

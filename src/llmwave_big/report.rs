@@ -7,6 +7,7 @@ use super::answer_surface::AnswerSurfaceReport;
 use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
+use super::demo_domain::DemoDomainReport;
 use super::dialogue_state::DialogueStateReport;
 use super::domain_eval::DomainEvalReport;
 use super::eval::BigEvalReport;
@@ -889,6 +890,52 @@ pub(crate) fn print_domain_eval_report(
         OutputFormat::Md => print_domain_eval_md(report),
     }
     Ok(())
+}
+
+pub(crate) fn print_demo_domain_report(
+    report: &DemoDomainReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_demo_domain_text(report),
+        OutputFormat::Md => print_demo_domain_md(report),
+    }
+    Ok(())
+}
+
+fn print_demo_domain_text(report: &DemoDomainReport) {
+    println!("LLMWave-Big Demo Domain");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("demo_dir: {}", report.demo_dir);
+    println!(
+        "small_domain_llmwave_ready: {}",
+        report.claim_boundary.small_domain_llmwave_ready
+    );
+    println!(
+        "general_llm_ready: {}",
+        report.claim_boundary.general_llm_ready
+    );
+}
+
+fn print_demo_domain_md(report: &DemoDomainReport) {
+    println!("# LLMWave-Big Demo Domain");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- demo_dir: `{}`", report.demo_dir);
+    println!(
+        "- small_domain_llmwave_ready: `{}`",
+        report.claim_boundary.small_domain_llmwave_ready
+    );
+    println!(
+        "- general_llm_ready: `{}`",
+        report.claim_boundary.general_llm_ready
+    );
 }
 
 fn print_domain_eval_text(report: &DomainEvalReport) {

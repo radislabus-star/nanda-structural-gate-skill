@@ -10,6 +10,7 @@ pub mod answer_surface;
 pub mod atlas;
 pub mod consolidation;
 pub mod coupled_decode_loop;
+pub mod demo_domain;
 pub mod dialogue_state;
 pub mod domain_eval;
 pub mod eval;
@@ -196,6 +197,9 @@ enum LlmwaveBigCommand {
     /// Evaluate the small-domain LLMWave path end-to-end.
     #[command(name = "domain-eval")]
     DomainEval(LlmwaveBigDomainEvalArgs),
+    /// Build and evaluate the bundled one-command small-domain demo.
+    #[command(name = "demo-domain")]
+    DemoDomain(LlmwaveBigDemoDomainArgs),
 }
 
 #[derive(Parser)]
@@ -632,6 +636,21 @@ struct LlmwaveBigDomainEvalArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigDemoDomainArgs {
+    #[arg(long, default_value = ".nanda/llmwave-big-demo")]
+    out_dir: PathBuf,
+    #[arg(
+        long,
+        default_value = "examples/llmwave-big-nonlinear-memory-corpus.json"
+    )]
+    nonlinear_corpus: PathBuf,
+    #[arg(long, default_value_t = 3)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigAskArgs {
     #[arg(long)]
     artifact: PathBuf,
@@ -1004,6 +1023,15 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 args.top_k,
             )?;
             report::print_domain_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::DemoDomain(args) => {
+            let report = demo_domain::build_demo_domain_report(
+                &args.out_dir,
+                &args.nonlinear_corpus,
+                args.top_k,
+            )?;
+            report::print_demo_domain_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }
