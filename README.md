@@ -274,6 +274,11 @@ nanda-llmwave-big memory-final-proof \
   --profile rust \
   --format json
 
+nanda-llmwave-big rust-corpus-build \
+  --repo . \
+  --out .nanda/llmwave-big-training/rust-corpus-artifact.json \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -317,6 +322,11 @@ target. It changes the proof surface to Rust module owners, public API exports,
 CLI dispatch, report printers, tests, compile evidence, and Rust-specific
 forbidden shortcuts. It still keeps broad nonlinear-memory and LLM claims
 blocked until a real Rust code corpus and held-out suite are present.
+
+`rust-corpus-build` creates that first Rust structural corpus artifact by
+scanning `.rs` files for modules, public exports, functions, CLI dispatch hints,
+report-printer hints, and test evidence. It is a corpus input layer; it does
+not by itself prove nonlinear memory.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

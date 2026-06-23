@@ -120,6 +120,7 @@ nanda-llmwave-big memory-physics --format json
 nanda-llmwave-big memory-proof-path --format json
 nanda-llmwave-big memory-final-proof --format json
 nanda-llmwave-big memory-final-proof --profile rust --format json
+nanda-llmwave-big rust-corpus-build --repo . --out .nanda/llmwave-big-training/rust-corpus-artifact.json --format json
 nanda-llmwave-big nonlinear-memory-eval --format json
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
@@ -153,6 +154,9 @@ honest state before a real big corpus is
 Use `--profile rust` for the first code-oriented corpus: module owners, public
 API exports, CLI dispatch, report printers, unit tests, integration tests, and
 forbidden shortcuts such as "compiled command implies LLM readiness".
+`rust-corpus-build` builds the first real Rust structural corpus artifact for
+that profile. It closes only the artifact-building layer; held-out and focus
+packets are still required before final proof claims.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

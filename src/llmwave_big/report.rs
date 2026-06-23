@@ -37,6 +37,7 @@ use super::open_surface_generation::OpenSurfaceGenerationReport;
 use super::query_wave::QueryWaveReport;
 use super::readiness::{ClaimGateReport, ReadinessLadderReport};
 use super::reasoning_field::ReasoningFieldReport;
+use super::rust_corpus::RustCorpusBuildReport;
 use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
 use super::surface_bank_fixture::SurfaceBankFixtureReport;
@@ -858,6 +859,21 @@ pub(crate) fn print_training_compile_report(
         ),
         OutputFormat::Text => print_training_compile_text(report),
         OutputFormat::Md => print_training_compile_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_rust_corpus_build_report(
+    report: &RustCorpusBuildReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_rust_corpus_build_text(report),
+        OutputFormat::Md => print_rust_corpus_build_md(report),
     }
     Ok(())
 }
@@ -1869,6 +1885,26 @@ fn print_training_compile_text(report: &TrainingCompileReport) {
     println!("chat_llm_ready: {}", report.claim_boundary.chat_llm_ready);
 }
 
+fn print_rust_corpus_build_text(report: &RustCorpusBuildReport) {
+    println!("mode: {}", report.mode);
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("profile: {}", report.profile);
+    println!("repo: {}", report.repo);
+    println!("rust_files: {}", report.artifact.rust_files);
+    println!("functions: {}", report.artifact.functions);
+    println!("facts: {}", report.artifact.fact_count);
+    println!("routes: {}", report.artifact.route_count);
+    println!(
+        "route_balance_ratio: {:.4}",
+        report.metrics.route_balance_ratio
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
 fn print_artifact_ask_text(report: &ArtifactAskReport) {
     println!("LLMWave-Big Ask");
     println!("version: {}", report.version);
@@ -2827,6 +2863,27 @@ fn print_training_compile_md(report: &TrainingCompileReport) {
     if let Some(path) = &report.output.artifact_path {
         println!("- artifact: `{path}`");
     }
+}
+
+fn print_rust_corpus_build_md(report: &RustCorpusBuildReport) {
+    println!("# LLMWave-Big Rust Corpus Build");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- profile: `{}`", report.profile);
+    println!("- repo: `{}`", report.repo);
+    println!("- Rust files: `{}`", report.artifact.rust_files);
+    println!("- functions: `{}`", report.artifact.functions);
+    println!("- facts: `{}`", report.artifact.fact_count);
+    println!("- routes: `{}`", report.artifact.route_count);
+    println!(
+        "- route balance ratio: `{:.4}`",
+        report.metrics.route_balance_ratio
+    );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
 }
 
 fn print_artifact_ask_md(report: &ArtifactAskReport) {

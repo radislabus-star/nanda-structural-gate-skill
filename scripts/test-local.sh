@@ -426,6 +426,13 @@ big_memory_final_proof_rust_json="$("$llmwave_big" memory-final-proof --profile 
 jq -e '.profile == "rust" and .big_corpus_gate.corpus_kind == "rust-code-structural-corpus" and .field_recall.dominant_route == "rust-cli-proof-route"' <<<"$big_memory_final_proof_rust_json" >/dev/null
 jq -e '.rust_profile != null and (.rust_profile.target_routes | index("cli-command-dispatch")) and (.rust_profile.forbidden_shortcuts | index("compiled command implies LLM readiness"))' <<<"$big_memory_final_proof_rust_json" >/dev/null
 jq -e '.verdict == "FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS" and (.big_corpus_gate.blocked_by | index("no_rust_code_corpus_artifact")) and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_memory_final_proof_rust_json" >/dev/null
+tmp_rust_corpus="$(mktemp -d)"
+big_rust_corpus_json="$("$llmwave_big" rust-corpus-build --repo "$root" --out "$tmp_rust_corpus/rust-corpus.json" --format json)"
+jq -e '.mode == "llmwave-big-rust-corpus-build" and .profile == "rust" and .verdict == "RUST_CORPUS_ARTIFACT_READY"' <<<"$big_rust_corpus_json" >/dev/null
+jq -e '.artifact.corpus_kind == "rust-code-structural-corpus" and .artifact.rust_files > 10 and .artifact.functions > 100 and .artifact.fact_count > .artifact.rust_files' <<<"$big_rust_corpus_json" >/dev/null
+jq -e '.claim_boundary.rust_corpus_loaded == true and .claim_boundary.heldout_suite_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_rust_corpus_json" >/dev/null
+test -s "$tmp_rust_corpus/rust-corpus.json"
+rm -rf "$tmp_rust_corpus"
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null
 jq -e '.conflict_preservation.state == "CONFLICTS_PRESERVED" and .eval.safe == true' <<<"$big_consolidate_json" >/dev/null

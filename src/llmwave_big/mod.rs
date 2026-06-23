@@ -39,6 +39,7 @@ pub mod query_wave;
 pub mod readiness;
 pub mod reasoning_field;
 pub mod residuals;
+pub mod rust_corpus;
 pub mod schema_memory_growth;
 pub mod schemas;
 pub mod surface_bank_build;
@@ -192,6 +193,9 @@ enum LlmwaveBigCommand {
     Query(LlmwaveBigQueryArgs),
     /// Compile a real corpus into LLMWave-Big training records.
     Train(LlmwaveBigTrainArgs),
+    /// Build a Rust-oriented structural corpus artifact for proof gates.
+    #[command(name = "rust-corpus-build", alias = "rust-corpus")]
+    RustCorpusBuild(LlmwaveBigRustCorpusBuildArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -595,6 +599,18 @@ struct LlmwaveBigTrainArgs {
     max_file_bytes: usize,
     #[arg(long, default_value_t = training::default_extensions_csv())]
     extensions: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigRustCorpusBuildArgs {
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 4 * 1024 * 1024)]
+    max_file_bytes: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1035,6 +1051,16 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 extensions: training::parse_extensions(&args.extensions),
             })?;
             report::print_training_compile_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::RustCorpusBuild(args) => {
+            let report =
+                rust_corpus::build_rust_corpus_report(rust_corpus::RustCorpusBuildConfig {
+                    repo: args.repo,
+                    out: args.out,
+                    max_file_bytes: args.max_file_bytes,
+                })?;
+            report::print_rust_corpus_build_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {
