@@ -301,6 +301,8 @@ nanda-init-md --task-id code-check --template code --query "check source/runtime
 nanda-init-md --task-id skill-check --template skill --query "check source/runtime skill flow"
 nanda-init-md --task-id project-check --template project --query "check repo readiness flow"
 nanda-gate-md examples/triads.route-splice.md --task-id md-splice --domain contract
+nanda-contract-gate --template --profile protocol --format json
+nanda-contract-gate --input examples/contract-gate.protocol-pass.json --profile edo --format json
 nanda-split examples/triad-packet.route-splice.json --by linked-group --out-dir split/
 nanda-split-md examples/triads.watch-large.md --by group --out-dir split/
 nanda-split-md examples/triads.code-flow-splice.md --by linked-group --out-dir split/
@@ -454,6 +456,13 @@ nanda-release-gate .nanda/route-atlas.json
 nanda-dogfood . --refactor-plan --boundary-economics --format json
 nanda-self-check
 ```
+
+`nanda-contract-gate` is the universal document-flow layer for contracts,
+appendices, protocol-of-disagreements, EDI/EDO, and similar role-sensitive
+checks. It does not hardcode a project or counterparty: the packet supplies
+parties, protocol author, source/proposed clauses, risk tags, and optional EDI
+messages. Treat `STRUCTURAL_PASS_NOT_LEGAL_APPROVAL` as structural coherence
+only; signing still requires legal/accounting review.
 
 CLI exit codes:
 

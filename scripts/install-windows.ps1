@@ -35,6 +35,7 @@ $Commands = @(
     "bench6m",
     "serve",
     "dogfood",
+    "contract-gate",
     "report",
     "split",
     "split-md",

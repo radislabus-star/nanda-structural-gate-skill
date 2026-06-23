@@ -454,6 +454,8 @@ jq empty "$root/examples/pattern-learning-corpus.json"
 jq empty "$root/examples/llmwave-corpus.json"
 jq empty "$root/examples/token-lens-corpus.json"
 jq empty "$root/examples/llmwave-memory-corpus.json"
+jq empty "$root/examples/contract-gate.protocol-pass.json"
+jq empty "$root/examples/contract-gate.protocol-watch.json"
 jq -e 'length > 0' <<<"$(jq -Rs . "$root/examples/llmwave-tiny-corpus.txt")" >/dev/null
 jq empty "$root/examples/triad-packet.token-lens-business.json"
 jq empty "$root/examples/demo-corpus.json"
@@ -509,6 +511,25 @@ tmp_task="$(mktemp)"
 "$init_task" --task-id smoke --domain contract --query "smoke" --out "$tmp_task" >/dev/null
 jq empty "$tmp_task"
 rm -f "$tmp_task"
+
+contract_template_json="$("$root/target/debug/nanda" contract-gate --template --profile edo --format json)"
+jq -e '.mode == "nanda-contract-gate-template" and .profile == "edo" and .packet.clauses[0].risk_tag == "unilateral_offset"' <<<"$contract_template_json" >/dev/null
+contract_pass_json="$("$root/target/debug/nanda" contract-gate --input "$root/examples/contract-gate.protocol-pass.json" --profile edo --format json)"
+jq -e '.mode == "nanda-contract-gate" and .verdict == "STRUCTURAL_PASS_NOT_LEGAL_APPROVAL" and .safe_to_sign == false' <<<"$contract_pass_json" >/dev/null
+jq -e '.role_first_pass.verdict == "PASS" and .protocol_direction_check.direction == "our_revision" and .multi_effect_clause_check.verdict == "PASS"' <<<"$contract_pass_json" >/dev/null
+jq -e '(.risk_map.risk_tags | index("auto_acceptance")) and (.risk_map.risk_tags | index("unilateral_offset")) and (.negotiation_position.must_hold | length) >= 2 and .claim_boundary.structural_pass_is_not_legal_approval == true' <<<"$contract_pass_json" >/dev/null
+tmp_contract_audit="$(mktemp -d)"
+"$root/target/debug/nanda" contract-gate --input "$root/examples/contract-gate.protocol-pass.json" --profile edo --audit-dir "$tmp_contract_audit" --format json >/dev/null
+test -s "$tmp_contract_audit/contract-gate-report.json"
+test -s "$tmp_contract_audit/negotiation-position.json"
+rm -rf "$tmp_contract_audit"
+set +e
+contract_watch_json="$("$root/target/debug/nanda" contract-gate --input "$root/examples/contract-gate.protocol-watch.json" --profile protocol --format json)"
+contract_watch_status=$?
+set -e
+test "$contract_watch_status" -eq 3
+jq -e '.verdict == "WATCH" and (.watch_reasons | index("protocol_direction_unknown_or_unmatched")) and (.watch_reasons | index("same_clause_multi_effect_requires_subclaim_split")) and (.watch_reasons | index("risk_tags_missing"))' <<<"$contract_watch_json" >/dev/null
+jq -e '.multi_effect_clause_check.repair == "split_by_subclaim" and ([.split_plan[].route] | index("same-clause-subclaims"))' <<<"$contract_watch_json" >/dev/null
 
 tmp_md_packet="$(mktemp)"
 "$pack_md" "$root/examples/triads.route-splice.md" --task-id md-splice --domain contract --out "$tmp_md_packet" >/dev/null

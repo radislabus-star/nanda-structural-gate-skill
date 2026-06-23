@@ -146,6 +146,23 @@ held-out pass rate, negative rejection, and noise rejection. A small corpus may
 show an amortized win while still failing standalone strict density because the
 64 KB basis overhead has not been repaid yet.
 
+## Contract / Protocol Gate
+
+Use this for contract, appendix, protocol-of-disagreements, EDI/EDO, and other
+document-flow checks where role swaps are dangerous. The command is universal:
+packet fields define parties, protocol direction, clauses, risk tags, and EDI
+messages. Do not encode a project or counterparty in the implementation.
+
+```bash
+nanda-contract-gate --template --profile protocol --format json
+nanda-contract-gate --input examples/contract-gate.protocol-pass.json --profile edo --format json
+nanda-contract-gate --input examples/contract-gate.protocol-watch.json --profile protocol --format json
+```
+
+Read `STRUCTURAL_PASS_NOT_LEGAL_APPROVAL` literally. It means role/route/
+protocol-direction coherence only. It is not permission to sign; final signing
+still needs legal/accounting review.
+
 ## LLMWave Core Stages
 
 ```bash

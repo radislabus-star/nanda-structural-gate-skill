@@ -1,0 +1,28 @@
+{
+  "task_id": "protocol-watch",
+  "base_document": "base-contract.txt",
+  "counterparty_document": "protocol.txt",
+  "protocol_author": "",
+  "our_party": "Supplier LLC",
+  "counterparty": "Buyer LLC",
+  "document_type": "protocol",
+  "same_clause_multi_effect_ok": false,
+  "clauses": [
+    {
+      "id": "p-1",
+      "route": "edo-evidence",
+      "source_clause": "one clause with several legal effects",
+      "original_obligation": "delivery may have legal effect",
+      "protocol_change": "delivery is not acceptance, debt admission, claim recognition, or offset consent",
+      "protected_party": "our_party",
+      "risk_removed": "unclear multi-effect clause",
+      "risk_tag": "",
+      "effects": [
+        "delivery_not_acceptance",
+        "delivery_not_debt_admission",
+        "delivery_not_offset_consent"
+      ],
+      "evidence": "protocol paragraph 1"
+    }
+  ]
+}

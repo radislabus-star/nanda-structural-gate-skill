@@ -102,6 +102,8 @@ scripts/nanda-build-atlas . --out .nanda/route-atlas.json
 scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id shared.version_bump_contract --diff version.diff
+scripts/nanda-contract-gate --template --profile protocol --format json
+scripts/nanda-contract-gate --input examples/contract-gate.protocol-pass.json --profile edo --format json
 scripts/nanda-field-report --from search-result.json --format json
 scripts/nanda-field-equivalence --structural-from search-result.json --packed-from pack6m-result.json --cognitive-from llmwave-big-result.json --format json
 scripts/nanda-field-audit --format json
@@ -874,6 +876,37 @@ size-only, `global_foreign_pull=0`, `local_veto=0`, `local_watch=0`, and all
 linked branches PASS.
 Use `peak_decision.safe_to_answer` as the final retrieval trust gate. A found
 peak with `WATCH` state is useful context, not a final answer skeleton.
+
+## Contract / Protocol Gate
+
+Use `nanda-contract-gate` for contract, appendix, protocol-of-disagreements,
+EDI/EDO, and other document-flow checks where role swaps are dangerous. This is
+a universal schema-driven layer, not a project-specific legal assistant. Do not
+hardcode counterparty names, local project names, or one-off clause wording into
+the implementation.
+
+Required packet concepts:
+
+- `our_party`;
+- `counterparty`;
+- `protocol_author`;
+- `base_document`;
+- `counterparty_document`;
+- `document_type`;
+- `clauses[].source_clause`;
+- `clauses[].original_obligation`;
+- `clauses[].protocol_change`;
+- `clauses[].risk_tag`;
+- optional `edo_messages[]`.
+
+Run the role/protocol direction pass first. If `role_first_pass.verdict` or
+`protocol_direction_check.verdict` is not `PASS`, do not produce a final
+contract position. If `same_clause_multi_effect_ok=false` and one clause has
+multiple effects, treat `split_by_subclaim` as the repair route.
+
+Read `STRUCTURAL_PASS_NOT_LEGAL_APPROVAL` literally: it means role/route/
+protocol-direction coherence only. It is not permission to sign; final signing
+requires legal/accounting review.
 
 For source/runtime/CLI architecture checks, start with:
 

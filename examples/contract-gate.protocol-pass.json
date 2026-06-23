@@ -1,0 +1,78 @@
+{
+  "task_id": "protocol-pass",
+  "base_document": "base-contract.txt",
+  "counterparty_document": "supplier-protocol.txt",
+  "protocol_author": "Supplier LLC",
+  "our_party": "Supplier LLC",
+  "counterparty": "Buyer LLC",
+  "document_type": "protocol",
+  "same_clause_multi_effect_ok": true,
+  "extracted_text_paths": [
+    "extract/base-contract.txt",
+    "extract/supplier-protocol.txt"
+  ],
+  "clauses": [
+    {
+      "id": "p-acceptance-1",
+      "route": "order-acceptance",
+      "source_clause": "EDI delivery status clause",
+      "original_obligation": "message delivery may be treated as acceptance",
+      "protocol_change": "delivery is not acceptance, debt admission, claim recognition, or offset consent",
+      "protected_party": "our_party",
+      "risk_removed": "automatic acceptance through technical delivery",
+      "risk_tag": "auto_acceptance",
+      "effects": [
+        "delivery_not_acceptance",
+        "delivery_not_debt_admission",
+        "delivery_not_offset_consent"
+      ],
+      "evidence": "protocol paragraph 2.1"
+    },
+    {
+      "id": "p-payment-1",
+      "route": "payment-or-offset",
+      "source_clause": "setoff clause",
+      "original_obligation": "buyer may offset claims unilaterally",
+      "protocol_change": "offset requires signed agreement or undisputed reconciliation",
+      "protected_party": "our_party",
+      "risk_removed": "unilateral offset",
+      "risk_tag": "unilateral_offset",
+      "effects": [
+        "offset_requires_agreement"
+      ],
+      "evidence": "protocol paragraph 3.4"
+    },
+    {
+      "id": "p-edo-1",
+      "route": "edo-evidence",
+      "source_clause": "technical EDI failure clause",
+      "original_obligation": "technical EDI failure blocks document route",
+      "protocol_change": "paper or email fallback remains valid evidence",
+      "protected_party": "both",
+      "risk_removed": "technical EDI failure",
+      "risk_tag": "edo_technical_failure",
+      "effects": [
+        "fallback_route_preserved"
+      ],
+      "evidence": "protocol paragraph 5.2"
+    }
+  ],
+  "edo_messages": [
+    {
+      "message": "ORDERS",
+      "sender": "buyer",
+      "receiver": "supplier",
+      "legal_effect": "request/order",
+      "risk": "may be treated as binding if confirmation route is absent",
+      "fallback_route": "ORDRSP required"
+    },
+    {
+      "message": "RECADV",
+      "sender": "buyer",
+      "receiver": "supplier",
+      "legal_effect": "receiving advice",
+      "risk": "must not be sole proof of acceptance",
+      "fallback_route": "UPD/TTN/acts/logs"
+    }
+  ]
+}
