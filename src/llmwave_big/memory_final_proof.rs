@@ -34,6 +34,7 @@ pub(crate) struct MemoryFinalProofConfig {
     pub artifact: Option<PathBuf>,
     pub heldout_suite: Option<PathBuf>,
     pub focus_packet: Option<PathBuf>,
+    pub compile_evidence: Option<PathBuf>,
 }
 
 #[derive(Serialize, Clone)]
@@ -83,8 +84,10 @@ pub(crate) struct BigCorpusGateReport {
     pub artifact_path: Option<String>,
     pub heldout_suite_path: Option<String>,
     pub focus_packet_path: Option<String>,
+    pub compile_evidence_path: Option<String>,
     pub heldout_suite_ready: bool,
     pub route_balanced_focus_ready: bool,
+    pub compile_test_evidence_bridge_ready: bool,
     pub real_big_corpus_loaded: bool,
     pub route_balanced_focus_required: bool,
     pub verdict: &'static str,
@@ -110,6 +113,7 @@ pub(crate) struct FinalProofGateReport {
     pub role_error_rate_bounded: bool,
     pub false_positive_rate_bounded: bool,
     pub compile_test_evidence_bridge_ready: bool,
+    pub heldout_inference_eval_ready: bool,
     pub final_proof_gate_passed: bool,
     pub nonlinear_memory_proven: bool,
     pub llm_ready: bool,
@@ -131,9 +135,11 @@ struct ProfileEvidence {
     artifact_path: Option<String>,
     heldout_suite_path: Option<String>,
     focus_packet_path: Option<String>,
+    compile_evidence_path: Option<String>,
     observed_facts: usize,
     heldout_suite_ready: bool,
     route_balanced_focus_ready: bool,
+    compile_test_evidence_bridge_ready: bool,
 }
 
 #[derive(Deserialize)]
@@ -172,6 +178,16 @@ struct RustFocusMetricsSummary {
     focus_packet_ready: bool,
 }
 
+#[derive(Deserialize)]
+struct RustCompileEvidencePayload {
+    evidence: RustCompileEvidenceSummary,
+}
+
+#[derive(Deserialize)]
+struct RustCompileEvidenceSummary {
+    compile_test_evidence_bridge_ready: bool,
+}
+
 pub(crate) fn build_memory_final_proof_report(
     config: MemoryFinalProofConfig,
 ) -> Result<MemoryFinalProofReport> {
@@ -192,14 +208,17 @@ pub(crate) fn build_memory_final_proof_report(
         llmwave_bridge.grounded_in_recall && llmwave_bridge.refuses_unsupported_prompt;
     let role_error_rate_bounded = true;
     let false_positive_rate_bounded = true;
-    let compile_test_evidence_bridge_ready = profile != MemoryProofProfile::Rust;
+    let compile_test_evidence_bridge_ready =
+        profile != MemoryProofProfile::Rust || profile_evidence.compile_test_evidence_bridge_ready;
+    let heldout_inference_eval_ready = profile != MemoryProofProfile::Rust;
     let final_proof_gate_passed = controlled_chain_ready
         && field_recall_ready
         && llmwave_bridge_ready
         && big_corpus_ready
         && role_error_rate_bounded
         && false_positive_rate_bounded
-        && compile_test_evidence_bridge_ready;
+        && compile_test_evidence_bridge_ready
+        && heldout_inference_eval_ready;
     let missing_evidence = missing_final_evidence(
         field_recall_ready,
         llmwave_bridge_ready,
@@ -211,6 +230,8 @@ pub(crate) fn build_memory_final_proof_report(
         "FINAL_PROOF_GATE_PASS"
     } else if controlled_chain_ready && big_corpus_ready && !compile_test_evidence_bridge_ready {
         "FINAL_PROOF_GATE_BLOCKED_BY_COMPILE_TEST_BRIDGE"
+    } else if controlled_chain_ready && big_corpus_ready && compile_test_evidence_bridge_ready {
+        "FINAL_PROOF_GATE_BLOCKED_BY_HELDOUT_INFERENCE_EVAL"
     } else if controlled_chain_ready {
         "FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS"
     } else {
@@ -236,6 +257,7 @@ pub(crate) fn build_memory_final_proof_report(
             role_error_rate_bounded,
             false_positive_rate_bounded,
             compile_test_evidence_bridge_ready,
+            heldout_inference_eval_ready,
             final_proof_gate_passed,
             nonlinear_memory_proven: final_proof_gate_passed,
             llm_ready: final_proof_gate_passed,
@@ -376,8 +398,10 @@ fn build_big_corpus_gate(
         artifact_path: profile_evidence.artifact_path.clone(),
         heldout_suite_path: profile_evidence.heldout_suite_path.clone(),
         focus_packet_path: profile_evidence.focus_packet_path.clone(),
+        compile_evidence_path: profile_evidence.compile_evidence_path.clone(),
         heldout_suite_ready: profile_evidence.heldout_suite_ready,
         route_balanced_focus_ready: profile_evidence.route_balanced_focus_ready,
+        compile_test_evidence_bridge_ready: profile_evidence.compile_test_evidence_bridge_ready,
         real_big_corpus_loaded: profile_loaded,
         route_balanced_focus_required: true,
         verdict,
@@ -416,6 +440,15 @@ fn load_profile_evidence(config: &MemoryFinalProofConfig) -> Result<ProfileEvide
         if evidence.observed_facts == 0 {
             evidence.observed_facts = payload.focus.selected_fact_count;
         }
+    }
+    if let Some(path) = &config.compile_evidence {
+        let raw = fs::read_to_string(path)
+            .with_context(|| format!("read Rust compile evidence {}", path.display()))?;
+        let payload: RustCompileEvidencePayload = serde_json::from_str(&raw)
+            .with_context(|| format!("parse Rust compile evidence {}", path.display()))?;
+        evidence.compile_evidence_path = Some(path.display().to_string());
+        evidence.compile_test_evidence_bridge_ready =
+            payload.evidence.compile_test_evidence_bridge_ready;
     }
     Ok(evidence)
 }
@@ -486,6 +519,9 @@ fn missing_final_evidence(
     if !compile_test_evidence_bridge_ready {
         missing.push("compile_test_evidence_bridge_missing");
     }
+    if big_corpus_ready && compile_test_evidence_bridge_ready {
+        missing.push("rust_heldout_inference_eval_missing");
+    }
     missing
 }
 
@@ -500,6 +536,7 @@ mod tests {
             artifact: None,
             heldout_suite: None,
             focus_packet: None,
+            compile_evidence: None,
         })
         .expect("final proof builds");
 
@@ -521,6 +558,7 @@ mod tests {
             artifact: None,
             heldout_suite: None,
             focus_packet: None,
+            compile_evidence: None,
         })
         .expect("final proof builds");
 
@@ -541,6 +579,7 @@ mod tests {
             artifact: None,
             heldout_suite: None,
             focus_packet: None,
+            compile_evidence: None,
         })
         .expect("final proof builds");
 

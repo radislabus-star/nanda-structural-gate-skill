@@ -37,6 +37,7 @@ use super::open_surface_generation::OpenSurfaceGenerationReport;
 use super::query_wave::QueryWaveReport;
 use super::readiness::{ClaimGateReport, ReadinessLadderReport};
 use super::reasoning_field::ReasoningFieldReport;
+use super::rust_compile_evidence::RustCompileEvidenceBuildReport;
 use super::rust_corpus::RustCorpusBuildReport;
 use super::rust_focus::RustFocusBuildReport;
 use super::rust_heldout::RustHeldoutBuildReport;
@@ -906,6 +907,21 @@ pub(crate) fn print_rust_focus_build_report(
         ),
         OutputFormat::Text => print_rust_focus_build_text(report),
         OutputFormat::Md => print_rust_focus_build_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_rust_compile_evidence_build_report(
+    report: &RustCompileEvidenceBuildReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_rust_compile_evidence_build_text(report),
+        OutputFormat::Md => print_rust_compile_evidence_build_md(report),
     }
     Ok(())
 }
@@ -1980,6 +1996,23 @@ fn print_rust_focus_build_text(report: &RustFocusBuildReport) {
     );
 }
 
+fn print_rust_compile_evidence_build_text(report: &RustCompileEvidenceBuildReport) {
+    println!("mode: {}", report.mode);
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("profile: {}", report.profile);
+    println!("selected_facts: {}", report.evidence.selected_fact_count);
+    println!("commands_passed: {}", report.evidence.commands_passed);
+    println!(
+        "compile_test_evidence_bridge_ready: {}",
+        report.evidence.compile_test_evidence_bridge_ready
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
 fn print_artifact_ask_text(report: &ArtifactAskReport) {
     println!("LLMWave-Big Ask");
     println!("version: {}", report.version);
@@ -2999,6 +3032,27 @@ fn print_rust_focus_build_md(report: &RustFocusBuildReport) {
     println!(
         "- focus packet ready: `{}`",
         report.claim_boundary.focus_packet_ready
+    );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_rust_compile_evidence_build_md(report: &RustCompileEvidenceBuildReport) {
+    println!("# LLMWave-Big Rust Compile Evidence Build");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- profile: `{}`", report.profile);
+    println!(
+        "- selected facts: `{}`",
+        report.evidence.selected_fact_count
+    );
+    println!("- commands passed: `{}`", report.evidence.commands_passed);
+    println!(
+        "- compile/test bridge ready: `{}`",
+        report.evidence.compile_test_evidence_bridge_ready
     );
     println!(
         "- nonlinear memory proven: `{}`",

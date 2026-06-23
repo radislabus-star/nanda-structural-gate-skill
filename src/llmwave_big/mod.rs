@@ -39,6 +39,7 @@ pub mod query_wave;
 pub mod readiness;
 pub mod reasoning_field;
 pub mod residuals;
+pub mod rust_compile_evidence;
 pub mod rust_corpus;
 pub mod rust_focus;
 pub mod rust_heldout;
@@ -204,6 +205,9 @@ enum LlmwaveBigCommand {
     /// Build a route-balanced Rust focus packet from corpus and held-out artifacts.
     #[command(name = "rust-focus-build", alias = "rust-focus")]
     RustFocusBuild(LlmwaveBigRustFocusBuildArgs),
+    /// Build Rust compile/test evidence linked to a focus packet.
+    #[command(name = "rust-compile-evidence-build", alias = "rust-compile-evidence")]
+    RustCompileEvidenceBuild(LlmwaveBigRustCompileEvidenceBuildArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -567,6 +571,8 @@ struct LlmwaveBigMemoryFinalProofArgs {
     heldout_suite: Option<PathBuf>,
     #[arg(long = "focus-packet")]
     focus_packet: Option<PathBuf>,
+    #[arg(long = "compile-evidence")]
+    compile_evidence: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "general")]
     profile: memory_final_proof::MemoryProofProfile,
     #[arg(long, value_enum, default_value = "json")]
@@ -653,6 +659,22 @@ struct LlmwaveBigRustFocusBuildArgs {
     max_facts: usize,
     #[arg(long, default_value_t = 256)]
     route_fact_cap: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigRustCompileEvidenceBuildArgs {
+    #[arg(long = "focus-packet")]
+    focus_packet: PathBuf,
+    #[arg(long = "check-evidence")]
+    check_evidence: PathBuf,
+    #[arg(long = "test-evidence")]
+    test_evidence: PathBuf,
+    #[arg(long = "clippy-evidence")]
+    clippy_evidence: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1067,6 +1089,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     artifact: args.artifact,
                     heldout_suite: args.heldout_suite,
                     focus_packet: args.focus_packet,
+                    compile_evidence: args.compile_evidence,
                 },
             )?;
             report::print_memory_final_proof_report(&report, &args.format)?;
@@ -1131,6 +1154,19 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 route_fact_cap: args.route_fact_cap,
             })?;
             report::print_rust_focus_build_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::RustCompileEvidenceBuild(args) => {
+            let report = rust_compile_evidence::build_rust_compile_evidence_report(
+                rust_compile_evidence::RustCompileEvidenceBuildConfig {
+                    focus_packet: args.focus_packet,
+                    check_evidence: args.check_evidence,
+                    test_evidence: args.test_evidence,
+                    clippy_evidence: args.clippy_evidence,
+                    out: args.out,
+                },
+            )?;
+            report::print_rust_compile_evidence_build_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {

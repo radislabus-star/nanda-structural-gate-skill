@@ -442,10 +442,27 @@ jq -e '.mode == "llmwave-big-rust-focus-build" and .profile == "rust" and .verdi
 jq -e '.focus.packet_kind == "rust-code-route-balanced-focus" and .focus.selected_fact_count > 100 and .metrics.route_balance_after < .metrics.route_balance_before and .metrics.exact_withheld_facts_removed >= 16' <<<"$big_rust_focus_json" >/dev/null
 jq -e '.claim_boundary.rust_corpus_loaded == true and .claim_boundary.heldout_suite_ready == true and .claim_boundary.focus_packet_ready == true and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_rust_focus_json" >/dev/null
 test -s "$tmp_rust_corpus/rust-focus.json"
+cat >"$tmp_rust_corpus/check.json" <<'JSON'
+{"command":"cargo check --all-targets --all-features","exit_code":0,"stdout":"ok\n","stderr":""}
+JSON
+cat >"$tmp_rust_corpus/test.json" <<'JSON'
+{"command":"scripts/test-local.sh","exit_code":0,"stdout":"ok\n","stderr":""}
+JSON
+cat >"$tmp_rust_corpus/clippy.json" <<'JSON'
+{"command":"cargo clippy --all-targets --all-features -- -D warnings","exit_code":0,"stdout":"ok\n","stderr":""}
+JSON
+big_rust_compile_evidence_json="$("$llmwave_big" rust-compile-evidence-build --focus-packet "$tmp_rust_corpus/rust-focus.json" --check-evidence "$tmp_rust_corpus/check.json" --test-evidence "$tmp_rust_corpus/test.json" --clippy-evidence "$tmp_rust_corpus/clippy.json" --out "$tmp_rust_corpus/rust-compile-evidence.json" --format json)"
+jq -e '.mode == "llmwave-big-rust-compile-evidence-build" and .profile == "rust" and .verdict == "RUST_COMPILE_EVIDENCE_READY"' <<<"$big_rust_compile_evidence_json" >/dev/null
+jq -e '.evidence.compile_test_evidence_bridge_ready == true and .evidence.commands_passed == .evidence.commands_required and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_rust_compile_evidence_json" >/dev/null
+test -s "$tmp_rust_corpus/rust-compile-evidence.json"
 big_memory_final_proof_rust_wired_json="$("$llmwave_big" memory-final-proof --profile rust --artifact "$tmp_rust_corpus/rust-corpus.json" --heldout-suite "$tmp_rust_corpus/rust-heldout.json" --focus-packet "$tmp_rust_corpus/rust-focus.json" --format json)"
 jq -e '.verdict == "FINAL_PROOF_GATE_BLOCKED_BY_COMPILE_TEST_BRIDGE" and .big_corpus_gate.verdict == "PROFILE_CORPUS_FOCUS_READY_NOT_FINAL_PROOF"' <<<"$big_memory_final_proof_rust_wired_json" >/dev/null
 jq -e '.big_corpus_gate.real_big_corpus_loaded == true and .big_corpus_gate.heldout_suite_ready == true and .big_corpus_gate.route_balanced_focus_ready == true and .final_proof_gate.compile_test_evidence_bridge_ready == false' <<<"$big_memory_final_proof_rust_wired_json" >/dev/null
 jq -e '.claim_boundary.blocked_by == ["compile_test_evidence_bridge_missing"] and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_memory_final_proof_rust_wired_json" >/dev/null
+big_memory_final_proof_rust_compile_json="$("$llmwave_big" memory-final-proof --profile rust --artifact "$tmp_rust_corpus/rust-corpus.json" --heldout-suite "$tmp_rust_corpus/rust-heldout.json" --focus-packet "$tmp_rust_corpus/rust-focus.json" --compile-evidence "$tmp_rust_corpus/rust-compile-evidence.json" --format json)"
+jq -e '.verdict == "FINAL_PROOF_GATE_BLOCKED_BY_HELDOUT_INFERENCE_EVAL" and .big_corpus_gate.compile_test_evidence_bridge_ready == true' <<<"$big_memory_final_proof_rust_compile_json" >/dev/null
+jq -e '.final_proof_gate.compile_test_evidence_bridge_ready == true and .final_proof_gate.heldout_inference_eval_ready == false and .claim_boundary.blocked_by == ["rust_heldout_inference_eval_missing"]' <<<"$big_memory_final_proof_rust_compile_json" >/dev/null
+jq -e '.claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_memory_final_proof_rust_compile_json" >/dev/null
 rm -rf "$tmp_rust_corpus"
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null
