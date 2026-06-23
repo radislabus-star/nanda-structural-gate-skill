@@ -1,5 +1,10 @@
 //! Field recall, LLMWave bridge, big-corpus boundary, and final proof gate.
 
+use std::fs;
+use std::path::PathBuf;
+
+use anyhow::{Context, Result};
+use serde::Deserialize;
 use serde::Serialize;
 
 use super::memory_proof_path;
@@ -21,6 +26,14 @@ impl MemoryProofProfile {
             Self::Rust => "rust",
         }
     }
+}
+
+#[derive(Clone)]
+pub(crate) struct MemoryFinalProofConfig {
+    pub profile: MemoryProofProfile,
+    pub artifact: Option<PathBuf>,
+    pub heldout_suite: Option<PathBuf>,
+    pub focus_packet: Option<PathBuf>,
 }
 
 #[derive(Serialize, Clone)]
@@ -67,6 +80,11 @@ pub(crate) struct BigCorpusGateReport {
     pub observed_real_corpus_facts: usize,
     pub synthetic_scale_projection_facts: usize,
     pub corpus_kind: &'static str,
+    pub artifact_path: Option<String>,
+    pub heldout_suite_path: Option<String>,
+    pub focus_packet_path: Option<String>,
+    pub heldout_suite_ready: bool,
+    pub route_balanced_focus_ready: bool,
     pub real_big_corpus_loaded: bool,
     pub route_balanced_focus_required: bool,
     pub verdict: &'static str,
@@ -91,6 +109,7 @@ pub(crate) struct FinalProofGateReport {
     pub big_corpus_ready: bool,
     pub role_error_rate_bounded: bool,
     pub false_positive_rate_bounded: bool,
+    pub compile_test_evidence_bridge_ready: bool,
     pub final_proof_gate_passed: bool,
     pub nonlinear_memory_proven: bool,
     pub llm_ready: bool,
@@ -107,44 +126,98 @@ pub(crate) struct MemoryFinalClaimBoundary {
     pub blocked_by: Vec<&'static str>,
 }
 
+#[derive(Default)]
+struct ProfileEvidence {
+    artifact_path: Option<String>,
+    heldout_suite_path: Option<String>,
+    focus_packet_path: Option<String>,
+    observed_facts: usize,
+    heldout_suite_ready: bool,
+    route_balanced_focus_ready: bool,
+}
+
+#[derive(Deserialize)]
+struct RustCorpusArtifactPayload {
+    artifact: RustCorpusArtifactSummary,
+}
+
+#[derive(Deserialize)]
+struct RustCorpusArtifactSummary {
+    fact_count: usize,
+}
+
+#[derive(Deserialize)]
+struct RustHeldoutSuitePayload {
+    metrics: RustHeldoutMetricsSummary,
+}
+
+#[derive(Deserialize)]
+struct RustHeldoutMetricsSummary {
+    heldout_suite_ready: bool,
+}
+
+#[derive(Deserialize)]
+struct RustFocusPacketPayload {
+    focus: RustFocusSummary,
+    metrics: RustFocusMetricsSummary,
+}
+
+#[derive(Deserialize)]
+struct RustFocusSummary {
+    selected_fact_count: usize,
+}
+
+#[derive(Deserialize)]
+struct RustFocusMetricsSummary {
+    focus_packet_ready: bool,
+}
+
 pub(crate) fn build_memory_final_proof_report(
-    profile: MemoryProofProfile,
-) -> MemoryFinalProofReport {
+    config: MemoryFinalProofConfig,
+) -> Result<MemoryFinalProofReport> {
+    let profile = config.profile;
     let proof_path = memory_proof_path::build_memory_proof_path_report();
     let field_recall = build_field_recall(profile);
     let llmwave_bridge = build_llmwave_bridge(profile, &field_recall);
-    let big_corpus_gate = build_big_corpus_gate(profile);
+    let profile_evidence = load_profile_evidence(&config)?;
+    let big_corpus_gate = build_big_corpus_gate(profile, &profile_evidence);
     let rust_profile = (profile == MemoryProofProfile::Rust).then(build_rust_profile);
     let controlled_chain_ready = proof_path.verdict == "PHASE6_8_MEMORY_PROOF_PATH_READY"
         && field_recall.focused
         && llmwave_bridge.grounded_in_recall;
-    let big_corpus_ready = big_corpus_gate.real_big_corpus_loaded;
+    let big_corpus_ready =
+        big_corpus_gate.real_big_corpus_loaded && big_corpus_gate.route_balanced_focus_ready;
     let field_recall_ready = field_recall.focused && field_recall.recall_score >= 0.95;
     let llmwave_bridge_ready =
         llmwave_bridge.grounded_in_recall && llmwave_bridge.refuses_unsupported_prompt;
     let role_error_rate_bounded = true;
     let false_positive_rate_bounded = true;
+    let compile_test_evidence_bridge_ready = profile != MemoryProofProfile::Rust;
     let final_proof_gate_passed = controlled_chain_ready
         && field_recall_ready
         && llmwave_bridge_ready
         && big_corpus_ready
         && role_error_rate_bounded
-        && false_positive_rate_bounded;
+        && false_positive_rate_bounded
+        && compile_test_evidence_bridge_ready;
     let missing_evidence = missing_final_evidence(
         field_recall_ready,
         llmwave_bridge_ready,
         big_corpus_ready,
+        compile_test_evidence_bridge_ready,
         final_proof_gate_passed,
     );
     let verdict = if final_proof_gate_passed {
         "FINAL_PROOF_GATE_PASS"
+    } else if controlled_chain_ready && big_corpus_ready && !compile_test_evidence_bridge_ready {
+        "FINAL_PROOF_GATE_BLOCKED_BY_COMPILE_TEST_BRIDGE"
     } else if controlled_chain_ready {
         "FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS"
     } else {
         "FINAL_PROOF_GATE_REVIEW"
     };
 
-    MemoryFinalProofReport {
+    Ok(MemoryFinalProofReport {
         mode: "llmwave-big-memory-final-proof",
         version: MEMORY_FINAL_PROOF_VERSION,
         phase: "phase-9-12-field-recall-llmwave-big-corpus-final-proof",
@@ -162,6 +235,7 @@ pub(crate) fn build_memory_final_proof_report(
             big_corpus_ready,
             role_error_rate_bounded,
             false_positive_rate_bounded,
+            compile_test_evidence_bridge_ready,
             final_proof_gate_passed,
             nonlinear_memory_proven: final_proof_gate_passed,
             llm_ready: final_proof_gate_passed,
@@ -181,7 +255,7 @@ pub(crate) fn build_memory_final_proof_report(
             },
             blocked_by: missing_evidence,
         },
-    }
+    })
 }
 
 fn build_field_recall(profile: MemoryProofProfile) -> FieldRecallReport {
@@ -254,8 +328,11 @@ fn build_llmwave_bridge(
     }
 }
 
-fn build_big_corpus_gate(profile: MemoryProofProfile) -> BigCorpusGateReport {
-    let (corpus_kind, blocked_by) = match profile {
+fn build_big_corpus_gate(
+    profile: MemoryProofProfile,
+    profile_evidence: &ProfileEvidence,
+) -> BigCorpusGateReport {
+    let (corpus_kind, mut blocked_by) = match profile {
         MemoryProofProfile::General => (
             "general-structural-corpus",
             vec![
@@ -274,16 +351,73 @@ fn build_big_corpus_gate(profile: MemoryProofProfile) -> BigCorpusGateReport {
             ],
         ),
     };
+    if profile_evidence.observed_facts > 0 {
+        blocked_by.retain(|reason| *reason != "no_rust_code_corpus_artifact");
+    }
+    if profile_evidence.heldout_suite_ready {
+        blocked_by.retain(|reason| *reason != "no_rust_api_owner_heldout_suite");
+    }
+    if profile_evidence.route_balanced_focus_ready {
+        blocked_by.retain(|reason| *reason != "no_rust_route_balanced_focus_packet");
+    }
+    let profile_loaded = profile_evidence.observed_facts > 0
+        && profile_evidence.heldout_suite_ready
+        && profile_evidence.route_balanced_focus_ready;
+    let verdict = if profile_loaded {
+        "PROFILE_CORPUS_FOCUS_READY_NOT_FINAL_PROOF"
+    } else {
+        "BIG_CORPUS_NOT_LOADED"
+    };
     BigCorpusGateReport {
         required_min_facts: 100_000,
-        observed_real_corpus_facts: 0,
+        observed_real_corpus_facts: profile_evidence.observed_facts,
         synthetic_scale_projection_facts: 100_000,
         corpus_kind,
-        real_big_corpus_loaded: false,
+        artifact_path: profile_evidence.artifact_path.clone(),
+        heldout_suite_path: profile_evidence.heldout_suite_path.clone(),
+        focus_packet_path: profile_evidence.focus_packet_path.clone(),
+        heldout_suite_ready: profile_evidence.heldout_suite_ready,
+        route_balanced_focus_ready: profile_evidence.route_balanced_focus_ready,
+        real_big_corpus_loaded: profile_loaded,
         route_balanced_focus_required: true,
-        verdict: "BIG_CORPUS_NOT_LOADED",
+        verdict,
         blocked_by,
     }
+}
+
+fn load_profile_evidence(config: &MemoryFinalProofConfig) -> Result<ProfileEvidence> {
+    if config.profile != MemoryProofProfile::Rust {
+        return Ok(ProfileEvidence::default());
+    }
+    let mut evidence = ProfileEvidence::default();
+    if let Some(path) = &config.artifact {
+        let raw = fs::read_to_string(path)
+            .with_context(|| format!("read Rust corpus artifact {}", path.display()))?;
+        let payload: RustCorpusArtifactPayload = serde_json::from_str(&raw)
+            .with_context(|| format!("parse Rust corpus artifact {}", path.display()))?;
+        evidence.artifact_path = Some(path.display().to_string());
+        evidence.observed_facts = payload.artifact.fact_count;
+    }
+    if let Some(path) = &config.heldout_suite {
+        let raw = fs::read_to_string(path)
+            .with_context(|| format!("read Rust held-out suite {}", path.display()))?;
+        let payload: RustHeldoutSuitePayload = serde_json::from_str(&raw)
+            .with_context(|| format!("parse Rust held-out suite {}", path.display()))?;
+        evidence.heldout_suite_path = Some(path.display().to_string());
+        evidence.heldout_suite_ready = payload.metrics.heldout_suite_ready;
+    }
+    if let Some(path) = &config.focus_packet {
+        let raw = fs::read_to_string(path)
+            .with_context(|| format!("read Rust focus packet {}", path.display()))?;
+        let payload: RustFocusPacketPayload = serde_json::from_str(&raw)
+            .with_context(|| format!("parse Rust focus packet {}", path.display()))?;
+        evidence.focus_packet_path = Some(path.display().to_string());
+        evidence.route_balanced_focus_ready = payload.metrics.focus_packet_ready;
+        if evidence.observed_facts == 0 {
+            evidence.observed_facts = payload.focus.selected_fact_count;
+        }
+    }
+    Ok(evidence)
 }
 
 fn build_rust_profile() -> RustProofProfileReport {
@@ -331,6 +465,7 @@ fn missing_final_evidence(
     field_recall_ready: bool,
     llmwave_bridge_ready: bool,
     big_corpus_ready: bool,
+    compile_test_evidence_bridge_ready: bool,
     final_proof_gate_passed: bool,
 ) -> Vec<&'static str> {
     if final_proof_gate_passed {
@@ -348,6 +483,9 @@ fn missing_final_evidence(
         missing.push("profile_heldout_eval_missing");
         missing.push("profile_route_balance_missing");
     }
+    if !compile_test_evidence_bridge_ready {
+        missing.push("compile_test_evidence_bridge_missing");
+    }
     missing
 }
 
@@ -357,7 +495,13 @@ mod tests {
 
     #[test]
     fn memory_final_proof_runs_full_command_path_but_blocks_big_claims() {
-        let report = build_memory_final_proof_report(MemoryProofProfile::General);
+        let report = build_memory_final_proof_report(MemoryFinalProofConfig {
+            profile: MemoryProofProfile::General,
+            artifact: None,
+            heldout_suite: None,
+            focus_packet: None,
+        })
+        .expect("final proof builds");
 
         assert_eq!(report.verdict, "FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS");
         assert_eq!(report.profile, "general");
@@ -372,7 +516,13 @@ mod tests {
 
     #[test]
     fn memory_final_proof_exposes_big_corpus_missing_evidence() {
-        let report = build_memory_final_proof_report(MemoryProofProfile::General);
+        let report = build_memory_final_proof_report(MemoryFinalProofConfig {
+            profile: MemoryProofProfile::General,
+            artifact: None,
+            heldout_suite: None,
+            focus_packet: None,
+        })
+        .expect("final proof builds");
 
         assert!(report
             .final_proof_gate
@@ -386,7 +536,13 @@ mod tests {
 
     #[test]
     fn memory_final_proof_rust_profile_is_code_oriented() {
-        let report = build_memory_final_proof_report(MemoryProofProfile::Rust);
+        let report = build_memory_final_proof_report(MemoryFinalProofConfig {
+            profile: MemoryProofProfile::Rust,
+            artifact: None,
+            heldout_suite: None,
+            focus_packet: None,
+        })
+        .expect("final proof builds");
 
         assert_eq!(report.profile, "rust");
         assert_eq!(

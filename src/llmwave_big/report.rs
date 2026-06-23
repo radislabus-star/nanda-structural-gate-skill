@@ -38,6 +38,7 @@ use super::query_wave::QueryWaveReport;
 use super::readiness::{ClaimGateReport, ReadinessLadderReport};
 use super::reasoning_field::ReasoningFieldReport;
 use super::rust_corpus::RustCorpusBuildReport;
+use super::rust_focus::RustFocusBuildReport;
 use super::rust_heldout::RustHeldoutBuildReport;
 use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
@@ -890,6 +891,21 @@ pub(crate) fn print_rust_heldout_build_report(
         ),
         OutputFormat::Text => print_rust_heldout_build_text(report),
         OutputFormat::Md => print_rust_heldout_build_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_rust_focus_build_report(
+    report: &RustFocusBuildReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_rust_focus_build_text(report),
+        OutputFormat::Md => print_rust_focus_build_md(report),
     }
     Ok(())
 }
@@ -1939,6 +1955,31 @@ fn print_rust_heldout_build_text(report: &RustHeldoutBuildReport) {
     );
 }
 
+fn print_rust_focus_build_text(report: &RustFocusBuildReport) {
+    println!("mode: {}", report.mode);
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("profile: {}", report.profile);
+    println!("selected_facts: {}", report.focus.selected_fact_count);
+    println!("heldout_cases: {}", report.focus.heldout_case_count);
+    println!(
+        "route_balance_before: {:.4}",
+        report.metrics.route_balance_before
+    );
+    println!(
+        "route_balance_after: {:.4}",
+        report.metrics.route_balance_after
+    );
+    println!(
+        "focus_packet_ready: {}",
+        report.claim_boundary.focus_packet_ready
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
 fn print_artifact_ask_text(report: &ArtifactAskReport) {
     println!("LLMWave-Big Ask");
     println!("version: {}", report.version);
@@ -2932,6 +2973,32 @@ fn print_rust_heldout_build_md(report: &RustHeldoutBuildReport) {
     println!(
         "- route coverage ratio: `{:.4}`",
         report.metrics.route_coverage_ratio
+    );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_rust_focus_build_md(report: &RustFocusBuildReport) {
+    println!("# LLMWave-Big Rust Focus Build");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- profile: `{}`", report.profile);
+    println!("- selected facts: `{}`", report.focus.selected_fact_count);
+    println!("- held-out cases: `{}`", report.focus.heldout_case_count);
+    println!(
+        "- route balance before: `{:.4}`",
+        report.metrics.route_balance_before
+    );
+    println!(
+        "- route balance after: `{:.4}`",
+        report.metrics.route_balance_after
+    );
+    println!(
+        "- focus packet ready: `{}`",
+        report.claim_boundary.focus_packet_ready
     );
     println!(
         "- nonlinear memory proven: `{}`",

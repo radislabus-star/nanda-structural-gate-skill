@@ -122,6 +122,8 @@ nanda-llmwave-big memory-final-proof --format json
 nanda-llmwave-big memory-final-proof --profile rust --format json
 nanda-llmwave-big rust-corpus-build --repo . --out .nanda/llmwave-big-training/rust-corpus-artifact.json --format json
 nanda-llmwave-big rust-heldout-build --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --out .nanda/llmwave-big-training/rust-heldout-suite.json --format json
+nanda-llmwave-big rust-focus-build --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --out .nanda/llmwave-big-training/rust-focus-packet.json --format json
+nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --format json
 nanda-llmwave-big nonlinear-memory-eval --format json
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
@@ -162,6 +164,12 @@ packets are still required before final proof claims.
 questions plus negative shortcuts. It can make
 `heldout_suite_ready=true`, but it still keeps focus, final proof, nonlinear
 memory, and LLM claims closed.
+`rust-focus-build` consumes the corpus and held-out suite and writes a
+route-balanced focus packet. It caps dominant routes, removes exact held-out
+facts from the training focus, and can make `focus_packet_ready=true`.
+`memory-final-proof --profile rust --artifact ... --heldout-suite ...
+--focus-packet ...` then stops at the next honest missing bridge:
+`compile_test_evidence_bridge_missing`, not at missing corpus/focus.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

@@ -284,6 +284,19 @@ nanda-llmwave-big rust-heldout-build \
   --out .nanda/llmwave-big-training/rust-heldout-suite.json \
   --format json
 
+nanda-llmwave-big rust-focus-build \
+  --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
+  --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json \
+  --out .nanda/llmwave-big-training/rust-focus-packet.json \
+  --format json
+
+nanda-llmwave-big memory-final-proof \
+  --profile rust \
+  --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
+  --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json \
+  --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -338,6 +351,12 @@ withheld route questions around module owners, public exports, CLI dispatch,
 report printers, and test evidence. It also adds negative shortcuts such as
 "compiled command implies LLM readiness". It is the next proof-prep layer, not
 a final nonlinear-memory proof.
+
+`rust-focus-build` consumes the corpus artifact and held-out suite, removes
+the exact withheld facts from the focus window, and caps dominant routes so the
+field is route-balanced. Once the three artifacts are passed into
+`memory-final-proof --profile rust`, the expected honest blocker moves from
+"missing corpus/focus" to `compile_test_evidence_bridge_missing`.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

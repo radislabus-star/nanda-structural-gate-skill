@@ -40,6 +40,7 @@ pub mod readiness;
 pub mod reasoning_field;
 pub mod residuals;
 pub mod rust_corpus;
+pub mod rust_focus;
 pub mod rust_heldout;
 pub mod schema_memory_growth;
 pub mod schemas;
@@ -200,6 +201,9 @@ enum LlmwaveBigCommand {
     /// Build Rust held-out route questions from a Rust structural corpus artifact.
     #[command(name = "rust-heldout-build", alias = "rust-heldout")]
     RustHeldoutBuild(LlmwaveBigRustHeldoutBuildArgs),
+    /// Build a route-balanced Rust focus packet from corpus and held-out artifacts.
+    #[command(name = "rust-focus-build", alias = "rust-focus")]
+    RustFocusBuild(LlmwaveBigRustFocusBuildArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -557,6 +561,12 @@ struct LlmwaveBigMemoryProofPathArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigMemoryFinalProofArgs {
+    #[arg(long)]
+    artifact: Option<PathBuf>,
+    #[arg(long = "heldout-suite")]
+    heldout_suite: Option<PathBuf>,
+    #[arg(long = "focus-packet")]
+    focus_packet: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "general")]
     profile: memory_final_proof::MemoryProofProfile,
     #[arg(long, value_enum, default_value = "json")]
@@ -627,6 +637,22 @@ struct LlmwaveBigRustHeldoutBuildArgs {
     out: Option<PathBuf>,
     #[arg(long, default_value_t = 64)]
     max_cases: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigRustFocusBuildArgs {
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long = "heldout-suite")]
+    heldout_suite: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 15_000)]
+    max_facts: usize,
+    #[arg(long, default_value_t = 256)]
+    route_fact_cap: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1035,7 +1061,14 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::MemoryFinalProof(args) => {
-            let report = memory_final_proof::build_memory_final_proof_report(args.profile);
+            let report = memory_final_proof::build_memory_final_proof_report(
+                memory_final_proof::MemoryFinalProofConfig {
+                    profile: args.profile,
+                    artifact: args.artifact,
+                    heldout_suite: args.heldout_suite,
+                    focus_packet: args.focus_packet,
+                },
+            )?;
             report::print_memory_final_proof_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
@@ -1087,6 +1120,17 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     max_cases: args.max_cases,
                 })?;
             report::print_rust_heldout_build_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::RustFocusBuild(args) => {
+            let report = rust_focus::build_rust_focus_report(rust_focus::RustFocusBuildConfig {
+                artifact: args.artifact,
+                heldout_suite: args.heldout_suite,
+                out: args.out,
+                max_facts: args.max_facts,
+                route_fact_cap: args.route_fact_cap,
+            })?;
+            report::print_rust_focus_build_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {
