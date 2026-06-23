@@ -405,6 +405,16 @@ pub(crate) struct HotChatReport {
 }
 
 #[derive(Serialize, Clone)]
+pub(crate) struct HotChatEvalReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub chat: HotChatReport,
+    pub metrics: HotChatEvalMetrics,
+    pub claim_boundary: HotChatEvalClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
 pub(crate) struct HotChatTurn {
     pub input: String,
     pub kind: &'static str,
@@ -419,6 +429,30 @@ pub(crate) struct HotChatClaimBoundary {
     pub batch_script_supported: bool,
     pub corrections_write_hot_memory: bool,
     pub broad_chat_llm_ready: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotChatEvalMetrics {
+    pub turn_count: usize,
+    pub ask_turns: usize,
+    pub learn_turns: usize,
+    pub unsafe_before_learning: bool,
+    pub safe_after_learning: bool,
+    pub memory_lift_observed: bool,
+    pub false_safe_before_learning: bool,
+    pub exit_seen: bool,
+    pub pass_rate: f32,
+    pub state: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct HotChatEvalClaimBoundary {
+    pub scripted_hot_chat_eval_implemented: bool,
+    pub multi_turn_memory_lift_observed: bool,
+    pub corrections_write_hot_memory: bool,
+    pub broad_chat_llm_ready: bool,
+    pub general_dialogue_ready: bool,
+    pub safe_claim: &'static str,
 }
 
 #[derive(Serialize, Clone)]
@@ -1144,6 +1178,81 @@ pub(crate) fn chat_hot_session(
             batch_script_supported: true,
             corrections_write_hot_memory: true,
             broad_chat_llm_ready: false,
+        },
+    })
+}
+
+pub(crate) fn eval_hot_chat_session(
+    hot_pack_path: &Path,
+    artifact_path: &Path,
+    memory_path: &Path,
+    script_path: &Path,
+    top_k: usize,
+) -> Result<HotChatEvalReport> {
+    if memory_path.exists() {
+        fs::remove_file(memory_path)
+            .with_context(|| format!("clear hot chat eval memory {}", memory_path.display()))?;
+    }
+    let chat = chat_hot_session(
+        hot_pack_path,
+        artifact_path,
+        memory_path,
+        Some(script_path),
+        top_k,
+    )?;
+    let ask_turns = chat.turns.iter().filter(|turn| turn.kind == "ask").count();
+    let learn_turns = chat
+        .turns
+        .iter()
+        .filter(|turn| turn.kind == "learn")
+        .count();
+    let first_ask = chat.turns.iter().find(|turn| turn.kind == "ask");
+    let last_ask = chat.turns.iter().rev().find(|turn| turn.kind == "ask");
+    let unsafe_before_learning = first_ask.is_some_and(|turn| !turn.safe_to_answer);
+    let safe_after_learning = last_ask.is_some_and(|turn| turn.safe_to_answer);
+    let memory_lift_observed = unsafe_before_learning && safe_after_learning && learn_turns > 0;
+    let false_safe_before_learning = first_ask.is_some_and(|turn| turn.safe_to_answer);
+    let exit_seen = chat.turns.iter().any(|turn| turn.state == "EXIT");
+    let passed_checks = [
+        ask_turns >= 2,
+        learn_turns >= 1,
+        memory_lift_observed,
+        !false_safe_before_learning,
+        exit_seen,
+    ]
+    .into_iter()
+    .filter(|passed| *passed)
+    .count();
+    let state = if passed_checks == 5 {
+        "HOT_CHAT_EVAL_PASS_NOT_GENERAL_LLM"
+    } else {
+        "HOT_CHAT_EVAL_REVIEW"
+    };
+    Ok(HotChatEvalReport {
+        mode: "llmwave-big-chat-hot-eval",
+        version: "llmwave-big-v1908-hot-chat-eval",
+        verdict: state,
+        chat,
+        metrics: HotChatEvalMetrics {
+            turn_count: ask_turns + learn_turns + usize::from(exit_seen),
+            ask_turns,
+            learn_turns,
+            unsafe_before_learning,
+            safe_after_learning,
+            memory_lift_observed,
+            false_safe_before_learning,
+            exit_seen,
+            pass_rate: round4(passed_checks as f32 / 5.0),
+            state,
+        },
+        claim_boundary: HotChatEvalClaimBoundary {
+            scripted_hot_chat_eval_implemented: true,
+            multi_turn_memory_lift_observed: memory_lift_observed,
+            corrections_write_hot_memory: learn_turns > 0,
+            broad_chat_llm_ready: false,
+            general_dialogue_ready: false,
+            safe_claim:
+                "LLMWave-Big can run a scripted hot-memory chat eval with learning lift, but this is not broad dialogue readiness.",
         },
     })
 }

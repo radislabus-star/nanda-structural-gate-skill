@@ -1023,6 +1023,28 @@ The eval now has two explicit proof policies:
 The scale-amortized policy is a local density result after fixed-basis overhead
 is amortized. It does not unlock the general nonlinear-memory claim.
 
+## Latest Implemented Step: Scripted Hot Chat Eval
+
+`nanda llmwave-big chat-hot-eval` wraps the existing hot runtime instead of
+creating a parallel chat path. It checks a scripted sequence:
+
+```text
+ask -> unsafe before learning
+learn -> hot memory update
+ask -> safe after learning
+exit -> controlled session close
+```
+
+Current boundary:
+
+```text
+scripted_hot_multi_turn_ready = true
+broad_chat_llm_ready = false
+general_dialogue_ready = false
+```
+
+This is a local multi-turn memory-lift result, not a general chat claim.
+
 This is a deliberately narrow result. It says the fixed basis starts to win at
 larger scale after basis overhead is amortized. It does not prove nonlinear
 memory yet, because the full-sweep baseline gates are still stricter than the

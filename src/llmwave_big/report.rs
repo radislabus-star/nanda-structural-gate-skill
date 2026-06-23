@@ -41,8 +41,8 @@ use super::surface_production::SurfaceProductionReport;
 use super::surface_raw_induce::SurfaceRawInduceReport;
 use super::surface_reconstruct::SurfaceReconstructReport;
 use super::training::{
-    ArtifactAskEvalReport, ArtifactAskReport, HotAskReport, HotChatReport, HotLearnReport,
-    HotPackReport, TrainingCompileReport,
+    ArtifactAskEvalReport, ArtifactAskReport, HotAskReport, HotChatEvalReport, HotChatReport,
+    HotLearnReport, HotPackReport, TrainingCompileReport,
 };
 use super::write::WriteReport;
 use super::LlmwaveBigReport;
@@ -858,6 +858,50 @@ pub(crate) fn print_hot_chat_report(report: &HotChatReport, format: &OutputForma
         OutputFormat::Md => print_hot_chat_md(report),
     }
     Ok(())
+}
+
+pub(crate) fn print_hot_chat_eval_report(
+    report: &HotChatEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_hot_chat_eval_text(report),
+        OutputFormat::Md => print_hot_chat_eval_md(report),
+    }
+    Ok(())
+}
+
+fn print_hot_chat_eval_text(report: &HotChatEvalReport) {
+    println!("LLMWave-Big Hot Chat Eval");
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "memory_lift_observed: {}",
+        report.metrics.memory_lift_observed
+    );
+    println!(
+        "broad_chat_llm_ready: {}",
+        report.claim_boundary.broad_chat_llm_ready
+    );
+}
+
+fn print_hot_chat_eval_md(report: &HotChatEvalReport) {
+    println!("# LLMWave-Big Hot Chat Eval");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- memory_lift_observed: `{}`",
+        report.metrics.memory_lift_observed
+    );
+    println!(
+        "- broad_chat_llm_ready: `{}`",
+        report.claim_boundary.broad_chat_llm_ready
+    );
 }
 
 fn print_hot_chat_text(report: &HotChatReport) {

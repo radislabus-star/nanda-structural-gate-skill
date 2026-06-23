@@ -189,6 +189,9 @@ enum LlmwaveBigCommand {
     /// Interactive/scripted shell over ask-hot plus learn-hot memory.
     #[command(name = "chat-hot")]
     ChatHot(LlmwaveBigChatHotArgs),
+    /// Evaluate scripted hot chat learning and answer lift.
+    #[command(name = "chat-hot-eval")]
+    ChatHotEval(LlmwaveBigChatHotEvalArgs),
 }
 
 #[derive(Parser)]
@@ -589,6 +592,22 @@ struct LlmwaveBigChatHotArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigChatHotEvalArgs {
+    #[arg(long)]
+    hot_pack: PathBuf,
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long)]
+    memory: PathBuf,
+    #[arg(long)]
+    script: PathBuf,
+    #[arg(long, default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigAskArgs {
     #[arg(long)]
     artifact: PathBuf,
@@ -937,6 +956,17 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 args.top_k,
             )?;
             report::print_hot_chat_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatHotEval(args) => {
+            let report = training::eval_hot_chat_session(
+                &args.hot_pack,
+                &args.artifact,
+                &args.memory,
+                &args.script,
+                args.top_k,
+            )?;
+            report::print_hot_chat_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
     }

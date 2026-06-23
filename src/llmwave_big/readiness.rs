@@ -24,6 +24,7 @@ pub(crate) struct ReadinessClaims {
     pub fixture_reasoning_ready: bool,
     pub artifact_grounded_qa_ready: bool,
     pub constrained_answer_generation_ready: bool,
+    pub scripted_hot_multi_turn_ready: bool,
     pub scale_amortized_nonlinear_memory_ready: bool,
     pub broad_chat_llm_ready: bool,
     pub nonlinear_memory_proven: bool,
@@ -107,10 +108,11 @@ pub(crate) fn build_readiness_ladder_report() -> ReadinessLadderReport {
             ReadinessLevel {
                 level: 4,
                 name: "multi-turn memory ready",
-                state: "WATCH",
+                state: "LOCAL_PASS_GENERAL_BLOCKED",
                 evidence: vec![
-                    "hot feedback memory exists",
-                    "broad multi-turn eval missing",
+                    "scripted chat-hot eval observes memory lift",
+                    "hot feedback memory changes next ask",
+                    "broad unscripted multi-turn eval missing",
                 ],
             },
             ReadinessLevel {
@@ -243,6 +245,7 @@ fn readiness_claims() -> ReadinessClaims {
         fixture_reasoning_ready: true,
         artifact_grounded_qa_ready: true,
         constrained_answer_generation_ready: true,
+        scripted_hot_multi_turn_ready: true,
         scale_amortized_nonlinear_memory_ready: true,
         broad_chat_llm_ready: false,
         nonlinear_memory_proven: false,
