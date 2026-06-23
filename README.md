@@ -298,12 +298,19 @@ nanda-llmwave-big rust-compile-evidence-build \
   --out .nanda/llmwave-big-training/rust-compile-evidence.json \
   --format json
 
+nanda-llmwave-big rust-heldout-eval \
+  --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
+  --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json \
+  --out .nanda/llmwave-big-training/rust-heldout-eval.json \
+  --format json
+
 nanda-llmwave-big memory-final-proof \
   --profile rust \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
   --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json \
+  --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json \
   --format json
 
 nanda-llmwave-big nonlinear-memory-eval \
@@ -373,6 +380,16 @@ packet. It intentionally does not run cargo as a hidden side effect. Once that
 artifact is passed into final proof, the expected blocker becomes
 `rust_heldout_inference_eval_missing`; nonlinear-memory and LLM claims remain
 false.
+
+`rust-heldout-eval` consumes `rust-focus-packet.json` and
+`rust-heldout-suite.json`, then runs actual deterministic inference over
+withheld route facts. The exact withheld facts are absent from the focus
+window, so the eval must recover answers through local route/path
+neighborhoods and reject false shortcuts such as "compiled command implies LLM
+readiness". With compile evidence and held-out eval both passed into
+`memory-final-proof --profile rust`, the honest next verdict is
+`FINAL_PROOF_GATE_PROFILE_EVAL_READY_NOT_NONLINEAR_PROOF`: profile evidence is
+ready, but broad nonlinear-memory and LLM claims remain false.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

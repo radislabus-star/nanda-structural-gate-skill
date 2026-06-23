@@ -221,8 +221,10 @@ scripts/nanda-llmwave-big rust-corpus-build --repo . --out .nanda/llmwave-big-tr
 scripts/nanda-llmwave-big rust-heldout-build --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --out .nanda/llmwave-big-training/rust-heldout-suite.json --format json
 scripts/nanda-llmwave-big rust-focus-build --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --out .nanda/llmwave-big-training/rust-focus-packet.json --format json
 scripts/nanda-llmwave-big rust-compile-evidence-build --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --check-evidence .nanda/llmwave-big-training/cargo-check.json --test-evidence .nanda/llmwave-big-training/cargo-test.json --clippy-evidence .nanda/llmwave-big-training/cargo-clippy.json --out .nanda/llmwave-big-training/rust-compile-evidence.json --format json
+scripts/nanda-llmwave-big rust-heldout-eval --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --out .nanda/llmwave-big-training/rust-heldout-eval.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
+scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
@@ -749,6 +751,14 @@ It must not run cargo as a hidden side effect. With `--compile-evidence` passed
 to final proof, the expected honest blocker moves to
 `rust_heldout_inference_eval_missing`; nonlinear-memory and LLM claims remain
 blocked.
+Use `nanda-llmwave-big rust-heldout-eval --focus-packet ... --heldout-suite ... --out ... --format json`
+to run actual held-out route-fact inference over the Rust focus packet. It
+reports held-out pass rate plus false-shortcut rejection and writes the
+held-out eval artifact. With `--compile-evidence` and `--heldout-eval` passed
+to final proof, the Rust profile can reach
+`FINAL_PROOF_GATE_PROFILE_EVAL_READY_NOT_NONLINEAR_PROOF`: profile evidence is
+ready, but nonlinear-memory and LLM claims remain blocked by the strict density
+claim gate.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a

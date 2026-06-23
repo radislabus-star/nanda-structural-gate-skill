@@ -41,6 +41,7 @@ use super::rust_compile_evidence::RustCompileEvidenceBuildReport;
 use super::rust_corpus::RustCorpusBuildReport;
 use super::rust_focus::RustFocusBuildReport;
 use super::rust_heldout::RustHeldoutBuildReport;
+use super::rust_heldout_eval::RustHeldoutEvalReport;
 use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
 use super::surface_bank_fixture::SurfaceBankFixtureReport;
@@ -922,6 +923,21 @@ pub(crate) fn print_rust_compile_evidence_build_report(
         ),
         OutputFormat::Text => print_rust_compile_evidence_build_text(report),
         OutputFormat::Md => print_rust_compile_evidence_build_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_rust_heldout_eval_report(
+    report: &RustHeldoutEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_rust_heldout_eval_text(report),
+        OutputFormat::Md => print_rust_heldout_eval_md(report),
     }
     Ok(())
 }
@@ -2013,6 +2029,27 @@ fn print_rust_compile_evidence_build_text(report: &RustCompileEvidenceBuildRepor
     );
 }
 
+fn print_rust_heldout_eval_text(report: &RustHeldoutEvalReport) {
+    println!("mode: {}", report.mode);
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("profile: {}", report.profile);
+    println!("heldout_cases: {}", report.metrics.heldout_case_count);
+    println!("heldout_pass_rate: {:.4}", report.metrics.heldout_pass_rate);
+    println!(
+        "negative_reject_rate: {:.4}",
+        report.metrics.negative_reject_rate
+    );
+    println!(
+        "heldout_inference_eval_ready: {}",
+        report.metrics.heldout_inference_eval_ready
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
 fn print_artifact_ask_text(report: &ArtifactAskReport) {
     println!("LLMWave-Big Ask");
     println!("version: {}", report.version);
@@ -3053,6 +3090,31 @@ fn print_rust_compile_evidence_build_md(report: &RustCompileEvidenceBuildReport)
     println!(
         "- compile/test bridge ready: `{}`",
         report.evidence.compile_test_evidence_bridge_ready
+    );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_rust_heldout_eval_md(report: &RustHeldoutEvalReport) {
+    println!("# LLMWave-Big Rust Held-Out Eval");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- profile: `{}`", report.profile);
+    println!("- held-out cases: `{}`", report.metrics.heldout_case_count);
+    println!(
+        "- held-out pass rate: `{:.4}`",
+        report.metrics.heldout_pass_rate
+    );
+    println!(
+        "- negative reject rate: `{:.4}`",
+        report.metrics.negative_reject_rate
+    );
+    println!(
+        "- held-out inference eval ready: `{}`",
+        report.metrics.heldout_inference_eval_ready
     );
     println!(
         "- nonlinear memory proven: `{}`",

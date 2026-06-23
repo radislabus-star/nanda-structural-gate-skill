@@ -43,6 +43,7 @@ pub mod rust_compile_evidence;
 pub mod rust_corpus;
 pub mod rust_focus;
 pub mod rust_heldout;
+pub mod rust_heldout_eval;
 pub mod schema_memory_growth;
 pub mod schemas;
 pub mod surface_bank_build;
@@ -208,6 +209,9 @@ enum LlmwaveBigCommand {
     /// Build Rust compile/test evidence linked to a focus packet.
     #[command(name = "rust-compile-evidence-build", alias = "rust-compile-evidence")]
     RustCompileEvidenceBuild(LlmwaveBigRustCompileEvidenceBuildArgs),
+    /// Evaluate held-out Rust route-fact inference over a focus packet.
+    #[command(name = "rust-heldout-eval", alias = "rust-inference-eval")]
+    RustHeldoutEval(LlmwaveBigRustHeldoutEvalArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -573,6 +577,8 @@ struct LlmwaveBigMemoryFinalProofArgs {
     focus_packet: Option<PathBuf>,
     #[arg(long = "compile-evidence")]
     compile_evidence: Option<PathBuf>,
+    #[arg(long = "heldout-eval")]
+    heldout_eval: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "general")]
     profile: memory_final_proof::MemoryProofProfile,
     #[arg(long, value_enum, default_value = "json")]
@@ -675,6 +681,20 @@ struct LlmwaveBigRustCompileEvidenceBuildArgs {
     clippy_evidence: PathBuf,
     #[arg(long)]
     out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigRustHeldoutEvalArgs {
+    #[arg(long = "focus-packet")]
+    focus_packet: PathBuf,
+    #[arg(long = "heldout-suite")]
+    heldout_suite: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 0.80)]
+    pass_threshold: f64,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1090,6 +1110,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     heldout_suite: args.heldout_suite,
                     focus_packet: args.focus_packet,
                     compile_evidence: args.compile_evidence,
+                    heldout_eval: args.heldout_eval,
                 },
             )?;
             report::print_memory_final_proof_report(&report, &args.format)?;
@@ -1167,6 +1188,18 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 },
             )?;
             report::print_rust_compile_evidence_build_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::RustHeldoutEval(args) => {
+            let report = rust_heldout_eval::build_rust_heldout_eval_report(
+                rust_heldout_eval::RustHeldoutEvalConfig {
+                    focus_packet: args.focus_packet,
+                    heldout_suite: args.heldout_suite,
+                    out: args.out,
+                    pass_threshold: args.pass_threshold,
+                },
+            )?;
+            report::print_rust_heldout_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {
