@@ -514,6 +514,7 @@ rm -f "$tmp_task"
 
 contract_template_json="$("$root/target/debug/nanda" contract-gate --template --profile edo --format json)"
 jq -e '.mode == "nanda-contract-gate-template" and .profile == "edo" and .packet.clauses[0].risk_tag == "unilateral_offset"' <<<"$contract_template_json" >/dev/null
+jq -e '.packet.document_author and .packet.revision_source and .packet.clauses[0].effective_obligation_after_revision' <<<"$contract_template_json" >/dev/null
 contract_pass_json="$("$root/target/debug/nanda" contract-gate --input "$root/examples/contract-gate.protocol-pass.json" --profile edo --format json)"
 jq -e '.mode == "nanda-contract-gate" and .verdict == "STRUCTURAL_PASS_NOT_LEGAL_APPROVAL" and .safe_to_sign == false' <<<"$contract_pass_json" >/dev/null
 jq -e '.role_first_pass.verdict == "PASS" and .protocol_direction_check.direction == "our_revision" and .multi_effect_clause_check.verdict == "PASS"' <<<"$contract_pass_json" >/dev/null

@@ -40,6 +40,10 @@ struct ContractPacket {
     #[serde(default)]
     protocol_author: String,
     #[serde(default)]
+    document_author: String,
+    #[serde(default)]
+    revision_source: String,
+    #[serde(default)]
     our_party: String,
     #[serde(default)]
     counterparty: String,
@@ -66,6 +70,8 @@ struct ContractClause {
     original_obligation: String,
     #[serde(default)]
     protocol_change: String,
+    #[serde(default)]
+    effective_obligation_after_revision: String,
     #[serde(default)]
     protected_party: String,
     #[serde(default)]
@@ -139,6 +145,7 @@ fn build_report(packet: &ContractPacket, profile: ContractProfile, input: &Path)
         "input": input.display().to_string(),
         "role_first_pass": role,
         "protocol_direction_check": protocol,
+        "document_revision_context": document_revision_context(packet),
         "multi_effect_clause_check": multi_effect,
         "risk_map": risk_map,
         "split_plan": split_plan.clone(),
@@ -191,6 +198,8 @@ fn role_first_pass(packet: &ContractPacket) -> Value {
         "our_party": packet.our_party,
         "counterparty": packet.counterparty,
         "protocol_author": packet.protocol_author,
+        "document_author": packet.document_author,
+        "revision_source": packet.revision_source,
         "document_type": packet.document_type,
         "missing": missing,
         "same_party_error": same_party,
@@ -220,6 +229,8 @@ fn protocol_direction(packet: &ContractPacket) -> Value {
         "verdict": if direction == "unknown" || direction == "third_party_or_unmatched_author" { "WATCH" } else { "PASS" },
         "direction": direction,
         "who_authored_protocol": author,
+        "document_author": packet.document_author,
+        "revision_source": packet.revision_source,
         "who_benefits_default": benefits,
         "source_vs_proposed_are_separate_routes": true
     })
@@ -268,6 +279,7 @@ fn risk_map(packet: &ContractPacket, profile: ContractProfile) -> Value {
             "source_clause": clause.source_clause,
             "original_obligation": clause.original_obligation,
             "protocol_change": clause.protocol_change,
+            "effective_obligation_after_revision": clause.effective_obligation_after_revision,
             "protected_party": clause.protected_party,
             "risk_removed": clause.risk_removed,
             "effect_count": clause.effects.len(),
@@ -377,6 +389,7 @@ fn negotiation_position(packet: &ContractPacket, risk_map: &Value) -> Value {
             "clause_id": clause.id,
             "risk_tag": value_or(&clause.risk_tag, "untagged_contract_risk"),
             "protocol_change": clause.protocol_change,
+            "effective_obligation_after_revision": clause.effective_obligation_after_revision,
             "protected_party": clause.protected_party
         });
         match tag {
@@ -443,46 +456,63 @@ fn watch_reasons(
 }
 
 fn template(profile: ContractProfile) -> Value {
+    let packet = json!({
+        "task_id": "contract-review",
+        "base_document": "contract.pdf",
+        "counterparty_document": "protocol-or-counterparty-redline.pdf",
+        "protocol_author": "our_party_or_counterparty_or_unknown",
+        "document_author": "document drafter or issuing party",
+        "revision_source": "original | counterparty_redline | our_redline | negotiated | external_appendix",
+        "our_party": "our legal entity",
+        "counterparty": "counterparty legal entity",
+        "document_type": "contract | appendix | edo_agreement | protocol",
+        "same_clause_multi_effect_ok": false,
+        "extracted_text_paths": ["extracted/base.txt", "extracted/protocol.txt"],
+        "clauses": [
+            {
+                "id": "p1",
+                "route": "payment-or-offset",
+                "source_clause": "original clause id/text",
+                "original_obligation": "original obligation",
+                "protocol_change": "proposed change",
+                "effective_obligation_after_revision": "obligation if this revision is accepted",
+                "protected_party": "our_party | counterparty | both | unknown",
+                "risk_removed": "risk removed by proposed edit",
+                "risk_tag": "unilateral_offset",
+                "effects": ["effect one", "effect two"],
+                "evidence": "page/paragraph/source"
+            }
+        ],
+        "edo_messages": [
+            {
+                "message": "ORDERS",
+                "sender": "buyer",
+                "receiver": "supplier",
+                "legal_effect": "request/order",
+                "risk": "may be treated as binding",
+                "fallback_route": "ORDRSP required"
+            }
+        ]
+    });
+
     json!({
         "mode": "nanda-contract-gate-template",
         "version": "contract-gate-v1-universal-document-flow",
         "profile": profile,
-        "packet": {
-            "task_id": "contract-review",
-            "base_document": "contract.pdf",
-            "counterparty_document": "protocol-or-counterparty-redline.pdf",
-            "protocol_author": "our_party_or_counterparty_or_unknown",
-            "our_party": "our legal entity",
-            "counterparty": "counterparty legal entity",
-            "document_type": "contract | appendix | edo_agreement | protocol",
-            "same_clause_multi_effect_ok": false,
-            "extracted_text_paths": ["extracted/base.txt", "extracted/protocol.txt"],
-            "clauses": [
-                {
-                    "id": "p1",
-                    "route": "payment-or-offset",
-                    "source_clause": "original clause id/text",
-                    "original_obligation": "original obligation",
-                    "protocol_change": "proposed change",
-                    "protected_party": "our_party | counterparty | both | unknown",
-                    "risk_removed": "risk removed by proposed edit",
-                    "risk_tag": "unilateral_offset",
-                    "effects": ["effect one", "effect two"],
-                    "evidence": "page/paragraph/source"
-                }
-            ],
-            "edo_messages": [
-                {
-                    "message": "ORDERS",
-                    "sender": "buyer",
-                    "receiver": "supplier",
-                    "legal_effect": "request/order",
-                    "risk": "may be treated as binding",
-                    "fallback_route": "ORDRSP required"
-                }
-            ]
-        },
+        "packet": packet,
         "read_as": "Fill this packet from any contract/protocol pair. The schema is universal; profiles only add route hints, not project-specific hardcode."
+    })
+}
+
+fn document_revision_context(packet: &ContractPacket) -> Value {
+    json!({
+        "base_document": packet.base_document,
+        "counterparty_document": packet.counterparty_document,
+        "document_author": packet.document_author,
+        "revision_source": packet.revision_source,
+        "document_type": packet.document_type,
+        "protocol_author": packet.protocol_author,
+        "read_as": "Use document_author/revision_source for non-protocol documents; use protocol_author when the packet is a protocol or disagreement redline."
     })
 }
 
@@ -560,5 +590,169 @@ fn value_or(value: &str, fallback: &str) -> String {
         fallback.to_string()
     } else {
         value.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contract_gate_structural_pass_is_not_legal_approval() {
+        let packet = pass_packet();
+        let report = build_report(
+            &packet,
+            ContractProfile::Edo,
+            Path::new("fixture-contract.json"),
+        );
+
+        assert_eq!(
+            report["verdict"].as_str(),
+            Some("STRUCTURAL_PASS_NOT_LEGAL_APPROVAL")
+        );
+        assert_eq!(report["safe_to_sign"].as_bool(), Some(false));
+        assert_eq!(
+            report["protocol_direction_check"]["direction"].as_str(),
+            Some("our_revision")
+        );
+        assert_eq!(
+            report["claim_boundary"]["structural_pass_is_not_legal_approval"].as_bool(),
+            Some(true)
+        );
+        assert!(report["negotiation_position"]["must_hold"]
+            .as_array()
+            .is_some_and(|items| items.len() == 2));
+    }
+
+    #[test]
+    fn contract_gate_watch_detects_missing_direction_multi_effect_and_risk_tags() {
+        let packet = watch_packet();
+        let report = build_report(
+            &packet,
+            ContractProfile::Protocol,
+            Path::new("fixture-contract.json"),
+        );
+        let reasons = report["watch_reasons"].as_array().expect("watch reasons");
+
+        assert_eq!(report["verdict"].as_str(), Some("WATCH"));
+        assert!(contains_reason(
+            reasons,
+            "protocol_direction_unknown_or_unmatched"
+        ));
+        assert!(contains_reason(
+            reasons,
+            "same_clause_multi_effect_requires_subclaim_split"
+        ));
+        assert!(contains_reason(reasons, "risk_tags_missing"));
+        assert_eq!(
+            report["multi_effect_clause_check"]["repair"].as_str(),
+            Some("split_by_subclaim")
+        );
+        assert_eq!(exit_for(&report), EXIT_WATCH);
+    }
+
+    #[test]
+    fn contract_gate_template_exposes_non_protocol_revision_fields() {
+        let report = template(ContractProfile::Generic);
+        let packet = &report["packet"];
+
+        assert_eq!(
+            report["mode"].as_str(),
+            Some("nanda-contract-gate-template")
+        );
+        assert!(packet.get("document_author").is_some());
+        assert!(packet.get("revision_source").is_some());
+        assert!(packet["clauses"][0]
+            .get("effective_obligation_after_revision")
+            .is_some());
+    }
+
+    fn contains_reason(reasons: &[Value], expected: &str) -> bool {
+        reasons
+            .iter()
+            .any(|reason| reason.as_str() == Some(expected))
+    }
+
+    fn pass_packet() -> ContractPacket {
+        ContractPacket {
+            task_id: "unit-pass".to_string(),
+            base_document: "base-contract.txt".to_string(),
+            counterparty_document: "supplier-protocol.txt".to_string(),
+            protocol_author: "Supplier LLC".to_string(),
+            document_author: "Buyer LLC".to_string(),
+            revision_source: "our_redline".to_string(),
+            our_party: "Supplier LLC".to_string(),
+            counterparty: "Buyer LLC".to_string(),
+            document_type: "protocol".to_string(),
+            same_clause_multi_effect_ok: true,
+            extracted_text_paths: vec![],
+            clauses: vec![
+                ContractClause {
+                    id: "acceptance".to_string(),
+                    route: "order-acceptance".to_string(),
+                    source_clause: "EDI delivery".to_string(),
+                    original_obligation: "delivery may be acceptance".to_string(),
+                    protocol_change: "delivery is not acceptance".to_string(),
+                    effective_obligation_after_revision: "acceptance requires confirmation"
+                        .to_string(),
+                    protected_party: "our_party".to_string(),
+                    risk_removed: "auto acceptance".to_string(),
+                    risk_tag: "auto_acceptance".to_string(),
+                    effects: vec![
+                        "delivery_not_acceptance".to_string(),
+                        "delivery_not_debt_admission".to_string(),
+                    ],
+                    evidence: "p1".to_string(),
+                },
+                ContractClause {
+                    id: "offset".to_string(),
+                    route: "payment-or-offset".to_string(),
+                    source_clause: "offset".to_string(),
+                    original_obligation: "buyer may offset".to_string(),
+                    protocol_change: "offset requires agreement".to_string(),
+                    effective_obligation_after_revision: "offset only by signed agreement"
+                        .to_string(),
+                    protected_party: "our_party".to_string(),
+                    risk_removed: "unilateral offset".to_string(),
+                    risk_tag: "unilateral_offset".to_string(),
+                    effects: vec!["offset_requires_agreement".to_string()],
+                    evidence: "p2".to_string(),
+                },
+            ],
+            edo_messages: vec![],
+        }
+    }
+
+    fn watch_packet() -> ContractPacket {
+        ContractPacket {
+            task_id: "unit-watch".to_string(),
+            base_document: "base-contract.txt".to_string(),
+            counterparty_document: "protocol.txt".to_string(),
+            protocol_author: String::new(),
+            document_author: "Buyer LLC".to_string(),
+            revision_source: "counterparty_redline".to_string(),
+            our_party: "Supplier LLC".to_string(),
+            counterparty: "Buyer LLC".to_string(),
+            document_type: "protocol".to_string(),
+            same_clause_multi_effect_ok: false,
+            extracted_text_paths: vec![],
+            clauses: vec![ContractClause {
+                id: "multi".to_string(),
+                route: "edo-evidence".to_string(),
+                source_clause: "technical delivery".to_string(),
+                original_obligation: "delivery has legal effect".to_string(),
+                protocol_change: "delivery is not acceptance or debt admission".to_string(),
+                effective_obligation_after_revision: String::new(),
+                protected_party: "our_party".to_string(),
+                risk_removed: "unclear".to_string(),
+                risk_tag: String::new(),
+                effects: vec![
+                    "delivery_not_acceptance".to_string(),
+                    "delivery_not_debt_admission".to_string(),
+                ],
+                evidence: "p1".to_string(),
+            }],
+            edo_messages: vec![],
+        }
     }
 }
