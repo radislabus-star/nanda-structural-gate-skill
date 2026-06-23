@@ -549,6 +549,8 @@ struct LlmwaveBigMemoryProofPathArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigMemoryFinalProofArgs {
+    #[arg(long, value_enum, default_value = "general")]
+    profile: memory_final_proof::MemoryProofProfile,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1001,7 +1003,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::MemoryFinalProof(args) => {
-            let report = memory_final_proof::build_memory_final_proof_report();
+            let report = memory_final_proof::build_memory_final_proof_report(args.profile);
             report::print_memory_final_proof_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }

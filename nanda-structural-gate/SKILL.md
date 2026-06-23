@@ -216,6 +216,7 @@ scripts/nanda-llmwave-big schema-residual-engine --format json
 scripts/nanda-llmwave-big memory-physics --format json
 scripts/nanda-llmwave-big memory-proof-path --format json
 scripts/nanda-llmwave-big memory-final-proof --format json
+scripts/nanda-llmwave-big memory-final-proof --profile rust --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
@@ -715,6 +716,11 @@ memory. It should still keep final nonlinear-memory and LLM claims blocked.
 Use `nanda-llmwave-big memory-final-proof --format json` for the Phase 9-12
 final proof gate. Before a real big corpus is loaded, the honest expected state
 is `FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS`, not a nonlinear-memory proof.
+Prefer `nanda-llmwave-big memory-final-proof --profile rust --format json` when
+the next proof target is code. The Rust profile checks module ownership, public
+API export, CLI dispatch, report printer, unit/integration tests, and
+compile/test evidence routes; it must still block broad claims without a real
+Rust code corpus and held-out suite.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a

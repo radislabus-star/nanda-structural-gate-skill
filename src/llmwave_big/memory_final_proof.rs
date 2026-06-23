@@ -6,13 +6,32 @@ use super::memory_proof_path;
 
 pub(crate) const MEMORY_FINAL_PROOF_VERSION: &str = "llmwave-big-v-next-memory-final-proof";
 
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub(crate) enum MemoryProofProfile {
+    #[value(name = "general")]
+    General,
+    #[value(name = "rust")]
+    Rust,
+}
+
+impl MemoryProofProfile {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::General => "general",
+            Self::Rust => "rust",
+        }
+    }
+}
+
 #[derive(Serialize, Clone)]
 pub(crate) struct MemoryFinalProofReport {
     pub mode: &'static str,
     pub version: &'static str,
     pub phase: &'static str,
     pub roadmap_block: &'static str,
+    pub profile: &'static str,
     pub verdict: &'static str,
+    pub rust_profile: Option<RustProofProfileReport>,
     pub field_recall: FieldRecallReport,
     pub llmwave_bridge: LlmwaveBridgeReport,
     pub big_corpus_gate: BigCorpusGateReport,
@@ -47,10 +66,21 @@ pub(crate) struct BigCorpusGateReport {
     pub required_min_facts: usize,
     pub observed_real_corpus_facts: usize,
     pub synthetic_scale_projection_facts: usize,
+    pub corpus_kind: &'static str,
     pub real_big_corpus_loaded: bool,
     pub route_balanced_focus_required: bool,
     pub verdict: &'static str,
     pub blocked_by: Vec<&'static str>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct RustProofProfileReport {
+    pub corpus_kind: &'static str,
+    pub target_routes: Vec<&'static str>,
+    pub target_schemas: Vec<&'static str>,
+    pub heldout_questions: Vec<&'static str>,
+    pub forbidden_shortcuts: Vec<&'static str>,
+    pub required_evidence: Vec<&'static str>,
 }
 
 #[derive(Serialize, Clone)]
@@ -77,11 +107,14 @@ pub(crate) struct MemoryFinalClaimBoundary {
     pub blocked_by: Vec<&'static str>,
 }
 
-pub(crate) fn build_memory_final_proof_report() -> MemoryFinalProofReport {
+pub(crate) fn build_memory_final_proof_report(
+    profile: MemoryProofProfile,
+) -> MemoryFinalProofReport {
     let proof_path = memory_proof_path::build_memory_proof_path_report();
-    let field_recall = build_field_recall();
-    let llmwave_bridge = build_llmwave_bridge(&field_recall);
-    let big_corpus_gate = build_big_corpus_gate();
+    let field_recall = build_field_recall(profile);
+    let llmwave_bridge = build_llmwave_bridge(profile, &field_recall);
+    let big_corpus_gate = build_big_corpus_gate(profile);
+    let rust_profile = (profile == MemoryProofProfile::Rust).then(build_rust_profile);
     let controlled_chain_ready = proof_path.verdict == "PHASE6_8_MEMORY_PROOF_PATH_READY"
         && field_recall.focused
         && llmwave_bridge.grounded_in_recall;
@@ -116,7 +149,9 @@ pub(crate) fn build_memory_final_proof_report() -> MemoryFinalProofReport {
         version: MEMORY_FINAL_PROOF_VERSION,
         phase: "phase-9-12-field-recall-llmwave-big-corpus-final-proof",
         roadmap_block: "phase-9-12-field-recall-llmwave-big-corpus-final-proof",
+        profile: profile.as_str(),
         verdict,
+        rust_profile,
         field_recall,
         llmwave_bridge,
         big_corpus_gate,
@@ -139,6 +174,8 @@ pub(crate) fn build_memory_final_proof_report() -> MemoryFinalProofReport {
             llm_ready: final_proof_gate_passed,
             safe_claim: if final_proof_gate_passed {
                 "The configured final proof gate passed."
+            } else if profile == MemoryProofProfile::Rust {
+                "Rust-oriented phases 1-12 are wired as a structural proof path, but Rust big-corpus evidence remains required before claiming nonlinear memory or coding LLM readiness."
             } else {
                 "Phases 1-12 are implemented as a command path, but final nonlinear memory and LLM readiness remain blocked until real big-corpus evidence passes."
             },
@@ -147,45 +184,145 @@ pub(crate) fn build_memory_final_proof_report() -> MemoryFinalProofReport {
     }
 }
 
-fn build_field_recall() -> FieldRecallReport {
-    FieldRecallReport {
-        query: "what document does the customs broker require?",
-        dominant_route: "customs-check",
-        schema_peak: "broker requires document",
-        residuals_recalled: vec!["protocol", "declaration"],
-        anti_wave_suppressed: vec!["invoice_implies_payment", "status_hub_current_noise"],
-        answer_candidates: vec!["broker requires protocol", "importer submits declaration"],
-        focused: true,
-        recall_score: 0.97,
+fn build_field_recall(profile: MemoryProofProfile) -> FieldRecallReport {
+    match profile {
+        MemoryProofProfile::General => FieldRecallReport {
+            query: "what document does the customs broker require?",
+            dominant_route: "customs-check",
+            schema_peak: "broker requires document",
+            residuals_recalled: vec!["protocol", "declaration"],
+            anti_wave_suppressed: vec!["invoice_implies_payment", "status_hub_current_noise"],
+            answer_candidates: vec!["broker requires protocol", "importer submits declaration"],
+            focused: true,
+            recall_score: 0.97,
+        },
+        MemoryProofProfile::Rust => FieldRecallReport {
+            query: "which Rust owner exposes the memory final proof command?",
+            dominant_route: "rust-cli-proof-route",
+            schema_peak: "module owns command",
+            residuals_recalled: vec![
+                "llmwave_big::memory_final_proof",
+                "LlmwaveBigCommand::MemoryFinalProof",
+                "report::print_memory_final_proof_report",
+            ],
+            anti_wave_suppressed: vec![
+                "test_fixture_implies_runtime_api",
+                "report_printer_implies_decision_owner",
+            ],
+            answer_candidates: vec![
+                "memory_final_proof owns final proof construction",
+                "llmwave_big::mod exposes the CLI route",
+            ],
+            focused: true,
+            recall_score: 0.97,
+        },
     }
 }
 
-fn build_llmwave_bridge(field_recall: &FieldRecallReport) -> LlmwaveBridgeReport {
-    let grounded = field_recall
-        .answer_candidates
-        .contains(&"broker requires protocol");
-    LlmwaveBridgeReport {
-        prompt: "what does the customs broker require?",
-        recall_used: field_recall.focused,
-        generated_surface: "The customs broker requires the protocol.",
-        grounded_in_recall: grounded,
-        refuses_unsupported_prompt: true,
-        broad_chat_ready: false,
+fn build_llmwave_bridge(
+    profile: MemoryProofProfile,
+    field_recall: &FieldRecallReport,
+) -> LlmwaveBridgeReport {
+    match profile {
+        MemoryProofProfile::General => {
+            let grounded = field_recall
+                .answer_candidates
+                .contains(&"broker requires protocol");
+            LlmwaveBridgeReport {
+                prompt: "what does the customs broker require?",
+                recall_used: field_recall.focused,
+                generated_surface: "The customs broker requires the protocol.",
+                grounded_in_recall: grounded,
+                refuses_unsupported_prompt: true,
+                broad_chat_ready: false,
+            }
+        }
+        MemoryProofProfile::Rust => {
+            let grounded = field_recall
+                .answer_candidates
+                .contains(&"memory_final_proof owns final proof construction");
+            LlmwaveBridgeReport {
+                prompt: "which Rust owner exposes final proof?",
+                recall_used: field_recall.focused,
+                generated_surface:
+                    "The memory_final_proof module owns final proof construction; llmwave_big::mod exposes the CLI route.",
+                grounded_in_recall: grounded,
+                refuses_unsupported_prompt: true,
+                broad_chat_ready: false,
+            }
+        }
     }
 }
 
-fn build_big_corpus_gate() -> BigCorpusGateReport {
+fn build_big_corpus_gate(profile: MemoryProofProfile) -> BigCorpusGateReport {
+    let (corpus_kind, blocked_by) = match profile {
+        MemoryProofProfile::General => (
+            "general-structural-corpus",
+            vec![
+                "no_real_big_corpus_artifact",
+                "no_big_corpus_heldout_suite",
+                "no_route_balanced_focus_packet_for_real_corpus",
+            ],
+        ),
+        MemoryProofProfile::Rust => (
+            "rust-code-structural-corpus",
+            vec![
+                "no_rust_code_corpus_artifact",
+                "no_rust_api_owner_heldout_suite",
+                "no_rust_route_balanced_focus_packet",
+                "no_compile_test_evidence_bridge",
+            ],
+        ),
+    };
     BigCorpusGateReport {
         required_min_facts: 100_000,
         observed_real_corpus_facts: 0,
         synthetic_scale_projection_facts: 100_000,
+        corpus_kind,
         real_big_corpus_loaded: false,
         route_balanced_focus_required: true,
         verdict: "BIG_CORPUS_NOT_LOADED",
-        blocked_by: vec![
-            "no_real_big_corpus_artifact",
-            "no_big_corpus_heldout_suite",
-            "no_route_balanced_focus_packet_for_real_corpus",
+        blocked_by,
+    }
+}
+
+fn build_rust_profile() -> RustProofProfileReport {
+    RustProofProfileReport {
+        corpus_kind: "rust-code-structural-corpus",
+        target_routes: vec![
+            "module-owner",
+            "public-api-export",
+            "cli-command-dispatch",
+            "report-printer",
+            "unit-test-proof",
+            "integration-test-proof",
+        ],
+        target_schemas: vec![
+            "module owns function",
+            "enum variant dispatches builder",
+            "builder returns report",
+            "report printer serializes report",
+            "test verifies claim boundary",
+        ],
+        heldout_questions: vec![
+            "which module owns the final proof builder?",
+            "which CLI variant dispatches memory-final-proof?",
+            "which tests prove the Rust claim boundary stays closed?",
+        ],
+        forbidden_shortcuts: vec![
+            "test helper is runtime owner",
+            "report printer owns decision",
+            "CLI dispatch implies proof passed",
+            "compiled command implies LLM readiness",
+        ],
+        required_evidence: vec![
+            "src path",
+            "module name",
+            "function name",
+            "enum variant",
+            "unit test",
+            "integration test",
+            "cargo check/clippy/test output",
         ],
     }
 }
@@ -207,9 +344,9 @@ fn missing_final_evidence(
         missing.push("llmwave_bridge_not_ready");
     }
     if !big_corpus_ready {
-        missing.push("real_big_corpus_not_loaded");
-        missing.push("big_corpus_heldout_eval_missing");
-        missing.push("big_corpus_route_balance_missing");
+        missing.push("real_or_profile_big_corpus_not_loaded");
+        missing.push("profile_heldout_eval_missing");
+        missing.push("profile_route_balance_missing");
     }
     missing
 }
@@ -220,9 +357,10 @@ mod tests {
 
     #[test]
     fn memory_final_proof_runs_full_command_path_but_blocks_big_claims() {
-        let report = build_memory_final_proof_report();
+        let report = build_memory_final_proof_report(MemoryProofProfile::General);
 
         assert_eq!(report.verdict, "FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS");
+        assert_eq!(report.profile, "general");
         assert!(report.final_proof_gate.controlled_chain_ready);
         assert!(report.final_proof_gate.field_recall_ready);
         assert!(report.final_proof_gate.llmwave_bridge_ready);
@@ -234,15 +372,34 @@ mod tests {
 
     #[test]
     fn memory_final_proof_exposes_big_corpus_missing_evidence() {
-        let report = build_memory_final_proof_report();
+        let report = build_memory_final_proof_report(MemoryProofProfile::General);
 
         assert!(report
             .final_proof_gate
             .missing_evidence
-            .contains(&"real_big_corpus_not_loaded"));
+            .contains(&"real_or_profile_big_corpus_not_loaded"));
         assert!(report
             .claim_boundary
             .blocked_by
-            .contains(&"big_corpus_heldout_eval_missing"));
+            .contains(&"profile_heldout_eval_missing"));
+    }
+
+    #[test]
+    fn memory_final_proof_rust_profile_is_code_oriented() {
+        let report = build_memory_final_proof_report(MemoryProofProfile::Rust);
+
+        assert_eq!(report.profile, "rust");
+        assert_eq!(
+            report.big_corpus_gate.corpus_kind,
+            "rust-code-structural-corpus"
+        );
+        assert_eq!(report.field_recall.dominant_route, "rust-cli-proof-route");
+        assert!(report.llmwave_bridge.grounded_in_recall);
+        assert!(report.rust_profile.is_some());
+        assert!(report
+            .big_corpus_gate
+            .blocked_by
+            .contains(&"no_rust_code_corpus_artifact"));
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
     }
 }

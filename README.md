@@ -270,6 +270,10 @@ nanda-llmwave-big memory-proof-path \
 nanda-llmwave-big memory-final-proof \
   --format json
 
+nanda-llmwave-big memory-final-proof \
+  --profile rust \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -307,6 +311,12 @@ partitions. It remains controlled evidence, not final nonlinear-memory proof.
 LLMWave bridge, big-corpus evidence, and the final proof boundary. Until a real
 big-corpus artifact and held-out suite are present, the expected honest verdict
 is `FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS`.
+
+Use `memory-final-proof --profile rust` for the first code-oriented proof
+target. It changes the proof surface to Rust module owners, public API exports,
+CLI dispatch, report printers, tests, compile evidence, and Rust-specific
+forbidden shortcuts. It still keeps broad nonlinear-memory and LLM claims
+blocked until a real Rust code corpus and held-out suite are present.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

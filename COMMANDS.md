@@ -119,6 +119,7 @@ nanda-llmwave-big schema-residual-engine --format json
 nanda-llmwave-big memory-physics --format json
 nanda-llmwave-big memory-proof-path --format json
 nanda-llmwave-big memory-final-proof --format json
+nanda-llmwave-big memory-final-proof --profile rust --format json
 nanda-llmwave-big nonlinear-memory-eval --format json
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
@@ -149,6 +150,9 @@ It is still a controlled proof path, not the final big-corpus proof gate.
 the LLMWave bridge, the big-corpus gate, and the final proof gate. The expected
 honest state before a real big corpus is
 `FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS`, with `nonlinear_memory_proven=false`.
+Use `--profile rust` for the first code-oriented corpus: module owners, public
+API exports, CLI dispatch, report printers, unit tests, integration tests, and
+forbidden shortcuts such as "compiled command implies LLM readiness".
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.
