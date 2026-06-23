@@ -203,6 +203,7 @@ scripts/nanda-llmwave-big run --evidence-mode release-confirmed --decision accep
 scripts/nanda-llmwave-big core-eval --format json
 scripts/nanda-llmwave-big readiness-ladder --format json
 scripts/nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
+scripts/nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
 scripts/nanda-llmwave-big claim-gate --claim llm-ready --format json
 scripts/nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json

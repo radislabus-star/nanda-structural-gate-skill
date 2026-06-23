@@ -39,6 +39,8 @@ pub(crate) enum ClaimGateKind {
     FixtureReasoning,
     #[value(name = "artifact-grounded-qa")]
     ArtifactGroundedQa,
+    #[value(name = "small-domain-llmwave")]
+    SmallDomainLlmwave,
     #[value(name = "llm-ready")]
     LlmReady,
     #[value(name = "nonlinear-memory")]
@@ -200,13 +202,36 @@ pub(crate) fn build_claim_gate_report(claim: ClaimGateKind) -> ClaimGateReport {
             missing_evidence: vec!["broad chat generalization"],
             claim_boundary: claims,
         },
+        ClaimGateKind::SmallDomainLlmwave => ClaimGateReport {
+            mode: "llmwave-big-claim-gate",
+            version: "llmwave-big-v-next-claim-gate",
+            claim: "small-domain-llmwave",
+            verdict: "CLAIM_ALLOWED_LOCAL_ONLY",
+            allowed: true,
+            evidence: vec![
+                "domain-eval combines artifact QA, scripted hot-memory chat, and scale-amortized memory density",
+                "artifact-grounded QA ready",
+                "scripted hot multi-turn memory lift ready",
+                "scale-amortized nonlinear memory ready",
+            ],
+            missing_evidence: vec![
+                "broad unscripted chat eval",
+                "general corpus eval",
+                "general nonlinear-memory proof",
+            ],
+            claim_boundary: claims,
+        },
         ClaimGateKind::LlmReady => ClaimGateReport {
             mode: "llmwave-big-claim-gate",
             version: "llmwave-big-v-next-claim-gate",
             claim: "llm-ready",
             verdict: "CLAIM_BLOCKED",
             allowed: false,
-            evidence: vec!["field-core sole engine", "local fixture reasoning"],
+            evidence: vec![
+                "field-core sole engine",
+                "local fixture reasoning",
+                "small-domain LLMWave eval pass",
+            ],
             missing_evidence: vec![
                 "broad multi-turn chat eval",
                 "external corpus generalization",

@@ -238,6 +238,8 @@ jq -e '.claim_boundary.field_core_as_sole_engine == true and .claim_boundary.fix
 jq -e '([.levels[].name] | index("scale-amortized nonlinear memory"))' <<<"$big_readiness_json" >/dev/null
 big_field_claim_json="$("$llmwave_big" claim-gate --claim field-core-sole-engine --format json)"
 jq -e '.mode == "llmwave-big-claim-gate" and .claim == "field-core-sole-engine" and .verdict == "CLAIM_ALLOWED" and .allowed == true' <<<"$big_field_claim_json" >/dev/null
+big_small_domain_claim_json="$("$llmwave_big" claim-gate --claim small-domain-llmwave --format json)"
+jq -e '.claim == "small-domain-llmwave" and .verdict == "CLAIM_ALLOWED_LOCAL_ONLY" and .allowed == true and (.missing_evidence | index("broad unscripted chat eval"))' <<<"$big_small_domain_claim_json" >/dev/null
 set +e
 big_llm_claim_json="$("$llmwave_big" claim-gate --claim llm-ready --format json)"
 big_llm_claim_code=$?
