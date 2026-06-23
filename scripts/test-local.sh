@@ -413,6 +413,10 @@ jq -e '.mode == "llmwave-big-memory-physics" and .phase == "phase-4-5-collision-
 jq -e '.schema_residual_bridge.phase4_5_uses_phase2_3_engine == true and .anti_wave_format.record_bytes == 32 and .anti_wave_format.shortcut_specific == true' <<<"$big_memory_physics_json" >/dev/null
 jq -e '.metrics.collision_reject_rate == 1 and .metrics.noise_reject_rate == 1 and .metrics.false_positive_rate_before_anti > .metrics.false_positive_rate_after_anti and .metrics.false_positive_rate_after_anti == 0' <<<"$big_memory_physics_json" >/dev/null
 jq -e '.claim_boundary.collision_noise_physics_implemented == true and .claim_boundary.anti_wave_memory_integrated == true and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_memory_physics_json" >/dev/null
+big_memory_proof_path_json="$("$llmwave_big" memory-proof-path --format json)"
+jq -e '.mode == "llmwave-big-memory-proof-path" and .phase == "phase-6-8-heldout-basis-atlas" and .verdict == "PHASE6_8_MEMORY_PROOF_PATH_READY"' <<<"$big_memory_proof_path_json" >/dev/null
+jq -e '.metrics.heldout_pass_rate == 1 and .metrics.memory_physics_ready == true and .wave_atlas.route_balanced == true and .basis_economics.ladder_phase_ready == true' <<<"$big_memory_proof_path_json" >/dev/null
+jq -e '.claim_boundary.heldout_inference_implemented == true and .claim_boundary.basis_economics_connected == true and .claim_boundary.wave_atlas_memory_implemented == true and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_memory_proof_path_json" >/dev/null
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null
 jq -e '.conflict_preservation.state == "CONFLICTS_PRESERVED" and .eval.safe == true' <<<"$big_consolidate_json" >/dev/null

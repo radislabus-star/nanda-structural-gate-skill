@@ -264,6 +264,9 @@ nanda-llmwave-big schema-residual-engine \
 nanda-llmwave-big memory-physics \
   --format json
 
+nanda-llmwave-big memory-proof-path \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -292,6 +295,10 @@ fallbacks.
 `memory-physics` is the Phase 4-5 collision/noise path. It runs clean,
 collision, and noise trials through shortcut-specific 32-byte anti-wave records
 and reports whether false positives fall after suppression.
+
+`memory-proof-path` is the Phase 6-8 bridge: held-out inference over schema
+keys, basis economics from the density ladder, and route-balanced Wave Atlas
+partitions. It remains controlled evidence, not final nonlinear-memory proof.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

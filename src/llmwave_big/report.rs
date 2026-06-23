@@ -27,6 +27,7 @@ use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::mature_anti_wave::MatureAntiWaveReport;
 use super::memory_physics::MemoryPhysicsReport;
+use super::memory_proof_path::MemoryProofPathReport;
 use super::mini_chat_eval::MiniChatEvalReport;
 use super::multi_peak_field::MultiPeakFieldReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
@@ -769,6 +770,21 @@ pub(crate) fn print_memory_physics_report(
         ),
         OutputFormat::Text => print_memory_physics_text(report),
         OutputFormat::Md => print_memory_physics_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_memory_proof_path_report(
+    report: &MemoryProofPathReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_memory_proof_path_text(report),
+        OutputFormat::Md => print_memory_proof_path_md(report),
     }
     Ok(())
 }
@@ -1733,6 +1749,15 @@ fn print_memory_physics_text(report: &MemoryPhysicsReport) {
     );
 }
 
+fn print_memory_proof_path_text(report: &MemoryProofPathReport) {
+    println!("mode: {}", report.mode);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("heldout_pass_rate: {:.4}", report.metrics.heldout_pass_rate);
+    println!("route_balanced: {}", report.wave_atlas.route_balanced);
+    println!("inference_score: {:.4}", report.metrics.inference_score);
+}
+
 fn print_consolidation_text(report: &ConsolidationReport) {
     println!("LLMWave-Big Consolidation Sleep");
     println!("version: {}", report.version);
@@ -2645,6 +2670,19 @@ fn print_memory_physics_md(report: &MemoryPhysicsReport) {
         "- false-positive rate after anti-wave: `{:.4}`",
         report.metrics.false_positive_rate_after_anti
     );
+}
+
+fn print_memory_proof_path_md(report: &MemoryProofPathReport) {
+    println!("# LLMWave-Big Memory Proof Path");
+    println!();
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- heldout pass rate: `{:.4}`",
+        report.metrics.heldout_pass_rate
+    );
+    println!("- route balanced: `{}`", report.wave_atlas.route_balanced);
+    println!("- inference score: `{:.4}`", report.metrics.inference_score);
 }
 
 fn print_consolidation_md(report: &ConsolidationReport) {

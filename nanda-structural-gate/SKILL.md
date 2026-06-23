@@ -214,6 +214,7 @@ scripts/nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
 scripts/nanda-llmwave-big nonlinear-memory-ladder --max-facts 100000 --format json
 scripts/nanda-llmwave-big schema-residual-engine --format json
 scripts/nanda-llmwave-big memory-physics --format json
+scripts/nanda-llmwave-big memory-proof-path --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
@@ -707,6 +708,9 @@ Use `nanda-llmwave-big memory-physics --format json` for the Phase 4-5
 collision/noise and anti-wave integration check. Read false-positive rates
 before and after anti-wave; useful suppression does not unlock the nonlinear
 memory claim by itself.
+Use `nanda-llmwave-big memory-proof-path --format json` for the Phase 6-8
+bridge: held-out inference, basis economics, and route-balanced Wave Atlas
+memory. It should still keep final nonlinear-memory and LLM claims blocked.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a
