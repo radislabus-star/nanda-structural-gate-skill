@@ -31,6 +31,10 @@ mechanism with literature footnotes: segmentation, fast mapping,
 cross-situational convergence, usage/exemplar strengthening, grammar
 integration, attractor cleanup, and anti-confusion.
 
+For the current command map, see [`COMMANDS.md`](COMMANDS.md). The runtime skill
+file (`nanda-structural-gate/SKILL.md`) is the agent-facing command source, and
+`COMMANDS.md` is the public human-facing index.
+
 ## Why
 
 LLMs can read individual facts correctly and still confuse the relation shape:
@@ -217,6 +221,49 @@ Then open a new PowerShell window and run:
 ```powershell
 nanda-doctor.cmd
 nanda-search.cmd examples\triad-packet.interference-search-route-trap.json --input-format json --top-k 3
+```
+
+## Command Map
+
+The canonical public command list lives in [`COMMANDS.md`](COMMANDS.md). Use the
+commands below as a quick smoke path after local install.
+
+```bash
+nanda-doctor
+nanda-self-check
+nanda-field-audit --format json
+nanda-llmwave-big readiness-ladder --format json
+nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
+nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
+nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
+nanda-llmwave-big claim-gate --claim llm-ready --format json
+```
+
+Current intended claim boundary:
+
+```text
+field_core_as_sole_engine = true
+small_domain_llmwave      = CLAIM_ALLOWED_LOCAL_ONLY
+nonlinear_memory          = CLAIM_BLOCKED
+llm_ready                 = CLAIM_BLOCKED
+```
+
+For the latest LLMWave-Big eval path, use:
+
+```bash
+nanda-llmwave-big nonlinear-memory-eval \
+  --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
+  --proof-policy scale-amortized \
+  --format json
+
+nanda-llmwave-big domain-eval \
+  --artifact .nanda/llmwave-big-training/project-artifact.json \
+  --ask-suite examples/llmwave-big-ask-eval.json \
+  --hot-pack .nanda/llmwave-big-training/project.hot.bin \
+  --chat-script .nanda/llmwave-big-training/chat.script \
+  --chat-memory .nanda/llmwave-big-training/domain-chat-memory.json \
+  --nonlinear-corpus examples/llmwave-big-nonlinear-memory-corpus.json \
+  --format json
 ```
 
 The Windows installer builds `target\release\nanda.exe`, copies the skill to

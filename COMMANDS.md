@@ -1,0 +1,285 @@
+# NANDA Command Map
+
+This file is the public command index. `nanda-structural-gate/SKILL.md` remains
+the runtime instruction file for Codex agents. `UNIFIED_FIELD_REFACTOR_PLAN.md`
+tracks what each claim means and which claims are still blocked.
+
+## Health And Install
+
+```bash
+scripts/install-local.sh
+nanda --version
+nanda-doctor
+nanda-self-check
+```
+
+Use these before release or after adding a new CLI subcommand:
+
+```bash
+cargo fmt --check
+cargo check --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
+git diff --check
+scripts/test-edge-cases.sh
+scripts/test-local.sh
+scripts/install-local.sh
+nanda-self-check
+```
+
+## Structural Gate
+
+```bash
+nanda-init-md --task-id local-check --domain general --query "check routes"
+nanda-gate-md nanda-task-local-check.md --task-id local-check --domain general
+nanda-check --triads examples/triad-packet.route-splice.json --input-format json
+nanda-map examples/triads.code-flow-splice.md --domain code --normalize-paths
+nanda-split-md examples/triads.code-flow-splice.md --by linked-group --out-dir split/
+nanda-split examples/triad-packet.route-splice.json --input-format json --by linked-group --out-dir split-json/
+```
+
+## Repo Guard
+
+Build an atlas once, then guard actions and diffs against route confusion.
+
+```bash
+nanda-build-atlas . --out .nanda/route-atlas.json
+nanda-guard-action .nanda/route-atlas.json \
+  --symptom "IME not visible" \
+  --action-id ime.activate_engine \
+  --boundary-economics
+nanda-guard-diff .nanda/route-atlas.json \
+  --action-id ime.show_candidate \
+  --diff git.diff \
+  --boundary-economics
+nanda-release-gate .nanda/route-atlas.json
+```
+
+## Boundary Economics
+
+Use this before refactoring. `WATCH` means do not cut yet.
+
+```bash
+nanda-boundary-economics . --format json
+nanda-boundary-economics . \
+  --atlas .nanda/route-atlas.json \
+  --route ime-display-flow \
+  --owner LayIbusEngine \
+  --format json
+nanda-dogfood . --refactor-plan --boundary-economics --format json
+```
+
+## Field Core
+
+```bash
+nanda-field-report --from search-result.json --format json
+nanda-field-audit --format json
+nanda-field-equivalence \
+  --structural-from search-result.json \
+  --packed-from pack6m-result.json \
+  --cognitive-from llmwave-big-result.json \
+  --format json
+nanda-field-cutover --suite structural-standard --format json
+```
+
+Current intended claim boundary:
+
+```text
+field_core_as_sole_engine = true
+llm_ready = false
+nonlinear_memory_proven = false
+```
+
+## LLMWave Readiness And Claims
+
+```bash
+nanda-llmwave-big readiness-ladder --format json
+nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
+nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
+nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
+nanda-llmwave-big claim-gate --claim llm-ready --format json
+```
+
+Expected boundary today:
+
+```text
+small-domain-llmwave      CLAIM_ALLOWED_LOCAL_ONLY
+nonlinear-memory          CLAIM_BLOCKED
+llm-ready                 CLAIM_BLOCKED
+```
+
+## Nonlinear Memory Eval
+
+Strict mode keeps the general nonlinear-memory claim blocked until the whole
+sweep beats the linear baseline.
+
+```bash
+nanda-llmwave-big nonlinear-memory-eval --format json
+nanda-llmwave-big nonlinear-memory-eval \
+  --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
+  --proof-policy strict-full-sweep \
+  --format json
+```
+
+Scale-amortized mode is the local density result after fixed-basis overhead is
+amortized. It does not unlock the general nonlinear-memory claim.
+
+```bash
+nanda-llmwave-big nonlinear-memory-eval \
+  --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
+  --proof-policy scale-amortized \
+  --format json
+```
+
+Expected boundary today:
+
+```text
+scale_amortized_nonlinear_memory_proven = true
+nonlinear_memory_proven = false
+```
+
+## LLMWave Core Stages
+
+```bash
+nanda-llmwave-big contract --format json
+nanda-llmwave-big atlas --format json
+nanda-llmwave-big active-core --format json
+nanda-llmwave-big l2 --format json
+nanda-llmwave-big hrr --format json
+nanda-llmwave-big schema-bind --format json
+nanda-llmwave-big l2-l3-couple --format json
+nanda-llmwave-big decode-loop --format json
+nanda-llmwave-big multi-schema --format json
+nanda-llmwave-big schema-grow --format json
+nanda-llmwave-big surface-generate --format json
+nanda-llmwave-big reason-field --format json
+nanda-llmwave-big dialogue-state --format json
+nanda-llmwave-big mini-chat-eval --format json
+nanda-llmwave-big query-wave --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big multi-peak-field --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big lens-scan --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big mature-anti-wave --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big evidence-proof --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
+nanda-llmwave-big answer-surface --text "Has customs cleared the goods?" --evidence-mode release-confirmed --format json
+nanda-llmwave-big field-feedback --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json
+nanda-llmwave-big feedback-memory --text "Has customs cleared the goods?" --evidence-mode release-confirmed --decision accept --format json
+nanda-llmwave-big feedback-aware-field --text "Has customs cleared the goods?" --memory-mode accept --format json
+nanda-llmwave-big applied-anti-memory --format json
+nanda-llmwave-big memory-store --path .nanda/llmwave-big-memory.json --action apply --decision accept --format json
+nanda-llmwave-big learning-eval --format json
+nanda-llmwave-big memory-consolidate --format json
+nanda-llmwave-big run --evidence-mode release-confirmed --decision accept --format json
+nanda-llmwave-big core-eval --format json
+```
+
+## Word And Surface Memory
+
+```bash
+nanda-llmwave-big word-birth --format json
+nanda-llmwave-big surface-production --format json
+nanda-llmwave-big surface-reconstruct --format json
+nanda-llmwave-big surface-corpus-eval --format json
+nanda-llmwave-big surface-bank-build --format json
+nanda-llmwave-big surface-bank-validate --format json
+nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus.json --format json
+nanda-llmwave-big surface-bank-fixture --corpus examples/llmwave-big-surface-corpus-ru.json --format json
+nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru.json --format json
+nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-noisy.json --format json
+nanda-llmwave-big surface-raw-induce --corpus examples/llmwave-big-raw-surface-corpus-ru-derived.json --format json
+```
+
+## Training, Hot Pack, And Small-Domain Eval
+
+Build a small project artifact:
+
+```bash
+mkdir -p .nanda/llmwave-big-training
+nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples \
+  --out .nanda/llmwave-big-training/project-artifact.json \
+  --format json
+```
+
+Ask and evaluate the artifact:
+
+```bash
+nanda-llmwave-big ask \
+  --artifact .nanda/llmwave-big-training/project-artifact.json \
+  --text "what does declaration require" \
+  --top-k 5 \
+  --format json
+nanda-llmwave-big ask-eval \
+  --artifact .nanda/llmwave-big-training/project-artifact.json \
+  --suite examples/llmwave-big-ask-eval.json \
+  --top-k 5 \
+  --format json
+```
+
+Pack and query the hot core:
+
+```bash
+nanda-llmwave-big pack-hot \
+  --artifact .nanda/llmwave-big-training/project-artifact.json \
+  --out .nanda/llmwave-big-training/project.hot.bin \
+  --format json
+nanda-llmwave-big ask-hot \
+  --hot-pack .nanda/llmwave-big-training/project.hot.bin \
+  --artifact .nanda/llmwave-big-training/project-artifact.json \
+  --text "invoice requires payment" \
+  --top-k 5 \
+  --format json
+```
+
+Scripted hot chat eval:
+
+```bash
+cat > .nanda/llmwave-big-training/chat.script <<'EOF'
+ask broker requires invoice
+learn accept: broker | requires | invoice
+ask broker requires invoice
+exit
+EOF
+
+nanda-llmwave-big chat-hot-eval \
+  --hot-pack .nanda/llmwave-big-training/project.hot.bin \
+  --artifact .nanda/llmwave-big-training/project-artifact.json \
+  --memory .nanda/llmwave-big-training/chat-eval-memory.json \
+  --script .nanda/llmwave-big-training/chat.script \
+  --top-k 5 \
+  --format json
+```
+
+Small-domain LLMWave eval:
+
+```bash
+nanda-llmwave-big domain-eval \
+  --artifact .nanda/llmwave-big-training/project-artifact.json \
+  --ask-suite examples/llmwave-big-ask-eval.json \
+  --hot-pack .nanda/llmwave-big-training/project.hot.bin \
+  --chat-script .nanda/llmwave-big-training/chat.script \
+  --chat-memory .nanda/llmwave-big-training/domain-chat-memory.json \
+  --nonlinear-corpus examples/llmwave-big-nonlinear-memory-corpus.json \
+  --top-k 5 \
+  --format json
+```
+
+## Public Corpus Helper
+
+```bash
+scripts/fetch-llmwave-big-gutenberg.sh
+nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples .nanda/external-corpus/gutenberg \
+  --out .nanda/llmwave-big-training/project-gutenberg-artifact.json \
+  --vocab-cap 65536 \
+  --transition-cap 262144 \
+  --active-chunk-cap 32768 \
+  --chunk-tokens 64 \
+  --format json
+```
+
+## Benchmarks
+
+```bash
+nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
+nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
+nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json
+nanda-bench6m --mode density --support-build-iterations 1000 --triads 15000 --format json
+```
+
