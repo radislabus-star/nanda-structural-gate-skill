@@ -211,6 +211,7 @@ scripts/nanda-llmwave-big claim-gate --claim field-core-sole-engine --format jso
 scripts/nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
 scripts/nanda-llmwave-big claim-gate --claim llm-ready --format json
 scripts/nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
+scripts/nanda-llmwave-big nonlinear-memory-ladder --max-facts 100000 --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
@@ -691,6 +692,11 @@ counts, linear bytes, standalone fixed-basis bytes, amortized fixed-basis
 bytes, held-out pass, negative rejection, and noise rejection. An amortized pass
 does not unlock the general nonlinear-memory claim unless the strict gates also
 repay basis overhead and broad eval coverage.
+Use `nanda-llmwave-big nonlinear-memory-ladder --max-facts 100000 --format json`
+as the Phase 1 density instrument. It maps amortized win points, standalone
+basis break-even, collision pressure, and the best operating window. Treat it
+as economics/profiling evidence only: `nonlinear_memory_proven=false` remains
+the correct claim boundary until later phases and the final proof gate pass.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a

@@ -148,6 +148,9 @@ enum LlmwaveBigCommand {
     /// Compare fixed-basis residual memory against a linear fact baseline.
     #[command(name = "nonlinear-memory-eval", alias = "density-proof")]
     NonlinearMemoryEval(LlmwaveBigNonlinearMemoryEvalArgs),
+    /// Build the Phase 1 nonlinear-memory density ladder.
+    #[command(name = "nonlinear-memory-ladder", alias = "density-ladder")]
+    NonlinearMemoryLadder(LlmwaveBigNonlinearMemoryLadderArgs),
     /// Print the v246-v252 literature-grounded lexical birth mechanism.
     WordBirth(LlmwaveBigWordBirthArgs),
     /// Print the v253-v260 surface production memory contract.
@@ -438,6 +441,14 @@ struct LlmwaveBigNonlinearMemoryEvalArgs {
     corpus: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "strict-full-sweep")]
     proof_policy: nonlinear_memory_eval::NonlinearProofPolicyKind,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigNonlinearMemoryLadderArgs {
+    #[arg(long, default_value_t = 100_000)]
+    max_facts: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -882,6 +893,12 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 args.proof_policy,
             )?;
             report::print_nonlinear_memory_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::NonlinearMemoryLadder(args) => {
+            let report =
+                nonlinear_memory_eval::build_nonlinear_memory_ladder_report(args.max_facts);
+            report::print_nonlinear_memory_ladder_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::WordBirth(args) => {

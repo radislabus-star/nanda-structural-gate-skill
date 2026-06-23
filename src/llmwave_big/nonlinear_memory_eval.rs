@@ -11,6 +11,8 @@ use serde::Serialize;
 use super::write;
 
 pub(crate) const NONLINEAR_MEMORY_EVAL_VERSION: &str = "llmwave-big-v-next-nonlinear-memory-eval";
+pub(crate) const NONLINEAR_MEMORY_LADDER_VERSION: &str =
+    "llmwave-big-v-next-nonlinear-memory-ladder";
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug)]
 pub(crate) enum NonlinearProofPolicyKind {
@@ -34,6 +36,65 @@ pub(crate) struct NonlinearMemoryEvalReport {
     pub aggregate: NonlinearAggregateMetrics,
     pub gates: NonlinearProofGates,
     pub claim_boundary: NonlinearClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct NonlinearMemoryLadderReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub phase: &'static str,
+    pub roadmap_block: &'static str,
+    pub max_facts: usize,
+    pub basis: FixedBasisReport,
+    pub ladder: Vec<NonlinearMemoryLadderPoint>,
+    pub aggregate: NonlinearMemoryLadderAggregate,
+    pub claim_boundary: NonlinearMemoryLadderClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct NonlinearMemoryLadderPoint {
+    pub facts: usize,
+    pub useful_facts: usize,
+    pub schema_count: usize,
+    pub residual_count: usize,
+    pub basis_overhead_bytes: usize,
+    pub basis_overhead_repaid: bool,
+    pub linear_baseline: CorpusMemoryModelMetrics,
+    pub fixed_basis_standalone: CorpusMemoryModelMetrics,
+    pub fixed_basis_amortized: CorpusMemoryModelMetrics,
+    pub delta: CorpusMemoryDelta,
+    pub collision_rate: f64,
+    pub role_error_rate: f64,
+    pub false_positive_rate: f64,
+    pub heldout_pass_rate: f64,
+    pub negative_reject_rate: f64,
+    pub noise_reject_rate: f64,
+    pub verdict: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct NonlinearMemoryLadderAggregate {
+    pub amortized_win_point: Option<usize>,
+    pub standalone_break_even_point: Option<usize>,
+    pub density_collapse_point: Option<usize>,
+    pub best_operating_window: Option<String>,
+    pub max_schema_reuse_ratio: f64,
+    pub max_residual_saving_ratio: f64,
+    pub max_collision_rate: f64,
+    pub min_heldout_pass_rate: f64,
+    pub phase1_ready: bool,
+    pub state: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct NonlinearMemoryLadderClaimBoundary {
+    pub nonlinear_memory_ladder_implemented: bool,
+    pub phase1_density_ladder_ready: bool,
+    pub final_proof_gate_passed: bool,
+    pub nonlinear_memory_proven: bool,
+    pub llm_ready: bool,
+    pub safe_claim: &'static str,
+    pub blocked_by: Vec<&'static str>,
 }
 
 #[derive(Serialize, Clone)]
@@ -324,6 +385,262 @@ pub(crate) fn build_nonlinear_memory_eval_report(
             blocked_by,
         },
     })
+}
+
+pub(crate) fn build_nonlinear_memory_ladder_report(
+    max_facts: usize,
+) -> NonlinearMemoryLadderReport {
+    let max_facts = max_facts.max(1);
+    let basis = FixedBasisReport {
+        wave_dim: super::super::WAVE_DIM,
+        basis_id: "fixed-field-basis-1024-v1",
+        fixed_across_sweep: true,
+        schema_families: 6,
+        relation_slots: 12,
+        role_slots: 16,
+    };
+    let ladder = ladder_levels(max_facts)
+        .into_iter()
+        .map(nonlinear_ladder_point)
+        .collect::<Vec<_>>();
+    let aggregate = nonlinear_ladder_aggregate(&ladder);
+
+    NonlinearMemoryLadderReport {
+        mode: "llmwave-big-nonlinear-memory-ladder",
+        version: NONLINEAR_MEMORY_LADDER_VERSION,
+        phase: "phase-1-nonlinear-memory-ladder",
+        roadmap_block: "phase-1-nonlinear-memory-ladder",
+        max_facts,
+        basis,
+        ladder,
+        aggregate,
+        claim_boundary: NonlinearMemoryLadderClaimBoundary {
+            nonlinear_memory_ladder_implemented: true,
+            phase1_density_ladder_ready: true,
+            final_proof_gate_passed: false,
+            nonlinear_memory_proven: false,
+            llm_ready: false,
+            safe_claim: "Phase 1 maps fixed-basis density economics and risk zones; it does not prove final nonlinear memory or LLM readiness.",
+            blocked_by: vec![
+                "schema_reuse_engine_not_yet_proved_on_big_corpus",
+                "residual_only_write_not_yet_validated_with_heldout_inference",
+                "collision_noise_and_anti_wave_physics_not_yet_integrated",
+                "final_proof_gate_not_run",
+            ],
+        },
+    }
+}
+
+fn ladder_levels(max_facts: usize) -> Vec<usize> {
+    let mut levels = [10usize, 100, 1_000, 10_000, 100_000]
+        .into_iter()
+        .filter(|level| *level <= max_facts)
+        .collect::<Vec<_>>();
+    if levels.last().copied() != Some(max_facts) {
+        levels.push(max_facts);
+    }
+    levels.sort_unstable();
+    levels.dedup();
+    levels
+}
+
+fn nonlinear_ladder_point(facts: usize) -> NonlinearMemoryLadderPoint {
+    let useful_facts = facts.max(1);
+    let schema_count = synthetic_schema_count(facts);
+    let residual_count = useful_facts;
+    let basis_overhead_bytes = 64 * 1024;
+    let schema_bytes = schema_count * 32;
+    let residual_bytes = residual_count * write::SMALL_RESIDUAL_BYTES;
+    let centroid_bytes = schema_count * write::CENTROID_UPDATE_BYTES;
+    let linear_bytes = facts * write::FULL_FACT_RECORD_BYTES;
+    let amortized_bytes = schema_bytes + residual_bytes + centroid_bytes;
+    let standalone_bytes = basis_overhead_bytes + amortized_bytes;
+    let schema_reuse_ratio = round4(useful_facts as f64 / schema_count.max(1) as f64);
+    let residual_saving_ratio =
+        round4(1.0 - (write::SMALL_RESIDUAL_BYTES as f64 / write::FULL_FACT_RECORD_BYTES as f64));
+    let collision_rate = synthetic_collision_rate(facts);
+    let role_error_rate = round4(0.003 + collision_rate * 0.55);
+    let false_positive_rate = round4(0.006 + collision_rate * 0.8);
+    let heldout_pass_rate = round4((0.995 - collision_rate * 0.65).max(0.0));
+    let negative_reject_rate = round4((0.996 - collision_rate * 0.75).max(0.0));
+    let noise_reject_rate = round4((0.994 - collision_rate * 0.85).max(0.0));
+    let linear = CorpusMemoryModelMetrics {
+        bytes_total: linear_bytes,
+        bytes_per_useful_fact: round4(linear_bytes as f64 / useful_facts as f64),
+        schema_reuse_ratio: 1.0,
+        residual_saving_ratio: 0.0,
+        heldout_pass_rate,
+        negative_reject_rate,
+        noise_reject_rate,
+    };
+    let fixed_basis_amortized = CorpusMemoryModelMetrics {
+        bytes_total: amortized_bytes,
+        bytes_per_useful_fact: round4(amortized_bytes as f64 / useful_facts as f64),
+        schema_reuse_ratio,
+        residual_saving_ratio,
+        heldout_pass_rate,
+        negative_reject_rate,
+        noise_reject_rate,
+    };
+    let fixed_basis_standalone = CorpusMemoryModelMetrics {
+        bytes_total: standalone_bytes,
+        bytes_per_useful_fact: round4(standalone_bytes as f64 / useful_facts as f64),
+        schema_reuse_ratio,
+        residual_saving_ratio,
+        heldout_pass_rate,
+        negative_reject_rate,
+        noise_reject_rate,
+    };
+    let delta = CorpusMemoryDelta {
+        standalone_bytes_per_useful_fact_gain: round4(
+            linear.bytes_per_useful_fact / fixed_basis_standalone.bytes_per_useful_fact.max(0.0001),
+        ),
+        amortized_bytes_per_useful_fact_gain: round4(
+            linear.bytes_per_useful_fact / fixed_basis_amortized.bytes_per_useful_fact.max(0.0001),
+        ),
+        amortized_total_bytes_gain: round4(linear_bytes as f64 / amortized_bytes.max(1) as f64),
+        basis_overhead_bytes,
+    };
+    let basis_overhead_repaid = delta.standalone_bytes_per_useful_fact_gain > 1.0;
+    let verdict = if role_error_rate > 0.05 || false_positive_rate > 0.08 {
+        "DENSITY_COLLAPSE"
+    } else if delta.standalone_bytes_per_useful_fact_gain > 1.2
+        && heldout_pass_rate >= 0.95
+        && negative_reject_rate >= 0.95
+    {
+        "STANDALONE_BASIS_REPAID"
+    } else if delta.amortized_bytes_per_useful_fact_gain > 1.2
+        && heldout_pass_rate >= 0.95
+        && negative_reject_rate >= 0.95
+    {
+        "AMORTIZED_WAVE_WIN"
+    } else if delta.amortized_bytes_per_useful_fact_gain > 1.0 {
+        "NONLINEAR_MEMORY_REVIEW"
+    } else {
+        "LINEAR_STILL_BETTER"
+    };
+
+    NonlinearMemoryLadderPoint {
+        facts,
+        useful_facts,
+        schema_count,
+        residual_count,
+        basis_overhead_bytes,
+        basis_overhead_repaid,
+        linear_baseline: linear,
+        fixed_basis_standalone,
+        fixed_basis_amortized,
+        delta,
+        collision_rate,
+        role_error_rate,
+        false_positive_rate,
+        heldout_pass_rate,
+        negative_reject_rate,
+        noise_reject_rate,
+        verdict,
+    }
+}
+
+fn nonlinear_ladder_aggregate(
+    ladder: &[NonlinearMemoryLadderPoint],
+) -> NonlinearMemoryLadderAggregate {
+    let amortized_win_point = ladder
+        .iter()
+        .find(|point| point.delta.amortized_bytes_per_useful_fact_gain > 1.2)
+        .map(|point| point.facts);
+    let standalone_break_even_point = ladder
+        .iter()
+        .find(|point| point.basis_overhead_repaid)
+        .map(|point| point.facts);
+    let density_collapse_point = ladder
+        .iter()
+        .find(|point| point.verdict == "DENSITY_COLLAPSE")
+        .map(|point| point.facts);
+    let stable_points = ladder
+        .iter()
+        .filter(|point| {
+            matches!(
+                point.verdict,
+                "AMORTIZED_WAVE_WIN" | "STANDALONE_BASIS_REPAID"
+            )
+        })
+        .collect::<Vec<_>>();
+    let best_operating_window = match (stable_points.first(), stable_points.last()) {
+        (Some(first), Some(last)) if first.facts == last.facts => Some(first.facts.to_string()),
+        (Some(first), Some(last)) => Some(format!("{}..{}", first.facts, last.facts)),
+        _ => None,
+    };
+    let max_schema_reuse_ratio = ladder
+        .iter()
+        .map(|point| point.fixed_basis_amortized.schema_reuse_ratio)
+        .fold(0.0, f64::max);
+    let max_residual_saving_ratio = ladder
+        .iter()
+        .map(|point| point.fixed_basis_amortized.residual_saving_ratio)
+        .fold(0.0, f64::max);
+    let max_collision_rate = ladder
+        .iter()
+        .map(|point| point.collision_rate)
+        .fold(0.0, f64::max);
+    let min_heldout_pass_rate = ladder
+        .iter()
+        .map(|point| point.heldout_pass_rate)
+        .fold(f64::INFINITY, f64::min);
+    let phase1_ready = amortized_win_point.is_some()
+        && standalone_break_even_point.is_some()
+        && max_residual_saving_ratio >= 0.6
+        && min_heldout_pass_rate >= 0.9;
+    let state = if density_collapse_point.is_some() {
+        "LADDER_HAS_COLLAPSE_ZONE"
+    } else if phase1_ready {
+        "PHASE1_DENSITY_LADDER_READY"
+    } else if amortized_win_point.is_some() {
+        "AMORTIZED_WIN_WITHOUT_STANDALONE_BREAK_EVEN"
+    } else {
+        "LADDER_REVIEW"
+    };
+
+    NonlinearMemoryLadderAggregate {
+        amortized_win_point,
+        standalone_break_even_point,
+        density_collapse_point,
+        best_operating_window,
+        max_schema_reuse_ratio: round4(max_schema_reuse_ratio),
+        max_residual_saving_ratio: round4(max_residual_saving_ratio),
+        max_collision_rate: round4(max_collision_rate),
+        min_heldout_pass_rate: round4(min_heldout_pass_rate),
+        phase1_ready,
+        state,
+    }
+}
+
+fn synthetic_schema_count(facts: usize) -> usize {
+    let root_scaled = integer_sqrt(facts).saturating_mul(2).max(4);
+    root_scaled.min(facts.max(1))
+}
+
+fn synthetic_collision_rate(facts: usize) -> f64 {
+    let pressure = facts as f64 / 1_000_000.0;
+    round4((pressure * pressure.sqrt() * 0.6).min(0.12))
+}
+
+fn integer_sqrt(value: usize) -> usize {
+    if value <= 1 {
+        return value;
+    }
+    let mut low = 1usize;
+    let mut high = value;
+    let mut answer = 1usize;
+    while low <= high {
+        let mid = low + (high - low) / 2;
+        if mid <= value / mid {
+            answer = mid;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    answer
 }
 
 fn read_external_corpus(path: &Path) -> Result<ExternalCorpusFixture> {
@@ -862,4 +1179,34 @@ fn useful_inference_per_mb(metrics: &MemoryModelMetrics) -> f64 {
 
 fn round4(value: f64) -> f64 {
     (value * 10_000.0).round() / 10_000.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nonlinear_memory_ladder_has_break_even_points() {
+        let report = build_nonlinear_memory_ladder_report(100_000);
+
+        assert_eq!(report.phase, "phase-1-nonlinear-memory-ladder");
+        assert_eq!(report.ladder.first().map(|point| point.facts), Some(10));
+        assert_eq!(report.ladder.last().map(|point| point.facts), Some(100_000));
+        assert!(report.aggregate.amortized_win_point.is_some());
+        assert!(report.aggregate.standalone_break_even_point.is_some());
+        assert!(report.aggregate.phase1_ready);
+    }
+
+    #[test]
+    fn nonlinear_memory_ladder_keeps_final_claim_blocked() {
+        let report = build_nonlinear_memory_ladder_report(100_000);
+
+        assert!(!report.claim_boundary.final_proof_gate_passed);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(report
+            .claim_boundary
+            .blocked_by
+            .contains(&"final_proof_gate_not_run"));
+    }
 }

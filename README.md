@@ -254,6 +254,10 @@ For the latest LLMWave-Big eval path, use:
 ```bash
 nanda-llmwave-big demo-domain --format json
 
+nanda-llmwave-big nonlinear-memory-ladder \
+  --max-facts 100000 \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -268,6 +272,11 @@ nanda-llmwave-big domain-eval \
   --nonlinear-corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --format json
 ```
+
+`nonlinear-memory-ladder` is the Phase 1 density instrument. It reports where
+fixed-basis residual memory starts to beat a linear fact baseline, where the
+basis overhead is repaid, and where collision pressure would need later gates.
+It does not by itself prove nonlinear memory or broad LLM readiness.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

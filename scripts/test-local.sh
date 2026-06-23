@@ -257,6 +257,11 @@ jq -e '.mode == "llmwave-big-nonlinear-memory-eval" and .verdict == "NONLINEAR_M
 jq -e '.basis.fixed_across_sweep == true and .basis.wave_dim == 1024 and (.sweep | length) == 5 and .sweep[-1].facts == 15000 and .sweep[-1].verdict == "WAVE_DENSITY_WIN"' <<<"$big_nonlinear_eval_json" >/dev/null
 jq -e '.aggregate.large_scale_win_rate == 1 and .aggregate.large_scale_bytes_per_useful_fact_gain > 4 and .aggregate.max_role_error_rate <= 0.02 and .aggregate.max_false_positive_rate <= 0.02' <<<"$big_nonlinear_eval_json" >/dev/null
 jq -e '.claim_boundary.nonlinear_memory_eval_implemented == true and .claim_boundary.useful_density_candidate == true and .claim_boundary.nonlinear_memory_proven == false and (.claim_boundary.blocked_by | index("external_corpus_missing")) and (.claim_boundary.blocked_by | index("broad_noise_eval_missing"))' <<<"$big_nonlinear_eval_json" >/dev/null
+big_nonlinear_ladder_json="$("$llmwave_big" nonlinear-memory-ladder --max-facts 100000 --format json)"
+jq -e '.mode == "llmwave-big-nonlinear-memory-ladder" and .phase == "phase-1-nonlinear-memory-ladder" and (.ladder | length) == 5' <<<"$big_nonlinear_ladder_json" >/dev/null
+jq -e '.ladder[0].facts == 10 and .ladder[-1].facts == 100000 and .aggregate.phase1_ready == true' <<<"$big_nonlinear_ladder_json" >/dev/null
+jq -e '.aggregate.amortized_win_point != null and .aggregate.standalone_break_even_point != null and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.final_proof_gate_passed == false' <<<"$big_nonlinear_ladder_json" >/dev/null
+jq -e '([.ladder[].verdict] | index("AMORTIZED_WAVE_WIN") or index("STANDALONE_BASIS_REPAID"))' <<<"$big_nonlinear_ladder_json" >/dev/null
 big_nonlinear_fixture_json="$("$llmwave_big" nonlinear-memory-eval --corpus "$root/examples/llmwave-big-nonlinear-memory-corpus.json" --format json)"
 jq -e '.external_corpus.state == "EXTERNAL_FIXTURE_AND_NOISE_PASS" and .external_corpus.heldout_pass_rate == 1 and .external_corpus.negative_reject_rate == 1 and .external_corpus.noise_reject_rate == 1' <<<"$big_nonlinear_fixture_json" >/dev/null
 jq -e '.corpus_driven_memory.verdict == "CORPUS_DRIVEN_AMORTIZED_DENSITY_OBSERVED" and .corpus_driven_memory.gates.corpus_driven_nonlinear_density_observed == true and .corpus_driven_memory.gates.strict_standalone_density_observed == false' <<<"$big_nonlinear_fixture_json" >/dev/null

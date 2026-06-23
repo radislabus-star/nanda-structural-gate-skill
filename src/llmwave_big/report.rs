@@ -29,7 +29,7 @@ use super::mature_anti_wave::MatureAntiWaveReport;
 use super::mini_chat_eval::MiniChatEvalReport;
 use super::multi_peak_field::MultiPeakFieldReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
-use super::nonlinear_memory_eval::NonlinearMemoryEvalReport;
+use super::nonlinear_memory_eval::{NonlinearMemoryEvalReport, NonlinearMemoryLadderReport};
 use super::open_surface_generation::OpenSurfaceGenerationReport;
 use super::query_wave::QueryWaveReport;
 use super::readiness::{ClaimGateReport, ReadinessLadderReport};
@@ -579,6 +579,21 @@ pub(crate) fn print_nonlinear_memory_eval_report(
         ),
         OutputFormat::Text => print_nonlinear_memory_eval_text(report),
         OutputFormat::Md => print_nonlinear_memory_eval_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_nonlinear_memory_ladder_report(
+    report: &NonlinearMemoryLadderReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_nonlinear_memory_ladder_text(report),
+        OutputFormat::Md => print_nonlinear_memory_ladder_md(report),
     }
     Ok(())
 }
@@ -1343,6 +1358,42 @@ fn print_nonlinear_memory_eval_md(report: &NonlinearMemoryEvalReport) {
     println!(
         "- median_bytes_per_useful_fact_gain: `{:.4}`",
         report.aggregate.median_bytes_per_useful_fact_gain
+    );
+    println!(
+        "- nonlinear_memory_proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_nonlinear_memory_ladder_text(report: &NonlinearMemoryLadderReport) {
+    println!("mode: {}", report.mode);
+    println!("phase: {}", report.phase);
+    println!("state: {}", report.aggregate.state);
+    println!(
+        "amortized_win_point: {:?}",
+        report.aggregate.amortized_win_point
+    );
+    println!(
+        "standalone_break_even_point: {:?}",
+        report.aggregate.standalone_break_even_point
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_nonlinear_memory_ladder_md(report: &NonlinearMemoryLadderReport) {
+    println!("# LLMWave-Big Nonlinear Memory Ladder\n");
+    println!("- phase: `{}`", report.phase);
+    println!("- state: `{}`", report.aggregate.state);
+    println!(
+        "- amortized_win_point: `{:?}`",
+        report.aggregate.amortized_win_point
+    );
+    println!(
+        "- standalone_break_even_point: `{:?}`",
+        report.aggregate.standalone_break_even_point
     );
     println!(
         "- nonlinear_memory_proven: `{}`",

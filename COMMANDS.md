@@ -114,12 +114,18 @@ Strict mode keeps the general nonlinear-memory claim blocked until the whole
 sweep beats the linear baseline.
 
 ```bash
+nanda-llmwave-big nonlinear-memory-ladder --max-facts 100000 --format json
 nanda-llmwave-big nonlinear-memory-eval --format json
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy strict-full-sweep \
   --format json
 ```
+
+The ladder is the Phase 1 density instrument: it maps amortized wins,
+standalone basis break-even, collision pressure, and the best operating window.
+It intentionally keeps `nonlinear_memory_proven=false` until later phases and
+the final proof gate pass.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.
