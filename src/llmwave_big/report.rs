@@ -26,6 +26,7 @@ use super::lens_scan::LensScanReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::mature_anti_wave::MatureAntiWaveReport;
+use super::memory_physics::MemoryPhysicsReport;
 use super::mini_chat_eval::MiniChatEvalReport;
 use super::multi_peak_field::MultiPeakFieldReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
@@ -753,6 +754,21 @@ pub(crate) fn print_schema_residual_engine_report(
         ),
         OutputFormat::Text => print_schema_residual_engine_text(report),
         OutputFormat::Md => print_schema_residual_engine_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_memory_physics_report(
+    report: &MemoryPhysicsReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_memory_physics_text(report),
+        OutputFormat::Md => print_memory_physics_md(report),
     }
     Ok(())
 }
@@ -1701,6 +1717,22 @@ fn print_schema_residual_engine_text(report: &SchemaResidualEngineReport) {
     );
 }
 
+fn print_memory_physics_text(report: &MemoryPhysicsReport) {
+    println!("mode: {}", report.mode);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("trial_count: {}", report.metrics.trial_count);
+    println!(
+        "collision_reject_rate: {:.4}",
+        report.metrics.collision_reject_rate
+    );
+    println!("noise_reject_rate: {:.4}", report.metrics.noise_reject_rate);
+    println!(
+        "false_positive_rate_after_anti: {:.4}",
+        report.metrics.false_positive_rate_after_anti
+    );
+}
+
 fn print_consolidation_text(report: &ConsolidationReport) {
     println!("LLMWave-Big Consolidation Sleep");
     println!("version: {}", report.version);
@@ -2592,6 +2624,26 @@ fn print_schema_residual_engine_md(report: &SchemaResidualEngineReport) {
     println!(
         "- bytes/useful fact gain: `{:.4}`",
         report.metrics.bytes_per_useful_fact_gain
+    );
+}
+
+fn print_memory_physics_md(report: &MemoryPhysicsReport) {
+    println!("# LLMWave-Big Memory Physics");
+    println!();
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- trials: `{}`", report.metrics.trial_count);
+    println!(
+        "- collision reject rate: `{:.4}`",
+        report.metrics.collision_reject_rate
+    );
+    println!(
+        "- noise reject rate: `{:.4}`",
+        report.metrics.noise_reject_rate
+    );
+    println!(
+        "- false-positive rate after anti-wave: `{:.4}`",
+        report.metrics.false_positive_rate_after_anti
     );
 }
 

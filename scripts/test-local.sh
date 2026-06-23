@@ -408,6 +408,11 @@ big_schema_residual_engine_json="$("$llmwave_big" schema-residual-engine --forma
 jq -e '.mode == "llmwave-big-schema-residual-engine" and .phase == "phase-2-3-schema-reuse-residual-write" and .verdict == "PHASE2_3_SCHEMA_RESIDUAL_ENGINE_READY"' <<<"$big_schema_residual_engine_json" >/dev/null
 jq -e '.promoted_schema_count == 3 and .residual_write_count == 10 and .full_fallback_count == 1 and .metrics.bytes_per_useful_fact_gain > 2' <<<"$big_schema_residual_engine_json" >/dev/null
 jq -e '.claim_boundary.schema_reuse_engine_implemented == true and .claim_boundary.residual_only_write_implemented == true and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_schema_residual_engine_json" >/dev/null
+big_memory_physics_json="$("$llmwave_big" memory-physics --format json)"
+jq -e '.mode == "llmwave-big-memory-physics" and .phase == "phase-4-5-collision-noise-anti-wave" and .verdict == "PHASE4_5_MEMORY_PHYSICS_READY"' <<<"$big_memory_physics_json" >/dev/null
+jq -e '.schema_residual_bridge.phase4_5_uses_phase2_3_engine == true and .anti_wave_format.record_bytes == 32 and .anti_wave_format.shortcut_specific == true' <<<"$big_memory_physics_json" >/dev/null
+jq -e '.metrics.collision_reject_rate == 1 and .metrics.noise_reject_rate == 1 and .metrics.false_positive_rate_before_anti > .metrics.false_positive_rate_after_anti and .metrics.false_positive_rate_after_anti == 0' <<<"$big_memory_physics_json" >/dev/null
+jq -e '.claim_boundary.collision_noise_physics_implemented == true and .claim_boundary.anti_wave_memory_integrated == true and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_memory_physics_json" >/dev/null
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null
 jq -e '.conflict_preservation.state == "CONFLICTS_PRESERVED" and .eval.safe == true' <<<"$big_consolidate_json" >/dev/null

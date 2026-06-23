@@ -116,6 +116,7 @@ sweep beats the linear baseline.
 ```bash
 nanda-llmwave-big nonlinear-memory-ladder --max-facts 100000 --format json
 nanda-llmwave-big schema-residual-engine --format json
+nanda-llmwave-big memory-physics --format json
 nanda-llmwave-big nonlinear-memory-eval --format json
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
@@ -132,6 +133,11 @@ the final proof gate pass.
 reused schema keys, writes matching facts as centroid updates plus compact
 residuals, and keeps one-off facts as full fallbacks instead of forcing a bad
 schema.
+
+`memory-physics` is the Phase 4-5 collision/noise instrument. It runs clean,
+collision, and noise trials over the schema-residual engine and applies
+shortcut-specific 32-byte anti-wave records. The useful signal is false
+positives before/after anti-wave, not a broad nonlinear-memory proof.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

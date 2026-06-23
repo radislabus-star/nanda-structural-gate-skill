@@ -261,6 +261,9 @@ nanda-llmwave-big nonlinear-memory-ladder \
 nanda-llmwave-big schema-residual-engine \
   --format json
 
+nanda-llmwave-big memory-physics \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -285,6 +288,10 @@ It does not by itself prove nonlinear memory or broad LLM readiness.
 observed facts into reusable schema keys, writes promoted routes as centroid
 updates plus residual records, and keeps unsupported one-off facts as full
 fallbacks.
+
+`memory-physics` is the Phase 4-5 collision/noise path. It runs clean,
+collision, and noise trials through shortcut-specific 32-byte anti-wave records
+and reports whether false positives fall after suppression.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
