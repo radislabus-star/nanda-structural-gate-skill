@@ -100,6 +100,9 @@ pub(crate) struct NonlinearAggregateMetrics {
 
 #[derive(Serialize, Clone)]
 pub(crate) struct NonlinearProofGates {
+    pub scale_amortized_basis_beats_linear: bool,
+    pub scale_amortized_bytes_per_useful_fact_improves: bool,
+    pub scale_amortized_nonlinear_memory_proven: bool,
     pub fixed_basis_beats_linear_baseline: bool,
     pub bytes_per_useful_fact_improves: bool,
     pub schema_reuse_rises_with_scale: bool,
@@ -117,6 +120,7 @@ pub(crate) struct NonlinearClaimBoundary {
     pub fixed_basis_used: bool,
     pub linear_baseline_compared: bool,
     pub useful_density_candidate: bool,
+    pub scale_amortized_nonlinear_memory_proven: bool,
     pub nonlinear_memory_proven: bool,
     pub safe_claim: &'static str,
     pub blocked_by: Vec<&'static str>,
@@ -206,6 +210,7 @@ pub(crate) fn build_nonlinear_memory_eval_report(
         && gates.heldout_inference_present
         && gates.external_corpus_present
         && gates.broad_noise_eval_present;
+    let scale_amortized_nonlinear_memory_proven = gates.scale_amortized_nonlinear_memory_proven;
     let blocked_by = blocked_reasons(&gates);
     let scale_candidate = aggregate.large_scale_win_rate >= 1.0
         && aggregate.large_scale_bytes_per_useful_fact_gain > 1.2
@@ -236,9 +241,12 @@ pub(crate) fn build_nonlinear_memory_eval_report(
             useful_density_candidate: verdict == "NONLINEAR_MEMORY_CANDIDATE_NOT_PROVEN"
                 || verdict == "NONLINEAR_MEMORY_SCALE_CANDIDATE_NOT_PROVEN"
                 || verdict == "NONLINEAR_MEMORY_PROOF_PASS",
+            scale_amortized_nonlinear_memory_proven,
             nonlinear_memory_proven,
             safe_claim: if nonlinear_memory_proven {
                 "Fixed-basis residual memory passed the configured nonlinear proof gates"
+            } else if scale_amortized_nonlinear_memory_proven {
+                "Fixed-basis residual memory passed the scale-amortized local proof gates, but strict/general nonlinear memory remains unproven"
             } else {
                 "Fixed-basis residual memory shows a useful density candidate, but nonlinear memory remains unproven until external held-out/noise gates pass"
             },
@@ -458,7 +466,19 @@ fn proof_gates(
         .iter()
         .skip(1)
         .all(|point| point.verdict == "WAVE_DENSITY_WIN");
+    let scale_amortized_basis_beats_linear = aggregate.large_scale_win_rate >= 1.0;
+    let scale_amortized_bytes_per_useful_fact_improves =
+        aggregate.large_scale_bytes_per_useful_fact_gain > 1.2;
+    let scale_amortized_nonlinear_memory_proven = scale_amortized_basis_beats_linear
+        && scale_amortized_bytes_per_useful_fact_improves
+        && aggregate.max_role_error_rate <= 0.02
+        && aggregate.max_false_positive_rate <= 0.02
+        && external_corpus.external_corpus_present
+        && external_corpus.broad_noise_eval_present;
     NonlinearProofGates {
+        scale_amortized_basis_beats_linear,
+        scale_amortized_bytes_per_useful_fact_improves,
+        scale_amortized_nonlinear_memory_proven,
         fixed_basis_beats_linear_baseline: all_density_wins,
         bytes_per_useful_fact_improves: aggregate.median_bytes_per_useful_fact_gain > 1.2,
         schema_reuse_rises_with_scale: sweep

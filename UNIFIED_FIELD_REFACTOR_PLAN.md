@@ -1004,6 +1004,8 @@ external_corpus.state = EXTERNAL_FIXTURE_AND_NOISE_PASS
 external_corpus.heldout_pass_rate = 1.0
 external_corpus.negative_reject_rate = 1.0
 external_corpus.noise_reject_rate = 1.0
+claim_boundary.scale_amortized_nonlinear_memory_proven = true
+claim_boundary.nonlinear_memory_proven = false
 ```
 
 This is a deliberately narrow result. It says the fixed basis starts to win at
