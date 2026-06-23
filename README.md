@@ -279,6 +279,11 @@ nanda-llmwave-big rust-corpus-build \
   --out .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --format json
 
+nanda-llmwave-big rust-heldout-build \
+  --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
+  --out .nanda/llmwave-big-training/rust-heldout-suite.json \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -327,6 +332,12 @@ blocked until a real Rust code corpus and held-out suite are present.
 scanning `.rs` files for modules, public exports, functions, CLI dispatch hints,
 report-printer hints, and test evidence. It is a corpus input layer; it does
 not by itself prove nonlinear memory.
+
+`rust-heldout-build` consumes the Rust structural corpus artifact and builds
+withheld route questions around module owners, public exports, CLI dispatch,
+report printers, and test evidence. It also adds negative shortcuts such as
+"compiled command implies LLM readiness". It is the next proof-prep layer, not
+a final nonlinear-memory proof.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

@@ -432,6 +432,11 @@ jq -e '.mode == "llmwave-big-rust-corpus-build" and .profile == "rust" and .verd
 jq -e '.artifact.corpus_kind == "rust-code-structural-corpus" and .artifact.rust_files > 10 and .artifact.functions > 100 and .artifact.fact_count > .artifact.rust_files' <<<"$big_rust_corpus_json" >/dev/null
 jq -e '.claim_boundary.rust_corpus_loaded == true and .claim_boundary.heldout_suite_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_rust_corpus_json" >/dev/null
 test -s "$tmp_rust_corpus/rust-corpus.json"
+big_rust_heldout_json="$("$llmwave_big" rust-heldout-build --artifact "$tmp_rust_corpus/rust-corpus.json" --out "$tmp_rust_corpus/rust-heldout.json" --format json)"
+jq -e '.mode == "llmwave-big-rust-heldout-build" and .profile == "rust" and .verdict == "RUST_HELDOUT_SUITE_READY"' <<<"$big_rust_heldout_json" >/dev/null
+jq -e '.suite.suite_kind == "rust-code-heldout-suite" and .suite.heldout_case_count >= 16 and .suite.covered_routes >= 4 and .suite.negative_shortcut_count >= 3' <<<"$big_rust_heldout_json" >/dev/null
+jq -e '.claim_boundary.rust_corpus_loaded == true and .claim_boundary.heldout_suite_ready == true and .claim_boundary.focus_packet_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_rust_heldout_json" >/dev/null
+test -s "$tmp_rust_corpus/rust-heldout.json"
 rm -rf "$tmp_rust_corpus"
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null

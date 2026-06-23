@@ -40,6 +40,7 @@ pub mod readiness;
 pub mod reasoning_field;
 pub mod residuals;
 pub mod rust_corpus;
+pub mod rust_heldout;
 pub mod schema_memory_growth;
 pub mod schemas;
 pub mod surface_bank_build;
@@ -196,6 +197,9 @@ enum LlmwaveBigCommand {
     /// Build a Rust-oriented structural corpus artifact for proof gates.
     #[command(name = "rust-corpus-build", alias = "rust-corpus")]
     RustCorpusBuild(LlmwaveBigRustCorpusBuildArgs),
+    /// Build Rust held-out route questions from a Rust structural corpus artifact.
+    #[command(name = "rust-heldout-build", alias = "rust-heldout")]
+    RustHeldoutBuild(LlmwaveBigRustHeldoutBuildArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -611,6 +615,18 @@ struct LlmwaveBigRustCorpusBuildArgs {
     out: Option<PathBuf>,
     #[arg(long, default_value_t = 4 * 1024 * 1024)]
     max_file_bytes: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigRustHeldoutBuildArgs {
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 64)]
+    max_cases: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1061,6 +1077,16 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     max_file_bytes: args.max_file_bytes,
                 })?;
             report::print_rust_corpus_build_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::RustHeldoutBuild(args) => {
+            let report =
+                rust_heldout::build_rust_heldout_report(rust_heldout::RustHeldoutBuildConfig {
+                    artifact: args.artifact,
+                    out: args.out,
+                    max_cases: args.max_cases,
+                })?;
+            report::print_rust_heldout_build_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {

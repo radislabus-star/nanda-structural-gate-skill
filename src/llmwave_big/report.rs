@@ -38,6 +38,7 @@ use super::query_wave::QueryWaveReport;
 use super::readiness::{ClaimGateReport, ReadinessLadderReport};
 use super::reasoning_field::ReasoningFieldReport;
 use super::rust_corpus::RustCorpusBuildReport;
+use super::rust_heldout::RustHeldoutBuildReport;
 use super::schema_memory_growth::SchemaMemoryGrowthReport;
 use super::surface_bank_build::SurfaceBankBuildReport;
 use super::surface_bank_fixture::SurfaceBankFixtureReport;
@@ -874,6 +875,21 @@ pub(crate) fn print_rust_corpus_build_report(
         ),
         OutputFormat::Text => print_rust_corpus_build_text(report),
         OutputFormat::Md => print_rust_corpus_build_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_rust_heldout_build_report(
+    report: &RustHeldoutBuildReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_rust_heldout_build_text(report),
+        OutputFormat::Md => print_rust_heldout_build_md(report),
     }
     Ok(())
 }
@@ -1905,6 +1921,24 @@ fn print_rust_corpus_build_text(report: &RustCorpusBuildReport) {
     );
 }
 
+fn print_rust_heldout_build_text(report: &RustHeldoutBuildReport) {
+    println!("mode: {}", report.mode);
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("profile: {}", report.profile);
+    println!("input_artifact: {}", report.input_artifact);
+    println!("heldout_cases: {}", report.suite.heldout_case_count);
+    println!("covered_routes: {}", report.suite.covered_routes);
+    println!(
+        "route_coverage_ratio: {:.4}",
+        report.metrics.route_coverage_ratio
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
 fn print_artifact_ask_text(report: &ArtifactAskReport) {
     println!("LLMWave-Big Ask");
     println!("version: {}", report.version);
@@ -2879,6 +2913,25 @@ fn print_rust_corpus_build_md(report: &RustCorpusBuildReport) {
     println!(
         "- route balance ratio: `{:.4}`",
         report.metrics.route_balance_ratio
+    );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_rust_heldout_build_md(report: &RustHeldoutBuildReport) {
+    println!("# LLMWave-Big Rust Held-Out Build");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- profile: `{}`", report.profile);
+    println!("- input artifact: `{}`", report.input_artifact);
+    println!("- held-out cases: `{}`", report.suite.heldout_case_count);
+    println!("- covered routes: `{}`", report.suite.covered_routes);
+    println!(
+        "- route coverage ratio: `{:.4}`",
+        report.metrics.route_coverage_ratio
     );
     println!(
         "- nonlinear memory proven: `{}`",

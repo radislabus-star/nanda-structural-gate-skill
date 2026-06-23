@@ -218,6 +218,7 @@ scripts/nanda-llmwave-big memory-proof-path --format json
 scripts/nanda-llmwave-big memory-final-proof --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --format json
 scripts/nanda-llmwave-big rust-corpus-build --repo . --out .nanda/llmwave-big-training/rust-corpus-artifact.json --format json
+scripts/nanda-llmwave-big rust-heldout-build --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --out .nanda/llmwave-big-training/rust-heldout-suite.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
@@ -726,6 +727,10 @@ Use `nanda-llmwave-big rust-corpus-build --repo . --out .nanda/llmwave-big-train
 to build the first Rust structural corpus artifact for that profile. This
 closes only the corpus-artifact layer; held-out and focus packets remain
 required before final proof claims.
+Use `nanda-llmwave-big rust-heldout-build --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --out .nanda/llmwave-big-training/rust-heldout-suite.json --format json`
+to turn the Rust corpus artifact into withheld route questions and negative
+shortcuts. This can make `heldout_suite_ready=true`, but focus, final proof,
+nonlinear-memory, and LLM claims must stay blocked until later gates pass.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a
