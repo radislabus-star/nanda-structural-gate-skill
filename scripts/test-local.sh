@@ -234,7 +234,8 @@ jq -e '.roadmap_block == "v1841-v1900" and .verdict == "CORE_RUNTIME_READY_FIXTU
 jq -e '.criteria.feedback_applied_to_next_run == true and .criteria.memory_persists_across_process_restart == true and .claim_boundary.core_runtime_ready == true and .claim_boundary.full_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_core_eval_json" >/dev/null
 big_readiness_json="$("$llmwave_big" readiness-ladder --format json)"
 jq -e '.mode == "llmwave-big-readiness-ladder" and .current_level == 3 and .current_state == "CONSTRAINED_FIELD_ENGINE_READY_NOT_GENERAL_LLM"' <<<"$big_readiness_json" >/dev/null
-jq -e '.claim_boundary.field_core_as_sole_engine == true and .claim_boundary.fixture_reasoning_ready == true and .claim_boundary.artifact_grounded_qa_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_readiness_json" >/dev/null
+jq -e '.claim_boundary.field_core_as_sole_engine == true and .claim_boundary.fixture_reasoning_ready == true and .claim_boundary.artifact_grounded_qa_ready == true and .claim_boundary.scale_amortized_nonlinear_memory_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_readiness_json" >/dev/null
+jq -e '([.levels[].name] | index("scale-amortized nonlinear memory"))' <<<"$big_readiness_json" >/dev/null
 big_field_claim_json="$("$llmwave_big" claim-gate --claim field-core-sole-engine --format json)"
 jq -e '.mode == "llmwave-big-claim-gate" and .claim == "field-core-sole-engine" and .verdict == "CLAIM_ALLOWED" and .allowed == true' <<<"$big_field_claim_json" >/dev/null
 set +e

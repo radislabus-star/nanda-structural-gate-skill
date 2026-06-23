@@ -24,6 +24,7 @@ pub(crate) struct ReadinessClaims {
     pub fixture_reasoning_ready: bool,
     pub artifact_grounded_qa_ready: bool,
     pub constrained_answer_generation_ready: bool,
+    pub scale_amortized_nonlinear_memory_ready: bool,
     pub broad_chat_llm_ready: bool,
     pub nonlinear_memory_proven: bool,
 }
@@ -123,12 +124,22 @@ pub(crate) fn build_readiness_ladder_report() -> ReadinessLadderReport {
             },
             ReadinessLevel {
                 level: 6,
+                name: "scale-amortized nonlinear memory",
+                state: "LOCAL_PASS_GENERAL_BLOCKED",
+                evidence: vec![
+                    "nonlinear-memory-eval scale candidate",
+                    "external fixture and noise controls pass",
+                    "strict full-sweep nonlinear proof still blocked",
+                ],
+            },
+            ReadinessLevel {
+                level: 7,
                 name: "broad chat candidate",
                 state: "BLOCKED",
                 evidence: vec!["external broad chat eval missing", "safety eval missing"],
             },
             ReadinessLevel {
-                level: 7,
+                level: 8,
                 name: "general LLM comparable eval",
                 state: "BLOCKED",
                 evidence: vec![
@@ -232,6 +243,7 @@ fn readiness_claims() -> ReadinessClaims {
         fixture_reasoning_ready: true,
         artifact_grounded_qa_ready: true,
         constrained_answer_generation_ready: true,
+        scale_amortized_nonlinear_memory_ready: true,
         broad_chat_llm_ready: false,
         nonlinear_memory_proven: false,
     }
