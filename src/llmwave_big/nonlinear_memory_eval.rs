@@ -44,6 +44,7 @@ pub(crate) struct NonlinearMemoryLadderReport {
     pub version: &'static str,
     pub phase: &'static str,
     pub roadmap_block: &'static str,
+    pub verdict: &'static str,
     pub max_facts: usize,
     pub basis: FixedBasisReport,
     pub ladder: Vec<NonlinearMemoryLadderPoint>,
@@ -410,6 +411,11 @@ pub(crate) fn build_nonlinear_memory_ladder_report(
         version: NONLINEAR_MEMORY_LADDER_VERSION,
         phase: "phase-1-nonlinear-memory-ladder",
         roadmap_block: "phase-1-nonlinear-memory-ladder",
+        verdict: if aggregate.phase1_ready {
+            "PHASE1_DENSITY_LADDER_READY"
+        } else {
+            "PHASE1_DENSITY_LADDER_REVIEW"
+        },
         max_facts,
         basis,
         ladder,
