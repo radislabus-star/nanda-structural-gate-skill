@@ -26,6 +26,7 @@ use super::lens_scan::LensScanReport;
 use super::lexical_birth::LexicalBirthReport;
 use super::loader::RuntimeProductReport;
 use super::mature_anti_wave::MatureAntiWaveReport;
+use super::memory_final_proof::MemoryFinalProofReport;
 use super::memory_physics::MemoryPhysicsReport;
 use super::memory_proof_path::MemoryProofPathReport;
 use super::mini_chat_eval::MiniChatEvalReport;
@@ -785,6 +786,21 @@ pub(crate) fn print_memory_proof_path_report(
         ),
         OutputFormat::Text => print_memory_proof_path_text(report),
         OutputFormat::Md => print_memory_proof_path_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_memory_final_proof_report(
+    report: &MemoryFinalProofReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_memory_final_proof_text(report),
+        OutputFormat::Md => print_memory_final_proof_md(report),
     }
     Ok(())
 }
@@ -1758,6 +1774,25 @@ fn print_memory_proof_path_text(report: &MemoryProofPathReport) {
     println!("inference_score: {:.4}", report.metrics.inference_score);
 }
 
+fn print_memory_final_proof_text(report: &MemoryFinalProofReport) {
+    println!("mode: {}", report.mode);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "controlled_chain_ready: {}",
+        report.final_proof_gate.controlled_chain_ready
+    );
+    println!(
+        "final_proof_gate_passed: {}",
+        report.final_proof_gate.final_proof_gate_passed
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.final_proof_gate.nonlinear_memory_proven
+    );
+    println!("llm_ready: {}", report.final_proof_gate.llm_ready);
+}
+
 fn print_consolidation_text(report: &ConsolidationReport) {
     println!("LLMWave-Big Consolidation Sleep");
     println!("version: {}", report.version);
@@ -2683,6 +2718,26 @@ fn print_memory_proof_path_md(report: &MemoryProofPathReport) {
     );
     println!("- route balanced: `{}`", report.wave_atlas.route_balanced);
     println!("- inference score: `{:.4}`", report.metrics.inference_score);
+}
+
+fn print_memory_final_proof_md(report: &MemoryFinalProofReport) {
+    println!("# LLMWave-Big Memory Final Proof");
+    println!();
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- controlled chain ready: `{}`",
+        report.final_proof_gate.controlled_chain_ready
+    );
+    println!(
+        "- final proof gate passed: `{}`",
+        report.final_proof_gate.final_proof_gate_passed
+    );
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.final_proof_gate.nonlinear_memory_proven
+    );
+    println!("- llm ready: `{}`", report.final_proof_gate.llm_ready);
 }
 
 fn print_consolidation_md(report: &ConsolidationReport) {

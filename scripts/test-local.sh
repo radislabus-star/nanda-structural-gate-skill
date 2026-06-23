@@ -417,6 +417,11 @@ big_memory_proof_path_json="$("$llmwave_big" memory-proof-path --format json)"
 jq -e '.mode == "llmwave-big-memory-proof-path" and .phase == "phase-6-8-heldout-basis-atlas" and .verdict == "PHASE6_8_MEMORY_PROOF_PATH_READY"' <<<"$big_memory_proof_path_json" >/dev/null
 jq -e '.metrics.heldout_pass_rate == 1 and .metrics.memory_physics_ready == true and .wave_atlas.route_balanced == true and .basis_economics.ladder_phase_ready == true' <<<"$big_memory_proof_path_json" >/dev/null
 jq -e '.claim_boundary.heldout_inference_implemented == true and .claim_boundary.basis_economics_connected == true and .claim_boundary.wave_atlas_memory_implemented == true and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_memory_proof_path_json" >/dev/null
+big_memory_final_proof_json="$("$llmwave_big" memory-final-proof --format json)"
+jq -e '.mode == "llmwave-big-memory-final-proof" and .phase == "phase-9-12-field-recall-llmwave-big-corpus-final-proof" and .verdict == "FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS"' <<<"$big_memory_final_proof_json" >/dev/null
+jq -e '.final_proof_gate.controlled_chain_ready == true and .final_proof_gate.field_recall_ready == true and .final_proof_gate.llmwave_bridge_ready == true and .final_proof_gate.big_corpus_ready == false' <<<"$big_memory_final_proof_json" >/dev/null
+jq -e '.final_proof_gate.final_proof_gate_passed == false and .final_proof_gate.nonlinear_memory_proven == false and .final_proof_gate.llm_ready == false and (.final_proof_gate.missing_evidence | index("real_big_corpus_not_loaded"))' <<<"$big_memory_final_proof_json" >/dev/null
+jq -e '.claim_boundary.phases_1_12_command_path_implemented == true and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_memory_final_proof_json" >/dev/null
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null
 jq -e '.conflict_preservation.state == "CONFLICTS_PRESERVED" and .eval.safe == true' <<<"$big_consolidate_json" >/dev/null

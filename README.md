@@ -267,6 +267,9 @@ nanda-llmwave-big memory-physics \
 nanda-llmwave-big memory-proof-path \
   --format json
 
+nanda-llmwave-big memory-final-proof \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -299,6 +302,11 @@ and reports whether false positives fall after suppression.
 `memory-proof-path` is the Phase 6-8 bridge: held-out inference over schema
 keys, basis economics from the density ladder, and route-balanced Wave Atlas
 partitions. It remains controlled evidence, not final nonlinear-memory proof.
+
+`memory-final-proof` is the Phase 9-12 gate. It checks field recall, the
+LLMWave bridge, big-corpus evidence, and the final proof boundary. Until a real
+big-corpus artifact and held-out suite are present, the expected honest verdict
+is `FINAL_PROOF_GATE_BLOCKED_BY_BIG_CORPUS`.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

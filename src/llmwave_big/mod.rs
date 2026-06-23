@@ -26,6 +26,7 @@ pub mod lens_scan;
 pub mod lexical_birth;
 pub mod loader;
 pub mod mature_anti_wave;
+pub mod memory_final_proof;
 pub mod memory_physics;
 pub mod memory_proof_path;
 pub mod mini_chat_eval;
@@ -180,6 +181,9 @@ enum LlmwaveBigCommand {
     /// Run the Phase 6-8 held-out inference, basis economics, and atlas bridge.
     #[command(name = "memory-proof-path", alias = "heldout-atlas")]
     MemoryProofPath(LlmwaveBigMemoryProofPathArgs),
+    /// Run the Phase 9-12 field recall, LLMWave bridge, big-corpus, and final proof gate.
+    #[command(name = "memory-final-proof", alias = "final-proof")]
+    MemoryFinalProof(LlmwaveBigMemoryFinalProofArgs),
     /// Print the v206-v218 consolidation/sleep contract.
     Consolidate(LlmwaveBigConsolidateArgs),
     /// Print the v219-v230 Big Cognition Eval report.
@@ -539,6 +543,12 @@ struct LlmwaveBigMemoryPhysicsArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigMemoryProofPathArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigMemoryFinalProofArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -988,6 +998,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::MemoryProofPath(args) => {
             let report = memory_proof_path::build_memory_proof_path_report();
             report::print_memory_proof_path_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::MemoryFinalProof(args) => {
+            let report = memory_final_proof::build_memory_final_proof_report();
+            report::print_memory_final_proof_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Consolidate(args) => {
