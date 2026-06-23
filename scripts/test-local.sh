@@ -404,6 +404,10 @@ jq -e '.roadmap_block == "v191-v205" and .verdict == "RESIDUAL_SAVING"' <<<"$big
 jq -e '.residual_format_v1.bytes == 20 and .write_decision.bytes_written == 28' <<<"$big_write_json" >/dev/null
 jq -e '.write_curve.state == "SYNTHETIC_CONTRACT_CURVE_NOT_NONLINEAR_PROOF" and .write_curve.residual_saving_ratio > 0.5' <<<"$big_write_json" >/dev/null
 jq -e '.compression_safety.safe == true and .anti_residual.anti_lane_id == 90001' <<<"$big_write_json" >/dev/null
+big_schema_residual_engine_json="$("$llmwave_big" schema-residual-engine --format json)"
+jq -e '.mode == "llmwave-big-schema-residual-engine" and .phase == "phase-2-3-schema-reuse-residual-write" and .verdict == "PHASE2_3_SCHEMA_RESIDUAL_ENGINE_READY"' <<<"$big_schema_residual_engine_json" >/dev/null
+jq -e '.promoted_schema_count == 3 and .residual_write_count == 10 and .full_fallback_count == 1 and .metrics.bytes_per_useful_fact_gain > 2' <<<"$big_schema_residual_engine_json" >/dev/null
+jq -e '.claim_boundary.schema_reuse_engine_implemented == true and .claim_boundary.residual_only_write_implemented == true and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_schema_residual_engine_json" >/dev/null
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null
 jq -e '.conflict_preservation.state == "CONFLICTS_PRESERVED" and .eval.safe == true' <<<"$big_consolidate_json" >/dev/null

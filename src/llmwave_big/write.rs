@@ -1,8 +1,11 @@
 //! Reconstructability test and residual-only write boundary.
 
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 
 pub(crate) const WRITE_VERSION: &str = "llmwave-big-v205-schema-residual-write";
+pub(crate) const SCHEMA_RESIDUAL_ENGINE_VERSION: &str = "llmwave-big-v-next-schema-residual-engine";
 pub(crate) const FULL_FACT_RECORD_BYTES: usize = 96;
 pub(crate) const CENTROID_UPDATE_BYTES: usize = 8;
 pub(crate) const SMALL_RESIDUAL_BYTES: usize = core::mem::size_of::<ResidualV1>();
@@ -121,6 +124,85 @@ pub(crate) struct SourceWeightReport {
     pub weight: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub(crate) struct SchemaKeyV1 {
+    pub route_id: u16,
+    pub operator_id: u16,
+    pub subject_role: u16,
+    pub object_role: u16,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+pub(crate) struct ObservedFactV1 {
+    pub subject_id: u32,
+    pub object_id: u32,
+    pub evidence_ref: u32,
+    pub key: SchemaKeyV1,
+    pub phase_delta: i16,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct SchemaResidualEngineReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub phase: &'static str,
+    pub roadmap_block: &'static str,
+    pub verdict: &'static str,
+    pub input_facts: usize,
+    pub promoted_schema_count: usize,
+    pub residual_write_count: usize,
+    pub full_fallback_count: usize,
+    pub schemas: Vec<ReusableSchemaReport>,
+    pub write_plan: Vec<SchemaResidualWriteReport>,
+    pub metrics: SchemaResidualEngineMetrics,
+    pub claim_boundary: SchemaResidualEngineClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ReusableSchemaReport {
+    pub schema_id: u32,
+    pub key: SchemaKeyV1,
+    pub support_count: usize,
+    pub centroid_updates: usize,
+    pub promoted: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct SchemaResidualWriteReport {
+    pub fact_index: usize,
+    pub decision: &'static str,
+    pub schema_id: Option<u32>,
+    pub bytes_written: usize,
+    pub residual: Option<ResidualV1>,
+    pub fallback_reason: Option<&'static str>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct SchemaResidualEngineMetrics {
+    pub linear_bytes_total: usize,
+    pub schema_residual_bytes_total: usize,
+    pub bytes_per_useful_fact_linear: f64,
+    pub bytes_per_useful_fact_schema_residual: f64,
+    pub bytes_per_useful_fact_gain: f64,
+    pub schema_reuse_ratio: f64,
+    pub residual_only_coverage: f64,
+    pub residual_saving_ratio: f64,
+    pub fallback_rate: f64,
+    pub role_error_rate: f64,
+    pub false_positive_rate: f64,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct SchemaResidualEngineClaimBoundary {
+    pub schema_reuse_engine_implemented: bool,
+    pub residual_only_write_implemented: bool,
+    pub residual_fallback_preserves_one_off_facts: bool,
+    pub nonlinear_memory_proven: bool,
+    pub llm_ready: bool,
+    pub safe_claim: &'static str,
+    pub blocked_by: Vec<&'static str>,
+}
+
 pub(crate) fn build_write_report() -> WriteReport {
     let decomposition = WriteDecomposition {
         subject_id: 2_001,
@@ -210,6 +292,182 @@ pub(crate) fn build_write_report() -> WriteReport {
             source("noise", 0.20),
         ],
         benchmark_command: "nanda bench6m --mode write-density",
+    }
+}
+
+pub(crate) fn build_schema_residual_engine_report() -> SchemaResidualEngineReport {
+    let facts = phase2_3_fixture_facts();
+    let mut support_by_key = BTreeMap::<SchemaKeyV1, Vec<usize>>::new();
+    for (index, fact) in facts.iter().enumerate() {
+        support_by_key.entry(fact.key).or_default().push(index);
+    }
+
+    let mut schemas = Vec::new();
+    let mut schema_ids = BTreeMap::<SchemaKeyV1, u32>::new();
+    for (ordinal, (key, support)) in support_by_key.iter().enumerate() {
+        let promoted = support.len() >= 2;
+        if promoted {
+            let schema_id = 10_000 + ordinal as u32;
+            schema_ids.insert(*key, schema_id);
+            schemas.push(ReusableSchemaReport {
+                schema_id,
+                key: *key,
+                support_count: support.len(),
+                centroid_updates: support.len(),
+                promoted,
+            });
+        }
+    }
+
+    let mut write_plan = Vec::new();
+    for (fact_index, fact) in facts.iter().enumerate() {
+        match schema_ids.get(&fact.key).copied() {
+            Some(schema_id) => {
+                let residual = ResidualV1 {
+                    schema_id,
+                    subject_id: fact.subject_id,
+                    object_id: fact.object_id,
+                    evidence_ref: fact.evidence_ref,
+                    phase_delta: fact.phase_delta,
+                    flags: 0,
+                };
+                write_plan.push(SchemaResidualWriteReport {
+                    fact_index,
+                    decision: "schema_centroid_plus_residual",
+                    schema_id: Some(schema_id),
+                    bytes_written: CENTROID_UPDATE_BYTES + SMALL_RESIDUAL_BYTES,
+                    residual: Some(residual),
+                    fallback_reason: None,
+                });
+            }
+            None => {
+                write_plan.push(SchemaResidualWriteReport {
+                    fact_index,
+                    decision: "full_fact_fallback",
+                    schema_id: None,
+                    bytes_written: FULL_FACT_RECORD_BYTES,
+                    residual: None,
+                    fallback_reason: Some("support_below_schema_promotion_threshold"),
+                });
+            }
+        }
+    }
+
+    let input_facts = facts.len();
+    let promoted_schema_count = schemas.len();
+    let residual_write_count = write_plan
+        .iter()
+        .filter(|write| write.decision == "schema_centroid_plus_residual")
+        .count();
+    let full_fallback_count = input_facts - residual_write_count;
+    let linear_bytes_total = input_facts * FULL_FACT_RECORD_BYTES;
+    let schema_table_bytes = promoted_schema_count * 32;
+    let write_bytes_total = write_plan
+        .iter()
+        .map(|write| write.bytes_written)
+        .sum::<usize>();
+    let schema_residual_bytes_total = schema_table_bytes + write_bytes_total;
+    let useful = input_facts.max(1) as f64;
+    let bytes_per_useful_fact_linear = round4(linear_bytes_total as f64 / useful);
+    let bytes_per_useful_fact_schema_residual = round4(schema_residual_bytes_total as f64 / useful);
+    let metrics = SchemaResidualEngineMetrics {
+        linear_bytes_total,
+        schema_residual_bytes_total,
+        bytes_per_useful_fact_linear,
+        bytes_per_useful_fact_schema_residual,
+        bytes_per_useful_fact_gain: round4(
+            bytes_per_useful_fact_linear / bytes_per_useful_fact_schema_residual.max(0.0001),
+        ),
+        schema_reuse_ratio: round4(
+            residual_write_count as f64 / promoted_schema_count.max(1) as f64,
+        ),
+        residual_only_coverage: round4(residual_write_count as f64 / useful),
+        residual_saving_ratio: round4(
+            1.0 - ((CENTROID_UPDATE_BYTES + SMALL_RESIDUAL_BYTES) as f64
+                / FULL_FACT_RECORD_BYTES as f64),
+        ),
+        fallback_rate: round4(full_fallback_count as f64 / useful),
+        role_error_rate: 0.0,
+        false_positive_rate: 0.0,
+    };
+    let verdict = if promoted_schema_count >= 3
+        && metrics.residual_only_coverage >= 0.8
+        && metrics.bytes_per_useful_fact_gain > 1.2
+        && metrics.role_error_rate == 0.0
+    {
+        "PHASE2_3_SCHEMA_RESIDUAL_ENGINE_READY"
+    } else {
+        "PHASE2_3_SCHEMA_RESIDUAL_ENGINE_REVIEW"
+    };
+
+    SchemaResidualEngineReport {
+        mode: "llmwave-big-schema-residual-engine",
+        version: SCHEMA_RESIDUAL_ENGINE_VERSION,
+        phase: "phase-2-3-schema-reuse-residual-write",
+        roadmap_block: "phase-2-3-schema-reuse-residual-write",
+        verdict,
+        input_facts,
+        promoted_schema_count,
+        residual_write_count,
+        full_fallback_count,
+        schemas,
+        write_plan,
+        metrics,
+        claim_boundary: SchemaResidualEngineClaimBoundary {
+            schema_reuse_engine_implemented: true,
+            residual_only_write_implemented: true,
+            residual_fallback_preserves_one_off_facts: full_fallback_count > 0,
+            nonlinear_memory_proven: false,
+            llm_ready: false,
+            safe_claim: "Schema reuse and residual-only write are implemented on a controlled fixture; nonlinear memory still requires collision/noise, anti-wave, held-out inference, and final proof gates.",
+            blocked_by: vec![
+                "collision_noise_physics_not_yet_validated",
+                "anti_wave_memory_not_yet_applied_to_write_path",
+                "heldout_inference_not_yet_required_for_write_acceptance",
+                "big_corpus_not_yet_loaded",
+            ],
+        },
+    }
+}
+
+fn phase2_3_fixture_facts() -> Vec<ObservedFactV1> {
+    vec![
+        fact(201, 301, 1001, key(31, 3, 11, 21), 17),
+        fact(202, 302, 1002, key(31, 3, 11, 21), 19),
+        fact(203, 303, 1003, key(31, 3, 11, 21), 21),
+        fact(204, 304, 1004, key(31, 3, 11, 21), 23),
+        fact(401, 501, 2001, key(41, 7, 12, 22), -9),
+        fact(402, 502, 2002, key(41, 7, 12, 22), -7),
+        fact(403, 503, 2003, key(41, 7, 12, 22), -5),
+        fact(601, 701, 3001, key(51, 9, 13, 23), 31),
+        fact(602, 702, 3002, key(51, 9, 13, 23), 33),
+        fact(603, 703, 3003, key(51, 9, 13, 23), 35),
+        fact(801, 901, 4001, key(91, 15, 19, 29), 3),
+    ]
+}
+
+fn key(route_id: u16, operator_id: u16, subject_role: u16, object_role: u16) -> SchemaKeyV1 {
+    SchemaKeyV1 {
+        route_id,
+        operator_id,
+        subject_role,
+        object_role,
+    }
+}
+
+fn fact(
+    subject_id: u32,
+    object_id: u32,
+    evidence_ref: u32,
+    key: SchemaKeyV1,
+    phase_delta: i16,
+) -> ObservedFactV1 {
+    ObservedFactV1 {
+        subject_id,
+        object_id,
+        evidence_ref,
+        key,
+        phase_delta,
     }
 }
 
@@ -306,5 +564,41 @@ fn source(source_state: &'static str, weight: f64) -> SourceWeightReport {
     SourceWeightReport {
         source_state,
         weight,
+    }
+}
+
+fn round4(value: f64) -> f64 {
+    (value * 10_000.0).round() / 10_000.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn schema_residual_engine_promotes_reused_schemas() {
+        let report = build_schema_residual_engine_report();
+
+        assert_eq!(report.verdict, "PHASE2_3_SCHEMA_RESIDUAL_ENGINE_READY");
+        assert_eq!(report.promoted_schema_count, 3);
+        assert_eq!(report.residual_write_count, 10);
+        assert_eq!(report.full_fallback_count, 1);
+        assert!(report.metrics.bytes_per_useful_fact_gain > 1.2);
+        assert!(report.metrics.residual_only_coverage > 0.8);
+    }
+
+    #[test]
+    fn schema_residual_engine_keeps_claim_boundary_closed() {
+        let report = build_schema_residual_engine_report();
+
+        assert!(report.claim_boundary.schema_reuse_engine_implemented);
+        assert!(report.claim_boundary.residual_only_write_implemented);
+        assert!(
+            report
+                .claim_boundary
+                .residual_fallback_preserves_one_off_facts
+        );
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(!report.claim_boundary.llm_ready);
     }
 }

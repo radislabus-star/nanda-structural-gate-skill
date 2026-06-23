@@ -46,7 +46,7 @@ use super::training::{
     ArtifactAskEvalReport, ArtifactAskReport, HotAskReport, HotChatEvalReport, HotChatReport,
     HotLearnReport, HotPackReport, TrainingCompileReport,
 };
-use super::write::WriteReport;
+use super::write::{SchemaResidualEngineReport, WriteReport};
 use super::LlmwaveBigReport;
 use crate::OutputFormat;
 
@@ -738,6 +738,21 @@ pub(crate) fn print_write_report(report: &WriteReport, format: &OutputFormat) ->
         ),
         OutputFormat::Text => print_write_text(report),
         OutputFormat::Md => print_write_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_schema_residual_engine_report(
+    report: &SchemaResidualEngineReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_schema_residual_engine_text(report),
+        OutputFormat::Md => print_schema_residual_engine_md(report),
     }
     Ok(())
 }
@@ -1673,6 +1688,19 @@ fn print_write_text(report: &WriteReport) {
     println!("curve_state: {}", report.write_curve.state);
 }
 
+fn print_schema_residual_engine_text(report: &SchemaResidualEngineReport) {
+    println!("mode: {}", report.mode);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input_facts: {}", report.input_facts);
+    println!("promoted_schema_count: {}", report.promoted_schema_count);
+    println!("residual_write_count: {}", report.residual_write_count);
+    println!(
+        "bytes_per_useful_fact_gain: {:.4}",
+        report.metrics.bytes_per_useful_fact_gain
+    );
+}
+
 fn print_consolidation_text(report: &ConsolidationReport) {
     println!("LLMWave-Big Consolidation Sleep");
     println!("version: {}", report.version);
@@ -2551,6 +2579,20 @@ fn print_write_md(report: &WriteReport) {
         report.write_curve.residual_saving_ratio
     );
     println!("- curve state: `{}`", report.write_curve.state);
+}
+
+fn print_schema_residual_engine_md(report: &SchemaResidualEngineReport) {
+    println!("# LLMWave-Big Schema Residual Engine");
+    println!();
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input facts: `{}`", report.input_facts);
+    println!("- promoted schemas: `{}`", report.promoted_schema_count);
+    println!("- residual writes: `{}`", report.residual_write_count);
+    println!(
+        "- bytes/useful fact gain: `{:.4}`",
+        report.metrics.bytes_per_useful_fact_gain
+    );
 }
 
 fn print_consolidation_md(report: &ConsolidationReport) {

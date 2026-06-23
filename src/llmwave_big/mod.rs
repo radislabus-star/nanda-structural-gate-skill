@@ -169,6 +169,9 @@ enum LlmwaveBigCommand {
     SurfaceRawInduce(LlmwaveBigSurfaceRawInduceArgs),
     /// Print the v191-v205 schema/residual write contract.
     Write(LlmwaveBigWriteArgs),
+    /// Run the Phase 2-3 schema reuse and residual-only write engine.
+    #[command(name = "schema-residual-engine", alias = "residual-write-engine")]
+    SchemaResidualEngine(LlmwaveBigSchemaResidualEngineArgs),
     /// Print the v206-v218 consolidation/sleep contract.
     Consolidate(LlmwaveBigConsolidateArgs),
     /// Print the v219-v230 Big Cognition Eval report.
@@ -510,6 +513,12 @@ struct LlmwaveBigSurfaceRawInduceArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigWriteArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSchemaResidualEngineArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -944,6 +953,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::Write(args) => {
             let report = write::build_write_report();
             report::print_write_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SchemaResidualEngine(args) => {
+            let report = write::build_schema_residual_engine_report();
+            report::print_schema_residual_engine_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Consolidate(args) => {

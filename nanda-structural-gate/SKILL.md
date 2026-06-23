@@ -212,6 +212,7 @@ scripts/nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
 scripts/nanda-llmwave-big claim-gate --claim llm-ready --format json
 scripts/nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
 scripts/nanda-llmwave-big nonlinear-memory-ladder --max-facts 100000 --format json
+scripts/nanda-llmwave-big schema-residual-engine --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
@@ -697,6 +698,10 @@ as the Phase 1 density instrument. It maps amortized win points, standalone
 basis break-even, collision pressure, and the best operating window. Treat it
 as economics/profiling evidence only: `nonlinear_memory_proven=false` remains
 the correct claim boundary until later phases and the final proof gate pass.
+Use `nanda-llmwave-big schema-residual-engine --format json` for the Phase 2-3
+write path: promoted schema keys should receive centroid+residual writes, while
+one-off facts must remain full fallbacks instead of being forced into bad
+schemas.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a

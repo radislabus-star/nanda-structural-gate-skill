@@ -258,6 +258,9 @@ nanda-llmwave-big nonlinear-memory-ladder \
   --max-facts 100000 \
   --format json
 
+nanda-llmwave-big schema-residual-engine \
+  --format json
+
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
   --proof-policy scale-amortized \
@@ -277,6 +280,11 @@ nanda-llmwave-big domain-eval \
 fixed-basis residual memory starts to beat a linear fact baseline, where the
 basis overhead is repaid, and where collision pressure would need later gates.
 It does not by itself prove nonlinear memory or broad LLM readiness.
+
+`schema-residual-engine` is the Phase 2-3 controlled write path. It groups
+observed facts into reusable schema keys, writes promoted routes as centroid
+updates plus residual records, and keeps unsupported one-off facts as full
+fallbacks.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
