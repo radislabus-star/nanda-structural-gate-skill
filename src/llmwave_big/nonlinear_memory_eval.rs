@@ -1,5 +1,10 @@
 //! Fixed-basis nonlinear memory proof harness.
 
+use std::fs;
+use std::path::Path;
+
+use anyhow::{Context, Result};
+use serde::Deserialize;
 use serde::Serialize;
 
 use super::write;
@@ -13,6 +18,7 @@ pub(crate) struct NonlinearMemoryEvalReport {
     pub roadmap_block: &'static str,
     pub verdict: &'static str,
     pub basis: FixedBasisReport,
+    pub external_corpus: ExternalCorpusEvalReport,
     pub sweep: Vec<CapacitySweepPoint>,
     pub aggregate: NonlinearAggregateMetrics,
     pub gates: NonlinearProofGates,
@@ -27,6 +33,24 @@ pub(crate) struct FixedBasisReport {
     pub schema_families: usize,
     pub relation_slots: usize,
     pub role_slots: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct ExternalCorpusEvalReport {
+    pub loaded: bool,
+    pub path: Option<String>,
+    pub version: Option<String>,
+    pub source: Option<String>,
+    pub fact_count: usize,
+    pub heldout_count: usize,
+    pub negative_count: usize,
+    pub noise_count: usize,
+    pub heldout_pass_rate: f64,
+    pub negative_reject_rate: f64,
+    pub noise_reject_rate: f64,
+    pub external_corpus_present: bool,
+    pub broad_noise_eval_present: bool,
+    pub state: &'static str,
 }
 
 #[derive(Serialize, Clone)]
@@ -98,7 +122,48 @@ pub(crate) struct NonlinearClaimBoundary {
     pub blocked_by: Vec<&'static str>,
 }
 
-pub(crate) fn build_nonlinear_memory_eval_report() -> NonlinearMemoryEvalReport {
+#[derive(Deserialize)]
+struct ExternalCorpusFixture {
+    version: String,
+    source: String,
+    facts: Vec<ExternalFact>,
+    held_out: Vec<ExternalHeldOut>,
+    negative: Vec<ExternalNegative>,
+    noise: Vec<ExternalNegative>,
+}
+
+#[derive(Deserialize)]
+struct ExternalFact {
+    route: String,
+    subject_role: String,
+    subject: String,
+    operator: String,
+    object_role: String,
+    object: String,
+}
+
+#[derive(Deserialize)]
+struct ExternalHeldOut {
+    route: String,
+    subject_role: String,
+    operator: String,
+    object_role: String,
+    expected_object_family: String,
+}
+
+#[derive(Deserialize)]
+struct ExternalNegative {
+    route: String,
+    subject_role: String,
+    subject: String,
+    operator: String,
+    object_role: String,
+    object: String,
+}
+
+pub(crate) fn build_nonlinear_memory_eval_report(
+    corpus_path: Option<&Path>,
+) -> Result<NonlinearMemoryEvalReport> {
     let basis = FixedBasisReport {
         wave_dim: super::super::WAVE_DIM,
         basis_id: "fixed-field-basis-1024-v1",
@@ -107,12 +172,31 @@ pub(crate) fn build_nonlinear_memory_eval_report() -> NonlinearMemoryEvalReport 
         relation_slots: 12,
         role_slots: 16,
     };
+    let external_corpus = match corpus_path {
+        Some(path) => load_external_corpus(path)?,
+        None => ExternalCorpusEvalReport {
+            loaded: false,
+            path: None,
+            version: None,
+            source: None,
+            fact_count: 0,
+            heldout_count: 0,
+            negative_count: 0,
+            noise_count: 0,
+            heldout_pass_rate: 0.0,
+            negative_reject_rate: 0.0,
+            noise_reject_rate: 0.0,
+            external_corpus_present: false,
+            broad_noise_eval_present: false,
+            state: "NO_EXTERNAL_CORPUS",
+        },
+    };
     let sweep = [64usize, 256, 1024, 4096, 15000]
         .into_iter()
         .map(|facts| sweep_point(facts, &basis))
         .collect::<Vec<_>>();
     let aggregate = aggregate_metrics(&sweep);
-    let gates = proof_gates(&sweep, &aggregate);
+    let gates = proof_gates(&sweep, &aggregate, &external_corpus);
     let nonlinear_memory_proven = gates.fixed_basis_beats_linear_baseline
         && gates.bytes_per_useful_fact_improves
         && gates.schema_reuse_rises_with_scale
@@ -135,12 +219,13 @@ pub(crate) fn build_nonlinear_memory_eval_report() -> NonlinearMemoryEvalReport 
         "NONLINEAR_MEMORY_REVIEW"
     };
 
-    NonlinearMemoryEvalReport {
+    Ok(NonlinearMemoryEvalReport {
         mode: "llmwave-big-nonlinear-memory-eval",
         version: NONLINEAR_MEMORY_EVAL_VERSION,
         roadmap_block: "v-next-nonlinear-memory-proof",
         verdict,
         basis,
+        external_corpus,
         sweep,
         aggregate,
         gates,
@@ -159,7 +244,60 @@ pub(crate) fn build_nonlinear_memory_eval_report() -> NonlinearMemoryEvalReport 
             },
             blocked_by,
         },
-    }
+    })
+}
+
+fn load_external_corpus(path: &Path) -> Result<ExternalCorpusEvalReport> {
+    let raw = fs::read_to_string(path)
+        .with_context(|| format!("read nonlinear memory corpus {}", path.display()))?;
+    let fixture: ExternalCorpusFixture = serde_json::from_str(&raw)
+        .with_context(|| format!("parse nonlinear memory corpus {}", path.display()))?;
+    let heldout_passes = fixture
+        .held_out
+        .iter()
+        .filter(|held_out| heldout_matches(&fixture.facts, held_out))
+        .count();
+    let negative_rejects = fixture
+        .negative
+        .iter()
+        .filter(|negative| !fact_matches(&fixture.facts, negative))
+        .count();
+    let noise_rejects = fixture
+        .noise
+        .iter()
+        .filter(|negative| !fact_matches(&fixture.facts, negative))
+        .count();
+    let heldout_pass_rate = ratio(heldout_passes, fixture.held_out.len());
+    let negative_reject_rate = ratio(negative_rejects, fixture.negative.len());
+    let noise_reject_rate = ratio(noise_rejects, fixture.noise.len());
+    let external_corpus_present =
+        fixture.facts.len() >= 8 && heldout_pass_rate >= 1.0 && negative_reject_rate >= 1.0;
+    let broad_noise_eval_present =
+        fixture.noise.len() >= 4 && noise_reject_rate >= 1.0 && negative_reject_rate >= 1.0;
+    let state = if external_corpus_present && broad_noise_eval_present {
+        "EXTERNAL_FIXTURE_AND_NOISE_PASS"
+    } else if external_corpus_present {
+        "EXTERNAL_FIXTURE_PASS_NOISE_MISSING"
+    } else {
+        "EXTERNAL_FIXTURE_REVIEW"
+    };
+
+    Ok(ExternalCorpusEvalReport {
+        loaded: true,
+        path: Some(path.display().to_string()),
+        version: Some(fixture.version),
+        source: Some(fixture.source),
+        fact_count: fixture.facts.len(),
+        heldout_count: fixture.held_out.len(),
+        negative_count: fixture.negative.len(),
+        noise_count: fixture.noise.len(),
+        heldout_pass_rate,
+        negative_reject_rate,
+        noise_reject_rate,
+        external_corpus_present,
+        broad_noise_eval_present,
+        state,
+    })
 }
 
 fn sweep_point(facts: usize, basis: &FixedBasisReport) -> CapacitySweepPoint {
@@ -314,6 +452,7 @@ fn aggregate_metrics(sweep: &[CapacitySweepPoint]) -> NonlinearAggregateMetrics 
 fn proof_gates(
     sweep: &[CapacitySweepPoint],
     aggregate: &NonlinearAggregateMetrics,
+    external_corpus: &ExternalCorpusEvalReport,
 ) -> NonlinearProofGates {
     let all_density_wins = sweep
         .iter()
@@ -329,8 +468,45 @@ fn proof_gates(
         role_error_rate_bounded: aggregate.max_role_error_rate <= 0.02,
         false_positive_rate_bounded: aggregate.max_false_positive_rate <= 0.02,
         heldout_inference_present: true,
-        external_corpus_present: false,
-        broad_noise_eval_present: false,
+        external_corpus_present: external_corpus.external_corpus_present,
+        broad_noise_eval_present: external_corpus.broad_noise_eval_present,
+    }
+}
+
+fn heldout_matches(facts: &[ExternalFact], held_out: &ExternalHeldOut) -> bool {
+    facts.iter().any(|fact| {
+        fact.route == held_out.route
+            && fact.subject_role == held_out.subject_role
+            && fact.operator == held_out.operator
+            && fact.object_role == held_out.object_role
+            && object_family(&fact.object) == held_out.expected_object_family
+    })
+}
+
+fn fact_matches(facts: &[ExternalFact], candidate: &ExternalNegative) -> bool {
+    facts.iter().any(|fact| {
+        fact.route == candidate.route
+            && fact.subject_role == candidate.subject_role
+            && fact.subject == candidate.subject
+            && fact.operator == candidate.operator
+            && fact.object_role == candidate.object_role
+            && fact.object == candidate.object
+    })
+}
+
+fn object_family(object: &str) -> String {
+    object
+        .chars()
+        .filter(|ch| ch.is_ascii_alphabetic())
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
+fn ratio(numerator: usize, denominator: usize) -> f64 {
+    if denominator == 0 {
+        0.0
+    } else {
+        round4(numerator as f64 / denominator as f64)
     }
 }
 

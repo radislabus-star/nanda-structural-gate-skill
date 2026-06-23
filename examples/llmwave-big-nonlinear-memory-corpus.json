@@ -1,0 +1,169 @@
+{
+  "version": "llmwave_big_nonlinear_memory_fixture_v1",
+  "source": "business_relation_density_fixture_v1",
+  "facts": [
+    {
+      "route": "supplier-docs",
+      "subject_role": "supplier",
+      "subject": "Honglu",
+      "operator": "issues",
+      "object_role": "document",
+      "object": "invoice"
+    },
+    {
+      "route": "supplier-docs",
+      "subject_role": "supplier",
+      "subject": "factory",
+      "operator": "issues",
+      "object_role": "document",
+      "object": "invoice"
+    },
+    {
+      "route": "supplier-docs",
+      "subject_role": "supplier",
+      "subject": "Honglu",
+      "operator": "issues",
+      "object_role": "document",
+      "object": "packing-list"
+    },
+    {
+      "route": "buyer-payment",
+      "subject_role": "buyer",
+      "subject": "Rustrade",
+      "operator": "pays",
+      "object_role": "document",
+      "object": "invoice"
+    },
+    {
+      "route": "buyer-payment",
+      "subject_role": "buyer",
+      "subject": "client",
+      "operator": "pays",
+      "object_role": "document",
+      "object": "invoice"
+    },
+    {
+      "route": "certification",
+      "subject_role": "applicant",
+      "subject": "Maria",
+      "operator": "orders",
+      "object_role": "evidence",
+      "object": "protocol"
+    },
+    {
+      "route": "certification",
+      "subject_role": "certificate",
+      "subject": "declaration",
+      "operator": "requires",
+      "object_role": "evidence",
+      "object": "protocol"
+    },
+    {
+      "route": "customs-check",
+      "subject_role": "authority",
+      "subject": "customs",
+      "operator": "checks",
+      "object_role": "document",
+      "object": "declaration"
+    },
+    {
+      "route": "customs-check",
+      "subject_role": "broker",
+      "subject": "declarant",
+      "operator": "files",
+      "object_role": "document",
+      "object": "declaration"
+    },
+    {
+      "route": "logistics",
+      "subject_role": "carrier",
+      "subject": "forwarder",
+      "operator": "moves",
+      "object_role": "cargo",
+      "object": "equipment"
+    }
+  ],
+  "held_out": [
+    {
+      "route": "supplier-docs",
+      "subject_role": "supplier",
+      "operator": "issues",
+      "object_role": "document",
+      "expected_object_family": "invoice"
+    },
+    {
+      "route": "certification",
+      "subject_role": "certificate",
+      "operator": "requires",
+      "object_role": "evidence",
+      "expected_object_family": "protocol"
+    },
+    {
+      "route": "customs-check",
+      "subject_role": "authority",
+      "operator": "checks",
+      "object_role": "document",
+      "expected_object_family": "declaration"
+    }
+  ],
+  "negative": [
+    {
+      "route": "supplier-docs",
+      "subject_role": "document",
+      "subject": "invoice",
+      "operator": "issues",
+      "object_role": "supplier",
+      "object": "Honglu"
+    },
+    {
+      "route": "buyer-payment",
+      "subject_role": "supplier",
+      "subject": "Honglu",
+      "operator": "pays",
+      "object_role": "document",
+      "object": "invoice"
+    },
+    {
+      "route": "certification",
+      "subject_role": "warehouse",
+      "subject": "warehouse",
+      "operator": "orders",
+      "object_role": "evidence",
+      "object": "protocol"
+    }
+  ],
+  "noise": [
+    {
+      "route": "supplier-docs",
+      "subject_role": "supplier",
+      "subject": "Honglu",
+      "operator": "clears",
+      "object_role": "authority",
+      "object": "customs"
+    },
+    {
+      "route": "customs-check",
+      "subject_role": "invoice",
+      "subject": "invoice",
+      "operator": "checks",
+      "object_role": "authority",
+      "object": "customs"
+    },
+    {
+      "route": "logistics",
+      "subject_role": "certificate",
+      "subject": "declaration",
+      "operator": "moves",
+      "object_role": "cargo",
+      "object": "equipment"
+    },
+    {
+      "route": "buyer-payment",
+      "subject_role": "carrier",
+      "subject": "forwarder",
+      "operator": "pays",
+      "object_role": "document",
+      "object": "invoice"
+    }
+  ]
+}

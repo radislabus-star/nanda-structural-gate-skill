@@ -254,6 +254,9 @@ jq -e '.mode == "llmwave-big-nonlinear-memory-eval" and .verdict == "NONLINEAR_M
 jq -e '.basis.fixed_across_sweep == true and .basis.wave_dim == 1024 and (.sweep | length) == 5 and .sweep[-1].facts == 15000 and .sweep[-1].verdict == "WAVE_DENSITY_WIN"' <<<"$big_nonlinear_eval_json" >/dev/null
 jq -e '.aggregate.large_scale_win_rate == 1 and .aggregate.large_scale_bytes_per_useful_fact_gain > 4 and .aggregate.max_role_error_rate <= 0.02 and .aggregate.max_false_positive_rate <= 0.02' <<<"$big_nonlinear_eval_json" >/dev/null
 jq -e '.claim_boundary.nonlinear_memory_eval_implemented == true and .claim_boundary.useful_density_candidate == true and .claim_boundary.nonlinear_memory_proven == false and (.claim_boundary.blocked_by | index("external_corpus_missing")) and (.claim_boundary.blocked_by | index("broad_noise_eval_missing"))' <<<"$big_nonlinear_eval_json" >/dev/null
+big_nonlinear_fixture_json="$("$llmwave_big" nonlinear-memory-eval --corpus "$root/examples/llmwave-big-nonlinear-memory-corpus.json" --format json)"
+jq -e '.external_corpus.state == "EXTERNAL_FIXTURE_AND_NOISE_PASS" and .external_corpus.heldout_pass_rate == 1 and .external_corpus.negative_reject_rate == 1 and .external_corpus.noise_reject_rate == 1' <<<"$big_nonlinear_fixture_json" >/dev/null
+jq -e '.claim_boundary.nonlinear_memory_proven == false and (.claim_boundary.blocked_by | index("external_corpus_missing") | not) and (.claim_boundary.blocked_by | index("broad_noise_eval_missing") | not) and (.claim_boundary.blocked_by | index("fixed_basis_does_not_beat_linear_baseline"))' <<<"$big_nonlinear_fixture_json" >/dev/null
 big_word_birth_json="$("$llmwave_big" word-birth --format json)"
 jq -e '.roadmap_block == "v246-v252" and .verdict == "LEXICAL_BIRTH_MECHANISM_READY"' <<<"$big_word_birth_json" >/dev/null
 jq -e '.sample.gate.verdict == "WORD_ACCEPTED" and .sample.binding_record.symbol_id == 70001' <<<"$big_word_birth_json" >/dev/null
@@ -419,6 +422,7 @@ jq empty "$root/examples/llmwave-big-surface-corpus-ru.json"
 jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru.json"
 jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru-noisy.json"
 jq empty "$root/examples/llmwave-big-raw-surface-corpus-ru-derived.json"
+jq empty "$root/examples/llmwave-big-nonlinear-memory-corpus.json"
 jq empty "$root/examples/eval-corpus.json"
 jq empty "$root/examples/probe-corpus.json"
 jq empty "$root/examples/waw-corpus.json"

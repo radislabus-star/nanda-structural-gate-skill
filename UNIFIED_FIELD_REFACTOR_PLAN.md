@@ -989,9 +989,27 @@ claim_boundary.useful_density_candidate = true
 claim_boundary.nonlinear_memory_proven = false
 ```
 
+With the external fixture:
+
+```bash
+nanda llmwave-big nonlinear-memory-eval \
+  --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
+  --format json
+```
+
+the external/noise gates report:
+
+```text
+external_corpus.state = EXTERNAL_FIXTURE_AND_NOISE_PASS
+external_corpus.heldout_pass_rate = 1.0
+external_corpus.negative_reject_rate = 1.0
+external_corpus.noise_reject_rate = 1.0
+```
+
 This is a deliberately narrow result. It says the fixed basis starts to win at
 larger scale after basis overhead is amortized. It does not prove nonlinear
-memory yet, because the external corpus and broad noise gates are still missing.
+memory yet, because the full-sweep baseline gates are still stricter than the
+current scale-candidate evidence.
 
 The nonlinear-memory claim stays blocked until:
 

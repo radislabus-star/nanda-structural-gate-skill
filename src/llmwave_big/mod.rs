@@ -423,6 +423,8 @@ struct LlmwaveBigClaimGateArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigNonlinearMemoryEvalArgs {
+    #[arg(long)]
+    corpus: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -811,7 +813,8 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(exit)
         }
         LlmwaveBigCommand::NonlinearMemoryEval(args) => {
-            let report = nonlinear_memory_eval::build_nonlinear_memory_eval_report();
+            let report =
+                nonlinear_memory_eval::build_nonlinear_memory_eval_report(args.corpus.as_deref())?;
             report::print_nonlinear_memory_eval_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
