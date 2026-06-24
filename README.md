@@ -522,6 +522,12 @@ nanda-llmwave-big broad-corpus-build \
   --out .nanda/llmwave-big-training/broad-public-corpus.json \
   --format json
 
+nanda-llmwave-big broad-corpus-build \
+  --source examples/llmwave-big-broad-public-corpus-100k.txt \
+  --profile public-safe-100k \
+  --out .nanda/llmwave-big-training/broad-public-100k-corpus.json \
+  --format json
+
 nanda-llmwave-big broad-dataset-doctor \
   --corpus .nanda/llmwave-big-training/broad-corpus.json \
   --out .nanda/llmwave-big-training/broad-dataset-doctor.json \
@@ -576,9 +582,10 @@ baseline wins. With `broad-chat-loop-eval` and memory proof evidence,
 `llmwave-readiness` can report `LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM` while
 still keeping `llm_ready=false`. That boundary means constrained LLMWave
 cognition candidate over an external-medium corpus, not a general LLM.
-`examples/llmwave-big-broad-public-corpus.txt` is a public-safe strong seed:
-96 synthetic structural facts across 8 domains and 32 routes. Its companion
-manifest explicitly excludes user/private business data and local correspondence.
+`examples/llmwave-big-broad-public-corpus-100k.txt` is the normal public-safe
+large seed: 100,000 generated structural facts across 10 domains and 50 routes.
+Its companion manifest explicitly excludes user/private business data and local
+correspondence. The smaller 96-fact file remains a fast smoke seed only.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

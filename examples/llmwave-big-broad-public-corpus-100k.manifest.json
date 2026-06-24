@@ -1,0 +1,33 @@
+{
+  "artifact": "llmwave-big-broad-public-corpus-100k",
+  "version": "1",
+  "generator": "scripts/build-llmwave-big-broad-public-corpus.sh",
+  "corpus_path": "examples/llmwave-big-broad-public-corpus-100k.txt",
+  "fact_count": 100000,
+  "domain_count": 10,
+  "route_count": 50,
+  "facts_per_domain_route": 200,
+  "privacy_policy": {
+    "private_user_data_excluded": true,
+    "allowed_sources": [
+      "public-safe generated structural facts",
+      "generic route templates",
+      "repository-public documentation concepts"
+    ],
+    "excluded_sources": [
+      "user correspondence",
+      "customs folders",
+      "contract originals",
+      "commercial documents",
+      "customer or counterparty data",
+      "browser/session exports",
+      "private project notes outside this repository"
+    ]
+  },
+  "claim_boundary": {
+    "proves_big_broad_artifact_exists": true,
+    "proves_llm_ready": false,
+    "proves_nonlinear_memory": false,
+    "safe_claim": "This is a public-safe 100k structural corpus for broad eval pipeline development, not proof of general LLM readiness."
+  }
+}
