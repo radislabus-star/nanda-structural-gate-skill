@@ -207,7 +207,9 @@ does not prove general nonlinear memory or LLM readiness by itself.
 One Rust profile must return `MULTI_PROFILE_DENSITY_BLOCKED_BY_SINGLE_PROFILE`.
 The general nonlinear-memory claim requires enough independent passing
 profiles, held-out quality, false-shortcut rejection, and bounded collision
-pressure. If the suite passes, final proof can reach
+pressure. Profiles must also have distinct source signatures: duplicate
+`source.corpus_hash` values or identical raw artifacts block the suite with
+`duplicate_or_missing_independent_profile_sources`. If the suite passes, final proof can reach
 `FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`: nonlinear memory may be
 claimed, but LLM readiness remains false until broad LLM evals pass.
 

@@ -5,6 +5,7 @@
 //! nonlinear-memory claim needs multiple passing profiles with quality and
 //! density wins.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -51,6 +52,9 @@ pub(crate) struct MultiProfileDensitySuiteSummary {
 pub(crate) struct ProfileDensityResult {
     pub profile: String,
     pub evidence_path: Option<String>,
+    pub source_signature: String,
+    pub source_name: Option<String>,
+    pub source_kind: Option<String>,
     pub present: bool,
     pub rust_density_profile_proven: bool,
     pub profile_density_proven: bool,
@@ -77,6 +81,7 @@ pub(crate) struct MultiProfileDensityAggregate {
 #[derive(Serialize, Clone)]
 pub(crate) struct MultiProfileDensityGates {
     pub enough_profiles: bool,
+    pub independent_profile_sources: bool,
     pub all_profiles_present: bool,
     pub all_profiles_density_proven: bool,
     pub heldout_quality_passed: bool,
@@ -104,9 +109,21 @@ pub(crate) struct MultiProfileDensityClaimBoundary {
 
 #[derive(Deserialize)]
 struct ProfileEvidencePayload {
+    #[serde(default)]
+    source: Option<ProfileSource>,
     density: ProfileDensityMetrics,
     quality: ProfileQualityMetrics,
     gates: ProfileGates,
+}
+
+#[derive(Deserialize)]
+struct ProfileSource {
+    #[serde(default)]
+    source_kind: Option<String>,
+    #[serde(default)]
+    corpus_hash: Option<String>,
+    #[serde(default)]
+    source_name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -165,6 +182,12 @@ pub(crate) fn build_multi_profile_density_suite_report(
     let missing_profile_count = min_profiles.saturating_sub(profiles.len());
     let aggregate = aggregate_profiles(&profiles);
     let enough_profiles = profiles.len() >= min_profiles;
+    let unique_sources = profiles
+        .iter()
+        .map(|profile| profile.source_signature.as_str())
+        .collect::<BTreeSet<_>>()
+        .len();
+    let independent_profile_sources = enough_profiles && unique_sources == profiles.len();
     let all_profiles_present = missing_profile_count == 0;
     let all_profiles_density_proven = enough_profiles
         && profiles
@@ -184,12 +207,14 @@ pub(crate) fn build_multi_profile_density_suite_report(
             .all(|profile| profile.collision_pressure <= 0.35);
     let general_nonlinear_memory_proven = enough_profiles
         && all_profiles_present
+        && independent_profile_sources
         && all_profiles_density_proven
         && heldout_quality_passed
         && false_shortcuts_passed
         && collision_pressure_bounded;
     let gates = MultiProfileDensityGates {
         enough_profiles,
+        independent_profile_sources,
         all_profiles_present,
         all_profiles_density_proven,
         heldout_quality_passed,
@@ -203,6 +228,7 @@ pub(crate) fn build_multi_profile_density_suite_report(
     hash.update(min_profiles.to_le_bytes());
     for profile in &profiles {
         hash.update(profile.profile.as_bytes());
+        hash.update(profile.source_signature.as_bytes());
         hash.update(profile.density_win_ratio.to_le_bytes());
         hash.update(profile.heldout_pass_rate.to_le_bytes());
         hash.update(profile.profile_density_proven.to_string().as_bytes());
@@ -264,6 +290,7 @@ fn read_profile(profile: &str, path: &PathBuf) -> Result<ProfileDensityResult> {
         .with_context(|| format!("read profile density evidence {}", path.display()))?;
     let payload: ProfileEvidencePayload = serde_json::from_str(&raw)
         .with_context(|| format!("parse profile density evidence {}", path.display()))?;
+    let source_signature = source_signature(&raw, payload.source.as_ref());
     let profile_density_proven = payload.gates.rust_density_profile_proven
         || payload.gates.profile_density_proven
         || payload.gates.general_nonlinear_memory_proven;
@@ -283,6 +310,15 @@ fn read_profile(profile: &str, path: &PathBuf) -> Result<ProfileDensityResult> {
     Ok(ProfileDensityResult {
         profile: profile.to_string(),
         evidence_path: Some(path.display().to_string()),
+        source_signature,
+        source_name: payload
+            .source
+            .as_ref()
+            .and_then(|source| source.source_name.clone()),
+        source_kind: payload
+            .source
+            .as_ref()
+            .and_then(|source| source.source_kind.clone()),
         present: true,
         rust_density_profile_proven: payload.gates.rust_density_profile_proven,
         profile_density_proven,
@@ -299,6 +335,17 @@ fn read_profile(profile: &str, path: &PathBuf) -> Result<ProfileDensityResult> {
         },
         blocked_by,
     })
+}
+
+fn source_signature(raw: &str, source: Option<&ProfileSource>) -> String {
+    if let Some(corpus_hash) = source.and_then(|source| source.corpus_hash.as_deref()) {
+        if !corpus_hash.trim().is_empty() {
+            return format!("corpus:{}", corpus_hash.trim());
+        }
+    }
+    let mut hash = Sha256::new();
+    hash.update(raw.as_bytes());
+    format!("artifact:{:x}", hash.finalize())
 }
 
 fn parse_profile_spec(spec: &str) -> Result<(String, PathBuf)> {
@@ -364,6 +411,9 @@ fn blocked_by(
     let mut blocked = Vec::new();
     if !gates.enough_profiles {
         blocked.push("not_enough_independent_profiles");
+    }
+    if !gates.independent_profile_sources {
+        blocked.push("duplicate_or_missing_independent_profile_sources");
     }
     if suite.missing_profile_count > 0 {
         blocked.push("profile_evidence_missing");
@@ -451,6 +501,9 @@ mod tests {
         let profiles = vec![ProfileDensityResult {
             profile: "rust".to_string(),
             evidence_path: None,
+            source_signature: "artifact:test-rust".to_string(),
+            source_name: None,
+            source_kind: None,
             present: true,
             rust_density_profile_proven: true,
             profile_density_proven: true,
@@ -467,6 +520,7 @@ mod tests {
         assert_eq!(aggregate.min_density_win_ratio, 3.0);
         let gates = MultiProfileDensityGates {
             enough_profiles: false,
+            independent_profile_sources: false,
             all_profiles_present: false,
             all_profiles_density_proven: false,
             heldout_quality_passed: false,
@@ -484,5 +538,62 @@ mod tests {
             missing_profile_count: 2,
         };
         assert!(blocked_by(&gates, &suite).contains(&"not_enough_independent_profiles"));
+    }
+
+    #[test]
+    fn duplicate_source_blocks_general_claim() {
+        let profiles = [
+            test_profile("business", "corpus:same"),
+            test_profile("contracts", "corpus:same"),
+            test_profile("rust", "artifact:rust"),
+        ];
+        let unique_sources = profiles
+            .iter()
+            .map(|profile| profile.source_signature.as_str())
+            .collect::<BTreeSet<_>>()
+            .len();
+        let gates = MultiProfileDensityGates {
+            enough_profiles: true,
+            independent_profile_sources: unique_sources == profiles.len(),
+            all_profiles_present: true,
+            all_profiles_density_proven: true,
+            heldout_quality_passed: true,
+            false_shortcuts_passed: true,
+            collision_pressure_bounded: true,
+            general_nonlinear_memory_proven: false,
+            llm_ready: false,
+        };
+        let suite = MultiProfileDensitySuiteSummary {
+            suite_kind: "multi-profile-density-suite",
+            suite_hash: "test".to_string(),
+            min_profiles_required: 3,
+            profile_count: 3,
+            passing_profile_count: 3,
+            missing_profile_count: 0,
+        };
+        assert!(!gates.independent_profile_sources);
+        assert!(blocked_by(&gates, &suite)
+            .contains(&"duplicate_or_missing_independent_profile_sources"));
+    }
+
+    fn test_profile(profile: &str, source_signature: &str) -> ProfileDensityResult {
+        ProfileDensityResult {
+            profile: profile.to_string(),
+            evidence_path: None,
+            source_signature: source_signature.to_string(),
+            source_name: None,
+            source_kind: None,
+            present: true,
+            rust_density_profile_proven: profile == "rust",
+            profile_density_proven: true,
+            density_win_ratio: 2.0,
+            schema_reuse_ratio: 3.0,
+            residual_saving_ratio: 0.6,
+            heldout_pass_rate: 1.0,
+            false_shortcut_rejection_rate: 1.0,
+            collision_pressure: 0.0,
+            verdict: "PROFILE_DENSITY_PROVEN",
+            blocked_by: Vec::new(),
+        }
     }
 }

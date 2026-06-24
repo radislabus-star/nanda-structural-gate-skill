@@ -782,7 +782,10 @@ Use `nanda-llmwave-big multi-profile-density-suite --rust-density ... --profile-
 to aggregate independent density profile artifacts. One Rust profile alone
 must stay blocked as `MULTI_PROFILE_DENSITY_BLOCKED_BY_SINGLE_PROFILE`. The
 general nonlinear-memory claim needs multiple independent passing profiles,
-held-out quality, false-shortcut rejection, and bounded collision pressure. If
+held-out quality, false-shortcut rejection, and bounded collision pressure.
+Independence is checked by source signature: duplicate `source.corpus_hash`
+values or identical raw artifacts block the suite with
+`duplicate_or_missing_independent_profile_sources`. If
 `--multi-profile-density-evidence` is passed to final proof and the suite
 passes, final proof may reach `FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`;
 LLM readiness remains false until broad LLM/chat evals pass.

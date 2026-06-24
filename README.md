@@ -448,6 +448,10 @@ passing profiles can produce
 `MULTI_PROFILE_NONLINEAR_MEMORY_PROVEN_NOT_LLM`. Passing that into
 `memory-final-proof --profile rust` may set `nonlinear_memory_proven=true`, but
 `llm_ready` remains false until broad LLM/chat evals exist.
+Independence is checked by source signature: generic profile artifacts expose
+`source.corpus_hash`, while legacy/strict artifacts fall back to a raw artifact
+hash. Duplicate source hashes or identical artifacts block the suite with
+`duplicate_or_missing_independent_profile_sources`.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
