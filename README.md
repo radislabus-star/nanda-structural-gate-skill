@@ -343,6 +343,12 @@ nanda-llmwave-big density-proof-doctor \
   --out .nanda/llmwave-big-training/density-proof-doctor.json \
   --format json
 
+nanda-llmwave-big density-proof-doctor \
+  --suite .nanda/llmwave-big-training/multi-profile-density.json \
+  --min-fact-count 10 \
+  --out .nanda/llmwave-big-training/density-proof-doctor-medium.json \
+  --format json
+
 nanda-llmwave-big memory-final-proof \
   --profile rust \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
@@ -474,6 +480,10 @@ strong. It reports `DENSITY_PROOF_BLOCKED`, `DENSITY_PROOF_WEAK`,
 remain WEAK even when the formal suite gates pass. Pass the doctor artifact to
 `memory-final-proof` with `--density-doctor-evidence`; WEAK/BLOCKED doctor
 evidence keeps the final nonlinear-memory claim closed.
+For fixture-scale development, `--min-fact-count 10` can demonstrate a
+`DENSITY_PROOF_MEDIUM` path over the business/contracts/adversarial suite. This
+is local medium evidence only: it may unlock
+`FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`, never LLM readiness.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

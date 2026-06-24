@@ -228,6 +228,7 @@ scripts/nanda-llmwave-big profile-density-build --profile contracts --corpus exa
 scripts/nanda-llmwave-big profile-density-build --profile adversarial --corpus examples/llmwave-big-adversarial-density-corpus.json --out .nanda/llmwave-big-training/adversarial-density.json --format json
 scripts/nanda-llmwave-big multi-profile-density-suite --rust-density .nanda/llmwave-big-training/strict-density.json --profile-evidence adversarial=.nanda/llmwave-big-training/adversarial-density.json --profile-evidence contracts=.nanda/llmwave-big-training/contracts-density.json --profile-evidence business=.nanda/llmwave-big-training/business-density.json --out .nanda/llmwave-big-training/multi-profile-density.json --format json
 scripts/nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi-profile-density.json --out .nanda/llmwave-big-training/density-proof-doctor.json --format json
+scripts/nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi-profile-density.json --min-fact-count 10 --out .nanda/llmwave-big-training/density-proof-doctor-medium.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --format json
@@ -797,6 +798,10 @@ to audit proof strength after the suite. A formal suite pass can still be
 `DENSITY_PROOF_WEAK` when profile corpora are tiny, source diversity is low, or
 negative/noise pressure is too mild. WEAK/BLOCKED doctor evidence keeps the
 final nonlinear-memory claim closed.
+For fixture-scale development, `--min-fact-count 10` can demonstrate a
+`DENSITY_PROOF_MEDIUM` path over the business/contracts/adversarial suite. This
+is local medium evidence only: it may unlock
+`FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`, never LLM readiness.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a
