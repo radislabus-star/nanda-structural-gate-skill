@@ -179,6 +179,7 @@ scripts/nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --pr
 scripts/nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 scripts/nanda-llmwave-big core-v1-contract --format json
 scripts/nanda-llmwave-big core-v1-field-cutover --format json
+scripts/nanda-llmwave-big core-v1-memory-writer --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -585,6 +586,12 @@ structural, packed, and LLMWave cognitive reports. Treat
 only. It still keeps `field_core_as_sole_llmwave_core_engine=false`,
 `llm_ready=false`, and `nonlinear_memory_proven=false` until memory writer,
 query wave, answer/verifier, feedback learning, and broad eval evidence exist.
+`nanda-llmwave-big core-v1-memory-writer` records Phase 3. It makes the primary
+memory writer schema residuals plus surface-family refs and evidence pointers,
+not a flat raw UTF-8 dictionary. Treat
+`raw_dictionary_is_not_primary_memory=true` as a writer contract only. It still
+keeps `nonlinear_memory_proven=false` and `llm_ready=false` until scale ladder,
+held-out quality, query wave, and verifier evidence exist.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest

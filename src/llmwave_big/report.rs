@@ -13,6 +13,7 @@ use super::broad_eval::{
 use super::consolidation::ConsolidationReport;
 use super::core_v1_contract::CoreV1ContractReport;
 use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
+use super::core_v1_memory_writer::CoreV1MemoryWriterReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
 use super::density_ablation::DensityAblationReport;
@@ -111,6 +112,21 @@ pub(crate) fn print_core_v1_field_cutover_report(
         ),
         OutputFormat::Text => print_core_v1_field_cutover_text(report),
         OutputFormat::Md => print_core_v1_field_cutover_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_memory_writer_report(
+    report: &CoreV1MemoryWriterReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_memory_writer_text(report),
+        OutputFormat::Md => print_core_v1_memory_writer_md(report),
     }
     Ok(())
 }
@@ -1784,6 +1800,29 @@ fn print_core_v1_field_cutover_text(report: &CoreV1FieldCutoverReport) {
     }
 }
 
+fn print_core_v1_memory_writer_text(report: &CoreV1MemoryWriterReport) {
+    println!("LLMWave Core V1 Memory Writer");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "raw_dictionary_is_not_primary_memory: {}",
+        report.claim_boundary.raw_dictionary_is_not_primary_memory
+    );
+    println!(
+        "residual_write_path_active: {}",
+        report.claim_boundary.residual_write_path_active
+    );
+    println!(
+        "writer_saving_ratio: {}",
+        report.byte_report.writer_saving_ratio
+    );
+    println!("blocked_by:");
+    for blocker in &report.claim_boundary.blocked_by {
+        println!("  - {blocker}");
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -2769,6 +2808,48 @@ fn print_core_v1_field_cutover_md(report: &CoreV1FieldCutoverReport) {
     for family in &report.family_cutovers {
         println!("- `{}`: `{}`", family.family, family.cutover_state);
     }
+    println!();
+    println!("## Still Blocked");
+    println!();
+    for blocker in &report.claim_boundary.blocked_by {
+        println!("- `{blocker}`");
+    }
+}
+
+fn print_core_v1_memory_writer_md(report: &CoreV1MemoryWriterReport) {
+    println!("# LLMWave Core V1 Memory Writer");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- residual_write_path_active: `{}`",
+        report.claim_boundary.residual_write_path_active
+    );
+    println!(
+        "- raw_dictionary_is_not_primary_memory: `{}`",
+        report.claim_boundary.raw_dictionary_is_not_primary_memory
+    );
+    println!(
+        "- writer_saving_ratio: `{}`",
+        report.byte_report.writer_saving_ratio
+    );
+    println!();
+    println!("## Byte Report");
+    println!();
+    println!(
+        "- raw dictionary baseline: `{}` bytes",
+        report.byte_report.raw_dictionary_baseline_bytes
+    );
+    println!(
+        "- writer total: `{}` bytes",
+        report.byte_report.writer_total_bytes
+    );
+    println!("- residual bytes: `{}`", report.byte_report.residual_bytes);
+    println!(
+        "- surface family bytes: `{}`",
+        report.byte_report.surface_family_bytes
+    );
     println!();
     println!("## Still Blocked");
     println!();

@@ -332,6 +332,7 @@ still needs legal/accounting review.
 ```bash
 nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
+nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -372,6 +373,9 @@ an LLM readiness proof.
 `LLMWAVE_CORE_V1_PHASE2_REPORT.md`. It records `field_core` as the sole owner
 of shared field operations while keeping `field_core_as_sole_llmwave_core_engine`,
 `nonlinear_memory_proven`, and `llm_ready` false.
+`core-v1-memory-writer` is the Phase 3 report from
+`LLMWAVE_CORE_V1_PHASE3_REPORT.md`. It records the schema residual plus surface
+family memory writer and keeps nonlinear memory proof closed until Phase 4.
 
 ## Word And Surface Memory
 

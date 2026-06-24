@@ -68,6 +68,9 @@ jq -e '.mode == "llmwave-core-v1-contract" and .verdict == "CORE_V1_CONTRACT_REC
 big_core_v1_field_cutover_json="$("$llmwave_big" core-v1-field-cutover --format json)"
 jq -e '.mode == "llmwave-core-v1-field-cutover" and .verdict == "CORE_V1_FIELD_OPERATIONS_CUTOVER_RECORDED_NOT_LLM" and .claim_boundary.field_core_as_sole_field_operations_engine == true and .claim_boundary.field_core_as_sole_llmwave_core_engine == false and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false and (.family_cutovers | length) == 3 and (.operation_contract | length) == 7' <<<"$big_core_v1_field_cutover_json" >/dev/null
 jq -e '.unified_field.field_pass.version == "unified-field-pass-v1" and .cognitive_field_engine.field_core_as_llm == false' <<<"$big_core_v1_field_cutover_json" >/dev/null
+big_core_v1_memory_writer_json="$("$llmwave_big" core-v1-memory-writer --format json)"
+jq -e '.mode == "llmwave-core-v1-memory-writer" and .verdict == "CORE_V1_MEMORY_WRITER_READY_NOT_NONLINEAR_PROOF" and .phase_3_exit_criteria.residual_write_path_active == true and .phase_3_exit_criteria.raw_dictionary_is_not_primary_memory == true and .phase_3_exit_criteria.memory_write_report_present == true and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_core_v1_memory_writer_json" >/dev/null
+jq -e '.byte_report.writer_saving_ratio > 0 and .rejected.rejected_duplicate_count > 0 and .rejected.rejected_noise_count > 0 and .unified_field.field_pass.version == "unified-field-pass-v1"' <<<"$big_core_v1_memory_writer_json" >/dev/null
 big_contract_json="$("$llmwave_big" contract --format json)"
 jq -e '.roadmap_block == "v158-v160"' <<<"$big_contract_json" >/dev/null
 jq -e '.unified_field.field_pass.version == "unified-field-pass-v1"' <<<"$big_contract_json" >/dev/null

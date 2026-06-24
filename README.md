@@ -239,6 +239,7 @@ nanda-self-check
 nanda-field-audit --format json
 nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
+nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -733,6 +734,7 @@ scripts/fetch-llmwave-big-gutenberg.sh
 nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples .nanda/external-corpus/gutenberg --out .nanda/llmwave-big-training/project-gutenberg-artifact.json --vocab-cap 65536 --transition-cap 262144 --active-chunk-cap 32768 --chunk-tokens 64 --format json
 nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
+nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1076,6 +1078,13 @@ structural, packed, and LLMWave cognitive reports. It opens only
 `field_core_as_sole_llmwave_core_engine=false`, `llm_ready=false`, and
 `nonlinear_memory_proven=false` until memory writing, query, answer, feedback,
 and eval gates are implemented.
+`nanda-llmwave-big core-v1-memory-writer` records Phase 3. It writes the Core
+V1 memory shape as schema residuals, surface-family refs, evidence pointers,
+and duplicate/noise rejection controls. It opens
+`residual_write_path_active=true` and
+`raw_dictionary_is_not_primary_memory=true`, but keeps
+`nonlinear_memory_proven=false` and `llm_ready=false` until scale and held-out
+proof gates pass.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

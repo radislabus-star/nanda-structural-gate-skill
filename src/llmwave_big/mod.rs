@@ -12,6 +12,7 @@ pub mod broad_eval;
 pub mod consolidation;
 pub mod core_v1_contract;
 pub mod core_v1_field_cutover;
+pub mod core_v1_memory_writer;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
 pub mod density_ablation;
@@ -86,6 +87,9 @@ enum LlmwaveBigCommand {
     /// Print the Phase 2 LLMWave Core V1 field-core cutover report.
     #[command(name = "core-v1-field-cutover", alias = "core-field-cutover")]
     CoreV1FieldCutover(LlmwaveBigCoreV1FieldCutoverArgs),
+    /// Print the Phase 3 LLMWave Core V1 memory writer report.
+    #[command(name = "core-v1-memory-writer", alias = "core-memory-writer")]
+    CoreV1MemoryWriter(LlmwaveBigCoreV1MemoryWriterArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -310,6 +314,12 @@ struct LlmwaveBigCoreV1ContractArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1FieldCutoverArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1MemoryWriterArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1130,6 +1140,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             report::print_core_v1_field_cutover_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::CoreV1MemoryWriter(args) => {
+            let report = core_v1_memory_writer::build_core_v1_memory_writer_report();
+            report::print_core_v1_memory_writer_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::Contract(args) => {
             let report = build_contract_report();
             report::print_contract_report(&report, &args.format)?;
@@ -1829,6 +1844,37 @@ mod tests {
         assert!(!report.claim_boundary.llm_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert_eq!(report.next_phase, "phase-3-memory-writer-v1");
+    }
+
+    #[test]
+    fn core_v1_memory_writer_records_residual_surface_and_evidence_memory() {
+        let report = core_v1_memory_writer::build_core_v1_memory_writer_report();
+        assert_eq!(report.mode, "llmwave-core-v1-memory-writer");
+        assert_eq!(
+            report.verdict,
+            "CORE_V1_MEMORY_WRITER_READY_NOT_NONLINEAR_PROOF"
+        );
+        assert!(report.phase_3_exit_criteria.residual_write_path_active);
+        assert!(
+            report
+                .phase_3_exit_criteria
+                .raw_dictionary_is_not_primary_memory
+        );
+        assert!(report.phase_3_exit_criteria.memory_write_report_present);
+        assert!(report.schema_residual_summary.residual_write_count > 0);
+        assert!(report.surface_family_summary.accepted_family_count > 0);
+        assert!(report.rejected.rejected_duplicate_count > 0);
+        assert!(report.rejected.rejected_noise_count > 0);
+        assert!(report.byte_report.writer_saving_ratio > 0.0);
+        assert!(report
+            .evidence_pointer_contract
+            .iter()
+            .any(|field| field.field == "ResidualV1.evidence_ref"));
+        assert!(report.claim_boundary.residual_write_path_active);
+        assert!(report.claim_boundary.raw_dictionary_is_not_primary_memory);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(!report.claim_boundary.llm_ready);
+        assert_eq!(report.next_phase, "phase-4-nonlinear-memory-proof-v1");
     }
 
     #[test]
