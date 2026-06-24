@@ -63,7 +63,8 @@ The 96-fact file remains a fast smoke seed.
 The 1M public-safe stress corpus is generated under ignored `.nanda/` with the
 same generator and is not committed. Current local measurement: 1,000,000
 facts, 224 MiB text source, 382 MiB JSON artifact, `BROAD_DATASET_STRONG`,
-`llm_ready=false`.
+route-balanced 1024-case held-out coverage over all 50 routes, 15,000 fact
+focus packet, `LLMWAVE_READY_CANDIDATE_EXTERNAL_STRONG`, and `llm_ready=false`.
 
 ## Core Question
 

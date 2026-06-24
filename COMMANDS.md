@@ -138,6 +138,9 @@ nanda-llmwave-big broad-corpus-build --source examples/llmwave-big-broad-public-
 nanda-llmwave-big broad-corpus-build --source examples/llmwave-big-broad-public-corpus-100k.txt --profile public-safe-100k --out .nanda/llmwave-big-training/broad-public-100k-corpus.json --format json
 scripts/build-llmwave-big-broad-public-corpus.sh .nanda/llmwave-big-corpus/public-safe-1m.txt .nanda/llmwave-big-corpus/public-safe-1m.manifest.json 1000000
 nanda-llmwave-big broad-corpus-build --source .nanda/llmwave-big-corpus/public-safe-1m.txt --profile public-safe-1m --out .nanda/llmwave-big-corpus/public-safe-1m.corpus.json --format json
+nanda-llmwave-big broad-heldout-build --corpus .nanda/llmwave-big-corpus/public-safe-1m.corpus.json --out .nanda/llmwave-big-corpus/public-safe-1m.heldout.json --max-cases 1024 --format json
+nanda-llmwave-big broad-focus-build --corpus .nanda/llmwave-big-corpus/public-safe-1m.corpus.json --heldout-suite .nanda/llmwave-big-corpus/public-safe-1m.heldout.json --out .nanda/llmwave-big-corpus/public-safe-1m.focus.json --max-facts 15000 --route-fact-cap 300 --format json
+nanda-llmwave-big broad-eval-run --corpus .nanda/llmwave-big-corpus/public-safe-1m.corpus.json --suite .nanda/llmwave-big-corpus/public-safe-1m.heldout.json --focus-packet .nanda/llmwave-big-corpus/public-safe-1m.focus.json --hot-packet .nanda/llmwave-big-training/density-ablation.hot --out .nanda/llmwave-big-corpus/public-safe-1m.broad-eval.json --format json
 nanda-llmwave-big broad-dataset-doctor --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-dataset-doctor.json --format json
 nanda-llmwave-big broad-eval-suite-build --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-eval-suite.json --format json
 nanda-llmwave-big broad-heldout-build --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-heldout.json --format json
@@ -274,6 +277,9 @@ For the local 1M stress corpus, generate under ignored `.nanda/` with
 machine this produced a 224 MiB text source and a 382 MiB JSON artifact;
 `broad-corpus-build` took about 3.8 seconds with about 2.1 GiB peak RSS, and
 `broad-dataset-doctor` took about 1.7 seconds with about 0.9 GiB peak RSS.
+The 1M held-out builder is route-balanced: a 1024-case held-out suite covered
+all 50 routes instead of taking the first ordered route. The full local 1M path
+reached `LLMWAVE_READY_CANDIDATE_EXTERNAL_STRONG` with `llm_ready=false`.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

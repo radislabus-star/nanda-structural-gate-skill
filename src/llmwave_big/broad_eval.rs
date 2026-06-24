@@ -716,7 +716,8 @@ pub(crate) fn build_broad_heldout_report(
     ];
     let mut cases = Vec::new();
     let mut withheld_fact_ids = Vec::new();
-    for (idx, fact) in corpus.facts.iter().take(config.max_cases).enumerate() {
+    let selected_facts = route_balanced_heldout_facts(&corpus.facts, config.max_cases);
+    for (idx, fact) in selected_facts.into_iter().enumerate() {
         let family = families[idx % families.len()];
         withheld_fact_ids.push(fact.fact_id.clone());
         cases.push(case_from_fact(fact, family, idx));
@@ -781,6 +782,35 @@ pub(crate) fn build_broad_heldout_report(
     };
     write_json_if_requested(&config.out, &report)?;
     Ok(report)
+}
+
+fn route_balanced_heldout_facts(facts: &[BroadFact], max_cases: usize) -> Vec<&BroadFact> {
+    if max_cases == 0 {
+        return Vec::new();
+    }
+    let mut buckets: BTreeMap<&str, Vec<&BroadFact>> = BTreeMap::new();
+    for fact in facts {
+        buckets.entry(fact.route.as_str()).or_default().push(fact);
+    }
+    let mut selected = Vec::new();
+    let mut offset = 0usize;
+    while selected.len() < max_cases {
+        let mut progressed = false;
+        for bucket in buckets.values() {
+            if let Some(fact) = bucket.get(offset) {
+                selected.push(*fact);
+                progressed = true;
+                if selected.len() >= max_cases {
+                    break;
+                }
+            }
+        }
+        if !progressed {
+            break;
+        }
+        offset += 1;
+    }
+    selected
 }
 
 pub(crate) fn build_broad_focus_report(
@@ -2187,6 +2217,7 @@ mod tests {
         .expect("heldout");
         assert_eq!(heldout.verdict, "BROAD_HELDOUT_SUITE_READY");
         assert_eq!(heldout.suite.withheld_fact_ids.len(), 16);
+        assert_eq!(heldout.metrics.covered_routes, 8);
 
         let focus = build_broad_focus_report(BroadFocusBuildConfig {
             corpus: corpus_path.clone(),

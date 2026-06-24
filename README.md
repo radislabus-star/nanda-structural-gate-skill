@@ -539,6 +539,28 @@ nanda-llmwave-big broad-corpus-build \
   --out .nanda/llmwave-big-corpus/public-safe-1m.corpus.json \
   --format json
 
+nanda-llmwave-big broad-heldout-build \
+  --corpus .nanda/llmwave-big-corpus/public-safe-1m.corpus.json \
+  --out .nanda/llmwave-big-corpus/public-safe-1m.heldout.json \
+  --max-cases 1024 \
+  --format json
+
+nanda-llmwave-big broad-focus-build \
+  --corpus .nanda/llmwave-big-corpus/public-safe-1m.corpus.json \
+  --heldout-suite .nanda/llmwave-big-corpus/public-safe-1m.heldout.json \
+  --out .nanda/llmwave-big-corpus/public-safe-1m.focus.json \
+  --max-facts 15000 \
+  --route-fact-cap 300 \
+  --format json
+
+nanda-llmwave-big broad-eval-run \
+  --corpus .nanda/llmwave-big-corpus/public-safe-1m.corpus.json \
+  --suite .nanda/llmwave-big-corpus/public-safe-1m.heldout.json \
+  --focus-packet .nanda/llmwave-big-corpus/public-safe-1m.focus.json \
+  --hot-packet .nanda/llmwave-big-training/density-ablation.hot \
+  --out .nanda/llmwave-big-corpus/public-safe-1m.broad-eval.json \
+  --format json
+
 nanda-llmwave-big broad-dataset-doctor \
   --corpus .nanda/llmwave-big-training/broad-corpus.json \
   --out .nanda/llmwave-big-training/broad-dataset-doctor.json \
@@ -599,7 +621,10 @@ Its companion manifest explicitly excludes user/private business data and local
 correspondence. The smaller 96-fact file remains a fast smoke seed only.
 The 1M public-safe corpus is generated under ignored `.nanda/`, not committed:
 1,000,000 facts, 10 domains, 50 routes, about 224 MiB as text and 382 MiB as
-the current JSON artifact.
+the current JSON artifact. The local 1M path uses route-balanced held-out
+selection; a 1024-case held-out suite covered all 50 routes, produced a 15,000
+fact focus packet, and reached `LLMWAVE_READY_CANDIDATE_EXTERNAL_STRONG` while
+still keeping `llm_ready=false`.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
