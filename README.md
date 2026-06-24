@@ -349,6 +349,10 @@ nanda-llmwave-big density-proof-doctor \
   --out .nanda/llmwave-big-training/density-proof-doctor-medium.json \
   --format json
 
+nanda-llmwave-big density-ablation \
+  --suite .nanda/llmwave-big-training/multi-profile-density.json \
+  --format json
+
 nanda-llmwave-big memory-final-proof \
   --profile rust \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
@@ -484,6 +488,9 @@ For fixture-scale development, `--min-fact-count 10` can demonstrate a
 `DENSITY_PROOF_MEDIUM` path over the business/contracts/adversarial suite. This
 is local medium evidence only: it may unlock
 `FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`, never LLM readiness.
+Run `density-ablation` when you need to know whether a suite depends on one
+critical profile and whether the exposed density metrics beat the linear
+baseline. It is a suite-level hook, not a proof by itself.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

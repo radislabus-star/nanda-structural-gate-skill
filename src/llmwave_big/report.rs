@@ -8,6 +8,7 @@ use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
+use super::density_ablation::DensityAblationReport;
 use super::density_proof_doctor::DensityProofDoctorReport;
 use super::dialogue_state::DialogueStateReport;
 use super::domain_eval::DomainEvalReport;
@@ -1002,6 +1003,54 @@ pub(crate) fn print_density_proof_doctor_report(
         ),
         OutputFormat::Text => print_density_proof_doctor_text(report),
         OutputFormat::Md => print_density_proof_doctor_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_density_ablation_report(
+    report: &DensityAblationReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("verdict: {}", report.verdict);
+            println!(
+                "min_density_win_ratio: {:.4}",
+                report.baseline_duel.min_density_win_ratio
+            );
+            println!(
+                "critical_profiles: {}",
+                report
+                    .ablations
+                    .iter()
+                    .filter(|ablation| ablation.impact == "CRITICAL")
+                    .count()
+            );
+            println!(
+                "proves_nonlinear_memory: {}",
+                report.claim_boundary.proves_nonlinear_memory
+            );
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave-Big Density Ablation");
+            println!();
+            println!("- version: `{}`", report.version);
+            println!("- verdict: `{}`", report.verdict);
+            println!(
+                "- min density win ratio: `{:.4}`",
+                report.baseline_duel.min_density_win_ratio
+            );
+            println!(
+                "- proves nonlinear memory: `{}`",
+                report.claim_boundary.proves_nonlinear_memory
+            );
+        }
     }
     Ok(())
 }

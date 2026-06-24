@@ -11,6 +11,7 @@ pub mod atlas;
 pub mod consolidation;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
+pub mod density_ablation;
 pub mod density_proof_doctor;
 pub mod dialogue_state;
 pub mod domain_eval;
@@ -228,6 +229,9 @@ enum LlmwaveBigCommand {
     /// Diagnose whether multi-profile density evidence is strong or only formal.
     #[command(name = "density-proof-doctor", alias = "density-doctor")]
     DensityProofDoctor(LlmwaveBigDensityProofDoctorArgs),
+    /// Run suite-level profile ablation and baseline-duel hooks.
+    #[command(name = "density-ablation")]
+    DensityAblation(LlmwaveBigDensityAblationArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -775,6 +779,14 @@ struct LlmwaveBigDensityProofDoctorArgs {
     strong_profile_min: usize,
     #[arg(long, default_value_t = 50)]
     min_fact_count: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigDensityAblationArgs {
+    #[arg(long)]
+    suite: PathBuf,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1332,6 +1344,13 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 },
             )?;
             report::print_density_proof_doctor_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::DensityAblation(args) => {
+            let report = density_ablation::build_density_ablation_report(
+                density_ablation::DensityAblationConfig { suite: args.suite },
+            )?;
+            report::print_density_ablation_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {
