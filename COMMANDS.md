@@ -337,6 +337,7 @@ nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -397,6 +398,9 @@ block answer generation.
 `core-v1-schema-reasoning` is the Phase 7 report from
 `LLMWAVE_CORE_V1_PHASE7_REPORT.md`. It turns a focused field peak into an
 explicit schema answer plan and keeps surface generation closed until Phase 8.
+`core-v1-surface-generation` is the Phase 8 report from
+`LLMWAVE_CORE_V1_PHASE8_REPORT.md`. It materializes constrained evidence-bound
+answer surfaces and leaves final answer permission to the Phase 9 verifier.
 
 ## Word And Surface Memory
 

@@ -18,6 +18,7 @@ use super::core_v1_memory_writer::CoreV1MemoryWriterReport;
 use super::core_v1_nonlinear_proof::CoreV1NonlinearProofReport;
 use super::core_v1_query_wave::CoreV1QueryWaveReport;
 use super::core_v1_schema_reasoning::CoreV1SchemaReasoningReport;
+use super::core_v1_surface_generation::CoreV1SurfaceGenerationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
 use super::density_ablation::DensityAblationReport;
@@ -191,6 +192,21 @@ pub(crate) fn print_core_v1_schema_reasoning_report(
         ),
         OutputFormat::Text => print_core_v1_schema_reasoning_text(report),
         OutputFormat::Md => print_core_v1_schema_reasoning_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_surface_generation_report(
+    report: &CoreV1SurfaceGenerationReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_surface_generation_text(report),
+        OutputFormat::Md => print_core_v1_surface_generation_md(report),
     }
     Ok(())
 }
@@ -1962,6 +1978,22 @@ fn print_core_v1_schema_reasoning_text(report: &CoreV1SchemaReasoningReport) {
     }
 }
 
+fn print_core_v1_surface_generation_text(report: &CoreV1SurfaceGenerationReport) {
+    println!("LLMWave Core V1 Surface Generation");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("answer_mode: {}", report.surface.answer_mode);
+    println!("surface_state: {}", report.surface.state);
+    println!("safe_for_verifier: {}", report.surface.safe_for_verifier);
+    println!("text: {}", report.surface.text);
+    println!("exit_criteria:");
+    for criterion in &report.exit_criteria {
+        println!("  - {}: {}", criterion.criterion, criterion.passed);
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -3138,6 +3170,51 @@ fn print_core_v1_schema_reasoning_md(report: &CoreV1SchemaReasoningReport) {
     println!(
         "- answer verifier ready: `{}`",
         report.claim_boundary.answer_verifier_ready
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_core_v1_surface_generation_md(report: &CoreV1SurfaceGenerationReport) {
+    println!("# LLMWave Core V1 Surface Generation");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- answer mode: `{}`", report.surface.answer_mode);
+    println!("- surface state: `{}`", report.surface.state);
+    println!(
+        "- safe for verifier: `{}`",
+        report.surface.safe_for_verifier
+    );
+    println!();
+    println!("## Surface");
+    println!();
+    println!("{}", report.surface.text);
+    println!();
+    println!("## Exit Criteria");
+    println!();
+    for criterion in &report.exit_criteria {
+        println!("- `{}`: `{}`", criterion.criterion, criterion.passed);
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- evidence bound surface ready: `{}`",
+        report.claim_boundary.evidence_bound_surface_ready
+    );
+    println!(
+        "- answer verifier ready: `{}`",
+        report.claim_boundary.answer_verifier_ready
+    );
+    println!(
+        "- final answer ready: `{}`",
+        report.claim_boundary.final_answer_ready
     );
     println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
     println!(

@@ -244,6 +244,7 @@ nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -743,6 +744,7 @@ nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1117,6 +1119,11 @@ condition, evidence, time/currentness, route, and forbidden shortcut. The local
 multi-hop fixture propagates `C missing` instead of claiming `A ready`, while
 contradiction and role-swap evals remain blocked. Surface generation is still
 closed.
+`nanda-llmwave-big core-v1-surface-generation` records Phase 8. It materializes
+only constrained evidence-bound surfaces: short answer, explanation, reason
+list, missing-evidence refusal, or WATCH/split required. It forbids fact
+invention, role changes, WATCH-to-confidence smoothing, and self-authorization
+without the Phase 9 verifier.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

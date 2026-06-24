@@ -184,6 +184,7 @@ scripts/nanda-llmwave-big core-v1-nonlinear-proof --format json
 scripts/nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -618,6 +619,12 @@ focused route peak into a schema answer plan with actor, action, object,
 condition, evidence, time/currentness, route, and forbidden shortcut. Treat
 `CORE_V1_SCHEMA_REASONING_READY_NOT_SURFACE` as schema-plan readiness only;
 surface generation, answer verification, LLM readiness, and nonlinear-memory
+proof remain closed.
+`nanda-llmwave-big core-v1-surface-generation` records Phase 8. It materializes
+only constrained evidence-bound surfaces: short answer, explanation,
+reason-list, missing-evidence refusal, or WATCH/split required. Treat
+`CORE_V1_SURFACE_GENERATION_READY_NOT_VERIFIED` as surface-candidate readiness
+only; answer verification, final answers, LLM readiness, and nonlinear-memory
 proof remain closed.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
