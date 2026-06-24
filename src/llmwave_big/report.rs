@@ -5,6 +5,10 @@ use serde_json::Value;
 use super::active_core::ActiveCoreReport;
 use super::answer_surface::AnswerSurfaceReport;
 use super::atlas::AtlasReport;
+use super::broad_eval::{
+    BroadBaselineDuelReport, BroadCorpusArtifact, BroadEvalRunReport, BroadEvalSuiteArtifact,
+    LlmwaveReadinessReport,
+};
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
@@ -1050,6 +1054,177 @@ pub(crate) fn print_density_ablation_report(
                 "- proves nonlinear memory: `{}`",
                 report.claim_boundary.proves_nonlinear_memory
             );
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_broad_corpus_report(
+    report: &BroadCorpusArtifact,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("profile: {}", report.profile);
+            println!("facts: {}", report.fact_count);
+            println!("routes: {}", report.route_count);
+            println!("llm_ready: {}", report.claim_boundary.llm_ready);
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Broad Corpus");
+            println!();
+            println!("- profile: `{}`", report.profile);
+            println!("- facts: `{}`", report.fact_count);
+            println!("- routes: `{}`", report.route_count);
+            println!("- llm_ready: `{}`", report.claim_boundary.llm_ready);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_broad_eval_suite_report(
+    report: &BroadEvalSuiteArtifact,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("corpus_profile: {}", report.corpus_profile);
+            println!("cases: {}", report.case_count);
+            println!("llm_ready: {}", report.claim_boundary.llm_ready);
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Broad Eval Suite");
+            println!();
+            println!("- corpus profile: `{}`", report.corpus_profile);
+            println!("- cases: `{}`", report.case_count);
+            println!("- llm_ready: `{}`", report.claim_boundary.llm_ready);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_broad_eval_run_report(
+    report: &BroadEvalRunReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("verdict: {}", report.verdict);
+            println!(
+                "field_reasoning_ready: {}",
+                report.claim_boundary.field_reasoning_ready
+            );
+            println!(
+                "answer_generation_ready: {}",
+                report.claim_boundary.answer_generation_ready
+            );
+            println!("llm_ready: {}", report.claim_boundary.llm_ready);
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Broad Eval Run");
+            println!();
+            println!("- verdict: `{}`", report.verdict);
+            println!(
+                "- field reasoning ready: `{}`",
+                report.claim_boundary.field_reasoning_ready
+            );
+            println!(
+                "- answer generation ready: `{}`",
+                report.claim_boundary.answer_generation_ready
+            );
+            println!("- llm_ready: `{}`", report.claim_boundary.llm_ready);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_broad_baseline_duel_report(
+    report: &BroadBaselineDuelReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("verdict: {}", report.verdict);
+            println!(
+                "broad_baseline_won: {}",
+                report.claim_boundary.broad_baseline_won
+            );
+            println!(
+                "proves_general_llm: {}",
+                report.claim_boundary.proves_general_llm
+            );
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Broad Baseline Duel");
+            println!();
+            println!("- verdict: `{}`", report.verdict);
+            println!(
+                "- broad baseline won: `{}`",
+                report.claim_boundary.broad_baseline_won
+            );
+            println!(
+                "- proves general LLM: `{}`",
+                report.claim_boundary.proves_general_llm
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_llmwave_readiness_report(
+    report: &LlmwaveReadinessReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("verdict: {}", report.verdict);
+            println!(
+                "llmwave_ready_candidate: {}",
+                report.claim_boundary.llmwave_ready_candidate
+            );
+            println!("llm_ready: {}", report.claim_boundary.llm_ready);
+            println!("blocked_by: {:?}", report.claim_boundary.blocked_by);
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Readiness");
+            println!();
+            println!("- verdict: `{}`", report.verdict);
+            println!(
+                "- llmwave_ready_candidate: `{}`",
+                report.claim_boundary.llmwave_ready_candidate
+            );
+            println!("- llm_ready: `{}`", report.claim_boundary.llm_ready);
+            println!("- blocked_by: `{:?}`", report.claim_boundary.blocked_by);
         }
     }
     Ok(())

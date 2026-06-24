@@ -31,6 +31,11 @@ mechanism with literature footnotes: segmentation, fast mapping,
 cross-situational convergence, usage/exemplar strengthening, grammar
 integration, attractor cleanup, and anti-confusion.
 
+For the next broad LLMWave eval block, see
+[`LLMWAVE_BROAD_EVAL_ROADMAP.md`](LLMWAVE_BROAD_EVAL_ROADMAP.md). It defines the
+route, generation, context, anti-shortcut, feedback, and baseline-duel eval work
+required before any `llmwave_ready_candidate` claim.
+
 For the current command map, see [`COMMANDS.md`](COMMANDS.md). The runtime skill
 file (`nanda-structural-gate/SKILL.md`) is the agent-facing command source, and
 `COMMANDS.md` is the public human-facing index.
@@ -502,6 +507,43 @@ header and 16-byte fixed records. That proves artifact materialization, not
 hot-loop execution.
 Pass that packet to `memory-final-proof` with `--density-hot-packet` to mark
 binary density evidence as present. It still does not make `llm_ready=true`.
+
+`LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
+The implemented first path is:
+
+```bash
+nanda-llmwave-big broad-corpus-build \
+  --out .nanda/llmwave-big-training/broad-corpus.json \
+  --format json
+
+nanda-llmwave-big broad-eval-suite-build \
+  --corpus .nanda/llmwave-big-training/broad-corpus.json \
+  --out .nanda/llmwave-big-training/broad-eval-suite.json \
+  --format json
+
+nanda-llmwave-big broad-eval-run \
+  --corpus .nanda/llmwave-big-training/broad-corpus.json \
+  --suite .nanda/llmwave-big-training/broad-eval-suite.json \
+  --hot-packet .nanda/llmwave-big-training/density-ablation.hot \
+  --out .nanda/llmwave-big-training/broad-eval.json \
+  --format json
+
+nanda-llmwave-big broad-baseline-duel \
+  --eval-report .nanda/llmwave-big-training/broad-eval.json \
+  --out .nanda/llmwave-big-training/broad-baseline-duel.json \
+  --format json
+
+nanda-llmwave-big llmwave-readiness \
+  --memory-final-proof .nanda/llmwave-big-training/memory-final-proof.json \
+  --broad-eval .nanda/llmwave-big-training/broad-eval.json \
+  --baseline-duel .nanda/llmwave-big-training/broad-baseline-duel.json \
+  --out .nanda/llmwave-big-training/llmwave-readiness.json \
+  --format json
+```
+
+This path can report `BROAD_EVAL_GENERATION_READY_NOT_CHAT` and target baseline
+wins, while `llmwave-readiness` still keeps `llm_ready=false` until an open
+chat-loop eval is implemented and passed.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

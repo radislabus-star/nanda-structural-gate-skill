@@ -8,6 +8,7 @@ use super::{nanda_6m, OutputFormat, CORE_VERSION, EXIT_PASS, WAVE_DIM};
 pub mod active_core;
 pub mod answer_surface;
 pub mod atlas;
+pub mod broad_eval;
 pub mod consolidation;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
@@ -232,6 +233,21 @@ enum LlmwaveBigCommand {
     /// Run suite-level profile ablation and baseline-duel hooks.
     #[command(name = "density-ablation")]
     DensityAblation(LlmwaveBigDensityAblationArgs),
+    /// Build a broad cognition eval corpus artifact.
+    #[command(name = "broad-corpus-build")]
+    BroadCorpusBuild(LlmwaveBigBroadCorpusBuildArgs),
+    /// Build a broad cognition eval suite.
+    #[command(name = "broad-eval-suite-build")]
+    BroadEvalSuiteBuild(LlmwaveBigBroadEvalSuiteBuildArgs),
+    /// Run broad cognition eval over route, generation, context, feedback, and shortcuts.
+    #[command(name = "broad-eval-run")]
+    BroadEvalRun(LlmwaveBigBroadEvalRunArgs),
+    /// Compare broad cognition eval against lexical/flat/route/markov baselines.
+    #[command(name = "broad-baseline-duel")]
+    BroadBaselineDuel(LlmwaveBigBroadBaselineDuelArgs),
+    /// Combine memory proof, broad eval, and baseline duel into readiness boundary.
+    #[command(name = "llmwave-readiness")]
+    LlmwaveReadiness(LlmwaveBigLlmwaveReadinessArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -791,6 +807,73 @@ struct LlmwaveBigDensityAblationArgs {
     suite: PathBuf,
     #[arg(long = "out-hot-packet")]
     out_hot_packet: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigBroadCorpusBuildArgs {
+    #[arg(long)]
+    source: Option<PathBuf>,
+    #[arg(long, default_value = "builtin-micro")]
+    profile: String,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigBroadEvalSuiteBuildArgs {
+    #[arg(long)]
+    corpus: Option<PathBuf>,
+    #[arg(
+        long,
+        default_value = "recall,role,route,multihop,context,generation,adversarial,feedback"
+    )]
+    families: String,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigBroadEvalRunArgs {
+    #[arg(long)]
+    corpus: Option<PathBuf>,
+    #[arg(long)]
+    suite: Option<PathBuf>,
+    #[arg(long = "hot-packet")]
+    hot_packet: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigBroadBaselineDuelArgs {
+    #[arg(long = "eval-report")]
+    eval_report: Option<PathBuf>,
+    #[arg(long, default_value = "lexical,flat,route-only,markov")]
+    baselines: String,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLlmwaveReadinessArgs {
+    #[arg(long = "memory-final-proof")]
+    memory_final_proof: Option<PathBuf>,
+    #[arg(long = "broad-eval")]
+    broad_eval: Option<PathBuf>,
+    #[arg(long = "baseline-duel")]
+    baseline_duel: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1359,6 +1442,58 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 },
             )?;
             report::print_density_ablation_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::BroadCorpusBuild(args) => {
+            let report =
+                broad_eval::build_broad_corpus_artifact(broad_eval::BroadCorpusBuildConfig {
+                    source: args.source,
+                    profile: args.profile,
+                    out: args.out,
+                })?;
+            report::print_broad_corpus_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::BroadEvalSuiteBuild(args) => {
+            let report =
+                broad_eval::build_broad_eval_suite(broad_eval::BroadEvalSuiteBuildConfig {
+                    corpus: args.corpus,
+                    families: args.families,
+                    out: args.out,
+                })?;
+            report::print_broad_eval_suite_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::BroadEvalRun(args) => {
+            let report = broad_eval::build_broad_eval_run_report(broad_eval::BroadEvalRunConfig {
+                corpus: args.corpus,
+                suite: args.suite,
+                hot_packet: args.hot_packet,
+                out: args.out,
+            })?;
+            report::print_broad_eval_run_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::BroadBaselineDuel(args) => {
+            let report = broad_eval::build_broad_baseline_duel_report(
+                broad_eval::BroadBaselineDuelConfig {
+                    eval_report: args.eval_report,
+                    baselines: args.baselines,
+                    out: args.out,
+                },
+            )?;
+            report::print_broad_baseline_duel_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LlmwaveReadiness(args) => {
+            let report =
+                broad_eval::build_llmwave_readiness_report(broad_eval::LlmwaveReadinessConfig {
+                    memory_final_proof: args.memory_final_proof,
+                    broad_eval: args.broad_eval,
+                    baseline_duel: args.baseline_duel,
+                    out: args.out,
+                })?;
+            report::print_llmwave_readiness_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {

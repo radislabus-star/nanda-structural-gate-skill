@@ -6,6 +6,10 @@ Updated: 2026-06-20.
 Engineering rules for implementing this roadmap are in
 `LLMWAVE_BIG_ENGINEERING_RULES.md`. Follow them before coding v158+.
 
+The next broad-eval block after the memory/density proof path is tracked in
+`LLMWAVE_BROAD_EVAL_ROADMAP.md`. That document defines the work needed to close
+`broad_llm_eval_missing` without prematurely claiming general LLM readiness.
+
 LLMWave-Big is not a small model. It is a large cognitive wave model with a
 small cache-resident active core.
 
