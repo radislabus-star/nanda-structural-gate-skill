@@ -338,6 +338,7 @@ nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --f
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -401,6 +402,10 @@ explicit schema answer plan and keeps surface generation closed until Phase 8.
 `core-v1-surface-generation` is the Phase 8 report from
 `LLMWAVE_CORE_V1_PHASE8_REPORT.md`. It materializes constrained evidence-bound
 answer surfaces and leaves final answer permission to the Phase 9 verifier.
+`core-v1-answer-verifier` is the Phase 9 report from
+`LLMWAVE_CORE_V1_PHASE9_REPORT.md`. It verifies local evidence-bound answer
+surfaces and blocks unsupported positive claims, role swaps, and WATCH/split
+surfaces before feedback learning starts.
 
 ## Word And Surface Memory
 

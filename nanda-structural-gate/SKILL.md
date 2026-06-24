@@ -185,6 +185,7 @@ scripts/nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goo
 scripts/nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -626,6 +627,13 @@ reason-list, missing-evidence refusal, or WATCH/split required. Treat
 `CORE_V1_SURFACE_GENERATION_READY_NOT_VERIFIED` as surface-candidate readiness
 only; answer verification, final answers, LLM readiness, and nonlinear-memory
 proof remain closed.
+`nanda-llmwave-big core-v1-answer-verifier` records Phase 9. It verifies a
+surface candidate before local answer permission. Treat
+`CORE_V1_ANSWER_VERIFIER_READY_LOCAL_ONLY` as a local verified-answer state:
+the current fixture allows a missing-evidence refusal, blocks unsupported
+positive answers, role swaps, and WATCH/split surfaces, and still keeps
+feedback learning, general chat, LLM readiness, and nonlinear-memory proof
+closed.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest

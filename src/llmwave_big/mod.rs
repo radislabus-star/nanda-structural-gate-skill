@@ -11,6 +11,7 @@ pub mod atlas;
 pub mod broad_eval;
 pub mod consolidation;
 pub mod core_v1_active_retrieval;
+pub mod core_v1_answer_verifier;
 pub mod core_v1_contract;
 pub mod core_v1_field_cutover;
 pub mod core_v1_memory_writer;
@@ -110,6 +111,9 @@ enum LlmwaveBigCommand {
     /// Print the Phase 8 LLMWave Core V1 surface generation gate.
     #[command(name = "core-v1-surface-generation", alias = "core-surface-generation")]
     CoreV1SurfaceGeneration(LlmwaveBigCoreV1SurfaceGenerationArgs),
+    /// Print the Phase 9 LLMWave Core V1 answer verifier gate.
+    #[command(name = "core-v1-answer-verifier", alias = "core-answer-verifier")]
+    CoreV1AnswerVerifier(LlmwaveBigCoreV1AnswerVerifierArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -376,6 +380,14 @@ struct LlmwaveBigCoreV1SchemaReasoningArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1SurfaceGenerationArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1AnswerVerifierArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, value_enum, default_value = "json")]
@@ -1227,6 +1239,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 core_v1_surface_generation::build_core_v1_surface_generation_report(args.text);
             report::print_core_v1_surface_generation_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV1AnswerVerifier(args) => {
+            let report = core_v1_answer_verifier::build_core_v1_answer_verifier_report(args.text);
+            report::print_core_v1_answer_verifier_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Contract(args) => {
@@ -2206,6 +2223,48 @@ mod tests {
         assert!(!report.claim_boundary.llm_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert_eq!(report.next_phase, "phase-9-answer-verifier-v1");
+    }
+
+    #[test]
+    fn core_v1_answer_verifier_allows_only_verified_refusal() {
+        let report = core_v1_answer_verifier::build_core_v1_answer_verifier_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.mode, "llmwave-core-v1-answer-verifier");
+        assert_eq!(report.verdict, "CORE_V1_ANSWER_VERIFIER_READY_LOCAL_ONLY");
+        assert_eq!(
+            core::mem::size_of::<core_v1_answer_verifier::CoreV1AnswerVerificationRecord32>(),
+            32
+        );
+        assert_eq!(report.verifier.decision, "VERIFIED_REFUSAL_READY");
+        assert_eq!(report.verifier.answer_state, "LOCAL_FINAL_REFUSAL");
+        assert!(report.verifier.safe_to_answer);
+        assert!(report
+            .verifier
+            .evidence_routes
+            .contains(&"release_evidence_missing"));
+        assert!(report
+            .verifier
+            .blocked_shortcuts
+            .contains(&"invoice_or_payment_implies_customs_release"));
+        assert!(report.blocking_rules.iter().all(|rule| rule.active));
+        assert!(report.eval_cases.iter().any(|case| case.case_id
+            == "positive_clearance_without_release_evidence"
+            && case.observed_decision == "UNSAFE_SURFACE_REJECTED"
+            && !case.observed_safe_to_answer
+            && case.passed));
+        assert!(report
+            .exit_criteria
+            .iter()
+            .all(|criterion| criterion.passed));
+        assert!(report.claim_boundary.answer_verifier_v1_implemented);
+        assert!(report.claim_boundary.verified_refusal_ready);
+        assert!(!report.claim_boundary.positive_answer_ready);
+        assert!(!report.claim_boundary.feedback_learning_ready);
+        assert!(!report.claim_boundary.general_chat_ready);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert_eq!(report.next_phase, "phase-10-feedback-learning-v1");
     }
 
     #[test]

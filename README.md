@@ -245,6 +245,7 @@ nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --f
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -745,6 +746,7 @@ nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --f
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1124,6 +1126,11 @@ only constrained evidence-bound surfaces: short answer, explanation, reason
 list, missing-evidence refusal, or WATCH/split required. It forbids fact
 invention, role changes, WATCH-to-confidence smoothing, and self-authorization
 without the Phase 9 verifier.
+`nanda-llmwave-big core-v1-answer-verifier` records Phase 9. It verifies the
+surface candidate before any local answer state is allowed. The current fixture
+permits only a verified missing-evidence refusal and keeps unsupported positive
+clearance, role-swap, and WATCH/split surfaces blocked. Feedback learning,
+general chat, LLM readiness, and nonlinear-memory proof remain closed.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

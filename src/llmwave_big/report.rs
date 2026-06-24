@@ -12,6 +12,7 @@ use super::broad_eval::{
 };
 use super::consolidation::ConsolidationReport;
 use super::core_v1_active_retrieval::CoreV1ActiveRetrievalReport;
+use super::core_v1_answer_verifier::CoreV1AnswerVerifierReport;
 use super::core_v1_contract::CoreV1ContractReport;
 use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
 use super::core_v1_memory_writer::CoreV1MemoryWriterReport;
@@ -207,6 +208,21 @@ pub(crate) fn print_core_v1_surface_generation_report(
         ),
         OutputFormat::Text => print_core_v1_surface_generation_text(report),
         OutputFormat::Md => print_core_v1_surface_generation_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_answer_verifier_report(
+    report: &CoreV1AnswerVerifierReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_answer_verifier_text(report),
+        OutputFormat::Md => print_core_v1_answer_verifier_md(report),
     }
     Ok(())
 }
@@ -1994,6 +2010,22 @@ fn print_core_v1_surface_generation_text(report: &CoreV1SurfaceGenerationReport)
     }
 }
 
+fn print_core_v1_answer_verifier_text(report: &CoreV1AnswerVerifierReport) {
+    println!("LLMWave Core V1 Answer Verifier");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("decision: {}", report.verifier.decision);
+    println!("answer_state: {}", report.verifier.answer_state);
+    println!("safe_to_answer: {}", report.verifier.safe_to_answer);
+    println!("text: {}", report.verifier.text);
+    println!("exit_criteria:");
+    for criterion in &report.exit_criteria {
+        println!("  - {}: {}", criterion.criterion, criterion.passed);
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -3215,6 +3247,52 @@ fn print_core_v1_surface_generation_md(report: &CoreV1SurfaceGenerationReport) {
     println!(
         "- final answer ready: `{}`",
         report.claim_boundary.final_answer_ready
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_core_v1_answer_verifier_md(report: &CoreV1AnswerVerifierReport) {
+    println!("# LLMWave Core V1 Answer Verifier");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- decision: `{}`", report.verifier.decision);
+    println!("- answer state: `{}`", report.verifier.answer_state);
+    println!("- safe to answer: `{}`", report.verifier.safe_to_answer);
+    println!();
+    println!("## Verified Surface");
+    println!();
+    println!("{}", report.verifier.text);
+    println!();
+    println!("## Exit Criteria");
+    println!();
+    for criterion in &report.exit_criteria {
+        println!("- `{}`: `{}`", criterion.criterion, criterion.passed);
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- verified refusal ready: `{}`",
+        report.claim_boundary.verified_refusal_ready
+    );
+    println!(
+        "- positive answer ready: `{}`",
+        report.claim_boundary.positive_answer_ready
+    );
+    println!(
+        "- feedback learning ready: `{}`",
+        report.claim_boundary.feedback_learning_ready
+    );
+    println!(
+        "- general chat ready: `{}`",
+        report.claim_boundary.general_chat_ready
     );
     println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
     println!(
