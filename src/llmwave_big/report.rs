@@ -35,6 +35,7 @@ use super::multi_profile_density_suite::MultiProfileDensitySuiteReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
 use super::nonlinear_memory_eval::{NonlinearMemoryEvalReport, NonlinearMemoryLadderReport};
 use super::open_surface_generation::OpenSurfaceGenerationReport;
+use super::profile_density_build::ProfileDensityBuildReport;
 use super::query_wave::QueryWaveReport;
 use super::readiness::{ClaimGateReport, ReadinessLadderReport};
 use super::reasoning_field::ReasoningFieldReport;
@@ -955,6 +956,21 @@ pub(crate) fn print_strict_density_claim_gate_report(
         ),
         OutputFormat::Text => print_strict_density_claim_gate_text(report),
         OutputFormat::Md => print_strict_density_claim_gate_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_profile_density_build_report(
+    report: &ProfileDensityBuildReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_profile_density_build_text(report),
+        OutputFormat::Md => print_profile_density_build_md(report),
     }
     Ok(())
 }
@@ -2108,6 +2124,29 @@ fn print_strict_density_claim_gate_text(report: &StrictDensityClaimGateReport) {
     );
 }
 
+fn print_profile_density_build_text(report: &ProfileDensityBuildReport) {
+    println!("mode: {}", report.mode);
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("profile: {}", report.profile);
+    println!("facts: {}", report.source.fact_count);
+    println!("density_win_ratio: {:.4}", report.density.density_win_ratio);
+    println!(
+        "schema_reuse_ratio: {:.4}",
+        report.density.schema_reuse_ratio
+    );
+    println!("heldout_pass_rate: {:.4}", report.quality.heldout_pass_rate);
+    println!(
+        "false_shortcut_rejection_rate: {:.4}",
+        report.quality.false_shortcut_rejection_rate
+    );
+    println!(
+        "profile_density_proven: {}",
+        report.claim_boundary.profile_density_proven
+    );
+    println!("llm_ready: {}", report.claim_boundary.llm_ready);
+}
+
 fn print_multi_profile_density_suite_text(report: &MultiProfileDensitySuiteReport) {
     println!("mode: {}", report.mode);
     println!("version: {}", report.version);
@@ -3235,6 +3274,36 @@ fn print_strict_density_claim_gate_md(report: &StrictDensityClaimGateReport) {
         "- general nonlinear memory proven: `{}`",
         report.claim_boundary.general_nonlinear_memory_proven
     );
+}
+
+fn print_profile_density_build_md(report: &ProfileDensityBuildReport) {
+    println!("# LLMWave-Big Profile Density Build");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- profile: `{}`", report.profile);
+    println!("- facts: `{}`", report.source.fact_count);
+    println!(
+        "- density win ratio: `{:.4}`",
+        report.density.density_win_ratio
+    );
+    println!(
+        "- schema reuse ratio: `{:.4}`",
+        report.density.schema_reuse_ratio
+    );
+    println!(
+        "- held-out pass rate: `{:.4}`",
+        report.quality.heldout_pass_rate
+    );
+    println!(
+        "- false shortcut rejection rate: `{:.4}`",
+        report.quality.false_shortcut_rejection_rate
+    );
+    println!(
+        "- profile density proven: `{}`",
+        report.claim_boundary.profile_density_proven
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
 }
 
 fn print_multi_profile_density_suite_md(report: &MultiProfileDensitySuiteReport) {

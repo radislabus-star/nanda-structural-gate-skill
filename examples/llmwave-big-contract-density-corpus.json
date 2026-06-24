@@ -1,0 +1,169 @@
+{
+  "version": "llmwave_big_contract_density_fixture_v1",
+  "source": "contract_revision_density_fixture_v1",
+  "facts": [
+    {
+      "route": "contract-roles",
+      "subject_role": "supplier",
+      "subject": "supplier",
+      "operator": "authors",
+      "object_role": "document",
+      "object": "protocol"
+    },
+    {
+      "route": "contract-roles",
+      "subject_role": "buyer",
+      "subject": "buyer",
+      "operator": "receives",
+      "object_role": "document",
+      "object": "protocol"
+    },
+    {
+      "route": "penalty-risk",
+      "subject_role": "protocol",
+      "subject": "supplier-protocol",
+      "operator": "reduces",
+      "object_role": "risk",
+      "object": "penalty"
+    },
+    {
+      "route": "penalty-risk",
+      "subject_role": "supplier-edit",
+      "subject": "edit-penalty",
+      "operator": "reduces",
+      "object_role": "risk",
+      "object": "penalty"
+    },
+    {
+      "route": "payment-risk",
+      "subject_role": "protocol",
+      "subject": "supplier-protocol",
+      "operator": "blocks",
+      "object_role": "risk",
+      "object": "offset"
+    },
+    {
+      "route": "payment-risk",
+      "subject_role": "supplier-edit",
+      "subject": "edit-offset",
+      "operator": "blocks",
+      "object_role": "risk",
+      "object": "offset"
+    },
+    {
+      "route": "edo-risk",
+      "subject_role": "delivery",
+      "subject": "edo-delivery",
+      "operator": "does-not-equal",
+      "object_role": "effect",
+      "object": "acceptance"
+    },
+    {
+      "route": "edo-risk",
+      "subject_role": "delivery",
+      "subject": "edo-delivery",
+      "operator": "does-not-equal",
+      "object_role": "effect",
+      "object": "debt"
+    },
+    {
+      "route": "evidence-risk",
+      "subject_role": "protocol",
+      "subject": "supplier-protocol",
+      "operator": "requires",
+      "object_role": "evidence",
+      "object": "audit"
+    },
+    {
+      "route": "signing-risk",
+      "subject_role": "appendix",
+      "subject": "appendix",
+      "operator": "requires",
+      "object_role": "evidence",
+      "object": "signature"
+    }
+  ],
+  "held_out": [
+    {
+      "route": "contract-roles",
+      "subject_role": "supplier",
+      "operator": "authors",
+      "object_role": "document",
+      "expected_object_family": "protocol"
+    },
+    {
+      "route": "penalty-risk",
+      "subject_role": "protocol",
+      "operator": "reduces",
+      "object_role": "risk",
+      "expected_object_family": "penalty"
+    },
+    {
+      "route": "payment-risk",
+      "subject_role": "protocol",
+      "operator": "blocks",
+      "object_role": "risk",
+      "expected_object_family": "offset"
+    }
+  ],
+  "negative": [
+    {
+      "route": "contract-roles",
+      "subject_role": "document",
+      "subject": "protocol",
+      "operator": "authors",
+      "object_role": "supplier",
+      "object": "supplier"
+    },
+    {
+      "route": "payment-risk",
+      "subject_role": "buyer-edit",
+      "subject": "buyer-edit",
+      "operator": "blocks",
+      "object_role": "risk",
+      "object": "offset"
+    },
+    {
+      "route": "edo-risk",
+      "subject_role": "delivery",
+      "subject": "edo-delivery",
+      "operator": "equals",
+      "object_role": "effect",
+      "object": "acceptance"
+    }
+  ],
+  "noise": [
+    {
+      "route": "penalty-risk",
+      "subject_role": "buyer",
+      "subject": "buyer",
+      "operator": "reduces",
+      "object_role": "risk",
+      "object": "penalty"
+    },
+    {
+      "route": "payment-risk",
+      "subject_role": "supplier",
+      "subject": "supplier",
+      "operator": "pays",
+      "object_role": "risk",
+      "object": "offset"
+    },
+    {
+      "route": "edo-risk",
+      "subject_role": "delivery",
+      "subject": "edo-delivery",
+      "operator": "does-not-equal",
+      "object_role": "risk",
+      "object": "penalty"
+    },
+    {
+      "route": "signing-risk",
+      "subject_role": "carrier",
+      "subject": "carrier",
+      "operator": "requires",
+      "object_role": "evidence",
+      "object": "signature"
+    }
+  ]
+}

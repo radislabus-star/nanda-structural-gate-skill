@@ -36,6 +36,7 @@ pub mod multi_schema_competition;
 pub mod nonlinear_memory_eval;
 pub mod open_surface_generation;
 pub mod operators;
+pub mod profile_density_build;
 pub mod query_wave;
 pub mod readiness;
 pub mod reasoning_field;
@@ -217,6 +218,9 @@ enum LlmwaveBigCommand {
     /// Check strict Rust profile density evidence before nonlinear claims.
     #[command(name = "strict-density-claim-gate", alias = "density-claim")]
     StrictDensityClaimGate(LlmwaveBigStrictDensityClaimGateArgs),
+    /// Build a generic non-Rust density profile artifact from a relation corpus.
+    #[command(name = "profile-density-build", alias = "profile-density")]
+    ProfileDensityBuild(LlmwaveBigProfileDensityBuildArgs),
     /// Aggregate independent density profiles before general nonlinear claims.
     #[command(name = "multi-profile-density-suite", alias = "density-suite")]
     MultiProfileDensitySuite(LlmwaveBigMultiProfileDensitySuiteArgs),
@@ -721,6 +725,18 @@ struct LlmwaveBigStrictDensityClaimGateArgs {
     heldout_eval: PathBuf,
     #[arg(long = "compile-evidence")]
     compile_evidence: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigProfileDensityBuildArgs {
+    #[arg(long)]
+    profile: String,
+    #[arg(long)]
+    corpus: PathBuf,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -1257,6 +1273,17 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 },
             )?;
             report::print_strict_density_claim_gate_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ProfileDensityBuild(args) => {
+            let report = profile_density_build::build_profile_density_report(
+                profile_density_build::ProfileDensityBuildConfig {
+                    profile: args.profile,
+                    corpus: args.corpus,
+                    out: args.out,
+                },
+            )?;
+            report::print_profile_density_build_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::MultiProfileDensitySuite(args) => {

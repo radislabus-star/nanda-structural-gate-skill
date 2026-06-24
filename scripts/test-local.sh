@@ -483,8 +483,10 @@ jq -e '.claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_
 big_multi_profile_single_json="$("$llmwave_big" multi-profile-density-suite --rust-density "$tmp_rust_corpus/strict-density.json" --out "$tmp_rust_corpus/multi-single.json" --format json)"
 jq -e '.mode == "llmwave-big-multi-profile-density-suite" and .verdict == "MULTI_PROFILE_DENSITY_BLOCKED_BY_SINGLE_PROFILE"' <<<"$big_multi_profile_single_json" >/dev/null
 jq -e '.suite.profile_count == 1 and .suite.missing_profile_count == 2 and .gates.general_nonlinear_memory_proven == false' <<<"$big_multi_profile_single_json" >/dev/null
-cp "$tmp_rust_corpus/strict-density.json" "$tmp_rust_corpus/contracts-density.json"
-cp "$tmp_rust_corpus/strict-density.json" "$tmp_rust_corpus/business-density.json"
+big_business_density_json="$("$llmwave_big" profile-density-build --profile business --corpus "$root/examples/llmwave-big-nonlinear-memory-corpus.json" --out "$tmp_rust_corpus/business-density.json" --format json)"
+jq -e '.mode == "llmwave-big-profile-density-build" and .verdict == "PROFILE_DENSITY_PROVEN_NOT_GENERAL_LLM" and .gates.profile_density_proven == true and .gates.general_nonlinear_memory_proven == false' <<<"$big_business_density_json" >/dev/null
+big_contracts_density_json="$("$llmwave_big" profile-density-build --profile contracts --corpus "$root/examples/llmwave-big-contract-density-corpus.json" --out "$tmp_rust_corpus/contracts-density.json" --format json)"
+jq -e '.mode == "llmwave-big-profile-density-build" and .verdict == "PROFILE_DENSITY_PROVEN_NOT_GENERAL_LLM" and .gates.profile_density_proven == true and .gates.general_nonlinear_memory_proven == false' <<<"$big_contracts_density_json" >/dev/null
 big_multi_profile_pass_json="$("$llmwave_big" multi-profile-density-suite --rust-density "$tmp_rust_corpus/strict-density.json" --profile-evidence contracts="$tmp_rust_corpus/contracts-density.json" --profile-evidence business="$tmp_rust_corpus/business-density.json" --out "$tmp_rust_corpus/multi-pass.json" --format json)"
 jq -e '.verdict == "MULTI_PROFILE_NONLINEAR_MEMORY_PROVEN_NOT_LLM" and .suite.profile_count == 3 and .suite.passing_profile_count == 3' <<<"$big_multi_profile_pass_json" >/dev/null
 jq -e '.gates.general_nonlinear_memory_proven == true and .gates.llm_ready == false and .claim_boundary.llm_ready == false' <<<"$big_multi_profile_pass_json" >/dev/null

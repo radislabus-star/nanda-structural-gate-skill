@@ -126,6 +126,8 @@ nanda-llmwave-big rust-focus-build --artifact .nanda/llmwave-big-training/rust-c
 nanda-llmwave-big rust-compile-evidence-build --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --check-evidence .nanda/llmwave-big-training/cargo-check.json --test-evidence .nanda/llmwave-big-training/cargo-test.json --clippy-evidence .nanda/llmwave-big-training/cargo-clippy.json --out .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 nanda-llmwave-big rust-heldout-eval --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --out .nanda/llmwave-big-training/rust-heldout-eval.json --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
+nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
+nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
 nanda-llmwave-big multi-profile-density-suite --rust-density .nanda/llmwave-big-training/strict-density.json --profile-evidence contracts=.nanda/llmwave-big-training/contracts-density.json --profile-evidence business=.nanda/llmwave-big-training/business-density.json --out .nanda/llmwave-big-training/multi-profile-density.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
@@ -197,6 +199,10 @@ Passing that evidence into final proof moves the Rust profile to
 `FINAL_PROOF_GATE_RUST_DENSITY_PROFILE_READY_NOT_GENERAL_LLM`; the general
 nonlinear-memory and LLM claims remain false until multi-profile broad evals
 exist.
+`profile-density-build` adapts an independent relation corpus into the density
+artifact consumed by `multi-profile-density-suite`. It is the generic non-Rust
+path: a profile may pass as `PROFILE_DENSITY_PROVEN_NOT_GENERAL_LLM`, but it
+does not prove general nonlinear memory or LLM readiness by itself.
 `multi-profile-density-suite` aggregates independent density profile artifacts.
 One Rust profile must return `MULTI_PROFILE_DENSITY_BLOCKED_BY_SINGLE_PROFILE`.
 The general nonlinear-memory claim requires enough independent passing

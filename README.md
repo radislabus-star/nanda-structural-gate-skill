@@ -312,6 +312,18 @@ nanda-llmwave-big strict-density-claim-gate \
   --out .nanda/llmwave-big-training/strict-density.json \
   --format json
 
+nanda-llmwave-big profile-density-build \
+  --profile business \
+  --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
+  --out .nanda/llmwave-big-training/business-density.json \
+  --format json
+
+nanda-llmwave-big profile-density-build \
+  --profile contracts \
+  --corpus examples/llmwave-big-contract-density-corpus.json \
+  --out .nanda/llmwave-big-training/contracts-density.json \
+  --format json
+
 nanda-llmwave-big multi-profile-density-suite \
   --rust-density .nanda/llmwave-big-training/strict-density.json \
   --profile-evidence contracts=.nanda/llmwave-big-training/contracts-density.json \
@@ -418,6 +430,14 @@ When passed into `memory-final-proof --profile rust`, the honest next verdict
 is `FINAL_PROOF_GATE_RUST_DENSITY_PROFILE_READY_NOT_GENERAL_LLM`; broad
 nonlinear-memory and LLM claims remain false until multi-profile broad evals
 exist.
+
+`profile-density-build` is the generic non-Rust profile path. It adapts an
+external relation corpus into the same density-evidence schema used by
+`multi-profile-density-suite`, with local gates for amortized density win,
+held-out quality, false-shortcut rejection, noise rejection, and bounded
+collision pressure. A passing profile is still only profile evidence:
+`PROFILE_DENSITY_PROVEN_NOT_GENERAL_LLM` does not prove broad nonlinear memory
+or LLM readiness.
 
 `multi-profile-density-suite` is the general nonlinear-memory guard. It accepts
 one Rust density artifact plus additional independent profile artifacts such as
