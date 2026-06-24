@@ -490,7 +490,8 @@ is local medium evidence only: it may unlock
 `FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`, never LLM readiness.
 Run `density-ablation` when you need to know whether a suite depends on one
 critical profile and whether the exposed density metrics beat the linear
-baseline. It is a suite-level hook, not a proof by itself.
+baseline. It is a suite-level hook, not a proof by itself. The JSON output is
+still wrapped in the unified field projection for agent-side comparison.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

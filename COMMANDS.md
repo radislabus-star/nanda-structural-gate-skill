@@ -229,7 +229,8 @@ that as local medium evidence only: it may unlock
 `FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`, never LLM readiness.
 `density-ablation` reports suite-level profile criticality and the exposed
 linear-baseline duel. It does not rerun field inference and does not prove
-nonlinear memory by itself.
+nonlinear memory by itself. Its JSON output is still wrapped in the unified
+field projection, so agents can compare it with other field-aware reports.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

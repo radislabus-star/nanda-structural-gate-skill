@@ -805,7 +805,8 @@ is local medium evidence only: it may unlock
 `FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`, never LLM readiness.
 Use `density-ablation` to inspect suite-level profile criticality and the
 exposed linear-baseline duel. It does not rerun field inference and does not
-prove nonlinear memory by itself.
+prove nonlinear memory by itself. The JSON output is still wrapped in the
+unified field projection for agent-side comparison.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a
