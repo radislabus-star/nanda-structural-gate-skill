@@ -336,6 +336,7 @@ nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -393,6 +394,9 @@ field input, not an answer.
 local focus, and a field pass. A focused route can be retrieval-ready for the
 next phase, but contested, thin, reversed, noisy, and no-answer states still
 block answer generation.
+`core-v1-schema-reasoning` is the Phase 7 report from
+`LLMWAVE_CORE_V1_PHASE7_REPORT.md`. It turns a focused field peak into an
+explicit schema answer plan and keeps surface generation closed until Phase 8.
 
 ## Word And Surface Memory
 

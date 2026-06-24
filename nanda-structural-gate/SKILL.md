@@ -183,6 +183,7 @@ scripts/nanda-llmwave-big core-v1-memory-writer --format json
 scripts/nanda-llmwave-big core-v1-nonlinear-proof --format json
 scripts/nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -612,6 +613,12 @@ Core V1 query wave, selects route peaks, emits `FIELD_FOCUSED`,
 `FIELD_NO_ANSWER`, and blocks answer generation for every non-focused state.
 Treat `CORE_V1_ACTIVE_FIELD_RETRIEVAL_READY_NOT_REASONING` as retrieval
 readiness only; schema reasoning and answer generation remain closed.
+`nanda-llmwave-big core-v1-schema-reasoning` records Phase 7. It turns a
+focused route peak into a schema answer plan with actor, action, object,
+condition, evidence, time/currentness, route, and forbidden shortcut. Treat
+`CORE_V1_SCHEMA_REASONING_READY_NOT_SURFACE` as schema-plan readiness only;
+surface generation, answer verification, LLM readiness, and nonlinear-memory
+proof remain closed.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest

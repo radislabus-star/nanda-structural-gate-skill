@@ -243,6 +243,7 @@ nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -741,6 +742,7 @@ nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1109,6 +1111,12 @@ the required states `FIELD_FOCUSED`, `FIELD_CONTESTED`, `FIELD_THIN`,
 `FIELD_REVERSED`, `FIELD_NOISY`, and `FIELD_NO_ANSWER`. It may mark a focused
 route as retrieval-ready for the next phase, but schema reasoning and answer
 generation remain closed.
+`nanda-llmwave-big core-v1-schema-reasoning` records Phase 7. It turns a
+focused retrieval peak into a schema answer plan with actor, action, object,
+condition, evidence, time/currentness, route, and forbidden shortcut. The local
+multi-hop fixture propagates `C missing` instead of claiming `A ready`, while
+contradiction and role-swap evals remain blocked. Surface generation is still
+closed.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

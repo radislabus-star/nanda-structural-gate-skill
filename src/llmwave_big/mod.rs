@@ -16,6 +16,7 @@ pub mod core_v1_field_cutover;
 pub mod core_v1_memory_writer;
 pub mod core_v1_nonlinear_proof;
 pub mod core_v1_query_wave;
+pub mod core_v1_schema_reasoning;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
 pub mod density_ablation;
@@ -102,6 +103,9 @@ enum LlmwaveBigCommand {
     /// Print the Phase 6 LLMWave Core V1 active field retrieval gate.
     #[command(name = "core-v1-active-retrieval", alias = "core-active-retrieval")]
     CoreV1ActiveRetrieval(LlmwaveBigCoreV1ActiveRetrievalArgs),
+    /// Print the Phase 7 LLMWave Core V1 schema reasoning gate.
+    #[command(name = "core-v1-schema-reasoning", alias = "core-schema-reasoning")]
+    CoreV1SchemaReasoning(LlmwaveBigCoreV1SchemaReasoningArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -352,6 +356,14 @@ struct LlmwaveBigCoreV1QueryWaveArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1ActiveRetrievalArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1SchemaReasoningArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, value_enum, default_value = "json")]
@@ -1192,6 +1204,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::CoreV1ActiveRetrieval(args) => {
             let report = core_v1_active_retrieval::build_core_v1_active_retrieval_report(args.text);
             report::print_core_v1_active_retrieval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV1SchemaReasoning(args) => {
+            let report = core_v1_schema_reasoning::build_core_v1_schema_reasoning_report(args.text);
+            report::print_core_v1_schema_reasoning_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Contract(args) => {
@@ -2066,6 +2083,66 @@ mod tests {
         assert!(!report.claim_boundary.llm_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert_eq!(report.next_phase, "phase-7-schema-reasoning-v1");
+    }
+
+    #[test]
+    fn core_v1_schema_reasoning_propagates_missing_dependency() {
+        let report = core_v1_schema_reasoning::build_core_v1_schema_reasoning_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.mode, "llmwave-core-v1-schema-reasoning");
+        assert_eq!(report.verdict, "CORE_V1_SCHEMA_REASONING_READY_NOT_SURFACE");
+        assert_eq!(
+            core::mem::size_of::<core_v1_schema_reasoning::CoreV1SchemaAnswerPlanRecord64>(),
+            64
+        );
+        assert_eq!(
+            report.answer_plan.answer_state,
+            "MISSING_DEPENDENCY_DECLARATION_PACKET"
+        );
+        assert_eq!(
+            report.answer_plan.forbidden_shortcut,
+            "invoice_or_payment_implies_customs_release"
+        );
+        assert!(report.answer_plan.safe_for_surface_generation);
+        assert!(report
+            .dependency_chain
+            .iter()
+            .any(|step| step.operator == "missing" && step.state == "missing_blocks_answer"));
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "multi_hop_missing_c"
+                && case.observed_state == "MISSING_DEPENDENCY_DECLARATION_PACKET"
+                && case.passed));
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "contradiction_refusal"
+                && case.observed_state == "CONTRADICTION_REFUSED_UNSUPPORTED"
+                && !case.observed_surface_permission
+                && case.passed));
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "role_swap_block"
+                && case.observed_state == "ROLE_SWAP_BLOCKED"
+                && !case.observed_surface_permission
+                && case.passed));
+        assert!(report
+            .exit_criteria
+            .iter()
+            .all(|criterion| criterion.passed));
+        assert!(report.claim_boundary.schema_reasoning_v1_implemented);
+        assert!(report.claim_boundary.schema_reasoning_ready);
+        assert!(report.claim_boundary.multi_hop_reasoning_ready);
+        assert!(report.claim_boundary.contradiction_refusal_ready);
+        assert!(report.claim_boundary.role_swap_block_ready);
+        assert!(!report.claim_boundary.surface_generation_ready);
+        assert!(!report.claim_boundary.answer_verifier_ready);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert_eq!(report.next_phase, "phase-8-surface-generation-v1");
     }
 
     #[test]

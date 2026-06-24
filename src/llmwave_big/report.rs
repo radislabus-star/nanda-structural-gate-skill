@@ -17,6 +17,7 @@ use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
 use super::core_v1_memory_writer::CoreV1MemoryWriterReport;
 use super::core_v1_nonlinear_proof::CoreV1NonlinearProofReport;
 use super::core_v1_query_wave::CoreV1QueryWaveReport;
+use super::core_v1_schema_reasoning::CoreV1SchemaReasoningReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
 use super::density_ablation::DensityAblationReport;
@@ -175,6 +176,21 @@ pub(crate) fn print_core_v1_active_retrieval_report(
         ),
         OutputFormat::Text => print_core_v1_active_retrieval_text(report),
         OutputFormat::Md => print_core_v1_active_retrieval_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_schema_reasoning_report(
+    report: &CoreV1SchemaReasoningReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_schema_reasoning_text(report),
+        OutputFormat::Md => print_core_v1_schema_reasoning_md(report),
     }
     Ok(())
 }
@@ -1924,6 +1940,28 @@ fn print_core_v1_active_retrieval_text(report: &CoreV1ActiveRetrievalReport) {
     }
 }
 
+fn print_core_v1_schema_reasoning_text(report: &CoreV1SchemaReasoningReport) {
+    println!("LLMWave Core V1 Schema Reasoning");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("answer_state: {}", report.answer_plan.answer_state);
+    println!("route: {}", report.answer_plan.route);
+    println!(
+        "forbidden_shortcut: {}",
+        report.answer_plan.forbidden_shortcut
+    );
+    println!(
+        "safe_for_surface_generation: {}",
+        report.answer_plan.safe_for_surface_generation
+    );
+    println!("exit_criteria:");
+    for criterion in &report.exit_criteria {
+        println!("  - {}: {}", criterion.criterion, criterion.passed);
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -3055,6 +3093,51 @@ fn print_core_v1_active_retrieval_md(report: &CoreV1ActiveRetrievalReport) {
     println!(
         "- answer generation ready: `{}`",
         report.claim_boundary.answer_generation_ready
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_core_v1_schema_reasoning_md(report: &CoreV1SchemaReasoningReport) {
+    println!("# LLMWave Core V1 Schema Reasoning");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- answer state: `{}`", report.answer_plan.answer_state);
+    println!("- route: `{}`", report.answer_plan.route);
+    println!(
+        "- forbidden shortcut: `{}`",
+        report.answer_plan.forbidden_shortcut
+    );
+    println!(
+        "- safe for surface generation: `{}`",
+        report.answer_plan.safe_for_surface_generation
+    );
+    println!();
+    println!("## Exit Criteria");
+    println!();
+    for criterion in &report.exit_criteria {
+        println!("- `{}`: `{}`", criterion.criterion, criterion.passed);
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- schema reasoning ready: `{}`",
+        report.claim_boundary.schema_reasoning_ready
+    );
+    println!(
+        "- surface generation ready: `{}`",
+        report.claim_boundary.surface_generation_ready
+    );
+    println!(
+        "- answer verifier ready: `{}`",
+        report.claim_boundary.answer_verifier_ready
     );
     println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
     println!(
