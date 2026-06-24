@@ -14,6 +14,7 @@ pub mod core_v1_contract;
 pub mod core_v1_field_cutover;
 pub mod core_v1_memory_writer;
 pub mod core_v1_nonlinear_proof;
+pub mod core_v1_query_wave;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
 pub mod density_ablation;
@@ -94,6 +95,9 @@ enum LlmwaveBigCommand {
     /// Print the Phase 4 LLMWave Core V1 nonlinear memory proof gate.
     #[command(name = "core-v1-nonlinear-proof", alias = "core-nonlinear-proof")]
     CoreV1NonlinearProof(LlmwaveBigCoreV1NonlinearProofArgs),
+    /// Print the Phase 5 LLMWave Core V1 query wave input gate.
+    #[command(name = "core-v1-query-wave", alias = "core-query-wave")]
+    CoreV1QueryWave(LlmwaveBigCoreV1QueryWaveArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -330,6 +334,14 @@ struct LlmwaveBigCoreV1MemoryWriterArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1NonlinearProofArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1QueryWaveArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1160,6 +1172,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             report::print_core_v1_nonlinear_proof_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::CoreV1QueryWave(args) => {
+            let report = core_v1_query_wave::build_core_v1_query_wave_report(args.text);
+            report::print_core_v1_query_wave_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::Contract(args) => {
             let report = build_contract_report();
             report::print_contract_report(&report, &args.format)?;
@@ -1915,6 +1932,60 @@ mod tests {
             .blocked_by
             .contains(&"heldout_quality_not_bound_to_memory_writer"));
         assert_eq!(report.next_phase, "phase-5-query-wave-v1");
+    }
+
+    #[test]
+    fn core_v1_query_wave_blocks_role_swap_and_missing_evidence() {
+        let report = core_v1_query_wave::build_core_v1_query_wave_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.mode, "llmwave-core-v1-query-wave");
+        assert_eq!(report.verdict, "CORE_V1_QUERY_WAVE_READY_NOT_RETRIEVAL");
+        assert_eq!(
+            core::mem::size_of::<core_v1_query_wave::CoreV1QueryWaveRecord64>(),
+            64
+        );
+        assert_eq!(report.route_hint, "customs-clearance-status");
+        assert_eq!(report.field_state, "QUERY_WAVE_STRUCTURED");
+        assert!(!report.safe_to_answer);
+        assert!(report
+            .exit_criteria
+            .iter()
+            .all(|criterion| criterion.passed));
+        assert!(report
+            .exit_eval
+            .iter()
+            .any(|case| case.case_id == "role_swap_invoice_actor"
+                && case.observed_state == "QUERY_WAVE_REVERSED_VETO"
+                && case.passed));
+        assert!(report
+            .exit_eval
+            .iter()
+            .any(|case| case.case_id == "missing_evidence_release"
+                && case.observed_state == "QUERY_WAVE_MISSING_EVIDENCE_NO_ANSWER"
+                && !case.safe_to_answer
+                && case.passed));
+        assert!(report.claim_boundary.query_wave_v1_implemented);
+        assert!(
+            report
+                .claim_boundary
+                .same_meaning_paraphrase_selects_same_route
+        );
+        assert!(
+            report
+                .claim_boundary
+                .role_swap_triggers_reversed_polarity_or_veto
+        );
+        assert!(
+            report
+                .claim_boundary
+                .missing_evidence_blocks_confident_answer
+        );
+        assert!(!report.claim_boundary.retrieval_ready);
+        assert!(!report.claim_boundary.answer_generation_ready);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert_eq!(report.next_phase, "phase-6-active-field-retrieval-v1");
     }
 
     #[test]

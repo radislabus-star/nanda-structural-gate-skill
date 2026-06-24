@@ -241,6 +241,7 @@ nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
+nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -737,6 +738,7 @@ nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
+nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1092,6 +1094,13 @@ memory-writer evidence with the fixed-basis density ladder and baseline gates.
 The current verdict is `CORE_V1_NONLINEAR_MEMORY_CANDIDATE_BLOCKED`: candidate
 evidence exists, but final proof remains blocked by missing writer-bound
 held-out quality, external corpus, leakage, and broad-noise evidence.
+`nanda-llmwave-big core-v1-query-wave` records Phase 5. It converts user text
+into a typed L2/L3 query wave with surface terms, roles, operators, negation,
+currentness, evidence demand, route hints, uncertainty, and polarity. It passes
+the local exit gate only when same-meaning paraphrases select the same route,
+role-swap queries become reversed-polarity/VETO states, and missing-evidence
+queries cannot produce a confident answer. It keeps retrieval, answer
+generation, LLM readiness, and nonlinear-memory proof false.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

@@ -334,6 +334,7 @@ nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
+nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -381,6 +382,11 @@ family memory writer and keeps nonlinear memory proof closed until Phase 4.
 `LLMWAVE_CORE_V1_PHASE4_REPORT.md`. It may mark a nonlinear-memory candidate,
 but it must keep `nonlinear_memory_proven=false` until held-out, external,
 leakage, and broad-noise gates are bound to the writer path.
+`core-v1-query-wave` is the Phase 5 report from
+`LLMWAVE_CORE_V1_PHASE5_REPORT.md`. It converts user text into a structured
+query wave with route, role, operator, evidence, time/currentness, uncertainty,
+and polarity components. It keeps `safe_to_answer=false`: the output is a
+field input, not an answer.
 
 ## Word And Surface Memory
 

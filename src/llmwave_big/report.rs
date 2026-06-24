@@ -15,6 +15,7 @@ use super::core_v1_contract::CoreV1ContractReport;
 use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
 use super::core_v1_memory_writer::CoreV1MemoryWriterReport;
 use super::core_v1_nonlinear_proof::CoreV1NonlinearProofReport;
+use super::core_v1_query_wave::CoreV1QueryWaveReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
 use super::density_ablation::DensityAblationReport;
@@ -143,6 +144,21 @@ pub(crate) fn print_core_v1_nonlinear_proof_report(
         ),
         OutputFormat::Text => print_core_v1_nonlinear_proof_text(report),
         OutputFormat::Md => print_core_v1_nonlinear_proof_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_query_wave_report(
+    report: &CoreV1QueryWaveReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_query_wave_text(report),
+        OutputFormat::Md => print_core_v1_query_wave_md(report),
     }
     Ok(())
 }
@@ -1858,6 +1874,22 @@ fn print_core_v1_nonlinear_proof_text(report: &CoreV1NonlinearProofReport) {
     }
 }
 
+fn print_core_v1_query_wave_text(report: &CoreV1QueryWaveReport) {
+    println!("LLMWave Core V1 Query Wave");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("route_hint: {}", report.route_hint);
+    println!("question_family: {}", report.question_family);
+    println!("field_state: {}", report.field_state);
+    println!("safe_to_answer: {}", report.safe_to_answer);
+    println!("exit_criteria:");
+    for criterion in &report.exit_criteria {
+        println!("  - {}: {}", criterion.criterion, criterion.passed);
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -2919,6 +2951,41 @@ fn print_core_v1_nonlinear_proof_md(report: &CoreV1NonlinearProofReport) {
     for blocker in &report.claim_boundary.blocked_by {
         println!("- `{blocker}`");
     }
+}
+
+fn print_core_v1_query_wave_md(report: &CoreV1QueryWaveReport) {
+    println!("# LLMWave Core V1 Query Wave");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- route hint: `{}`", report.route_hint);
+    println!("- question family: `{}`", report.question_family);
+    println!("- field state: `{}`", report.field_state);
+    println!("- safe to answer: `{}`", report.safe_to_answer);
+    println!();
+    println!("## Exit Criteria");
+    println!();
+    for criterion in &report.exit_criteria {
+        println!("- `{}`: `{}`", criterion.criterion, criterion.passed);
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- retrieval ready: `{}`",
+        report.claim_boundary.retrieval_ready
+    );
+    println!(
+        "- answer generation ready: `{}`",
+        report.claim_boundary.answer_generation_ready
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
 }
 
 fn print_atlas_md(report: &AtlasReport) {
