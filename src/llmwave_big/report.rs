@@ -8,6 +8,7 @@ use super::atlas::AtlasReport;
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
+use super::density_proof_doctor::DensityProofDoctorReport;
 use super::dialogue_state::DialogueStateReport;
 use super::domain_eval::DomainEvalReport;
 use super::eval::BigEvalReport;
@@ -986,6 +987,21 @@ pub(crate) fn print_multi_profile_density_suite_report(
         ),
         OutputFormat::Text => print_multi_profile_density_suite_text(report),
         OutputFormat::Md => print_multi_profile_density_suite_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_density_proof_doctor_report(
+    report: &DensityProofDoctorReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_density_proof_doctor_text(report),
+        OutputFormat::Md => print_density_proof_doctor_md(report),
     }
     Ok(())
 }
@@ -2168,6 +2184,31 @@ fn print_multi_profile_density_suite_text(report: &MultiProfileDensitySuiteRepor
     println!("llm_ready: {}", report.claim_boundary.llm_ready);
 }
 
+fn print_density_proof_doctor_text(report: &DensityProofDoctorReport) {
+    println!("mode: {}", report.mode);
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("quality_score: {:.4}", report.proof_quality.quality_score);
+    println!("profiles: {}", report.profile_diversity.profile_count);
+    println!(
+        "unique_sources: {}",
+        report.profile_diversity.unique_source_signatures
+    );
+    println!(
+        "small_profile_count: {}",
+        report.profile_diversity.small_profile_count
+    );
+    println!(
+        "medium_or_better: {}",
+        report.claim_boundary.medium_or_better_profile_evidence
+    );
+    println!(
+        "strong_profile_evidence: {}",
+        report.claim_boundary.strong_profile_evidence
+    );
+    println!("llm_ready: {}", report.claim_boundary.llm_ready);
+}
+
 fn print_artifact_ask_text(report: &ArtifactAskReport) {
     println!("LLMWave-Big Ask");
     println!("version: {}", report.version);
@@ -3327,6 +3368,35 @@ fn print_multi_profile_density_suite_md(report: &MultiProfileDensitySuiteReport)
     println!(
         "- general nonlinear memory proven: `{}`",
         report.claim_boundary.general_nonlinear_memory_proven
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+}
+
+fn print_density_proof_doctor_md(report: &DensityProofDoctorReport) {
+    println!("# LLMWave-Big Density Proof Doctor");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- quality score: `{:.4}`",
+        report.proof_quality.quality_score
+    );
+    println!("- profiles: `{}`", report.profile_diversity.profile_count);
+    println!(
+        "- unique sources: `{}`",
+        report.profile_diversity.unique_source_signatures
+    );
+    println!(
+        "- small profile count: `{}`",
+        report.profile_diversity.small_profile_count
+    );
+    println!(
+        "- medium or better: `{}`",
+        report.claim_boundary.medium_or_better_profile_evidence
+    );
+    println!(
+        "- strong profile evidence: `{}`",
+        report.claim_boundary.strong_profile_evidence
     );
     println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
 }

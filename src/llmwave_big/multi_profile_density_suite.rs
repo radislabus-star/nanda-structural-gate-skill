@@ -55,6 +55,7 @@ pub(crate) struct ProfileDensityResult {
     pub source_signature: String,
     pub source_name: Option<String>,
     pub source_kind: Option<String>,
+    pub source_fact_count: Option<usize>,
     pub present: bool,
     pub rust_density_profile_proven: bool,
     pub profile_density_proven: bool,
@@ -124,6 +125,8 @@ struct ProfileSource {
     corpus_hash: Option<String>,
     #[serde(default)]
     source_name: Option<String>,
+    #[serde(default)]
+    fact_count: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -319,6 +322,7 @@ fn read_profile(profile: &str, path: &PathBuf) -> Result<ProfileDensityResult> {
             .source
             .as_ref()
             .and_then(|source| source.source_kind.clone()),
+        source_fact_count: payload.source.as_ref().and_then(|source| source.fact_count),
         present: true,
         rust_density_profile_proven: payload.gates.rust_density_profile_proven,
         profile_density_proven,
@@ -504,6 +508,7 @@ mod tests {
             source_signature: "artifact:test-rust".to_string(),
             source_name: None,
             source_kind: None,
+            source_fact_count: None,
             present: true,
             rust_density_profile_proven: true,
             profile_density_proven: true,
@@ -583,6 +588,7 @@ mod tests {
             source_signature: source_signature.to_string(),
             source_name: None,
             source_kind: None,
+            source_fact_count: None,
             present: true,
             rust_density_profile_proven: profile == "rust",
             profile_density_proven: true,

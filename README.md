@@ -331,6 +331,11 @@ nanda-llmwave-big multi-profile-density-suite \
   --out .nanda/llmwave-big-training/multi-profile-density.json \
   --format json
 
+nanda-llmwave-big density-proof-doctor \
+  --suite .nanda/llmwave-big-training/multi-profile-density.json \
+  --out .nanda/llmwave-big-training/density-proof-doctor.json \
+  --format json
+
 nanda-llmwave-big memory-final-proof \
   --profile rust \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
@@ -452,6 +457,10 @@ Independence is checked by source signature: generic profile artifacts expose
 `source.corpus_hash`, while legacy/strict artifacts fall back to a raw artifact
 hash. Duplicate source hashes or identical artifacts block the suite with
 `duplicate_or_missing_independent_profile_sources`.
+Run `density-proof-doctor` over the suite before treating the evidence as
+strong. It reports `DENSITY_PROOF_BLOCKED`, `DENSITY_PROOF_WEAK`,
+`DENSITY_PROOF_MEDIUM`, or `DENSITY_PROOF_STRONG`; small fixture corpora should
+remain WEAK even when the formal suite gates pass.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
