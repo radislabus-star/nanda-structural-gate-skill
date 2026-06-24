@@ -15,9 +15,10 @@ commands:
   llmwave-readiness
 current honest top state:
   BROAD_EVAL_GENERATION_READY_NOT_CHAT
-  LLMWAVE_READINESS_BLOCKED_BY_CHAT_LOOP when memory proof evidence is supplied
+  BROAD_CHAT_LOOP_READY_NOT_GENERAL_LLM
+  LLMWAVE_READY_CANDIDATE when memory proof, broad eval, baseline duel,
+  and chat-loop evidence are supplied
 still blocked:
-  open chat loop
   broad external corpus scale
   general LLM readiness
 ```

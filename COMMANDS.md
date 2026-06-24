@@ -137,7 +137,8 @@ nanda-llmwave-big broad-corpus-build --out .nanda/llmwave-big-training/broad-cor
 nanda-llmwave-big broad-eval-suite-build --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-eval-suite.json --format json
 nanda-llmwave-big broad-eval-run --corpus .nanda/llmwave-big-training/broad-corpus.json --suite .nanda/llmwave-big-training/broad-eval-suite.json --hot-packet .nanda/llmwave-big-training/density-ablation.hot --out .nanda/llmwave-big-training/broad-eval.json --format json
 nanda-llmwave-big broad-baseline-duel --eval-report .nanda/llmwave-big-training/broad-eval.json --out .nanda/llmwave-big-training/broad-baseline-duel.json --format json
-nanda-llmwave-big llmwave-readiness --memory-final-proof .nanda/llmwave-big-training/memory-final-proof.json --broad-eval .nanda/llmwave-big-training/broad-eval.json --baseline-duel .nanda/llmwave-big-training/broad-baseline-duel.json --out .nanda/llmwave-big-training/llmwave-readiness.json --format json
+nanda-llmwave-big broad-chat-loop-eval --out .nanda/llmwave-big-training/broad-chat-loop.json --format json
+nanda-llmwave-big llmwave-readiness --memory-final-proof .nanda/llmwave-big-training/memory-final-proof.json --broad-eval .nanda/llmwave-big-training/broad-eval.json --baseline-duel .nanda/llmwave-big-training/broad-baseline-duel.json --chat-loop .nanda/llmwave-big-training/broad-chat-loop.json --out .nanda/llmwave-big-training/llmwave-readiness.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --format json
@@ -250,8 +251,9 @@ binary density evidence as present in final proof. It still does not make
 `broad-baseline-duel`, and `llmwave-readiness` are the first broad cognition
 eval path. They test recall, role binding, route reasoning, multi-hop context,
 answer generation, adversarial shortcut rejection, feedback, and baseline
-duels. A passing broad eval can open route/generation readiness states, but it
-still keeps `llm_ready=false` until an open chat loop eval exists.
+duels. `broad-chat-loop-eval` adds a constrained multi-turn correction/refusal
+check. A full pass can open `LLMWAVE_READY_CANDIDATE`, but it still keeps
+`llm_ready=false`; this is a candidate boundary, not a general LLM proof.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

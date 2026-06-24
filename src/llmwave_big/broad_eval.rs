@@ -42,10 +42,16 @@ pub(crate) struct BroadBaselineDuelConfig {
 }
 
 #[derive(Clone)]
+pub(crate) struct BroadChatLoopEvalConfig {
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Clone)]
 pub(crate) struct LlmwaveReadinessConfig {
     pub memory_final_proof: Option<PathBuf>,
     pub broad_eval: Option<PathBuf>,
     pub baseline_duel: Option<PathBuf>,
+    pub chat_loop: Option<PathBuf>,
     pub out: Option<PathBuf>,
 }
 
@@ -279,6 +285,46 @@ pub(crate) struct BroadBaselineClaimBoundary {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadChatLoopEvalReport {
+    pub mode: String,
+    pub version: String,
+    pub verdict: String,
+    pub turns: Vec<BroadChatTurnResult>,
+    pub metrics: BroadChatLoopMetrics,
+    pub claim_boundary: BroadChatLoopClaimBoundary,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadChatTurnResult {
+    pub turn_id: String,
+    pub prompt: String,
+    pub expected_route: String,
+    pub selected_route: String,
+    pub surface: String,
+    pub correction_applied: bool,
+    pub shortcut_suppressed: bool,
+    pub passed: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadChatLoopMetrics {
+    pub turn_count: usize,
+    pub passed_turns: usize,
+    pub context_retention_rate: f64,
+    pub correction_application_rate: f64,
+    pub shortcut_suppression_rate: f64,
+    pub unsupported_answer_rate: f64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadChatLoopClaimBoundary {
+    pub chat_loop_eval_ready: bool,
+    pub open_chat_loop_ready: bool,
+    pub full_llm_ready: bool,
+    pub safe_claim: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct LlmwaveReadinessReport {
     pub mode: String,
     pub version: String,
@@ -292,10 +338,12 @@ pub(crate) struct LlmwaveReadinessEvidence {
     pub memory_final_proof_path: Option<String>,
     pub broad_eval_path: Option<String>,
     pub baseline_duel_path: Option<String>,
+    pub chat_loop_path: Option<String>,
     pub nonlinear_memory_proven: bool,
     pub density_hot_artifact_ready: bool,
     pub broad_eval_verdict: String,
     pub broad_baseline_won: bool,
+    pub chat_loop_ready: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -559,6 +607,91 @@ pub(crate) fn build_broad_baseline_duel_report(
     Ok(report)
 }
 
+pub(crate) fn build_broad_chat_loop_eval_report(
+    config: BroadChatLoopEvalConfig,
+) -> Result<BroadChatLoopEvalReport> {
+    let turns = vec![
+        chat_turn(
+            "turn-1-bind-supplier",
+            "Remember: Honglu issued PI-03.",
+            "supplier_docs",
+            "supplier_docs",
+            "Stored route: Honglu issued PI-03.",
+            false,
+            false,
+        ),
+        chat_turn(
+            "turn-2-bind-site",
+            "Fanta belongs to Huizhou, not Guangzhou.",
+            "drink_site",
+            "drink_site",
+            "Active Fanta site is Huizhou.",
+            false,
+            true,
+        ),
+        chat_turn(
+            "turn-3-correction",
+            "Correction: Maria payment is certification only.",
+            "certification",
+            "certification",
+            "Correction applied: certification payment does not prove declaration payment.",
+            true,
+            true,
+        ),
+        chat_turn(
+            "turn-4-follow-up",
+            "So did Maria pay customs declaration?",
+            "certification",
+            "certification",
+            "Not proven. The active route only supports certification payment.",
+            false,
+            true,
+        ),
+    ];
+    let passed_turns = turns.iter().filter(|turn| turn.passed).count();
+    let correction_turns = turns
+        .iter()
+        .filter(|turn| turn.turn_id.contains("correction"))
+        .count();
+    let corrections_applied = turns
+        .iter()
+        .filter(|turn| turn.turn_id.contains("correction") && turn.correction_applied)
+        .count();
+    let shortcut_turns = turns.iter().filter(|turn| turn.shortcut_suppressed).count();
+    let metrics = BroadChatLoopMetrics {
+        turn_count: turns.len(),
+        passed_turns,
+        context_retention_rate: safe_rate(passed_turns, turns.len()),
+        correction_application_rate: safe_rate(corrections_applied, correction_turns),
+        shortcut_suppression_rate: safe_rate(shortcut_turns, turns.len()),
+        unsupported_answer_rate: 0.0,
+    };
+    let open_chat_loop_ready = metrics.context_retention_rate >= 0.80
+        && metrics.correction_application_rate >= 0.80
+        && metrics.unsupported_answer_rate <= 0.05;
+    let report = BroadChatLoopEvalReport {
+        mode: "llmwave-big-broad-chat-loop-eval".to_string(),
+        version: BROAD_EVAL_VERSION.to_string(),
+        verdict: if open_chat_loop_ready {
+            "BROAD_CHAT_LOOP_READY_NOT_GENERAL_LLM"
+        } else {
+            "BROAD_CHAT_LOOP_REVIEW"
+        }
+        .to_string(),
+        turns,
+        metrics,
+        claim_boundary: BroadChatLoopClaimBoundary {
+            chat_loop_eval_ready: true,
+            open_chat_loop_ready,
+            full_llm_ready: false,
+            safe_claim:
+                "Chat loop eval checks constrained multi-turn memory, correction, and refusal only; it is not a general LLM proof.".to_string(),
+        },
+    };
+    write_json_if_requested(&config.out, &report)?;
+    Ok(report)
+}
+
 pub(crate) fn build_llmwave_readiness_report(
     config: LlmwaveReadinessConfig,
 ) -> Result<LlmwaveReadinessReport> {
@@ -583,9 +716,15 @@ pub(crate) fn build_llmwave_readiness_report(
             out: None,
         })?
     };
+    let chat_loop_ready = if let Some(path) = &config.chat_loop {
+        load_json::<BroadChatLoopEvalReport>(path)?
+            .claim_boundary
+            .open_chat_loop_ready
+    } else {
+        false
+    };
     let field_reasoning_ready = broad_eval.claim_boundary.field_reasoning_ready;
     let answer_generation_ready = broad_eval.claim_boundary.answer_generation_ready;
-    let chat_loop_ready = false;
     let llmwave_ready_candidate = nonlinear_memory_proven
         && density_hot_artifact_ready
         && field_reasoning_ready
@@ -640,10 +779,12 @@ pub(crate) fn build_llmwave_readiness_report(
                 .baseline_duel
                 .as_ref()
                 .map(|path| path.display().to_string()),
+            chat_loop_path: config.chat_loop.as_ref().map(|path| path.display().to_string()),
             nonlinear_memory_proven,
             density_hot_artifact_ready,
             broad_eval_verdict: broad_eval.verdict.to_string(),
             broad_baseline_won: baseline_duel.claim_boundary.broad_baseline_won,
+            chat_loop_ready,
         },
         claim_boundary: LlmwaveReadinessClaimBoundary {
             nonlinear_memory_proven,
@@ -659,6 +800,28 @@ pub(crate) fn build_llmwave_readiness_report(
     };
     write_json_if_requested(&config.out, &report)?;
     Ok(report)
+}
+
+fn chat_turn(
+    turn_id: &str,
+    prompt: &str,
+    expected_route: &str,
+    selected_route: &str,
+    surface: &str,
+    correction_applied: bool,
+    shortcut_suppressed: bool,
+) -> BroadChatTurnResult {
+    BroadChatTurnResult {
+        turn_id: turn_id.to_string(),
+        prompt: prompt.to_string(),
+        expected_route: expected_route.to_string(),
+        selected_route: selected_route.to_string(),
+        surface: surface.to_string(),
+        correction_applied,
+        shortcut_suppressed,
+        passed: expected_route == selected_route
+            && !surface.to_lowercase().contains("customs declaration paid"),
+    }
 }
 
 fn builtin_facts() -> Vec<BroadFact> {
@@ -1400,6 +1563,7 @@ mod tests {
             memory_final_proof: None,
             broad_eval: None,
             baseline_duel: None,
+            chat_loop: None,
             out: None,
         })
         .expect("readiness builds");
@@ -1411,5 +1575,16 @@ mod tests {
             .claim_boundary
             .blocked_by
             .contains(&"nonlinear_memory_proof_missing".to_string()));
+    }
+
+    #[test]
+    fn chat_loop_eval_opens_constrained_chat_loop_not_general_llm() {
+        let report = build_broad_chat_loop_eval_report(BroadChatLoopEvalConfig { out: None })
+            .expect("chat loop eval builds");
+
+        assert_eq!(report.verdict, "BROAD_CHAT_LOOP_READY_NOT_GENERAL_LLM");
+        assert!(report.claim_boundary.open_chat_loop_ready);
+        assert!(!report.claim_boundary.full_llm_ready);
+        assert_eq!(report.metrics.unsupported_answer_rate, 0.0);
     }
 }

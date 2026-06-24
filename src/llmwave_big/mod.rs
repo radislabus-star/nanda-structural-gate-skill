@@ -245,6 +245,9 @@ enum LlmwaveBigCommand {
     /// Compare broad cognition eval against lexical/flat/route/markov baselines.
     #[command(name = "broad-baseline-duel")]
     BroadBaselineDuel(LlmwaveBigBroadBaselineDuelArgs),
+    /// Evaluate constrained multi-turn context, correction, and shortcut refusal.
+    #[command(name = "broad-chat-loop-eval")]
+    BroadChatLoopEval(LlmwaveBigBroadChatLoopEvalArgs),
     /// Combine memory proof, broad eval, and baseline duel into readiness boundary.
     #[command(name = "llmwave-readiness")]
     LlmwaveReadiness(LlmwaveBigLlmwaveReadinessArgs),
@@ -865,6 +868,14 @@ struct LlmwaveBigBroadBaselineDuelArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigBroadChatLoopEvalArgs {
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigLlmwaveReadinessArgs {
     #[arg(long = "memory-final-proof")]
     memory_final_proof: Option<PathBuf>,
@@ -872,6 +883,8 @@ struct LlmwaveBigLlmwaveReadinessArgs {
     broad_eval: Option<PathBuf>,
     #[arg(long = "baseline-duel")]
     baseline_duel: Option<PathBuf>,
+    #[arg(long = "chat-loop")]
+    chat_loop: Option<PathBuf>,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -1485,12 +1498,20 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             report::print_broad_baseline_duel_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::BroadChatLoopEval(args) => {
+            let report = broad_eval::build_broad_chat_loop_eval_report(
+                broad_eval::BroadChatLoopEvalConfig { out: args.out },
+            )?;
+            report::print_broad_chat_loop_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::LlmwaveReadiness(args) => {
             let report =
                 broad_eval::build_llmwave_readiness_report(broad_eval::LlmwaveReadinessConfig {
                     memory_final_proof: args.memory_final_proof,
                     broad_eval: args.broad_eval,
                     baseline_duel: args.baseline_duel,
+                    chat_loop: args.chat_loop,
                     out: args.out,
                 })?;
             report::print_llmwave_readiness_report(&report, &args.format)?;

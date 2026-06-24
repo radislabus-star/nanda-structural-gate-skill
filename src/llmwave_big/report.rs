@@ -6,8 +6,8 @@ use super::active_core::ActiveCoreReport;
 use super::answer_surface::AnswerSurfaceReport;
 use super::atlas::AtlasReport;
 use super::broad_eval::{
-    BroadBaselineDuelReport, BroadCorpusArtifact, BroadEvalRunReport, BroadEvalSuiteArtifact,
-    LlmwaveReadinessReport,
+    BroadBaselineDuelReport, BroadChatLoopEvalReport, BroadCorpusArtifact, BroadEvalRunReport,
+    BroadEvalSuiteArtifact, LlmwaveReadinessReport,
 };
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
@@ -1189,6 +1189,42 @@ pub(crate) fn print_broad_baseline_duel_report(
             println!(
                 "- proves general LLM: `{}`",
                 report.claim_boundary.proves_general_llm
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_broad_chat_loop_eval_report(
+    report: &BroadChatLoopEvalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("verdict: {}", report.verdict);
+            println!(
+                "open_chat_loop_ready: {}",
+                report.claim_boundary.open_chat_loop_ready
+            );
+            println!("full_llm_ready: {}", report.claim_boundary.full_llm_ready);
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Broad Chat Loop Eval");
+            println!();
+            println!("- verdict: `{}`", report.verdict);
+            println!(
+                "- open chat loop ready: `{}`",
+                report.claim_boundary.open_chat_loop_ready
+            );
+            println!(
+                "- full LLM ready: `{}`",
+                report.claim_boundary.full_llm_ready
             );
         }
     }

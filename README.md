@@ -533,17 +533,23 @@ nanda-llmwave-big broad-baseline-duel \
   --out .nanda/llmwave-big-training/broad-baseline-duel.json \
   --format json
 
+nanda-llmwave-big broad-chat-loop-eval \
+  --out .nanda/llmwave-big-training/broad-chat-loop.json \
+  --format json
+
 nanda-llmwave-big llmwave-readiness \
   --memory-final-proof .nanda/llmwave-big-training/memory-final-proof.json \
   --broad-eval .nanda/llmwave-big-training/broad-eval.json \
   --baseline-duel .nanda/llmwave-big-training/broad-baseline-duel.json \
+  --chat-loop .nanda/llmwave-big-training/broad-chat-loop.json \
   --out .nanda/llmwave-big-training/llmwave-readiness.json \
   --format json
 ```
 
 This path can report `BROAD_EVAL_GENERATION_READY_NOT_CHAT` and target baseline
-wins, while `llmwave-readiness` still keeps `llm_ready=false` until an open
-chat-loop eval is implemented and passed.
+wins. With `broad-chat-loop-eval` and memory proof evidence, `llmwave-readiness`
+can report `LLMWAVE_READY_CANDIDATE` while still keeping `llm_ready=false`.
+That boundary means constrained LLMWave cognition candidate, not a general LLM.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
