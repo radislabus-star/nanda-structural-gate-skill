@@ -177,6 +177,7 @@ scripts/nanda-llmwave-memory grow .nanda/llmwave-memory.json .nanda/index.json -
 scripts/nanda-llmwave-memory eval --suite examples/llmwave-memory-corpus.json
 scripts/nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "what does customs declaration require?"
 scripts/nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
+scripts/nanda-llmwave-big core-v1-contract --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -571,6 +572,10 @@ duel, margin-vs-baseline compare, anti-wave ablation proxy, fixed-basis sweep
 plan, useful-capacity score, packed density hot-loop report, `bench6m --mode
 density`, L2 candidate cache, and L3 phase-bias into L2. Use `bench6m --mode
 density` when the question is hot-loop speed, not cold JSON report behavior.
+`nanda-llmwave-big core-v1-contract` records Phase 1 of the LLMWave Core V1
+execution plan: the full model loop, component owners, required boundaries, and
+claim table. Treat `CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED` as a recorded
+contract only; it keeps `llm_ready=false` and `nonlinear_memory_proven=false`.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest

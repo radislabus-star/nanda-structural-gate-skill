@@ -11,6 +11,7 @@ use super::broad_eval::{
     BroadHeldoutBuildReport, LlmwaveReadinessReport,
 };
 use super::consolidation::ConsolidationReport;
+use super::core_v1_contract::CoreV1ContractReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
 use super::density_ablation::DensityAblationReport;
@@ -79,6 +80,21 @@ pub(crate) fn print_contract_report(
         ),
         OutputFormat::Text => print_contract_text(report),
         OutputFormat::Md => print_contract_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_contract_report(
+    report: &CoreV1ContractReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_contract_text(report),
+        OutputFormat::Md => print_core_v1_contract_md(report),
     }
     Ok(())
 }
@@ -1707,6 +1723,26 @@ fn print_contract_text(report: &LlmwaveBigReport) {
     }
 }
 
+fn print_core_v1_contract_text(report: &CoreV1ContractReport) {
+    println!("LLMWave Core V1 Contract");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("safe_claim: {}", report.claim_boundary.safe_claim);
+    println!("components:");
+    for component in &report.components {
+        println!("  - {} [{}]", component.name, component.route);
+    }
+    println!("required_boundaries:");
+    for boundary in &report.required_boundaries {
+        println!("  - {}", boundary.rule);
+    }
+    println!("blocked_by:");
+    for blocker in &report.claim_boundary.blocked_by {
+        println!("  - {blocker}");
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -2615,6 +2651,45 @@ fn print_contract_md(report: &LlmwaveBigReport) {
         println!(
             "- `{}`: {} / {}",
             metric.name, metric.unit, metric.direction
+        );
+    }
+    println!();
+    println!("## Forbidden Claims");
+    println!();
+    for claim in &report.claim_boundary.forbidden_claims {
+        println!("- `{claim}`");
+    }
+}
+
+fn print_core_v1_contract_md(report: &CoreV1ContractReport) {
+    println!("# LLMWave Core V1 Contract");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- safe_claim: {}", report.claim_boundary.safe_claim);
+    println!();
+    println!("## Model Loop");
+    println!();
+    for step in &report.model_loop {
+        println!("- `{step}`");
+    }
+    println!();
+    println!("## Components");
+    println!();
+    for component in &report.components {
+        println!(
+            "- `{}` (`{}`): {}",
+            component.name, component.route, component.responsibility
+        );
+    }
+    println!();
+    println!("## Required Boundaries");
+    println!();
+    for boundary in &report.required_boundaries {
+        println!(
+            "- {} Owner: `{}`. Enforced by `{}`.",
+            boundary.rule, boundary.owner, boundary.enforced_by
         );
     }
     println!();

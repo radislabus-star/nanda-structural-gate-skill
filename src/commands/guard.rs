@@ -340,6 +340,12 @@ fn shared_contracts() -> Value {
             "shared_candidates": ["layout_sync", "layout_controller", "backend_hint"],
             "reason": "layout sync contract may bridge runtime layout state and visible adapter state"
         },
+        "shared.architecture_contract": {
+            "allowed_routes": ["source-flow", "nanda-field-flow", "test-flow"],
+            "shared_candidates": ["contract", "roadmap", "execution_plan", "README", "COMMANDS", "SKILL", "test-local"],
+            "contract_scope": "architecture contract, docs, and tests only",
+            "reason": "architecture contracts may synchronously update source report types, docs, skill instructions, and route tests"
+        },
         "shared.version_bump_contract": {
             "allowed_routes": ["source-flow", "config-flow", "ui-status-flow", "install-flow"],
             "shared_candidates": ["Cargo.toml", "Cargo.lock", "VERSIONING.md", "metadata.json", "prefs.js", "settings.js", "tray_support.js", "README", "HOW_IT_WORKS", "version"],

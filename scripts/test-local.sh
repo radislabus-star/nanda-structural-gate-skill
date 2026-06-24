@@ -63,6 +63,8 @@ version_text="$("$root/target/debug/nanda" --version)"
 grep -q '^nanda ' <<<"$version_text"
 grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
 grep -q 'nanda_6m:' <<<"$version_text"
+big_core_v1_contract_json="$("$llmwave_big" core-v1-contract --format json)"
+jq -e '.mode == "llmwave-core-v1-contract" and .verdict == "CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED" and .claim_boundary.core_contract_recorded == true and .claim_boundary.claim_boundary_table_present == true and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false and (.components | length) == 11 and (.required_boundaries | length) == 5' <<<"$big_core_v1_contract_json" >/dev/null
 big_contract_json="$("$llmwave_big" contract --format json)"
 jq -e '.roadmap_block == "v158-v160"' <<<"$big_contract_json" >/dev/null
 jq -e '.unified_field.field_pass.version == "unified-field-pass-v1"' <<<"$big_contract_json" >/dev/null

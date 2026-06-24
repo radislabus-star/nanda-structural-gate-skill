@@ -330,6 +330,7 @@ still needs legal/accounting review.
 ## LLMWave Core Stages
 
 ```bash
+nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -360,6 +361,12 @@ nanda-llmwave-big memory-consolidate --format json
 nanda-llmwave-big run --evidence-mode release-confirmed --decision accept --format json
 nanda-llmwave-big core-eval --format json
 ```
+
+`core-v1-contract` is the Phase 1 LLMWave Core V1 contract from
+`LLMWAVE_CORE_V1_CONTRACT.md`. It defines the full model loop, component
+owners, required boundaries, and claim table before implementation phases start.
+It deliberately reports `CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED`; it is not
+an LLM readiness proof.
 
 ## Word And Surface Memory
 

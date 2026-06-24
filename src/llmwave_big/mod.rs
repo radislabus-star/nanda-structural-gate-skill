@@ -10,6 +10,7 @@ pub mod answer_surface;
 pub mod atlas;
 pub mod broad_eval;
 pub mod consolidation;
+pub mod core_v1_contract;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
 pub mod density_ablation;
@@ -78,6 +79,9 @@ pub(super) struct LlmwaveBigArgs {
 
 #[derive(Subcommand)]
 enum LlmwaveBigCommand {
+    /// Print the Phase 1 LLMWave Core V1 execution contract.
+    #[command(name = "core-v1-contract", alias = "core-contract")]
+    CoreV1Contract(LlmwaveBigCoreV1ContractArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -290,6 +294,12 @@ enum LlmwaveBigCommand {
 
 #[derive(Parser)]
 struct LlmwaveBigContractArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1ContractArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1100,6 +1110,11 @@ pub(crate) struct EngineeringRulesReport {
 
 pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
     match args.command {
+        LlmwaveBigCommand::CoreV1Contract(args) => {
+            let report = core_v1_contract::build_core_v1_contract_report();
+            report::print_core_v1_contract_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::Contract(args) => {
             let report = build_contract_report();
             report::print_contract_report(&report, &args.format)?;
@@ -1745,6 +1760,30 @@ mod tests {
         assert!(!report.claim_boundary.claims.llm_ready);
         assert!(!report.claim_boundary.claims.nonlinear_memory_proven);
         assert!(!report.claim_boundary.claims.cache_only_execution_proven);
+    }
+
+    #[test]
+    fn core_v1_contract_records_phase_1_boundaries_without_llm_claims() {
+        let report = core_v1_contract::build_core_v1_contract_report();
+        assert_eq!(report.mode, "llmwave-core-v1-contract");
+        assert_eq!(report.verdict, "CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED");
+        assert!(report.claim_boundary.core_contract_recorded);
+        assert!(report.claim_boundary.claim_boundary_table_present);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(!report.claim_boundary.field_core_as_sole_engine);
+        assert!(!report.phase_1_exit_criteria.implementation_started);
+        assert_eq!(report.components.len(), 11);
+        assert_eq!(report.required_boundaries.len(), 5);
+        assert!(report
+            .components
+            .iter()
+            .any(|component| component.name == "Memory Writer"
+                && component.must_not_own.contains(&"final_claims")));
+        assert!(report
+            .required_boundaries
+            .iter()
+            .any(|boundary| boundary.rule == "Verifier does not generate."));
     }
 
     #[test]

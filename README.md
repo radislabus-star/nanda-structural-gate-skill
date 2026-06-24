@@ -729,6 +729,7 @@ nanda-llmwave-memory demo --corpus examples/llmwave-tiny-corpus.txt --prompt "wh
 nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 scripts/fetch-llmwave-big-gutenberg.sh
 nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples .nanda/external-corpus/gutenberg --out .nanda/llmwave-big-training/project-gutenberg-artifact.json --vocab-cap 65536 --transition-cap 262144 --active-chunk-cap 32768 --chunk-tokens 64 --format json
+nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1059,6 +1060,11 @@ proof that nonlinear density is solved. Treat
 `LLMWAVE_LENS_READY` as a usable structural readout and
 `LLMWAVE_LENS_REVIEW` / `LLMWAVE_LENS_WATCH` as unresolved.
 `nanda-llmwave-eval` verifies those fields through `examples/llmwave-corpus.json`.
+`nanda-llmwave-big core-v1-contract` records Phase 1 of
+`LLMWAVE_CORE_V1_EXECUTION_PLAN.md`: the full LLMWave Core V1 loop, component
+owners, required boundaries, and claim table. It reports
+`CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED`, keeping `llm_ready=false` and
+`nonlinear_memory_proven=false`.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and
