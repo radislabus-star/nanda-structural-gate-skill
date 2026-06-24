@@ -65,6 +65,9 @@ grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
 grep -q 'nanda_6m:' <<<"$version_text"
 big_core_v1_contract_json="$("$llmwave_big" core-v1-contract --format json)"
 jq -e '.mode == "llmwave-core-v1-contract" and .verdict == "CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED" and .claim_boundary.core_contract_recorded == true and .claim_boundary.claim_boundary_table_present == true and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false and (.components | length) == 11 and (.required_boundaries | length) == 5' <<<"$big_core_v1_contract_json" >/dev/null
+big_core_v1_field_cutover_json="$("$llmwave_big" core-v1-field-cutover --format json)"
+jq -e '.mode == "llmwave-core-v1-field-cutover" and .verdict == "CORE_V1_FIELD_OPERATIONS_CUTOVER_RECORDED_NOT_LLM" and .claim_boundary.field_core_as_sole_field_operations_engine == true and .claim_boundary.field_core_as_sole_llmwave_core_engine == false and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false and (.family_cutovers | length) == 3 and (.operation_contract | length) == 7' <<<"$big_core_v1_field_cutover_json" >/dev/null
+jq -e '.unified_field.field_pass.version == "unified-field-pass-v1" and .cognitive_field_engine.field_core_as_llm == false' <<<"$big_core_v1_field_cutover_json" >/dev/null
 big_contract_json="$("$llmwave_big" contract --format json)"
 jq -e '.roadmap_block == "v158-v160"' <<<"$big_contract_json" >/dev/null
 jq -e '.unified_field.field_pass.version == "unified-field-pass-v1"' <<<"$big_contract_json" >/dev/null

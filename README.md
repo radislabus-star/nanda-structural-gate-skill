@@ -237,6 +237,8 @@ commands below as a quick smoke path after local install.
 nanda-doctor
 nanda-self-check
 nanda-field-audit --format json
+nanda-llmwave-big core-v1-contract --format json
+nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -730,6 +732,7 @@ nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 scripts/fetch-llmwave-big-gutenberg.sh
 nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src examples .nanda/external-corpus/gutenberg --out .nanda/llmwave-big-training/project-gutenberg-artifact.json --vocab-cap 65536 --transition-cap 262144 --active-chunk-cap 32768 --chunk-tokens 64 --format json
 nanda-llmwave-big core-v1-contract --format json
+nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1065,6 +1068,14 @@ proof that nonlinear density is solved. Treat
 owners, required boundaries, and claim table. It reports
 `CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED`, keeping `llm_ready=false` and
 `nonlinear_memory_proven=false`.
+`nanda-llmwave-big core-v1-field-cutover` records Phase 2 of that plan. It
+declares `field_core` as the sole owner for shared field operations
+peak/coherence/verdict/anti-wave/readout/local-path/runtime-dual-run across
+structural, packed, and LLMWave cognitive reports. It opens only
+`field_core_as_sole_field_operations_engine=true`; it keeps the wider
+`field_core_as_sole_llmwave_core_engine=false`, `llm_ready=false`, and
+`nonlinear_memory_proven=false` until memory writing, query, answer, feedback,
+and eval gates are implemented.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

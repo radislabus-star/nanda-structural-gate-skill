@@ -137,8 +137,14 @@ The next phase is:
 phase-2-field-core-cutover
 ```
 
-Phase 2 may start only after the NANDA self-gate workflow passes for the
-declared action:
+Phase 2 is tracked by `LLMWAVE_CORE_V1_PHASE2_REPORT.md` and:
+
+```bash
+nanda-llmwave-big core-v1-field-cutover --format json
+```
+
+It may run only after the NANDA self-gate workflow passes for the declared
+action:
 
 ```text
 llmwave.field_core_cutover

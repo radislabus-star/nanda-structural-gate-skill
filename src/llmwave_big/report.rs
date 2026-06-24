@@ -12,6 +12,7 @@ use super::broad_eval::{
 };
 use super::consolidation::ConsolidationReport;
 use super::core_v1_contract::CoreV1ContractReport;
+use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
 use super::density_ablation::DensityAblationReport;
@@ -95,6 +96,21 @@ pub(crate) fn print_core_v1_contract_report(
         ),
         OutputFormat::Text => print_core_v1_contract_text(report),
         OutputFormat::Md => print_core_v1_contract_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_field_cutover_report(
+    report: &CoreV1FieldCutoverReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_field_cutover_text(report),
+        OutputFormat::Md => print_core_v1_field_cutover_md(report),
     }
     Ok(())
 }
@@ -1743,6 +1759,31 @@ fn print_core_v1_contract_text(report: &CoreV1ContractReport) {
     }
 }
 
+fn print_core_v1_field_cutover_text(report: &CoreV1FieldCutoverReport) {
+    println!("LLMWave Core V1 Field Cutover");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "field_core_as_sole_field_operations_engine: {}",
+        report
+            .claim_boundary
+            .field_core_as_sole_field_operations_engine
+    );
+    println!(
+        "field_core_as_sole_llmwave_core_engine: {}",
+        report.claim_boundary.field_core_as_sole_llmwave_core_engine
+    );
+    println!("families:");
+    for family in &report.family_cutovers {
+        println!("  - {}: {}", family.family, family.cutover_state);
+    }
+    println!("blocked_by:");
+    for blocker in &report.claim_boundary.blocked_by {
+        println!("  - {blocker}");
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -2697,6 +2738,42 @@ fn print_core_v1_contract_md(report: &CoreV1ContractReport) {
     println!();
     for claim in &report.claim_boundary.forbidden_claims {
         println!("- `{claim}`");
+    }
+}
+
+fn print_core_v1_field_cutover_md(report: &CoreV1FieldCutoverReport) {
+    println!("# LLMWave Core V1 Field Cutover");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- field_core_as_sole_field_operations_engine: `{}`",
+        report
+            .claim_boundary
+            .field_core_as_sole_field_operations_engine
+    );
+    println!(
+        "- field_core_as_sole_llmwave_core_engine: `{}`",
+        report.claim_boundary.field_core_as_sole_llmwave_core_engine
+    );
+    println!();
+    println!("## Operations");
+    println!();
+    for operation in &report.operation_contract {
+        println!("- `{}` owned by `{}`", operation.operation, operation.owner);
+    }
+    println!();
+    println!("## Families");
+    println!();
+    for family in &report.family_cutovers {
+        println!("- `{}`: `{}`", family.family, family.cutover_state);
+    }
+    println!();
+    println!("## Still Blocked");
+    println!();
+    for blocker in &report.claim_boundary.blocked_by {
+        println!("- `{blocker}`");
     }
 }
 

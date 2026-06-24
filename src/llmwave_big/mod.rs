@@ -11,6 +11,7 @@ pub mod atlas;
 pub mod broad_eval;
 pub mod consolidation;
 pub mod core_v1_contract;
+pub mod core_v1_field_cutover;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
 pub mod density_ablation;
@@ -82,6 +83,9 @@ enum LlmwaveBigCommand {
     /// Print the Phase 1 LLMWave Core V1 execution contract.
     #[command(name = "core-v1-contract", alias = "core-contract")]
     CoreV1Contract(LlmwaveBigCoreV1ContractArgs),
+    /// Print the Phase 2 LLMWave Core V1 field-core cutover report.
+    #[command(name = "core-v1-field-cutover", alias = "core-field-cutover")]
+    CoreV1FieldCutover(LlmwaveBigCoreV1FieldCutoverArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -300,6 +304,12 @@ struct LlmwaveBigContractArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1ContractArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1FieldCutoverArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1115,6 +1125,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             report::print_core_v1_contract_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::CoreV1FieldCutover(args) => {
+            let report = core_v1_field_cutover::build_core_v1_field_cutover_report();
+            report::print_core_v1_field_cutover_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::Contract(args) => {
             let report = build_contract_report();
             report::print_contract_report(&report, &args.format)?;
@@ -1784,6 +1799,36 @@ mod tests {
             .required_boundaries
             .iter()
             .any(|boundary| boundary.rule == "Verifier does not generate."));
+    }
+
+    #[test]
+    fn core_v1_field_cutover_records_shared_field_engine_without_llm_claims() {
+        let report = core_v1_field_cutover::build_core_v1_field_cutover_report();
+        assert_eq!(report.mode, "llmwave-core-v1-field-cutover");
+        assert_eq!(
+            report.verdict,
+            "CORE_V1_FIELD_OPERATIONS_CUTOVER_RECORDED_NOT_LLM"
+        );
+        assert_eq!(report.family_cutovers.len(), 3);
+        assert_eq!(report.operation_contract.len(), 7);
+        assert!(report
+            .operation_contract
+            .iter()
+            .any(|operation| operation.operation == "anti_wave"
+                && operation.owner.contains("field_core::anti_wave")));
+        assert!(report
+            .family_cutovers
+            .iter()
+            .all(|family| family.sole_field_operations_engine));
+        assert!(
+            report
+                .claim_boundary
+                .field_core_as_sole_field_operations_engine
+        );
+        assert!(!report.claim_boundary.field_core_as_sole_llmwave_core_engine);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert_eq!(report.next_phase, "phase-3-memory-writer-v1");
     }
 
     #[test]

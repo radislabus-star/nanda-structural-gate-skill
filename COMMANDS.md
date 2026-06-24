@@ -331,6 +331,7 @@ still needs legal/accounting review.
 
 ```bash
 nanda-llmwave-big core-v1-contract --format json
+nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -367,6 +368,10 @@ nanda-llmwave-big core-eval --format json
 owners, required boundaries, and claim table before implementation phases start.
 It deliberately reports `CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED`; it is not
 an LLM readiness proof.
+`core-v1-field-cutover` is the Phase 2 report from
+`LLMWAVE_CORE_V1_PHASE2_REPORT.md`. It records `field_core` as the sole owner
+of shared field operations while keeping `field_core_as_sole_llmwave_core_engine`,
+`nonlinear_memory_proven`, and `llm_ready` false.
 
 ## Word And Surface Memory
 
