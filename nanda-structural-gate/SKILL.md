@@ -186,6 +186,7 @@ scripts/nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared t
 scripts/nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -634,6 +635,12 @@ the current fixture allows a missing-evidence refusal, blocks unsupported
 positive answers, role swaps, and WATCH/split surfaces, and still keeps
 feedback learning, general chat, LLM readiness, and nonlinear-memory proof
 closed.
+`nanda-llmwave-big core-v1-feedback-learning` records Phase 10. It turns the
+verified answer decision into shortcut-specific feedback memory and shows the
+next fixture field pass changing. Treat
+`CORE_V1_FEEDBACK_LEARNING_READY_NOT_CONSOLIDATED` as local feedback readiness
+only; consolidation, broad training, LLM readiness, and nonlinear-memory proof
+remain closed.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest

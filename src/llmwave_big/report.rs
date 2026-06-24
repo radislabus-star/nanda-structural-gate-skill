@@ -14,6 +14,7 @@ use super::consolidation::ConsolidationReport;
 use super::core_v1_active_retrieval::CoreV1ActiveRetrievalReport;
 use super::core_v1_answer_verifier::CoreV1AnswerVerifierReport;
 use super::core_v1_contract::CoreV1ContractReport;
+use super::core_v1_feedback_learning::CoreV1FeedbackLearningReport;
 use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
 use super::core_v1_memory_writer::CoreV1MemoryWriterReport;
 use super::core_v1_nonlinear_proof::CoreV1NonlinearProofReport;
@@ -223,6 +224,21 @@ pub(crate) fn print_core_v1_answer_verifier_report(
         ),
         OutputFormat::Text => print_core_v1_answer_verifier_text(report),
         OutputFormat::Md => print_core_v1_answer_verifier_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_feedback_learning_report(
+    report: &CoreV1FeedbackLearningReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_feedback_learning_text(report),
+        OutputFormat::Md => print_core_v1_feedback_learning_md(report),
     }
     Ok(())
 }
@@ -2026,6 +2042,23 @@ fn print_core_v1_answer_verifier_text(report: &CoreV1AnswerVerifierReport) {
     }
 }
 
+fn print_core_v1_feedback_learning_text(report: &CoreV1FeedbackLearningReport) {
+    println!("LLMWave Core V1 Feedback Learning");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("packet_state: {}", report.memory_packet.packet_state);
+    println!("lanes: {}", report.memory_packet.lanes.len());
+    println!("refusal_delta: {}", report.next_field_pass.refusal_delta);
+    println!("shortcut_delta: {}", report.next_field_pass.shortcut_delta);
+    println!("field_changed: {}", report.next_field_pass.field_changed);
+    println!("exit_criteria:");
+    for criterion in &report.exit_criteria {
+        println!("  - {}: {}", criterion.criterion, criterion.passed);
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -3293,6 +3326,59 @@ fn print_core_v1_answer_verifier_md(report: &CoreV1AnswerVerifierReport) {
     println!(
         "- general chat ready: `{}`",
         report.claim_boundary.general_chat_ready
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_core_v1_feedback_learning_md(report: &CoreV1FeedbackLearningReport) {
+    println!("# LLMWave Core V1 Feedback Learning");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- packet state: `{}`", report.memory_packet.packet_state);
+    println!("- lanes: `{}`", report.memory_packet.lanes.len());
+    println!(
+        "- refusal delta: `{}`",
+        report.next_field_pass.refusal_delta
+    );
+    println!(
+        "- shortcut delta: `{}`",
+        report.next_field_pass.shortcut_delta
+    );
+    println!(
+        "- field changed: `{}`",
+        report.next_field_pass.field_changed
+    );
+    println!();
+    println!("## Exit Criteria");
+    println!();
+    for criterion in &report.exit_criteria {
+        println!("- `{}`: `{}`", criterion.criterion, criterion.passed);
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- memory packet ready: `{}`",
+        report.claim_boundary.memory_packet_ready
+    );
+    println!(
+        "- next field pass changes: `{}`",
+        report.claim_boundary.next_field_pass_changes
+    );
+    println!(
+        "- consolidation ready: `{}`",
+        report.claim_boundary.consolidation_ready
+    );
+    println!(
+        "- broad training ready: `{}`",
+        report.claim_boundary.broad_training_ready
     );
     println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
     println!(

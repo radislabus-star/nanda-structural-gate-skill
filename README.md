@@ -246,6 +246,7 @@ nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -747,6 +748,7 @@ nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1131,6 +1133,11 @@ surface candidate before any local answer state is allowed. The current fixture
 permits only a verified missing-evidence refusal and keeps unsupported positive
 clearance, role-swap, and WATCH/split surfaces blocked. Feedback learning,
 general chat, LLM readiness, and nonlinear-memory proof remain closed.
+`nanda-llmwave-big core-v1-feedback-learning` records Phase 10. It turns the
+verified refusal and blocked shortcut into a local feedback memory packet and
+shows the next fixture field pass changing: the refusal score rises while the
+shortcut score falls. This is shortcut-specific local learning, not
+consolidated training, broad learning, LLM readiness, or nonlinear-memory proof.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

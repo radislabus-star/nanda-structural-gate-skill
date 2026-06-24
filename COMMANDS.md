@@ -339,6 +339,7 @@ nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods
 nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -406,6 +407,10 @@ answer surfaces and leaves final answer permission to the Phase 9 verifier.
 `LLMWAVE_CORE_V1_PHASE9_REPORT.md`. It verifies local evidence-bound answer
 surfaces and blocks unsupported positive claims, role swaps, and WATCH/split
 surfaces before feedback learning starts.
+`core-v1-feedback-learning` is the Phase 10 report from
+`LLMWAVE_CORE_V1_PHASE10_REPORT.md`. It emits shortcut-specific feedback
+memory and shows the next local field pass changing while keeping consolidation,
+broad learning, LLM readiness, and nonlinear-memory proof closed.
 
 ## Word And Surface Memory
 
