@@ -231,7 +231,7 @@ scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/ll
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --strict-density-evidence .nanda/llmwave-big-training/strict-density.json --format json
-scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --strict-density-evidence .nanda/llmwave-big-training/strict-density.json --multi-profile-density-evidence .nanda/llmwave-big-training/multi-profile-density.json --format json
+scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --strict-density-evidence .nanda/llmwave-big-training/strict-density.json --multi-profile-density-evidence .nanda/llmwave-big-training/multi-profile-density.json --density-doctor-evidence .nanda/llmwave-big-training/density-proof-doctor.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --format json
 scripts/nanda-llmwave-big nonlinear-memory-eval --corpus examples/llmwave-big-nonlinear-memory-corpus.json --proof-policy scale-amortized --format json
@@ -786,15 +786,14 @@ general nonlinear-memory claim needs multiple independent passing profiles,
 held-out quality, false-shortcut rejection, and bounded collision pressure.
 Independence is checked by source signature: duplicate `source.corpus_hash`
 values or identical raw artifacts block the suite with
-`duplicate_or_missing_independent_profile_sources`. If
-`--multi-profile-density-evidence` is passed to final proof and the suite
-passes, final proof may reach `FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM`;
-LLM readiness remains false until broad LLM/chat evals pass.
+`duplicate_or_missing_independent_profile_sources`. A passing suite is not
+enough for final proof by itself; `memory-final-proof` also requires
+`--density-doctor-evidence`.
 Use `nanda-llmwave-big density-proof-doctor --suite <multi-profile-density.json> --format json`
 to audit proof strength after the suite. A formal suite pass can still be
 `DENSITY_PROOF_WEAK` when profile corpora are tiny, source diversity is low, or
-negative/noise pressure is too mild. Treat WEAK as a planning signal, not as a
-public nonlinear-memory proof.
+negative/noise pressure is too mild. WEAK/BLOCKED doctor evidence keeps the
+final nonlinear-memory claim closed.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a

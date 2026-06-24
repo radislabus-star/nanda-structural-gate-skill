@@ -599,6 +599,8 @@ struct LlmwaveBigMemoryFinalProofArgs {
     strict_density_evidence: Option<PathBuf>,
     #[arg(long = "multi-profile-density-evidence")]
     multi_profile_density_evidence: Option<PathBuf>,
+    #[arg(long = "density-doctor-evidence")]
+    density_doctor_evidence: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "general")]
     profile: memory_final_proof::MemoryProofProfile,
     #[arg(long, value_enum, default_value = "json")]
@@ -1191,6 +1193,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     heldout_eval: args.heldout_eval,
                     strict_density_evidence: args.strict_density_evidence,
                     multi_profile_density_evidence: args.multi_profile_density_evidence,
+                    density_doctor_evidence: args.density_doctor_evidence,
                 },
             )?;
             report::print_memory_final_proof_report(&report, &args.format)?;

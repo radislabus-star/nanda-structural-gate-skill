@@ -345,6 +345,7 @@ nanda-llmwave-big memory-final-proof \
   --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json \
   --strict-density-evidence .nanda/llmwave-big-training/strict-density.json \
   --multi-profile-density-evidence .nanda/llmwave-big-training/multi-profile-density.json \
+  --density-doctor-evidence .nanda/llmwave-big-training/density-proof-doctor.json \
   --format json
 
 nanda-llmwave-big nonlinear-memory-eval \
@@ -460,7 +461,9 @@ hash. Duplicate source hashes or identical artifacts block the suite with
 Run `density-proof-doctor` over the suite before treating the evidence as
 strong. It reports `DENSITY_PROOF_BLOCKED`, `DENSITY_PROOF_WEAK`,
 `DENSITY_PROOF_MEDIUM`, or `DENSITY_PROOF_STRONG`; small fixture corpora should
-remain WEAK even when the formal suite gates pass.
+remain WEAK even when the formal suite gates pass. Pass the doctor artifact to
+`memory-final-proof` with `--density-doctor-evidence`; WEAK/BLOCKED doctor
+evidence keeps the final nonlinear-memory claim closed.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
