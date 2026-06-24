@@ -1,0 +1,43 @@
+{
+  "artifact": "llmwave-big-broad-public-corpus-seed",
+  "version": "1",
+  "privacy_policy": {
+    "private_user_data_excluded": true,
+    "excluded_sources": [
+      "user correspondence",
+      "customs folders",
+      "contract originals",
+      "commercial documents",
+      "customer or counterparty data",
+      "local browser/session exports",
+      "private project notes outside this repository"
+    ],
+    "allowed_sources": [
+      "public-safe synthetic structural facts",
+      "repository documentation patterns",
+      "generic code/contract/runtime/finance route templates"
+    ]
+  },
+  "source_files": [
+    {
+      "source_id": "examples.llmwave_big_broad_public_corpus",
+      "path": "examples/llmwave-big-broad-public-corpus.txt",
+      "source_type": "public_safe_synthetic_fixture",
+      "format": "domain|route|subject|relation|object|evidence",
+      "fact_count": 96,
+      "domain_count": 8,
+      "route_count": 32
+    }
+  ],
+  "intended_use": [
+    "broad-corpus-build external source",
+    "broad-dataset-doctor strong corpus smoke",
+    "held-out/focus/eval pipeline seed"
+  ],
+  "claim_boundary": {
+    "proves_big_broad_artifact_exists": true,
+    "proves_llm_ready": false,
+    "proves_nonlinear_memory": false,
+    "safe_claim": "This is a public-safe seed corpus for broad eval pipeline development, not proof of general LLM readiness."
+  }
+}

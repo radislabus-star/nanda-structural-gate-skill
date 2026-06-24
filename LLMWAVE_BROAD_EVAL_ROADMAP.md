@@ -55,6 +55,11 @@ broad-dataset-doctor
 That path can open `LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM`; it deliberately
 does not open `llm_ready`.
 
+The first public-safe strong seed is
+`examples/llmwave-big-broad-public-corpus.txt`: 96 synthetic structural facts
+across 8 domains and 32 routes. It is an artifact seed for corpus/eval pipeline
+development and intentionally excludes user/private data.
+
 ## Core Question
 
 The next proof must answer:

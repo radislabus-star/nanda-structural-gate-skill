@@ -134,6 +134,7 @@ nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi
 nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi-profile-density.json --min-fact-count 10 --out .nanda/llmwave-big-training/density-proof-doctor-medium.json --format json
 nanda-llmwave-big density-ablation --suite .nanda/llmwave-big-training/multi-profile-density.json --out-hot-packet .nanda/llmwave-big-training/density-ablation.hot --format json
 nanda-llmwave-big broad-corpus-build --out .nanda/llmwave-big-training/broad-corpus.json --format json
+nanda-llmwave-big broad-corpus-build --source examples/llmwave-big-broad-public-corpus.txt --profile public-safe-strong-seed --out .nanda/llmwave-big-training/broad-public-corpus.json --format json
 nanda-llmwave-big broad-dataset-doctor --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-dataset-doctor.json --format json
 nanda-llmwave-big broad-eval-suite-build --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-eval-suite.json --format json
 nanda-llmwave-big broad-heldout-build --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-heldout.json --format json
@@ -261,6 +262,9 @@ controlled smoke fixture; the external path should use held-out/focus
 artifacts. A full external-medium pass can open
 `LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM`, but it still keeps
 `llm_ready=false`; this is a candidate boundary, not a general LLM proof.
+`examples/llmwave-big-broad-public-corpus.txt` is the public-safe strong seed
+for this path: 96 synthetic route facts, 8 domains, 32 routes, and no
+user/private business data.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

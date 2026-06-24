@@ -1,0 +1,100 @@
+# Public-safe LLMWave broad corpus seed.
+# Format: domain|route|subject|relation|object|evidence
+# This file intentionally excludes user/private business data, local correspondence,
+# customs folders, contract files, and customer-specific facts.
+code|owner_route|core correction owner|decides|correction outcome|public-safe synthetic code route fact 001
+code|owner_route|adapter module|must_delegate_to|core correction owner|public-safe synthetic code route fact 002
+code|owner_route|duplicate decision owner|causes|route ambiguity|public-safe synthetic code route fact 003
+code|adapter_boundary|display adapter|renders|candidate list|public-safe synthetic code route fact 004
+code|adapter_boundary|display adapter|must_not_decide|candidate score|public-safe synthetic code route fact 005
+code|adapter_boundary|typed request|crosses|adapter boundary|public-safe synthetic code route fact 006
+code|cli_dispatch|CLI command|calls|command handler|public-safe synthetic code route fact 007
+code|cli_dispatch|command handler|loads|route packet|public-safe synthetic code route fact 008
+code|cli_dispatch|CLI dispatch|must_not_skip|claim gate|public-safe synthetic code route fact 009
+code|test_contract|unit test|covers|owner invariant|public-safe synthetic code route fact 010
+code|test_contract|integration test|covers|runtime route|public-safe synthetic code route fact 011
+code|test_contract|green test|does_not_prove|release readiness|public-safe synthetic code route fact 012
+contracts|protocol_direction|base contract|states|original obligation|public-safe synthetic contract route fact 013
+contracts|protocol_direction|supplier protocol|changes|original obligation|public-safe synthetic contract route fact 014
+contracts|protocol_direction|protocol author|determines|revision direction|public-safe synthetic contract route fact 015
+contracts|payment_obligation|invoice due date|defines|payment deadline|public-safe synthetic contract route fact 016
+contracts|payment_obligation|payment delay|triggers|contract risk|public-safe synthetic contract route fact 017
+contracts|payment_obligation|payment clause|must_not_merge_with|shipment notice|public-safe synthetic contract route fact 018
+contracts|penalty_clause|late delivery|may_trigger|penalty clause|public-safe synthetic contract route fact 019
+contracts|penalty_clause|penalty cap|limits|commercial exposure|public-safe synthetic contract route fact 020
+contracts|penalty_clause|penalty clause|does_not_define|tax evidence|public-safe synthetic contract route fact 021
+contracts|edo_effect|EDI delivery status|records|message delivery|public-safe synthetic contract route fact 022
+contracts|edo_effect|EDI delivery status|does_not_equal|debt admission|public-safe synthetic contract route fact 023
+contracts|edo_effect|technical EDI failure|requires|fallback route|public-safe synthetic contract route fact 024
+business|supplier_docs|supplier|issues|invoice|public-safe synthetic business route fact 025
+business|supplier_docs|invoice|supports|shipment document set|public-safe synthetic business route fact 026
+business|supplier_docs|invoice|does_not_prove|customs release|public-safe synthetic business route fact 027
+business|buyer_supplier_roles|buyer|places|purchase order|public-safe synthetic business route fact 028
+business|buyer_supplier_roles|supplier|confirms|order response|public-safe synthetic business route fact 029
+business|buyer_supplier_roles|role swap|breaks|commercial route|public-safe synthetic business route fact 030
+business|invoice_shipment|shipment notice|describes|packed goods|public-safe synthetic business route fact 031
+business|invoice_shipment|packing list|supports|shipment notice|public-safe synthetic business route fact 032
+business|invoice_shipment|shipment notice|does_not_confirm|payment receipt|public-safe synthetic business route fact 033
+business|manufacturer_address|manufacturer name|binds_to|production site|public-safe synthetic business route fact 034
+business|manufacturer_address|production site|binds_to|address evidence|public-safe synthetic business route fact 035
+business|manufacturer_address|brand owner|does_not_equal|production site|public-safe synthetic business route fact 036
+customs|declaration_route|customs declaration|requires|invoice evidence|public-safe synthetic customs route fact 037
+customs|declaration_route|customs declaration|requires|classification route|public-safe synthetic customs route fact 038
+customs|declaration_route|invoice evidence|does_not_prove|release status|public-safe synthetic customs route fact 039
+customs|certification_route|certificate protocol|supports|compliance claim|public-safe synthetic customs route fact 040
+customs|certification_route|certification payment|covers|certificate work|public-safe synthetic customs route fact 041
+customs|certification_route|certificate work|does_not_equal|customs filing|public-safe synthetic customs route fact 042
+customs|border_docs|transport document|supports|border crossing evidence|public-safe synthetic customs route fact 043
+customs|border_docs|border crossing|precedes|release check|public-safe synthetic customs route fact 044
+customs|border_docs|border document|does_not_replace|import declaration|public-safe synthetic customs route fact 045
+customs|hs_code_route|HS code|determines|duty route|public-safe synthetic customs route fact 046
+customs|hs_code_route|product description|supports|HS code selection|public-safe synthetic customs route fact 047
+customs|hs_code_route|similar product|does_not_prove|same HS code|public-safe synthetic customs route fact 048
+runtime|symptom_action|runtime symptom|requires|runtime evidence|public-safe synthetic runtime route fact 049
+runtime|symptom_action|runtime symptom|does_not_imply|code edit|public-safe synthetic runtime route fact 050
+runtime|symptom_action|selected action|must_match|observed evidence|public-safe synthetic runtime route fact 051
+runtime|runtime_state|service status|reports|runtime availability|public-safe synthetic runtime route fact 052
+runtime|runtime_state|process list|reports|component presence|public-safe synthetic runtime route fact 053
+runtime|runtime_state|active process|does_not_prove|correct config|public-safe synthetic runtime route fact 054
+runtime|config_ui_mismatch|UI setting|displays|configured backend|public-safe synthetic runtime route fact 055
+runtime|config_ui_mismatch|configured backend|must_match|runtime backend|public-safe synthetic runtime route fact 056
+runtime|config_ui_mismatch|UI label|does_not_prove|backend activation|public-safe synthetic runtime route fact 057
+runtime|stale_build|binary version|reports|installed build|public-safe synthetic runtime route fact 058
+runtime|stale_build|source version|may_differ_from|installed build|public-safe synthetic runtime route fact 059
+runtime|stale_build|stale binary|causes|false debugging route|public-safe synthetic runtime route fact 060
+finance|rate_fact|central rate|describes|policy benchmark|public-safe synthetic finance route fact 061
+finance|rate_fact|policy benchmark|does_not_equal|deposit offer|public-safe synthetic finance route fact 062
+finance|rate_fact|market headline|requires|source timestamp|public-safe synthetic finance route fact 063
+finance|source_timestamp|current source|overrides|old source|public-safe synthetic finance route fact 064
+finance|source_timestamp|archive source|must_not_override|current source|public-safe synthetic finance route fact 065
+finance|source_timestamp|timestamp mismatch|causes|evidence conflict|public-safe synthetic finance route fact 066
+finance|payer_beneficiary|payer identity|must_match|payment route|public-safe synthetic finance route fact 067
+finance|payer_beneficiary|beneficiary identity|must_match|invoice route|public-safe synthetic finance route fact 068
+finance|payer_beneficiary|third party payer|requires|extra evidence|public-safe synthetic finance route fact 069
+finance|product_boundary|deposit product|has|own rate terms|public-safe synthetic finance route fact 070
+finance|product_boundary|loan product|has|different rate terms|public-safe synthetic finance route fact 071
+finance|product_boundary|product family|must_not_merge|rate conclusion|public-safe synthetic finance route fact 072
+dialogue|accepted_correction|user correction|updates|route memory|public-safe synthetic dialogue route fact 073
+dialogue|accepted_correction|accepted correction|reinforces|future answer|public-safe synthetic dialogue route fact 074
+dialogue|accepted_correction|accepted correction|does_not_generalize_to|unrelated route|public-safe synthetic dialogue route fact 075
+dialogue|rejected_answer|rejected answer|creates|negative shortcut|public-safe synthetic dialogue route fact 076
+dialogue|rejected_answer|negative shortcut|suppresses|future false answer|public-safe synthetic dialogue route fact 077
+dialogue|rejected_answer|rejection|does_not_delete|valid neighboring fact|public-safe synthetic dialogue route fact 078
+dialogue|route_memory_update|feedback packet|records|decision route|public-safe synthetic dialogue route fact 079
+dialogue|route_memory_update|decision route|guides|next field pass|public-safe synthetic dialogue route fact 080
+dialogue|route_memory_update|feedback packet|requires|local scope|public-safe synthetic dialogue route fact 081
+dialogue|followup_uses_correction|follow-up question|uses|accepted correction|public-safe synthetic dialogue route fact 082
+dialogue|followup_uses_correction|follow-up answer|must_preserve|corrected route|public-safe synthetic dialogue route fact 083
+dialogue|followup_uses_correction|follow-up answer|must_not_import|old rejected route|public-safe synthetic dialogue route fact 084
+adversarial|same_name_different_route|same surface name|may_belong_to|different route|public-safe synthetic adversarial route fact 085
+adversarial|same_name_different_route|namespace label|separates|same-name entities|public-safe synthetic adversarial route fact 086
+adversarial|same_name_different_route|lexical equality|does_not_prove|route equality|public-safe synthetic adversarial route fact 087
+adversarial|old_fact_vs_current_fact|old fact|must_not_override|current fact|public-safe synthetic adversarial route fact 088
+adversarial|old_fact_vs_current_fact|current fact|requires|fresh evidence|public-safe synthetic adversarial route fact 089
+adversarial|old_fact_vs_current_fact|stale source|creates|temporal trap|public-safe synthetic adversarial route fact 090
+adversarial|lexical_match_wrong_role|word overlap|may_hide|role swap|public-safe synthetic adversarial route fact 091
+adversarial|lexical_match_wrong_role|role label|protects|subject object direction|public-safe synthetic adversarial route fact 092
+adversarial|lexical_match_wrong_role|lexical match|does_not_prove|causal route|public-safe synthetic adversarial route fact 093
+adversarial|route_splice|candidate answer|pulls_from|foreign route|public-safe synthetic adversarial route fact 094
+adversarial|route_splice|foreign pull|requires|route split|public-safe synthetic adversarial route fact 095
+adversarial|route_splice|route splice|must_not_receive|PASS verdict|public-safe synthetic adversarial route fact 096

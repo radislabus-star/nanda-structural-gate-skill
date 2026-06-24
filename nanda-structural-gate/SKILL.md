@@ -231,6 +231,7 @@ scripts/nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-traini
 scripts/nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi-profile-density.json --min-fact-count 10 --out .nanda/llmwave-big-training/density-proof-doctor-medium.json --format json
 scripts/nanda-llmwave-big density-ablation --suite .nanda/llmwave-big-training/multi-profile-density.json --out-hot-packet .nanda/llmwave-big-training/density-ablation.hot --format json
 scripts/nanda-llmwave-big broad-corpus-build --out .nanda/llmwave-big-training/broad-corpus.json --format json
+scripts/nanda-llmwave-big broad-corpus-build --source examples/llmwave-big-broad-public-corpus.txt --profile public-safe-strong-seed --out .nanda/llmwave-big-training/broad-public-corpus.json --format json
 scripts/nanda-llmwave-big broad-dataset-doctor --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-dataset-doctor.json --format json
 scripts/nanda-llmwave-big broad-eval-suite-build --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-eval-suite.json --format json
 scripts/nanda-llmwave-big broad-heldout-build --corpus .nanda/llmwave-big-training/broad-corpus.json --out .nanda/llmwave-big-training/broad-heldout.json --format json
