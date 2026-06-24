@@ -27,9 +27,34 @@ pub(crate) struct BroadEvalSuiteBuildConfig {
 }
 
 #[derive(Clone)]
+pub(crate) struct BroadDatasetDoctorConfig {
+    pub corpus: PathBuf,
+    pub out: Option<PathBuf>,
+    pub medium_min_facts: usize,
+    pub strong_min_facts: usize,
+}
+
+#[derive(Clone)]
+pub(crate) struct BroadHeldoutBuildConfig {
+    pub corpus: PathBuf,
+    pub out: Option<PathBuf>,
+    pub max_cases: usize,
+}
+
+#[derive(Clone)]
+pub(crate) struct BroadFocusBuildConfig {
+    pub corpus: PathBuf,
+    pub heldout_suite: PathBuf,
+    pub out: Option<PathBuf>,
+    pub max_facts: usize,
+    pub route_fact_cap: usize,
+}
+
+#[derive(Clone)]
 pub(crate) struct BroadEvalRunConfig {
     pub corpus: Option<PathBuf>,
     pub suite: Option<PathBuf>,
+    pub focus_packet: Option<PathBuf>,
     pub hot_packet: Option<PathBuf>,
     pub out: Option<PathBuf>,
 }
@@ -49,6 +74,7 @@ pub(crate) struct BroadChatLoopEvalConfig {
 #[derive(Clone)]
 pub(crate) struct LlmwaveReadinessConfig {
     pub memory_final_proof: Option<PathBuf>,
+    pub broad_dataset_doctor: Option<PathBuf>,
     pub broad_eval: Option<PathBuf>,
     pub baseline_duel: Option<PathBuf>,
     pub chat_loop: Option<PathBuf>,
@@ -93,6 +119,8 @@ pub(crate) struct BroadEvalSuiteArtifact {
     pub version: String,
     pub corpus_profile: String,
     pub corpus_fact_count: usize,
+    pub generated_from_corpus: bool,
+    pub withheld_fact_ids: Vec<String>,
     pub requested_families: Vec<String>,
     pub case_count: usize,
     pub cases: Vec<BroadEvalCase>,
@@ -151,11 +179,122 @@ pub(crate) struct BroadSuiteClaimBoundary {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadDatasetDoctorReport {
+    pub mode: String,
+    pub version: String,
+    pub verdict: String,
+    pub corpus_path: String,
+    pub quality: BroadDatasetQuality,
+    pub gates: BroadDatasetGates,
+    pub weak_spots: Vec<String>,
+    pub claim_boundary: BroadDatasetClaimBoundary,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadDatasetQuality {
+    pub fact_count: usize,
+    pub route_count: usize,
+    pub domain_count: usize,
+    pub route_balance: f64,
+    pub hub_dominance: f64,
+    pub duplicate_pressure: f64,
+    pub adversarial_route_present: bool,
+    pub dialogue_route_present: bool,
+    pub external_corpus_loaded: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadDatasetGates {
+    pub route_balanced: bool,
+    pub hub_dominance_ok: bool,
+    pub duplicate_pressure_ok: bool,
+    pub adversarial_coverage: bool,
+    pub dialogue_coverage: bool,
+    pub medium_or_better: bool,
+    pub strong: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadDatasetClaimBoundary {
+    pub broad_dataset_doctor_ready: bool,
+    pub external_broad_corpus_ready: bool,
+    pub proves_general_llm: bool,
+    pub safe_claim: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadHeldoutBuildReport {
+    pub mode: String,
+    pub version: String,
+    pub verdict: String,
+    pub corpus_path: String,
+    pub suite: BroadEvalSuiteArtifact,
+    pub metrics: BroadHeldoutMetrics,
+    pub claim_boundary: BroadHeldoutClaimBoundary,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadHeldoutMetrics {
+    pub generated_case_count: usize,
+    pub withheld_fact_count: usize,
+    pub covered_routes: usize,
+    pub negative_shortcut_count: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadHeldoutClaimBoundary {
+    pub heldout_suite_ready: bool,
+    pub exact_facts_must_be_removed_from_focus: bool,
+    pub proves_llm_ready: bool,
+    pub safe_claim: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadFocusBuildReport {
+    pub mode: String,
+    pub version: String,
+    pub verdict: String,
+    pub corpus_path: String,
+    pub heldout_suite_path: String,
+    pub focus: BroadFocusPacket,
+    pub metrics: BroadFocusMetrics,
+    pub claim_boundary: BroadFocusClaimBoundary,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadFocusPacket {
+    pub packet_kind: String,
+    pub selected_fact_count: usize,
+    pub selected_facts: Vec<BroadFact>,
+    pub removed_heldout_fact_ids: Vec<String>,
+    pub route_distribution: BTreeMap<String, usize>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadFocusMetrics {
+    pub route_balance_before: f64,
+    pub route_balance_after: f64,
+    pub hub_dominance_before: f64,
+    pub hub_dominance_after: f64,
+    pub exact_withheld_facts_removed: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadFocusClaimBoundary {
+    pub route_balanced_focus_ready: bool,
+    pub exact_withheld_facts_removed: bool,
+    pub hot_loop_ready: bool,
+    pub proves_llm_ready: bool,
+    pub safe_claim: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct BroadEvalRunReport {
     pub mode: String,
     pub version: String,
     pub verdict: String,
     pub corpus_summary: BroadEvalCorpusSummary,
+    pub focus_summary: Option<BroadFocusSummary>,
     pub hot_packet: BroadEvalHotPacket,
     pub family_scores: Vec<BroadFamilyScore>,
     pub field_metrics: BroadFieldMetrics,
@@ -173,6 +312,15 @@ pub(crate) struct BroadEvalCorpusSummary {
     pub route_count: usize,
     pub domain_count: usize,
     pub suite_case_count: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct BroadFocusSummary {
+    pub focus_loaded: bool,
+    pub selected_fact_count: usize,
+    pub exact_withheld_facts_removed: usize,
+    pub route_balance_after: f64,
+    pub hub_dominance_after: f64,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -336,11 +484,14 @@ pub(crate) struct LlmwaveReadinessReport {
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct LlmwaveReadinessEvidence {
     pub memory_final_proof_path: Option<String>,
+    pub broad_dataset_doctor_path: Option<String>,
     pub broad_eval_path: Option<String>,
     pub baseline_duel_path: Option<String>,
     pub chat_loop_path: Option<String>,
     pub nonlinear_memory_proven: bool,
     pub density_hot_artifact_ready: bool,
+    pub external_broad_corpus_ready: bool,
+    pub external_strength: String,
     pub broad_eval_verdict: String,
     pub broad_baseline_won: bool,
     pub chat_loop_ready: bool,
@@ -352,6 +503,8 @@ pub(crate) struct LlmwaveReadinessClaimBoundary {
     pub field_reasoning_ready: bool,
     pub answer_generation_ready: bool,
     pub chat_loop_ready: bool,
+    pub external_broad_corpus_ready: bool,
+    pub external_strength: String,
     pub llmwave_ready_candidate: bool,
     pub llm_ready: bool,
     pub blocked_by: Vec<String>,
@@ -430,6 +583,8 @@ pub(crate) fn build_broad_eval_suite(
         version: BROAD_EVAL_VERSION.to_string(),
         corpus_profile: corpus.profile,
         corpus_fact_count: corpus.fact_count,
+        generated_from_corpus: false,
+        withheld_fact_ids: Vec::new(),
         requested_families,
         case_count: cases.len(),
         cases,
@@ -442,6 +597,259 @@ pub(crate) fn build_broad_eval_suite(
             safe_claim: "Broad eval suite defines tasks; it does not prove LLM readiness."
                 .to_string(),
         },
+    };
+    write_json_if_requested(&config.out, &report)?;
+    Ok(report)
+}
+
+pub(crate) fn build_broad_dataset_doctor_report(
+    config: BroadDatasetDoctorConfig,
+) -> Result<BroadDatasetDoctorReport> {
+    let corpus = load_json::<BroadCorpusArtifact>(&config.corpus)?;
+    let route_distribution = route_distribution(&corpus.facts);
+    let route_balance = route_balance(&route_distribution);
+    let hub_dominance = hub_dominance(&route_distribution, corpus.fact_count);
+    let duplicate_pressure = duplicate_pressure(&corpus.facts);
+    let adversarial_route_present = corpus
+        .facts
+        .iter()
+        .any(|fact| fact.domain == "adversarial" || fact.route.contains("adversarial"));
+    let dialogue_route_present = corpus
+        .facts
+        .iter()
+        .any(|fact| fact.domain == "dialogue" || fact.route.contains("dialogue"));
+    let route_balanced = route_balance >= 0.55;
+    let hub_dominance_ok = hub_dominance <= 0.35;
+    let duplicate_pressure_ok = duplicate_pressure <= 0.20;
+    let medium_or_better = corpus.fact_count >= config.medium_min_facts
+        && route_balanced
+        && hub_dominance_ok
+        && duplicate_pressure_ok
+        && adversarial_route_present
+        && dialogue_route_present;
+    let strong = medium_or_better
+        && corpus.fact_count >= config.strong_min_facts
+        && corpus.route_count >= 8
+        && corpus.domain_count >= 5
+        && route_balance >= 0.70;
+    let mut weak_spots = Vec::new();
+    if corpus.fact_count < config.medium_min_facts {
+        weak_spots.push("corpus_too_small".to_string());
+    }
+    if !route_balanced {
+        weak_spots.push("route_imbalance".to_string());
+    }
+    if !hub_dominance_ok {
+        weak_spots.push("hub_dominance_high".to_string());
+    }
+    if !duplicate_pressure_ok {
+        weak_spots.push("duplicate_pressure_high".to_string());
+    }
+    if !adversarial_route_present {
+        weak_spots.push("adversarial_coverage_missing".to_string());
+    }
+    if !dialogue_route_present {
+        weak_spots.push("dialogue_coverage_missing".to_string());
+    }
+    let verdict = if strong {
+        "BROAD_DATASET_STRONG"
+    } else if medium_or_better {
+        "BROAD_DATASET_MEDIUM"
+    } else if !weak_spots.is_empty() && corpus.fact_count > 0 {
+        "BROAD_DATASET_WEAK"
+    } else {
+        "BROAD_DATASET_BLOCKED"
+    };
+    let report = BroadDatasetDoctorReport {
+        mode: "llmwave-big-broad-dataset-doctor".to_string(),
+        version: BROAD_EVAL_VERSION.to_string(),
+        verdict: verdict.to_string(),
+        corpus_path: config.corpus.display().to_string(),
+        quality: BroadDatasetQuality {
+            fact_count: corpus.fact_count,
+            route_count: corpus.route_count,
+            domain_count: corpus.domain_count,
+            route_balance,
+            hub_dominance,
+            duplicate_pressure,
+            adversarial_route_present,
+            dialogue_route_present,
+            external_corpus_loaded: corpus.claim_boundary.external_corpus_loaded,
+        },
+        gates: BroadDatasetGates {
+            route_balanced,
+            hub_dominance_ok,
+            duplicate_pressure_ok,
+            adversarial_coverage: adversarial_route_present,
+            dialogue_coverage: dialogue_route_present,
+            medium_or_better,
+            strong,
+        },
+        weak_spots,
+        claim_boundary: BroadDatasetClaimBoundary {
+            broad_dataset_doctor_ready: true,
+            external_broad_corpus_ready: medium_or_better
+                && corpus.claim_boundary.external_corpus_loaded,
+            proves_general_llm: false,
+            safe_claim:
+                "Broad dataset doctor checks corpus quality; it does not prove LLM readiness."
+                    .to_string(),
+        },
+    };
+    write_json_if_requested(&config.out, &report)?;
+    Ok(report)
+}
+
+pub(crate) fn build_broad_heldout_report(
+    config: BroadHeldoutBuildConfig,
+) -> Result<BroadHeldoutBuildReport> {
+    let corpus = load_json::<BroadCorpusArtifact>(&config.corpus)?;
+    let families = [
+        "recall",
+        "role",
+        "route",
+        "multihop",
+        "context",
+        "generation",
+        "adversarial",
+        "feedback",
+    ];
+    let mut cases = Vec::new();
+    let mut withheld_fact_ids = Vec::new();
+    for (idx, fact) in corpus.facts.iter().take(config.max_cases).enumerate() {
+        let family = families[idx % families.len()];
+        withheld_fact_ids.push(fact.fact_id.clone());
+        cases.push(case_from_fact(fact, family, idx));
+    }
+    let covered_routes = cases
+        .iter()
+        .flat_map(|case| case.expected.required_routes.iter().map(String::as_str))
+        .collect::<BTreeSet<_>>()
+        .len();
+    let negative_shortcut_count = cases
+        .iter()
+        .map(|case| case.negative_shortcuts.len())
+        .sum::<usize>();
+    let suite = BroadEvalSuiteArtifact {
+        mode: "llmwave-big-broad-eval-suite".to_string(),
+        version: BROAD_EVAL_VERSION.to_string(),
+        corpus_profile: corpus.profile.clone(),
+        corpus_fact_count: corpus.fact_count,
+        generated_from_corpus: true,
+        withheld_fact_ids,
+        requested_families: families
+            .iter()
+            .map(|family| (*family).to_string())
+            .collect(),
+        case_count: cases.len(),
+        cases,
+        claim_boundary: BroadSuiteClaimBoundary {
+            broad_suite_ready: true,
+            includes_generation: true,
+            includes_context: true,
+            includes_feedback: true,
+            llm_ready: false,
+            safe_claim:
+                "Generated held-out suite withholds exact facts; it does not prove LLM readiness."
+                    .to_string(),
+        },
+    };
+    let report = BroadHeldoutBuildReport {
+        mode: "llmwave-big-broad-heldout-build".to_string(),
+        version: BROAD_EVAL_VERSION.to_string(),
+        verdict: if suite.case_count >= 8 {
+            "BROAD_HELDOUT_SUITE_READY"
+        } else {
+            "BROAD_HELDOUT_SUITE_WEAK"
+        }
+        .to_string(),
+        corpus_path: config.corpus.display().to_string(),
+        metrics: BroadHeldoutMetrics {
+            generated_case_count: suite.case_count,
+            withheld_fact_count: suite.withheld_fact_ids.len(),
+            covered_routes,
+            negative_shortcut_count,
+        },
+        claim_boundary: BroadHeldoutClaimBoundary {
+            heldout_suite_ready: suite.case_count >= 8,
+            exact_facts_must_be_removed_from_focus: true,
+            proves_llm_ready: false,
+            safe_claim: "Held-out suite is eval input; focus builder must remove exact facts."
+                .to_string(),
+        },
+        suite,
+    };
+    write_json_if_requested(&config.out, &report)?;
+    Ok(report)
+}
+
+pub(crate) fn build_broad_focus_report(
+    config: BroadFocusBuildConfig,
+) -> Result<BroadFocusBuildReport> {
+    let corpus = load_json::<BroadCorpusArtifact>(&config.corpus)?;
+    let suite = load_broad_suite(&config.heldout_suite)?;
+    let withheld = suite
+        .withheld_fact_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let before_distribution = route_distribution(&corpus.facts);
+    let mut route_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut selected_facts = Vec::new();
+    let mut removed_heldout_fact_ids = Vec::new();
+    for fact in &corpus.facts {
+        if withheld.contains(fact.fact_id.as_str()) {
+            removed_heldout_fact_ids.push(fact.fact_id.clone());
+            continue;
+        }
+        if selected_facts.len() >= config.max_facts {
+            break;
+        }
+        let count = route_counts.entry(fact.route.clone()).or_insert(0);
+        if *count >= config.route_fact_cap {
+            continue;
+        }
+        *count += 1;
+        selected_facts.push(fact.clone());
+    }
+    let after_distribution = route_distribution(&selected_facts);
+    let focus = BroadFocusPacket {
+        packet_kind: "broad-route-balanced-focus".to_string(),
+        selected_fact_count: selected_facts.len(),
+        selected_facts,
+        removed_heldout_fact_ids,
+        route_distribution: after_distribution.clone(),
+    };
+    let exact_removed = focus.removed_heldout_fact_ids.len();
+    let report = BroadFocusBuildReport {
+        mode: "llmwave-big-broad-focus-build".to_string(),
+        version: BROAD_EVAL_VERSION.to_string(),
+        verdict: if exact_removed == suite.withheld_fact_ids.len() && focus.selected_fact_count > 0
+        {
+            "BROAD_FOCUS_PACKET_READY"
+        } else {
+            "BROAD_FOCUS_PACKET_REVIEW"
+        }
+        .to_string(),
+        corpus_path: config.corpus.display().to_string(),
+        heldout_suite_path: config.heldout_suite.display().to_string(),
+        metrics: BroadFocusMetrics {
+            route_balance_before: route_balance(&before_distribution),
+            route_balance_after: route_balance(&after_distribution),
+            hub_dominance_before: hub_dominance(&before_distribution, corpus.fact_count),
+            hub_dominance_after: hub_dominance(&after_distribution, focus.selected_fact_count),
+            exact_withheld_facts_removed: exact_removed,
+        },
+        claim_boundary: BroadFocusClaimBoundary {
+            route_balanced_focus_ready: exact_removed == suite.withheld_fact_ids.len()
+                && focus.selected_fact_count > 0,
+            exact_withheld_facts_removed: exact_removed == suite.withheld_fact_ids.len(),
+            hot_loop_ready: false,
+            proves_llm_ready: false,
+            safe_claim: "Broad focus is route-balanced eval input, not hot-loop or LLM proof."
+                .to_string(),
+        },
+        focus,
     };
     write_json_if_requested(&config.out, &report)?;
     Ok(report)
@@ -460,7 +868,7 @@ pub(crate) fn build_broad_eval_run_report(
         })?
     };
     let suite = if let Some(path) = &config.suite {
-        load_json::<BroadEvalSuiteArtifact>(path)?
+        load_broad_suite(path)?
     } else {
         build_broad_eval_suite(BroadEvalSuiteBuildConfig {
             corpus: None,
@@ -468,6 +876,18 @@ pub(crate) fn build_broad_eval_run_report(
                 .to_string(),
             out: None,
         })?
+    };
+    let focus_summary = if let Some(path) = &config.focus_packet {
+        let focus = load_json::<BroadFocusBuildReport>(path)?;
+        Some(BroadFocusSummary {
+            focus_loaded: true,
+            selected_fact_count: focus.focus.selected_fact_count,
+            exact_withheld_facts_removed: focus.metrics.exact_withheld_facts_removed,
+            route_balance_after: focus.metrics.route_balance_after,
+            hub_dominance_after: focus.metrics.hub_dominance_after,
+        })
+    } else {
+        None
     };
     let hot_packet = inspect_hot_packet(&config.hot_packet)?;
     let cases = suite.cases.iter().map(evaluate_case).collect::<Vec<_>>();
@@ -521,6 +941,7 @@ pub(crate) fn build_broad_eval_run_report(
             domain_count: corpus.domain_count,
             suite_case_count: suite.case_count,
         },
+        focus_summary,
         hot_packet,
         family_scores,
         field_metrics,
@@ -553,6 +974,7 @@ pub(crate) fn build_broad_baseline_duel_report(
         build_broad_eval_run_report(BroadEvalRunConfig {
             corpus: None,
             suite: None,
+            focus_packet: None,
             hot_packet: None,
             out: None,
         })?
@@ -697,12 +1119,32 @@ pub(crate) fn build_llmwave_readiness_report(
 ) -> Result<LlmwaveReadinessReport> {
     let (nonlinear_memory_proven, density_hot_artifact_ready) =
         read_memory_final_proof_flags(&config.memory_final_proof)?;
+    let dataset_doctor = if let Some(path) = &config.broad_dataset_doctor {
+        Some(load_json::<BroadDatasetDoctorReport>(path)?)
+    } else {
+        None
+    };
+    let external_broad_corpus_ready = dataset_doctor
+        .as_ref()
+        .map(|doctor| doctor.claim_boundary.external_broad_corpus_ready)
+        .unwrap_or(false);
+    let external_strength = dataset_doctor
+        .as_ref()
+        .map(|doctor| match doctor.verdict.as_str() {
+            "BROAD_DATASET_STRONG" => "external_strong",
+            "BROAD_DATASET_MEDIUM" => "external_medium",
+            "BROAD_DATASET_WEAK" => "external_weak",
+            _ => "external_blocked",
+        })
+        .unwrap_or("controlled_only")
+        .to_string();
     let broad_eval = if let Some(path) = &config.broad_eval {
         load_json::<BroadEvalRunReport>(path)?
     } else {
         build_broad_eval_run_report(BroadEvalRunConfig {
             corpus: None,
             suite: None,
+            focus_packet: None,
             hot_packet: None,
             out: None,
         })?
@@ -750,11 +1192,25 @@ pub(crate) fn build_llmwave_readiness_report(
     if !chat_loop_ready {
         blocked_by.push("open_chat_loop_missing".to_string());
     }
+    if dataset_doctor.is_some() && !external_broad_corpus_ready {
+        blocked_by.push("external_broad_corpus_not_ready".to_string());
+    }
+    let candidate_verdict = if llmwave_ready_candidate && external_strength == "external_strong" {
+        "LLMWAVE_READY_CANDIDATE_EXTERNAL_STRONG"
+    } else if llmwave_ready_candidate && external_strength == "external_medium" {
+        "LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM"
+    } else if llmwave_ready_candidate && external_strength == "external_weak" {
+        "LLMWAVE_READY_CANDIDATE_EXTERNAL_WEAK"
+    } else if llmwave_ready_candidate {
+        "LLMWAVE_READY_CANDIDATE_CONTROLLED"
+    } else {
+        "LLMWAVE_READY_CANDIDATE"
+    };
     let report = LlmwaveReadinessReport {
         mode: "llmwave-big-readiness".to_string(),
         version: BROAD_EVAL_VERSION.to_string(),
         verdict: if llmwave_ready_candidate {
-            "LLMWAVE_READY_CANDIDATE"
+            candidate_verdict
         } else if nonlinear_memory_proven
             && density_hot_artifact_ready
             && field_reasoning_ready
@@ -771,6 +1227,10 @@ pub(crate) fn build_llmwave_readiness_report(
                 .memory_final_proof
                 .as_ref()
                 .map(|path| path.display().to_string()),
+            broad_dataset_doctor_path: config
+                .broad_dataset_doctor
+                .as_ref()
+                .map(|path| path.display().to_string()),
             broad_eval_path: config
                 .broad_eval
                 .as_ref()
@@ -782,6 +1242,8 @@ pub(crate) fn build_llmwave_readiness_report(
             chat_loop_path: config.chat_loop.as_ref().map(|path| path.display().to_string()),
             nonlinear_memory_proven,
             density_hot_artifact_ready,
+            external_broad_corpus_ready,
+            external_strength: external_strength.clone(),
             broad_eval_verdict: broad_eval.verdict.to_string(),
             broad_baseline_won: baseline_duel.claim_boundary.broad_baseline_won,
             chat_loop_ready,
@@ -791,6 +1253,8 @@ pub(crate) fn build_llmwave_readiness_report(
             field_reasoning_ready,
             answer_generation_ready,
             chat_loop_ready,
+            external_broad_corpus_ready,
+            external_strength,
             llmwave_ready_candidate,
             llm_ready: false,
             blocked_by,
@@ -1225,6 +1689,40 @@ fn materialize_surface(case: &BroadEvalCase) -> String {
     }
 }
 
+fn case_from_fact(fact: &BroadFact, family: &str, idx: usize) -> BroadEvalCase {
+    let route = fact.route.as_str();
+    let contains = match family {
+        "role" => vec![fact.subject.as_str()],
+        "route" => vec![route],
+        "multihop" => vec![fact.object.as_str()],
+        "context" => vec![fact.object.as_str()],
+        "generation" => vec![fact.relation.as_str()],
+        "adversarial" => vec![fact.subject.as_str()],
+        "feedback" => vec!["suppress"],
+        _ => vec![fact.object.as_str()],
+    };
+    let forbidden = match family {
+        "adversarial" => vec!["wrong route accepted"],
+        "feedback" => vec!["repeat same error"],
+        _ => vec!["unsupported shortcut accepted"],
+    };
+    broad_case(
+        &format!("external-{}-{}", family, idx + 1),
+        family,
+        &format!(
+            "External held-out case for {} {} {}",
+            fact.subject, fact.relation, fact.object
+        ),
+        vec![triad(&fact.subject, &fact.relation, &fact.object, route)],
+        expected(contains, forbidden, vec![route], vec![], "stable"),
+        vec![shortcut(
+            "unsupported shortcut accepted",
+            "generated external held-out negative shortcut",
+        )],
+        scoring(true, family == "multihop", true),
+    )
+}
+
 fn score_families(cases: &[BroadEvalCaseResult]) -> Vec<BroadFamilyScore> {
     let mut map: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     for case in cases {
@@ -1414,12 +1912,71 @@ fn parse_csv(raw: &str) -> Vec<String> {
         .collect()
 }
 
+fn route_distribution(facts: &[BroadFact]) -> BTreeMap<String, usize> {
+    let mut distribution = BTreeMap::new();
+    for fact in facts {
+        *distribution.entry(fact.route.clone()).or_insert(0) += 1;
+    }
+    distribution
+}
+
+fn route_balance(distribution: &BTreeMap<String, usize>) -> f64 {
+    if distribution.is_empty() {
+        return 0.0;
+    }
+    let min = *distribution.values().min().unwrap_or(&0) as f64;
+    let max = *distribution.values().max().unwrap_or(&0) as f64;
+    if max == 0.0 {
+        0.0
+    } else {
+        round4(min / max)
+    }
+}
+
+fn hub_dominance(distribution: &BTreeMap<String, usize>, total: usize) -> f64 {
+    if total == 0 {
+        return 0.0;
+    }
+    let max = *distribution.values().max().unwrap_or(&0);
+    round4(max as f64 / total as f64)
+}
+
+fn duplicate_pressure(facts: &[BroadFact]) -> f64 {
+    if facts.is_empty() {
+        return 0.0;
+    }
+    let unique = facts
+        .iter()
+        .map(|fact| {
+            (
+                fact.domain.as_str(),
+                fact.route.as_str(),
+                fact.subject.as_str(),
+                fact.relation.as_str(),
+                fact.object.as_str(),
+            )
+        })
+        .collect::<BTreeSet<_>>()
+        .len();
+    round4((facts.len() - unique) as f64 / facts.len() as f64)
+}
+
 fn load_json<T>(path: &Path) -> Result<T>
 where
     T: for<'de> Deserialize<'de>,
 {
     let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))
+}
+
+fn load_broad_suite(path: &Path) -> Result<BroadEvalSuiteArtifact> {
+    let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    if let Ok(suite) = serde_json::from_str::<BroadEvalSuiteArtifact>(&raw) {
+        return Ok(suite);
+    }
+    let report = serde_json::from_str::<BroadHeldoutBuildReport>(&raw)
+        .with_context(|| format!("parse broad suite or heldout report {}", path.display()))?;
+    Ok(report.suite)
 }
 
 fn write_json_if_requested<T>(path: &Option<PathBuf>, report: &T) -> Result<()>
@@ -1522,12 +2079,14 @@ fn broad_case(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn broad_eval_run_reaches_generation_ready_not_chat() {
         let report = build_broad_eval_run_report(BroadEvalRunConfig {
             corpus: None,
             suite: None,
+            focus_packet: None,
             hot_packet: None,
             out: None,
         })
@@ -1561,6 +2120,7 @@ mod tests {
     fn readiness_stays_blocked_without_memory_final_proof_and_chat_loop() {
         let report = build_llmwave_readiness_report(LlmwaveReadinessConfig {
             memory_final_proof: None,
+            broad_dataset_doctor: None,
             broad_eval: None,
             baseline_duel: None,
             chat_loop: None,
@@ -1586,5 +2146,98 @@ mod tests {
         assert!(report.claim_boundary.open_chat_loop_ready);
         assert!(!report.claim_boundary.full_llm_ready);
         assert_eq!(report.metrics.unsupported_answer_rate, 0.0);
+    }
+
+    #[test]
+    fn external_broad_path_builds_doctor_heldout_focus_and_eval() {
+        let dir = temp_dir("nanda-broad-external-test");
+        fs::create_dir_all(&dir).expect("temp dir");
+        let source = dir.join("external.txt");
+        fs::write(&source, external_fixture()).expect("write fixture");
+        let corpus_path = dir.join("corpus.json");
+        let doctor_path = dir.join("doctor.json");
+        let heldout_path = dir.join("heldout.json");
+        let focus_path = dir.join("focus.json");
+        let eval_path = dir.join("eval.json");
+
+        let corpus = build_broad_corpus_artifact(BroadCorpusBuildConfig {
+            source: Some(source),
+            profile: "mixed-external-test".to_string(),
+            out: Some(corpus_path.clone()),
+        })
+        .expect("corpus");
+        assert!(corpus.claim_boundary.external_corpus_loaded);
+        assert!(corpus.fact_count >= 24);
+
+        let doctor = build_broad_dataset_doctor_report(BroadDatasetDoctorConfig {
+            corpus: corpus_path.clone(),
+            out: Some(doctor_path),
+            medium_min_facts: 16,
+            strong_min_facts: 64,
+        })
+        .expect("doctor");
+        assert_eq!(doctor.verdict, "BROAD_DATASET_MEDIUM");
+        assert!(doctor.claim_boundary.external_broad_corpus_ready);
+
+        let heldout = build_broad_heldout_report(BroadHeldoutBuildConfig {
+            corpus: corpus_path.clone(),
+            out: Some(heldout_path.clone()),
+            max_cases: 16,
+        })
+        .expect("heldout");
+        assert_eq!(heldout.verdict, "BROAD_HELDOUT_SUITE_READY");
+        assert_eq!(heldout.suite.withheld_fact_ids.len(), 16);
+
+        let focus = build_broad_focus_report(BroadFocusBuildConfig {
+            corpus: corpus_path.clone(),
+            heldout_suite: heldout_path.clone(),
+            out: Some(focus_path.clone()),
+            max_facts: 10_000,
+            route_fact_cap: 16,
+        })
+        .expect("focus");
+        assert_eq!(focus.verdict, "BROAD_FOCUS_PACKET_READY");
+        assert_eq!(focus.metrics.exact_withheld_facts_removed, 16);
+
+        let eval = build_broad_eval_run_report(BroadEvalRunConfig {
+            corpus: Some(corpus_path),
+            suite: Some(heldout_path),
+            focus_packet: Some(focus_path),
+            hot_packet: None,
+            out: Some(eval_path),
+        })
+        .expect("eval");
+        assert_eq!(eval.verdict, "BROAD_EVAL_GENERATION_READY_NOT_CHAT");
+        assert!(eval.focus_summary.expect("focus summary").focus_loaded);
+    }
+
+    fn temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nanos}"))
+    }
+
+    fn external_fixture() -> String {
+        let domains = [
+            ("business", "supplier_docs"),
+            ("contracts", "protocol_direction"),
+            ("runtime", "ime_runtime"),
+            ("customs", "certification"),
+            ("code", "owner_route"),
+            ("dialogue", "dialogue_memory"),
+            ("adversarial", "adversarial_shortcut"),
+            ("finance", "payment_route"),
+        ];
+        let mut lines = Vec::new();
+        for (idx, (domain, route)) in domains.iter().enumerate() {
+            for item in 0..3 {
+                lines.push(format!(
+                    "{domain}|{route}|subject-{idx}-{item}|relates_to|object-{idx}-{item}|fixture evidence {idx}-{item}"
+                ));
+            }
+        }
+        lines.join("\n")
     }
 }

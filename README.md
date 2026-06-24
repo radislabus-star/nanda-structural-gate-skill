@@ -509,11 +509,16 @@ Pass that packet to `memory-final-proof` with `--density-hot-packet` to mark
 binary density evidence as present. It still does not make `llm_ready=true`.
 
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
-The implemented first path is:
+The implemented external-medium path is:
 
 ```bash
 nanda-llmwave-big broad-corpus-build \
   --out .nanda/llmwave-big-training/broad-corpus.json \
+  --format json
+
+nanda-llmwave-big broad-dataset-doctor \
+  --corpus .nanda/llmwave-big-training/broad-corpus.json \
+  --out .nanda/llmwave-big-training/broad-dataset-doctor.json \
   --format json
 
 nanda-llmwave-big broad-eval-suite-build \
@@ -521,9 +526,21 @@ nanda-llmwave-big broad-eval-suite-build \
   --out .nanda/llmwave-big-training/broad-eval-suite.json \
   --format json
 
+nanda-llmwave-big broad-heldout-build \
+  --corpus .nanda/llmwave-big-training/broad-corpus.json \
+  --out .nanda/llmwave-big-training/broad-heldout.json \
+  --format json
+
+nanda-llmwave-big broad-focus-build \
+  --corpus .nanda/llmwave-big-training/broad-corpus.json \
+  --heldout-suite .nanda/llmwave-big-training/broad-heldout.json \
+  --out .nanda/llmwave-big-training/broad-focus.json \
+  --format json
+
 nanda-llmwave-big broad-eval-run \
   --corpus .nanda/llmwave-big-training/broad-corpus.json \
-  --suite .nanda/llmwave-big-training/broad-eval-suite.json \
+  --suite .nanda/llmwave-big-training/broad-heldout.json \
+  --focus-packet .nanda/llmwave-big-training/broad-focus.json \
   --hot-packet .nanda/llmwave-big-training/density-ablation.hot \
   --out .nanda/llmwave-big-training/broad-eval.json \
   --format json
@@ -539,6 +556,7 @@ nanda-llmwave-big broad-chat-loop-eval \
 
 nanda-llmwave-big llmwave-readiness \
   --memory-final-proof .nanda/llmwave-big-training/memory-final-proof.json \
+  --broad-dataset-doctor .nanda/llmwave-big-training/broad-dataset-doctor.json \
   --broad-eval .nanda/llmwave-big-training/broad-eval.json \
   --baseline-duel .nanda/llmwave-big-training/broad-baseline-duel.json \
   --chat-loop .nanda/llmwave-big-training/broad-chat-loop.json \
@@ -546,10 +564,12 @@ nanda-llmwave-big llmwave-readiness \
   --format json
 ```
 
-This path can report `BROAD_EVAL_GENERATION_READY_NOT_CHAT` and target baseline
-wins. With `broad-chat-loop-eval` and memory proof evidence, `llmwave-readiness`
-can report `LLMWAVE_READY_CANDIDATE` while still keeping `llm_ready=false`.
-That boundary means constrained LLMWave cognition candidate, not a general LLM.
+This path can report `BROAD_DATASET_MEDIUM`,
+`BROAD_EVAL_GENERATION_READY_NOT_CHAT`, exact withheld-fact removal, and target
+baseline wins. With `broad-chat-loop-eval` and memory proof evidence,
+`llmwave-readiness` can report `LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM` while
+still keeping `llm_ready=false`. That boundary means constrained LLMWave
+cognition candidate over an external-medium corpus, not a general LLM.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

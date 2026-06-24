@@ -239,6 +239,15 @@ enum LlmwaveBigCommand {
     /// Build a broad cognition eval suite.
     #[command(name = "broad-eval-suite-build")]
     BroadEvalSuiteBuild(LlmwaveBigBroadEvalSuiteBuildArgs),
+    /// Diagnose whether a broad corpus is balanced enough for external proof.
+    #[command(name = "broad-dataset-doctor")]
+    BroadDatasetDoctor(LlmwaveBigBroadDatasetDoctorArgs),
+    /// Generate held-out broad cognition cases from a broad corpus.
+    #[command(name = "broad-heldout-build")]
+    BroadHeldoutBuild(LlmwaveBigBroadHeldoutBuildArgs),
+    /// Build a route-balanced broad focus packet with held-out facts removed.
+    #[command(name = "broad-focus-build")]
+    BroadFocusBuild(LlmwaveBigBroadFocusBuildArgs),
     /// Run broad cognition eval over route, generation, context, feedback, and shortcuts.
     #[command(name = "broad-eval-run")]
     BroadEvalRun(LlmwaveBigBroadEvalRunArgs),
@@ -842,11 +851,55 @@ struct LlmwaveBigBroadEvalSuiteBuildArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigBroadDatasetDoctorArgs {
+    #[arg(long)]
+    corpus: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 16)]
+    medium_min_facts: usize,
+    #[arg(long, default_value_t = 64)]
+    strong_min_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigBroadHeldoutBuildArgs {
+    #[arg(long)]
+    corpus: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 32)]
+    max_cases: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigBroadFocusBuildArgs {
+    #[arg(long)]
+    corpus: PathBuf,
+    #[arg(long = "heldout-suite")]
+    heldout_suite: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 15_000)]
+    max_facts: usize,
+    #[arg(long, default_value_t = 256)]
+    route_fact_cap: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigBroadEvalRunArgs {
     #[arg(long)]
     corpus: Option<PathBuf>,
     #[arg(long)]
     suite: Option<PathBuf>,
+    #[arg(long = "focus-packet")]
+    focus_packet: Option<PathBuf>,
     #[arg(long = "hot-packet")]
     hot_packet: Option<PathBuf>,
     #[arg(long)]
@@ -879,6 +932,8 @@ struct LlmwaveBigBroadChatLoopEvalArgs {
 struct LlmwaveBigLlmwaveReadinessArgs {
     #[arg(long = "memory-final-proof")]
     memory_final_proof: Option<PathBuf>,
+    #[arg(long = "broad-dataset-doctor")]
+    broad_dataset_doctor: Option<PathBuf>,
     #[arg(long = "broad-eval")]
     broad_eval: Option<PathBuf>,
     #[arg(long = "baseline-duel")]
@@ -1477,10 +1532,44 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             report::print_broad_eval_suite_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::BroadDatasetDoctor(args) => {
+            let report = broad_eval::build_broad_dataset_doctor_report(
+                broad_eval::BroadDatasetDoctorConfig {
+                    corpus: args.corpus,
+                    out: args.out,
+                    medium_min_facts: args.medium_min_facts,
+                    strong_min_facts: args.strong_min_facts,
+                },
+            )?;
+            report::print_broad_dataset_doctor_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::BroadHeldoutBuild(args) => {
+            let report =
+                broad_eval::build_broad_heldout_report(broad_eval::BroadHeldoutBuildConfig {
+                    corpus: args.corpus,
+                    out: args.out,
+                    max_cases: args.max_cases,
+                })?;
+            report::print_broad_heldout_build_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::BroadFocusBuild(args) => {
+            let report = broad_eval::build_broad_focus_report(broad_eval::BroadFocusBuildConfig {
+                corpus: args.corpus,
+                heldout_suite: args.heldout_suite,
+                out: args.out,
+                max_facts: args.max_facts,
+                route_fact_cap: args.route_fact_cap,
+            })?;
+            report::print_broad_focus_build_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::BroadEvalRun(args) => {
             let report = broad_eval::build_broad_eval_run_report(broad_eval::BroadEvalRunConfig {
                 corpus: args.corpus,
                 suite: args.suite,
+                focus_packet: args.focus_packet,
                 hot_packet: args.hot_packet,
                 out: args.out,
             })?;
@@ -1509,6 +1598,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 broad_eval::build_llmwave_readiness_report(broad_eval::LlmwaveReadinessConfig {
                     memory_final_proof: args.memory_final_proof,
+                    broad_dataset_doctor: args.broad_dataset_doctor,
                     broad_eval: args.broad_eval,
                     baseline_duel: args.baseline_duel,
                     chat_loop: args.chat_loop,

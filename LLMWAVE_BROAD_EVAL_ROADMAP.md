@@ -9,17 +9,22 @@ Implementation checkpoint:
 first broad eval path: implemented
 commands:
   broad-corpus-build
+  broad-dataset-doctor
   broad-eval-suite-build
+  broad-heldout-build
+  broad-focus-build
   broad-eval-run
   broad-baseline-duel
+  broad-chat-loop-eval
   llmwave-readiness
 current honest top state:
+  BROAD_DATASET_MEDIUM
   BROAD_EVAL_GENERATION_READY_NOT_CHAT
   BROAD_CHAT_LOOP_READY_NOT_GENERAL_LLM
-  LLMWAVE_READY_CANDIDATE when memory proof, broad eval, baseline duel,
-  and chat-loop evidence are supplied
+  LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM when memory proof, broad dataset
+  doctor, held-out focus broad eval, baseline duel, and chat-loop evidence are
+  supplied
 still blocked:
-  broad external corpus scale
   general LLM readiness
 ```
 
@@ -35,6 +40,20 @@ blocked_by = ["broad_llm_eval_missing"]
 The goal is to close `broad_llm_eval_missing` honestly. This document does not
 claim that LLMWave is a chatbot or a general LLM. It defines the broad eval
 system needed before any `llmwave_ready_candidate` claim can open.
+
+Current implementation separates controlled readiness from external-medium
+readiness:
+
+```text
+broad-dataset-doctor
+  -> broad-heldout-build
+  -> broad-focus-build
+  -> broad-eval-run --focus-packet
+  -> llmwave-readiness --broad-dataset-doctor
+```
+
+That path can open `LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM`; it deliberately
+does not open `llm_ready`.
 
 ## Core Question
 
@@ -450,14 +469,28 @@ nanda-llmwave-big broad-corpus-build \
   --profile mixed \
   --out .nanda/llmwave-big/broad-corpus.json
 
+nanda-llmwave-big broad-dataset-doctor \
+  --corpus .nanda/llmwave-big/broad-corpus.json \
+  --out .nanda/llmwave-big/broad-dataset-doctor.json
+
 nanda-llmwave-big broad-eval-suite-build \
   --corpus .nanda/llmwave-big/broad-corpus.json \
   --families recall,role,route,multihop,context,generation,adversarial,feedback \
   --out .nanda/llmwave-big/broad-eval-suite.json
 
+nanda-llmwave-big broad-heldout-build \
+  --corpus .nanda/llmwave-big/broad-corpus.json \
+  --out .nanda/llmwave-big/broad-heldout.json
+
+nanda-llmwave-big broad-focus-build \
+  --corpus .nanda/llmwave-big/broad-corpus.json \
+  --heldout-suite .nanda/llmwave-big/broad-heldout.json \
+  --out .nanda/llmwave-big/broad-focus.json
+
 nanda-llmwave-big broad-eval-run \
   --corpus .nanda/llmwave-big/broad-corpus.json \
-  --suite .nanda/llmwave-big/broad-eval-suite.json \
+  --suite .nanda/llmwave-big/broad-heldout.json \
+  --focus-packet .nanda/llmwave-big/broad-focus.json \
   --hot-packet .nanda/llmwave-big/density-ablation.hot \
   --format json \
   --out .nanda/llmwave-big/broad-eval-report.json
@@ -469,6 +502,7 @@ nanda-llmwave-big broad-baseline-duel \
 
 nanda-llmwave-big llmwave-readiness \
   --memory-final-proof .nanda/llmwave-big/memory-final-proof.json \
+  --broad-dataset-doctor .nanda/llmwave-big/broad-dataset-doctor.json \
   --broad-eval .nanda/llmwave-big/broad-eval-report.json \
   --baseline-duel .nanda/llmwave-big/broad-baseline-duel.json \
   --format json

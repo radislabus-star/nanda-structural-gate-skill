@@ -519,18 +519,48 @@ big_memory_final_proof_medium_doctor_json="$("$llmwave_big" memory-final-proof -
 jq -e '.verdict == "FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM" and .final_proof_gate.general_nonlinear_memory_claim_ready == true and .claim_boundary.nonlinear_memory_proven == true and .claim_boundary.llm_ready == false' <<<"$big_memory_final_proof_medium_doctor_json" >/dev/null
 jq -e '.claim_boundary.blocked_by == ["broad_llm_eval_missing"] and .final_proof_gate.density_proof_doctor_ready == true and .final_proof_gate.density_proof_doctor_strong == false and .final_proof_gate.density_hot_artifact_ready == true and .big_corpus_gate.density_hot_packet_path != null' <<<"$big_memory_final_proof_medium_doctor_json" >/dev/null
 printf '%s\n' "$big_memory_final_proof_medium_doctor_json" >"$tmp_rust_corpus/memory-final-proof-medium.json"
-big_broad_corpus_json="$("$llmwave_big" broad-corpus-build --out "$tmp_rust_corpus/broad-corpus.json" --format json)"
-jq -e '.mode == "llmwave-big-broad-corpus" and .fact_count >= 8 and .route_count >= 6 and .claim_boundary.llm_ready == false' <<<"$big_broad_corpus_json" >/dev/null
-big_broad_suite_json="$("$llmwave_big" broad-eval-suite-build --corpus "$tmp_rust_corpus/broad-corpus.json" --out "$tmp_rust_corpus/broad-suite.json" --format json)"
-jq -e '.mode == "llmwave-big-broad-eval-suite" and .case_count == 8 and .claim_boundary.includes_generation == true and .claim_boundary.includes_context == true and .claim_boundary.includes_feedback == true and .claim_boundary.llm_ready == false' <<<"$big_broad_suite_json" >/dev/null
-big_broad_eval_json="$("$llmwave_big" broad-eval-run --corpus "$tmp_rust_corpus/broad-corpus.json" --suite "$tmp_rust_corpus/broad-suite.json" --hot-packet "$tmp_rust_corpus/density-ablation.hot" --out "$tmp_rust_corpus/broad-eval.json" --format json)"
-jq -e '.mode == "llmwave-big-broad-eval-run" and .verdict == "BROAD_EVAL_GENERATION_READY_NOT_CHAT" and .hot_packet.valid_density_packet == true and .claim_boundary.field_reasoning_ready == true and .claim_boundary.answer_generation_ready == true and .claim_boundary.llmwave_ready_candidate == false and .claim_boundary.llm_ready == false and (.claim_boundary.blocked_by | index("open_chat_loop_missing"))' <<<"$big_broad_eval_json" >/dev/null
+cat >"$tmp_rust_corpus/broad-external.txt" <<'EOF_BROAD_EXTERNAL'
+business|supplier_docs|Honglu|issues|invoice PI-03|external business evidence 1
+business|supplier_docs|Rustrade|pays|Honglu|external business evidence 2
+business|supplier_docs|invoice PI-03|supports|shipment docs|external business evidence 3
+contracts|protocol_direction|supplier|authors|protocol|external contract evidence 1
+contracts|protocol_direction|buyer|authors|original contract|external contract evidence 2
+contracts|protocol_direction|protocol|changes|supplier obligation|external contract evidence 3
+runtime|ime_runtime|IME not visible|requires|runtime engine check|external runtime evidence 1
+runtime|ime_runtime|candidate scoring|is_not|IME activation|external runtime evidence 2
+runtime|ime_runtime|runtime snapshot|shows|engine missing|external runtime evidence 3
+customs|certification|Maria payment|covers|certification protocols|external customs evidence 1
+customs|certification|customs declaration|requires|invoice evidence|external customs evidence 2
+customs|certification|certification protocols|do_not_prove|customs payment|external customs evidence 3
+code|owner_route|adapter|must_not_decide|core correction|external code evidence 1
+code|owner_route|core owner|decides|correction|external code evidence 2
+code|owner_route|ui adapter|displays|backend state|external code evidence 3
+dialogue|dialogue_memory|reject shortcut|suppresses|next false route|external dialogue evidence 1
+dialogue|dialogue_memory|correction|updates|session route|external dialogue evidence 2
+dialogue|dialogue_memory|follow up|uses|accepted correction|external dialogue evidence 3
+adversarial|adversarial_shortcut|same name|must_not_merge|different route|external adversarial evidence 1
+adversarial|adversarial_shortcut|stale fact|must_not_override|current route|external adversarial evidence 2
+adversarial|adversarial_shortcut|lexical match|must_not_force|role swap|external adversarial evidence 3
+finance|payment_route|bank rate|does_not_prove|deposit rate|external finance evidence 1
+finance|payment_route|payment route|must_match|payer beneficiary|external finance evidence 2
+finance|payment_route|market shortcut|requires|source timestamp|external finance evidence 3
+EOF_BROAD_EXTERNAL
+big_broad_corpus_json="$("$llmwave_big" broad-corpus-build --source "$tmp_rust_corpus/broad-external.txt" --profile mixed-external-test --out "$tmp_rust_corpus/broad-corpus.json" --format json)"
+jq -e '.mode == "llmwave-big-broad-corpus" and .fact_count == 24 and .route_count == 8 and .domain_count == 8 and .claim_boundary.external_corpus_loaded == true and .claim_boundary.llm_ready == false' <<<"$big_broad_corpus_json" >/dev/null
+big_broad_doctor_json="$("$llmwave_big" broad-dataset-doctor --corpus "$tmp_rust_corpus/broad-corpus.json" --out "$tmp_rust_corpus/broad-dataset-doctor.json" --format json)"
+jq -e '.mode == "llmwave-big-broad-dataset-doctor" and .verdict == "BROAD_DATASET_MEDIUM" and .gates.medium_or_better == true and .gates.strong == false and .claim_boundary.external_broad_corpus_ready == true' <<<"$big_broad_doctor_json" >/dev/null
+big_broad_heldout_json="$("$llmwave_big" broad-heldout-build --corpus "$tmp_rust_corpus/broad-corpus.json" --out "$tmp_rust_corpus/broad-heldout.json" --max-cases 16 --format json)"
+jq -e '.mode == "llmwave-big-broad-heldout-build" and .verdict == "BROAD_HELDOUT_SUITE_READY" and .metrics.generated_case_count == 16 and .metrics.withheld_fact_count == 16 and .claim_boundary.heldout_suite_ready == true' <<<"$big_broad_heldout_json" >/dev/null
+big_broad_focus_json="$("$llmwave_big" broad-focus-build --corpus "$tmp_rust_corpus/broad-corpus.json" --heldout-suite "$tmp_rust_corpus/broad-heldout.json" --out "$tmp_rust_corpus/broad-focus.json" --format json)"
+jq -e '.mode == "llmwave-big-broad-focus-build" and .verdict == "BROAD_FOCUS_PACKET_READY" and .metrics.exact_withheld_facts_removed == 16 and .claim_boundary.route_balanced_focus_ready == true and .claim_boundary.hot_loop_ready == false' <<<"$big_broad_focus_json" >/dev/null
+big_broad_eval_json="$("$llmwave_big" broad-eval-run --corpus "$tmp_rust_corpus/broad-corpus.json" --suite "$tmp_rust_corpus/broad-heldout.json" --focus-packet "$tmp_rust_corpus/broad-focus.json" --hot-packet "$tmp_rust_corpus/density-ablation.hot" --out "$tmp_rust_corpus/broad-eval.json" --format json)"
+jq -e '.mode == "llmwave-big-broad-eval-run" and .verdict == "BROAD_EVAL_GENERATION_READY_NOT_CHAT" and .focus_summary.focus_loaded == true and .focus_summary.exact_withheld_facts_removed == 16 and .hot_packet.valid_density_packet == true and .claim_boundary.field_reasoning_ready == true and .claim_boundary.answer_generation_ready == true and .claim_boundary.llmwave_ready_candidate == false and .claim_boundary.llm_ready == false and (.claim_boundary.blocked_by | index("open_chat_loop_missing"))' <<<"$big_broad_eval_json" >/dev/null
 big_broad_baseline_json="$("$llmwave_big" broad-baseline-duel --eval-report "$tmp_rust_corpus/broad-eval.json" --out "$tmp_rust_corpus/broad-baseline.json" --format json)"
 jq -e '.mode == "llmwave-big-broad-baseline-duel" and .verdict == "BROAD_BASELINE_DUEL_TARGET_WIN" and .claim_boundary.broad_baseline_won == true and .claim_boundary.proves_general_llm == false' <<<"$big_broad_baseline_json" >/dev/null
 big_broad_chat_loop_json="$("$llmwave_big" broad-chat-loop-eval --out "$tmp_rust_corpus/broad-chat-loop.json" --format json)"
 jq -e '.mode == "llmwave-big-broad-chat-loop-eval" and .verdict == "BROAD_CHAT_LOOP_READY_NOT_GENERAL_LLM" and .claim_boundary.open_chat_loop_ready == true and .claim_boundary.full_llm_ready == false' <<<"$big_broad_chat_loop_json" >/dev/null
-big_llmwave_readiness_json="$("$llmwave_big" llmwave-readiness --memory-final-proof "$tmp_rust_corpus/memory-final-proof-medium.json" --broad-eval "$tmp_rust_corpus/broad-eval.json" --baseline-duel "$tmp_rust_corpus/broad-baseline.json" --chat-loop "$tmp_rust_corpus/broad-chat-loop.json" --out "$tmp_rust_corpus/llmwave-readiness.json" --format json)"
-jq -e '.mode == "llmwave-big-readiness" and .verdict == "LLMWAVE_READY_CANDIDATE" and .evidence.nonlinear_memory_proven == true and .evidence.density_hot_artifact_ready == true and .evidence.broad_baseline_won == true and .evidence.chat_loop_ready == true and .claim_boundary.field_reasoning_ready == true and .claim_boundary.answer_generation_ready == true and .claim_boundary.chat_loop_ready == true and .claim_boundary.llmwave_ready_candidate == true and .claim_boundary.llm_ready == false and (.claim_boundary.blocked_by | length) == 0' <<<"$big_llmwave_readiness_json" >/dev/null
+big_llmwave_readiness_json="$("$llmwave_big" llmwave-readiness --memory-final-proof "$tmp_rust_corpus/memory-final-proof-medium.json" --broad-dataset-doctor "$tmp_rust_corpus/broad-dataset-doctor.json" --broad-eval "$tmp_rust_corpus/broad-eval.json" --baseline-duel "$tmp_rust_corpus/broad-baseline.json" --chat-loop "$tmp_rust_corpus/broad-chat-loop.json" --out "$tmp_rust_corpus/llmwave-readiness.json" --format json)"
+jq -e '.mode == "llmwave-big-readiness" and .verdict == "LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM" and .evidence.nonlinear_memory_proven == true and .evidence.density_hot_artifact_ready == true and .evidence.external_broad_corpus_ready == true and .evidence.external_strength == "external_medium" and .evidence.broad_baseline_won == true and .evidence.chat_loop_ready == true and .claim_boundary.field_reasoning_ready == true and .claim_boundary.answer_generation_ready == true and .claim_boundary.chat_loop_ready == true and .claim_boundary.external_broad_corpus_ready == true and .claim_boundary.llmwave_ready_candidate == true and .claim_boundary.llm_ready == false and (.claim_boundary.blocked_by | length) == 0' <<<"$big_llmwave_readiness_json" >/dev/null
 rm -rf "$tmp_rust_corpus"
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null

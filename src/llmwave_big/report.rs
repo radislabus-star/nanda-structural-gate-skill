@@ -6,8 +6,9 @@ use super::active_core::ActiveCoreReport;
 use super::answer_surface::AnswerSurfaceReport;
 use super::atlas::AtlasReport;
 use super::broad_eval::{
-    BroadBaselineDuelReport, BroadChatLoopEvalReport, BroadCorpusArtifact, BroadEvalRunReport,
-    BroadEvalSuiteArtifact, LlmwaveReadinessReport,
+    BroadBaselineDuelReport, BroadChatLoopEvalReport, BroadCorpusArtifact,
+    BroadDatasetDoctorReport, BroadEvalRunReport, BroadEvalSuiteArtifact, BroadFocusBuildReport,
+    BroadHeldoutBuildReport, LlmwaveReadinessReport,
 };
 use super::consolidation::ConsolidationReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
@@ -1110,6 +1111,101 @@ pub(crate) fn print_broad_eval_suite_report(
             println!("- corpus profile: `{}`", report.corpus_profile);
             println!("- cases: `{}`", report.case_count);
             println!("- llm_ready: `{}`", report.claim_boundary.llm_ready);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_broad_dataset_doctor_report(
+    report: &BroadDatasetDoctorReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("verdict: {}", report.verdict);
+            println!("facts: {}", report.quality.fact_count);
+            println!("route_balance: {:.4}", report.quality.route_balance);
+            println!(
+                "external_broad_corpus_ready: {}",
+                report.claim_boundary.external_broad_corpus_ready
+            );
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Broad Dataset Doctor");
+            println!();
+            println!("- verdict: `{}`", report.verdict);
+            println!("- facts: `{}`", report.quality.fact_count);
+            println!("- route balance: `{:.4}`", report.quality.route_balance);
+            println!(
+                "- external broad corpus ready: `{}`",
+                report.claim_boundary.external_broad_corpus_ready
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_broad_heldout_build_report(
+    report: &BroadHeldoutBuildReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("verdict: {}", report.verdict);
+            println!("cases: {}", report.metrics.generated_case_count);
+            println!("withheld: {}", report.metrics.withheld_fact_count);
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Broad Heldout Build");
+            println!();
+            println!("- verdict: `{}`", report.verdict);
+            println!("- cases: `{}`", report.metrics.generated_case_count);
+            println!("- withheld: `{}`", report.metrics.withheld_fact_count);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn print_broad_focus_build_report(
+    report: &BroadFocusBuildReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("mode: {}", report.mode);
+            println!("version: {}", report.version);
+            println!("verdict: {}", report.verdict);
+            println!("selected_facts: {}", report.focus.selected_fact_count);
+            println!(
+                "exact_withheld_facts_removed: {}",
+                report.metrics.exact_withheld_facts_removed
+            );
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Broad Focus Build");
+            println!();
+            println!("- verdict: `{}`", report.verdict);
+            println!("- selected facts: `{}`", report.focus.selected_fact_count);
+            println!(
+                "- exact withheld facts removed: `{}`",
+                report.metrics.exact_withheld_facts_removed
+            );
         }
     }
     Ok(())
