@@ -11,6 +11,7 @@ use super::broad_eval::{
     BroadHeldoutBuildReport, LlmwaveReadinessReport,
 };
 use super::consolidation::ConsolidationReport;
+use super::core_v1_active_retrieval::CoreV1ActiveRetrievalReport;
 use super::core_v1_contract::CoreV1ContractReport;
 use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
 use super::core_v1_memory_writer::CoreV1MemoryWriterReport;
@@ -159,6 +160,21 @@ pub(crate) fn print_core_v1_query_wave_report(
         ),
         OutputFormat::Text => print_core_v1_query_wave_text(report),
         OutputFormat::Md => print_core_v1_query_wave_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_active_retrieval_report(
+    report: &CoreV1ActiveRetrievalReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_active_retrieval_text(report),
+        OutputFormat::Md => print_core_v1_active_retrieval_md(report),
     }
     Ok(())
 }
@@ -1890,6 +1906,24 @@ fn print_core_v1_query_wave_text(report: &CoreV1QueryWaveReport) {
     }
 }
 
+fn print_core_v1_active_retrieval_text(report: &CoreV1ActiveRetrievalReport) {
+    println!("LLMWave Core V1 Active Retrieval");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("field_state: {}", report.output.field_state);
+    println!("top_peak: {}", report.output.top_peak);
+    println!("runner_up: {}", report.output.runner_up);
+    println!("peak_margin: {:.3}", report.output.peak_margin);
+    println!("coherence: {:.3}", report.output.coherence);
+    println!("safe_to_answer: {}", report.output.safe_to_answer);
+    println!("exit_criteria:");
+    for criterion in &report.exit_criteria {
+        println!("  - {}: {}", criterion.criterion, criterion.passed);
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -2976,6 +3010,47 @@ fn print_core_v1_query_wave_md(report: &CoreV1QueryWaveReport) {
     println!(
         "- retrieval ready: `{}`",
         report.claim_boundary.retrieval_ready
+    );
+    println!(
+        "- answer generation ready: `{}`",
+        report.claim_boundary.answer_generation_ready
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_core_v1_active_retrieval_md(report: &CoreV1ActiveRetrievalReport) {
+    println!("# LLMWave Core V1 Active Retrieval");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- field state: `{}`", report.output.field_state);
+    println!("- top peak: `{}`", report.output.top_peak);
+    println!("- runner up: `{}`", report.output.runner_up);
+    println!("- peak margin: `{:.3}`", report.output.peak_margin);
+    println!("- coherence: `{:.3}`", report.output.coherence);
+    println!("- safe to answer: `{}`", report.output.safe_to_answer);
+    println!();
+    println!("## Exit Criteria");
+    println!();
+    for criterion in &report.exit_criteria {
+        println!("- `{}`: `{}`", criterion.criterion, criterion.passed);
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- retrieval ready: `{}`",
+        report.claim_boundary.retrieval_ready
+    );
+    println!(
+        "- schema reasoning ready: `{}`",
+        report.claim_boundary.schema_reasoning_ready
     );
     println!(
         "- answer generation ready: `{}`",

@@ -242,6 +242,7 @@ nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -739,6 +740,7 @@ nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1101,6 +1103,12 @@ the local exit gate only when same-meaning paraphrases select the same route,
 role-swap queries become reversed-polarity/VETO states, and missing-evidence
 queries cannot produce a confident answer. It keeps retrieval, answer
 generation, LLM readiness, and nonlinear-memory proof false.
+`nanda-llmwave-big core-v1-active-retrieval` records Phase 6. It runs the query
+wave through coarse route peaks, a local focus packet, and a field pass with
+the required states `FIELD_FOCUSED`, `FIELD_CONTESTED`, `FIELD_THIN`,
+`FIELD_REVERSED`, `FIELD_NOISY`, and `FIELD_NO_ANSWER`. It may mark a focused
+route as retrieval-ready for the next phase, but schema reasoning and answer
+generation remain closed.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

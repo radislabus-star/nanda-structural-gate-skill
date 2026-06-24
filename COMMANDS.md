@@ -335,6 +335,7 @@ nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
 nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -387,6 +388,11 @@ leakage, and broad-noise gates are bound to the writer path.
 query wave with route, role, operator, evidence, time/currentness, uncertainty,
 and polarity components. It keeps `safe_to_answer=false`: the output is a
 field input, not an answer.
+`core-v1-active-retrieval` is the Phase 6 report from
+`LLMWAVE_CORE_V1_PHASE6_REPORT.md`. It runs the query wave through route peaks,
+local focus, and a field pass. A focused route can be retrieval-ready for the
+next phase, but contested, thin, reversed, noisy, and no-answer states still
+block answer generation.
 
 ## Word And Surface Memory
 

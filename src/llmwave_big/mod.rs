@@ -10,6 +10,7 @@ pub mod answer_surface;
 pub mod atlas;
 pub mod broad_eval;
 pub mod consolidation;
+pub mod core_v1_active_retrieval;
 pub mod core_v1_contract;
 pub mod core_v1_field_cutover;
 pub mod core_v1_memory_writer;
@@ -98,6 +99,9 @@ enum LlmwaveBigCommand {
     /// Print the Phase 5 LLMWave Core V1 query wave input gate.
     #[command(name = "core-v1-query-wave", alias = "core-query-wave")]
     CoreV1QueryWave(LlmwaveBigCoreV1QueryWaveArgs),
+    /// Print the Phase 6 LLMWave Core V1 active field retrieval gate.
+    #[command(name = "core-v1-active-retrieval", alias = "core-active-retrieval")]
+    CoreV1ActiveRetrieval(LlmwaveBigCoreV1ActiveRetrievalArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -340,6 +344,14 @@ struct LlmwaveBigCoreV1NonlinearProofArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1QueryWaveArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1ActiveRetrievalArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, value_enum, default_value = "json")]
@@ -1177,6 +1189,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             report::print_core_v1_query_wave_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::CoreV1ActiveRetrieval(args) => {
+            let report = core_v1_active_retrieval::build_core_v1_active_retrieval_report(args.text);
+            report::print_core_v1_active_retrieval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::Contract(args) => {
             let report = build_contract_report();
             report::print_contract_report(&report, &args.format)?;
@@ -1986,6 +2003,69 @@ mod tests {
         assert!(!report.claim_boundary.llm_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert_eq!(report.next_phase, "phase-6-active-field-retrieval-v1");
+    }
+
+    #[test]
+    fn core_v1_active_retrieval_covers_field_states_and_blocks_traps() {
+        let report = core_v1_active_retrieval::build_core_v1_active_retrieval_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.mode, "llmwave-core-v1-active-retrieval");
+        assert_eq!(
+            report.verdict,
+            "CORE_V1_ACTIVE_FIELD_RETRIEVAL_READY_NOT_REASONING"
+        );
+        assert_eq!(
+            core::mem::size_of::<core_v1_active_retrieval::CoreV1RoutePeakRecord32>(),
+            32
+        );
+        assert_eq!(report.output.field_state, "FIELD_FOCUSED");
+        assert_eq!(report.output.top_peak, "customs-clearance-status");
+        assert!(report.output.safe_to_answer);
+        assert!(report.output.peak_margin > 0.4);
+        assert!(report
+            .exit_criteria
+            .iter()
+            .all(|criterion| criterion.passed));
+        assert_eq!(
+            report.metrics.required_field_states_covered,
+            report.metrics.required_field_state_count
+        );
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "thin_assertion_trap"
+                && case.observed_state == "FIELD_THIN"
+                && !case.safe_to_answer
+                && case.passed));
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "contested_invoice_customs"
+                && case.observed_state == "FIELD_CONTESTED"
+                && !case.safe_to_answer
+                && case.passed));
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "reversed_invoice_actor"
+                && case.observed_state == "FIELD_REVERSED"
+                && !case.safe_to_answer
+                && case.passed));
+        assert!(report.claim_boundary.active_field_retrieval_v1_implemented);
+        assert!(report.claim_boundary.retrieval_ready);
+        assert!(report.claim_boundary.lexical_traps_blocked);
+        assert!(
+            report
+                .claim_boundary
+                .contested_fields_block_answer_generation
+        );
+        assert!(report.claim_boundary.anti_wave_suppression_local);
+        assert!(!report.claim_boundary.schema_reasoning_ready);
+        assert!(!report.claim_boundary.answer_generation_ready);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert_eq!(report.next_phase, "phase-7-schema-reasoning-v1");
     }
 
     #[test]

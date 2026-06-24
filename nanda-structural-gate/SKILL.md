@@ -182,6 +182,7 @@ scripts/nanda-llmwave-big core-v1-field-cutover --format json
 scripts/nanda-llmwave-big core-v1-memory-writer --format json
 scripts/nanda-llmwave-big core-v1-nonlinear-proof --format json
 scripts/nanda-llmwave-big core-v1-query-wave --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big core-v1-active-retrieval --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -605,6 +606,12 @@ into a typed L2/L3 query wave with surface, role, operator, negation,
 currentness, evidence, route, uncertainty, and polarity channels. Treat
 `CORE_V1_QUERY_WAVE_READY_NOT_RETRIEVAL` as input readiness only: retrieval,
 answer generation, LLM readiness, and nonlinear-memory proof remain false.
+`nanda-llmwave-big core-v1-active-retrieval` records Phase 6. It consumes the
+Core V1 query wave, selects route peaks, emits `FIELD_FOCUSED`,
+`FIELD_CONTESTED`, `FIELD_THIN`, `FIELD_REVERSED`, `FIELD_NOISY`, or
+`FIELD_NO_ANSWER`, and blocks answer generation for every non-focused state.
+Treat `CORE_V1_ACTIVE_FIELD_RETRIEVAL_READY_NOT_REASONING` as retrieval
+readiness only; schema reasoning and answer generation remain closed.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest
