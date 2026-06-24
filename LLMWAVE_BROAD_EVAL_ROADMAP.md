@@ -60,6 +60,10 @@ The normal public-safe strong seed is
 structural facts across 10 domains and 50 routes. It is an artifact seed for
 corpus/eval pipeline development and intentionally excludes user/private data.
 The 96-fact file remains a fast smoke seed.
+The 1M public-safe stress corpus is generated under ignored `.nanda/` with the
+same generator and is not committed. Current local measurement: 1,000,000
+facts, 224 MiB text source, 382 MiB JSON artifact, `BROAD_DATASET_STRONG`,
+`llm_ready=false`.
 
 ## Core Question
 

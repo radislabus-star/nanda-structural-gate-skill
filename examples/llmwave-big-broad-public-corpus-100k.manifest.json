@@ -1,5 +1,5 @@
 {
-  "artifact": "llmwave-big-broad-public-corpus-100k",
+  "artifact": "llmwave-big-broad-public-corpus-100000",
   "version": "1",
   "generator": "scripts/build-llmwave-big-broad-public-corpus.sh",
   "corpus_path": "examples/llmwave-big-broad-public-corpus-100k.txt",
@@ -28,6 +28,6 @@
     "proves_big_broad_artifact_exists": true,
     "proves_llm_ready": false,
     "proves_nonlinear_memory": false,
-    "safe_claim": "This is a public-safe 100k structural corpus for broad eval pipeline development, not proof of general LLM readiness."
+    "safe_claim": "This is a public-safe structural corpus for broad eval pipeline development, not proof of general LLM readiness."
   }
 }

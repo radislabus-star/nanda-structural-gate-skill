@@ -528,6 +528,17 @@ nanda-llmwave-big broad-corpus-build \
   --out .nanda/llmwave-big-training/broad-public-100k-corpus.json \
   --format json
 
+scripts/build-llmwave-big-broad-public-corpus.sh \
+  .nanda/llmwave-big-corpus/public-safe-1m.txt \
+  .nanda/llmwave-big-corpus/public-safe-1m.manifest.json \
+  1000000
+
+nanda-llmwave-big broad-corpus-build \
+  --source .nanda/llmwave-big-corpus/public-safe-1m.txt \
+  --profile public-safe-1m \
+  --out .nanda/llmwave-big-corpus/public-safe-1m.corpus.json \
+  --format json
+
 nanda-llmwave-big broad-dataset-doctor \
   --corpus .nanda/llmwave-big-training/broad-corpus.json \
   --out .nanda/llmwave-big-training/broad-dataset-doctor.json \
@@ -586,6 +597,9 @@ cognition candidate over an external-medium corpus, not a general LLM.
 large seed: 100,000 generated structural facts across 10 domains and 50 routes.
 Its companion manifest explicitly excludes user/private business data and local
 correspondence. The smaller 96-fact file remains a fast smoke seed only.
+The 1M public-safe corpus is generated under ignored `.nanda/`, not committed:
+1,000,000 facts, 10 domains, 50 routes, about 224 MiB as text and 382 MiB as
+the current JSON artifact.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
