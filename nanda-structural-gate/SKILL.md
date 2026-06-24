@@ -187,6 +187,7 @@ scripts/nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared t
 scripts/nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big core-v1-consolidation-sleep --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -641,6 +642,12 @@ next fixture field pass changing. Treat
 `CORE_V1_FEEDBACK_LEARNING_READY_NOT_CONSOLIDATED` as local feedback readiness
 only; consolidation, broad training, LLM readiness, and nonlinear-memory proof
 remain closed.
+`nanda-llmwave-big core-v1-consolidation-sleep` records Phase 11. It merges
+local feedback while preserving negative shortcut lanes and keeping unsafe
+WATCH forms from becoming accepted memory. Treat
+`CORE_V1_CONSOLIDATION_SLEEP_READY_NOT_BROAD_EVAL` as local consolidation
+readiness only; broad eval, broad training, LLM readiness, and
+nonlinear-memory proof remain closed.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest

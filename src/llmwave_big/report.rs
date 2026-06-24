@@ -13,6 +13,7 @@ use super::broad_eval::{
 use super::consolidation::ConsolidationReport;
 use super::core_v1_active_retrieval::CoreV1ActiveRetrievalReport;
 use super::core_v1_answer_verifier::CoreV1AnswerVerifierReport;
+use super::core_v1_consolidation_sleep::CoreV1ConsolidationSleepReport;
 use super::core_v1_contract::CoreV1ContractReport;
 use super::core_v1_feedback_learning::CoreV1FeedbackLearningReport;
 use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
@@ -239,6 +240,21 @@ pub(crate) fn print_core_v1_feedback_learning_report(
         ),
         OutputFormat::Text => print_core_v1_feedback_learning_text(report),
         OutputFormat::Md => print_core_v1_feedback_learning_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_consolidation_sleep_report(
+    report: &CoreV1ConsolidationSleepReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_consolidation_sleep_text(report),
+        OutputFormat::Md => print_core_v1_consolidation_sleep_md(report),
     }
     Ok(())
 }
@@ -2059,6 +2075,25 @@ fn print_core_v1_feedback_learning_text(report: &CoreV1FeedbackLearningReport) {
     }
 }
 
+fn print_core_v1_consolidation_sleep_text(report: &CoreV1ConsolidationSleepReport) {
+    println!("LLMWave Core V1 Consolidation Sleep");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("sleep_state: {}", report.consolidated_memory.state);
+    println!("before_records: {}", report.sleep_pass.before_records);
+    println!("after_records: {}", report.sleep_pass.after_records);
+    println!(
+        "shortcut_still_suppressed: {}",
+        report.post_sleep_field.shortcut_still_suppressed
+    );
+    println!("exit_criteria:");
+    for criterion in &report.exit_criteria {
+        println!("  - {}: {}", criterion.criterion, criterion.passed);
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -3379,6 +3414,52 @@ fn print_core_v1_feedback_learning_md(report: &CoreV1FeedbackLearningReport) {
     println!(
         "- broad training ready: `{}`",
         report.claim_boundary.broad_training_ready
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_core_v1_consolidation_sleep_md(report: &CoreV1ConsolidationSleepReport) {
+    println!("# LLMWave Core V1 Consolidation Sleep");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- sleep state: `{}`", report.consolidated_memory.state);
+    println!("- before records: `{}`", report.sleep_pass.before_records);
+    println!("- after records: `{}`", report.sleep_pass.after_records);
+    println!(
+        "- shortcut still suppressed: `{}`",
+        report.post_sleep_field.shortcut_still_suppressed
+    );
+    println!();
+    println!("## Exit Criteria");
+    println!();
+    for criterion in &report.exit_criteria {
+        println!("- `{}`: `{}`", criterion.criterion, criterion.passed);
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- consolidation ready: `{}`",
+        report.claim_boundary.consolidation_ready
+    );
+    println!(
+        "- safety preserved after sleep: `{}`",
+        report.claim_boundary.safety_preserved_after_sleep
+    );
+    println!(
+        "- broad eval ready: `{}`",
+        report.claim_boundary.broad_eval_ready
+    );
+    println!(
+        "- general chat ready: `{}`",
+        report.claim_boundary.general_chat_ready
     );
     println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
     println!(

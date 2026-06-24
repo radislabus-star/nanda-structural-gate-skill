@@ -12,6 +12,7 @@ pub mod broad_eval;
 pub mod consolidation;
 pub mod core_v1_active_retrieval;
 pub mod core_v1_answer_verifier;
+pub mod core_v1_consolidation_sleep;
 pub mod core_v1_contract;
 pub mod core_v1_feedback_learning;
 pub mod core_v1_field_cutover;
@@ -118,6 +119,12 @@ enum LlmwaveBigCommand {
     /// Print the Phase 10 LLMWave Core V1 feedback learning gate.
     #[command(name = "core-v1-feedback-learning", alias = "core-feedback-learning")]
     CoreV1FeedbackLearning(LlmwaveBigCoreV1FeedbackLearningArgs),
+    /// Print the Phase 11 LLMWave Core V1 consolidation sleep-pass gate.
+    #[command(
+        name = "core-v1-consolidation-sleep",
+        alias = "core-consolidation-sleep"
+    )]
+    CoreV1ConsolidationSleep(LlmwaveBigCoreV1ConsolidationSleepArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -400,6 +407,14 @@ struct LlmwaveBigCoreV1AnswerVerifierArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1FeedbackLearningArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1ConsolidationSleepArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, value_enum, default_value = "json")]
@@ -1262,6 +1277,12 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 core_v1_feedback_learning::build_core_v1_feedback_learning_report(args.text);
             report::print_core_v1_feedback_learning_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV1ConsolidationSleep(args) => {
+            let report =
+                core_v1_consolidation_sleep::build_core_v1_consolidation_sleep_report(args.text);
+            report::print_core_v1_consolidation_sleep_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Contract(args) => {
@@ -2328,6 +2349,52 @@ mod tests {
         assert!(!report.claim_boundary.llm_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert_eq!(report.next_phase, "phase-11-consolidation-sleep-pass-v1");
+    }
+
+    #[test]
+    fn core_v1_consolidation_sleep_merges_without_erasing_safety() {
+        let report = core_v1_consolidation_sleep::build_core_v1_consolidation_sleep_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.mode, "llmwave-core-v1-consolidation-sleep");
+        assert_eq!(
+            report.verdict,
+            "CORE_V1_CONSOLIDATION_SLEEP_READY_NOT_BROAD_EVAL"
+        );
+        assert_eq!(
+            core::mem::size_of::<core_v1_consolidation_sleep::CoreV1ConsolidatedMemoryRecord32>(),
+            32
+        );
+        assert_eq!(
+            report.consolidated_memory.state,
+            "CONSOLIDATED_LOCAL_MEMORY_READY"
+        );
+        assert!(report.sleep_pass.after_records < report.sleep_pass.before_records);
+        assert!(report.sleep_pass.preserved_negative_lanes > 0);
+        assert!(!report.sleep_pass.route_kill_switch);
+        assert!(report.post_sleep_field.shortcut_still_suppressed);
+        assert!(report.post_sleep_field.safe_to_answer);
+        assert!(report
+            .consolidated_memory
+            .retained_forms
+            .contains(&"negative_shortcut_lane"));
+        assert!(report
+            .eval_cases
+            .iter()
+            .any(|case| case.case_id == "watch_decay_not_accept" && case.passed));
+        assert!(report
+            .exit_criteria
+            .iter()
+            .all(|criterion| criterion.passed));
+        assert!(report.claim_boundary.consolidation_sleep_v1_implemented);
+        assert!(report.claim_boundary.consolidation_ready);
+        assert!(report.claim_boundary.safety_preserved_after_sleep);
+        assert!(!report.claim_boundary.broad_eval_ready);
+        assert!(!report.claim_boundary.broad_training_ready);
+        assert!(!report.claim_boundary.general_chat_ready);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert_eq!(report.next_phase, "phase-12-broad-eval-harness-v1");
     }
 
     #[test]

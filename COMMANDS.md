@@ -340,6 +340,7 @@ nanda-llmwave-big core-v1-schema-reasoning --text "Has customs cleared the goods
 nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-consolidation-sleep --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -411,6 +412,9 @@ surfaces before feedback learning starts.
 `LLMWAVE_CORE_V1_PHASE10_REPORT.md`. It emits shortcut-specific feedback
 memory and shows the next local field pass changing while keeping consolidation,
 broad learning, LLM readiness, and nonlinear-memory proof closed.
+`core-v1-consolidation-sleep` is the Phase 11 report from
+`LLMWAVE_CORE_V1_PHASE11_REPORT.md`. It merges local feedback safely, preserves
+negative shortcut memory, and keeps broad eval/training and hard claims closed.
 
 ## Word And Surface Memory
 
