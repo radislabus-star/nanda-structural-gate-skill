@@ -480,6 +480,18 @@ big_memory_final_proof_rust_density_json="$("$llmwave_big" memory-final-proof --
 jq -e '.verdict == "FINAL_PROOF_GATE_RUST_DENSITY_PROFILE_READY_NOT_GENERAL_LLM" and .final_proof_gate.rust_density_profile_ready == true' <<<"$big_memory_final_proof_rust_density_json" >/dev/null
 jq -e '.final_proof_gate.final_proof_gate_passed == false and .final_proof_gate.general_nonlinear_memory_claim_ready == false and .claim_boundary.blocked_by == ["general_nonlinear_memory_multi_profile_eval_missing"]' <<<"$big_memory_final_proof_rust_density_json" >/dev/null
 jq -e '.claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_memory_final_proof_rust_density_json" >/dev/null
+big_multi_profile_single_json="$("$llmwave_big" multi-profile-density-suite --rust-density "$tmp_rust_corpus/strict-density.json" --out "$tmp_rust_corpus/multi-single.json" --format json)"
+jq -e '.mode == "llmwave-big-multi-profile-density-suite" and .verdict == "MULTI_PROFILE_DENSITY_BLOCKED_BY_SINGLE_PROFILE"' <<<"$big_multi_profile_single_json" >/dev/null
+jq -e '.suite.profile_count == 1 and .suite.missing_profile_count == 2 and .gates.general_nonlinear_memory_proven == false' <<<"$big_multi_profile_single_json" >/dev/null
+cp "$tmp_rust_corpus/strict-density.json" "$tmp_rust_corpus/contracts-density.json"
+cp "$tmp_rust_corpus/strict-density.json" "$tmp_rust_corpus/business-density.json"
+big_multi_profile_pass_json="$("$llmwave_big" multi-profile-density-suite --rust-density "$tmp_rust_corpus/strict-density.json" --profile-evidence contracts="$tmp_rust_corpus/contracts-density.json" --profile-evidence business="$tmp_rust_corpus/business-density.json" --out "$tmp_rust_corpus/multi-pass.json" --format json)"
+jq -e '.verdict == "MULTI_PROFILE_NONLINEAR_MEMORY_PROVEN_NOT_LLM" and .suite.profile_count == 3 and .suite.passing_profile_count == 3' <<<"$big_multi_profile_pass_json" >/dev/null
+jq -e '.gates.general_nonlinear_memory_proven == true and .gates.llm_ready == false and .claim_boundary.llm_ready == false' <<<"$big_multi_profile_pass_json" >/dev/null
+test -s "$tmp_rust_corpus/multi-pass.json"
+big_memory_final_proof_multi_profile_json="$("$llmwave_big" memory-final-proof --profile rust --artifact "$tmp_rust_corpus/rust-corpus.json" --heldout-suite "$tmp_rust_corpus/rust-heldout.json" --focus-packet "$tmp_rust_corpus/rust-focus.json" --compile-evidence "$tmp_rust_corpus/rust-compile-evidence.json" --heldout-eval "$tmp_rust_corpus/rust-heldout-eval.json" --strict-density-evidence "$tmp_rust_corpus/strict-density.json" --multi-profile-density-evidence "$tmp_rust_corpus/multi-pass.json" --format json)"
+jq -e '.verdict == "FINAL_PROOF_GATE_NONLINEAR_MEMORY_READY_NOT_LLM" and .claim_boundary.nonlinear_memory_proven == true and .claim_boundary.llm_ready == false' <<<"$big_memory_final_proof_multi_profile_json" >/dev/null
+jq -e '.final_proof_gate.general_nonlinear_memory_claim_ready == true and .final_proof_gate.broad_llm_claim_ready == false and .claim_boundary.blocked_by == ["broad_llm_eval_missing"]' <<<"$big_memory_final_proof_multi_profile_json" >/dev/null
 rm -rf "$tmp_rust_corpus"
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null

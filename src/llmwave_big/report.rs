@@ -31,6 +31,7 @@ use super::memory_physics::MemoryPhysicsReport;
 use super::memory_proof_path::MemoryProofPathReport;
 use super::mini_chat_eval::MiniChatEvalReport;
 use super::multi_peak_field::MultiPeakFieldReport;
+use super::multi_profile_density_suite::MultiProfileDensitySuiteReport;
 use super::multi_schema_competition::MultiSchemaCompetitionReport;
 use super::nonlinear_memory_eval::{NonlinearMemoryEvalReport, NonlinearMemoryLadderReport};
 use super::open_surface_generation::OpenSurfaceGenerationReport;
@@ -954,6 +955,21 @@ pub(crate) fn print_strict_density_claim_gate_report(
         ),
         OutputFormat::Text => print_strict_density_claim_gate_text(report),
         OutputFormat::Md => print_strict_density_claim_gate_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_multi_profile_density_suite_report(
+    report: &MultiProfileDensitySuiteReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_multi_profile_density_suite_text(report),
+        OutputFormat::Md => print_multi_profile_density_suite_md(report),
     }
     Ok(())
 }
@@ -2092,6 +2108,27 @@ fn print_strict_density_claim_gate_text(report: &StrictDensityClaimGateReport) {
     );
 }
 
+fn print_multi_profile_density_suite_text(report: &MultiProfileDensitySuiteReport) {
+    println!("mode: {}", report.mode);
+    println!("version: {}", report.version);
+    println!("verdict: {}", report.verdict);
+    println!("profiles: {}", report.suite.profile_count);
+    println!("passing_profiles: {}", report.suite.passing_profile_count);
+    println!(
+        "min_density_win_ratio: {:.4}",
+        report.aggregate.min_density_win_ratio
+    );
+    println!(
+        "min_heldout_pass_rate: {:.4}",
+        report.aggregate.min_heldout_pass_rate
+    );
+    println!(
+        "general_nonlinear_memory_proven: {}",
+        report.claim_boundary.general_nonlinear_memory_proven
+    );
+    println!("llm_ready: {}", report.claim_boundary.llm_ready);
+}
+
 fn print_artifact_ask_text(report: &ArtifactAskReport) {
     println!("LLMWave-Big Ask");
     println!("version: {}", report.version);
@@ -3198,6 +3235,31 @@ fn print_strict_density_claim_gate_md(report: &StrictDensityClaimGateReport) {
         "- general nonlinear memory proven: `{}`",
         report.claim_boundary.general_nonlinear_memory_proven
     );
+}
+
+fn print_multi_profile_density_suite_md(report: &MultiProfileDensitySuiteReport) {
+    println!("# LLMWave-Big Multi-Profile Density Suite");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- profiles: `{}`", report.suite.profile_count);
+    println!(
+        "- passing profiles: `{}`",
+        report.suite.passing_profile_count
+    );
+    println!(
+        "- min density win ratio: `{:.4}`",
+        report.aggregate.min_density_win_ratio
+    );
+    println!(
+        "- min held-out pass rate: `{:.4}`",
+        report.aggregate.min_heldout_pass_rate
+    );
+    println!(
+        "- general nonlinear memory proven: `{}`",
+        report.claim_boundary.general_nonlinear_memory_proven
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
 }
 
 fn print_artifact_ask_md(report: &ArtifactAskReport) {

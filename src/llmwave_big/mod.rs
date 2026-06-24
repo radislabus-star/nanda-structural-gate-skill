@@ -31,6 +31,7 @@ pub mod memory_physics;
 pub mod memory_proof_path;
 pub mod mini_chat_eval;
 pub mod multi_peak_field;
+pub mod multi_profile_density_suite;
 pub mod multi_schema_competition;
 pub mod nonlinear_memory_eval;
 pub mod open_surface_generation;
@@ -216,6 +217,9 @@ enum LlmwaveBigCommand {
     /// Check strict Rust profile density evidence before nonlinear claims.
     #[command(name = "strict-density-claim-gate", alias = "density-claim")]
     StrictDensityClaimGate(LlmwaveBigStrictDensityClaimGateArgs),
+    /// Aggregate independent density profiles before general nonlinear claims.
+    #[command(name = "multi-profile-density-suite", alias = "density-suite")]
+    MultiProfileDensitySuite(LlmwaveBigMultiProfileDensitySuiteArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -585,6 +589,8 @@ struct LlmwaveBigMemoryFinalProofArgs {
     heldout_eval: Option<PathBuf>,
     #[arg(long = "strict-density-evidence")]
     strict_density_evidence: Option<PathBuf>,
+    #[arg(long = "multi-profile-density-evidence")]
+    multi_profile_density_evidence: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "general")]
     profile: memory_final_proof::MemoryProofProfile,
     #[arg(long, value_enum, default_value = "json")]
@@ -717,6 +723,20 @@ struct LlmwaveBigStrictDensityClaimGateArgs {
     compile_evidence: PathBuf,
     #[arg(long)]
     out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigMultiProfileDensitySuiteArgs {
+    #[arg(long = "rust-density")]
+    rust_density: Option<PathBuf>,
+    #[arg(long = "profile-evidence")]
+    profile_evidence: Vec<String>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, default_value_t = 3)]
+    min_profiles: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1134,6 +1154,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     compile_evidence: args.compile_evidence,
                     heldout_eval: args.heldout_eval,
                     strict_density_evidence: args.strict_density_evidence,
+                    multi_profile_density_evidence: args.multi_profile_density_evidence,
                 },
             )?;
             report::print_memory_final_proof_report(&report, &args.format)?;
@@ -1236,6 +1257,18 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 },
             )?;
             report::print_strict_density_claim_gate_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::MultiProfileDensitySuite(args) => {
+            let report = multi_profile_density_suite::build_multi_profile_density_suite_report(
+                multi_profile_density_suite::MultiProfileDensitySuiteConfig {
+                    rust_density: args.rust_density,
+                    profile_evidence: args.profile_evidence,
+                    out: args.out,
+                    min_profiles: args.min_profiles,
+                },
+            )?;
+            report::print_multi_profile_density_suite_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {

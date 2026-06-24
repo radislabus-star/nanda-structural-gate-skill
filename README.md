@@ -312,6 +312,13 @@ nanda-llmwave-big strict-density-claim-gate \
   --out .nanda/llmwave-big-training/strict-density.json \
   --format json
 
+nanda-llmwave-big multi-profile-density-suite \
+  --rust-density .nanda/llmwave-big-training/strict-density.json \
+  --profile-evidence contracts=.nanda/llmwave-big-training/contracts-density.json \
+  --profile-evidence business=.nanda/llmwave-big-training/business-density.json \
+  --out .nanda/llmwave-big-training/multi-profile-density.json \
+  --format json
+
 nanda-llmwave-big memory-final-proof \
   --profile rust \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
@@ -320,6 +327,7 @@ nanda-llmwave-big memory-final-proof \
   --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json \
   --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json \
   --strict-density-evidence .nanda/llmwave-big-training/strict-density.json \
+  --multi-profile-density-evidence .nanda/llmwave-big-training/multi-profile-density.json \
   --format json
 
 nanda-llmwave-big nonlinear-memory-eval \
@@ -410,6 +418,16 @@ When passed into `memory-final-proof --profile rust`, the honest next verdict
 is `FINAL_PROOF_GATE_RUST_DENSITY_PROFILE_READY_NOT_GENERAL_LLM`; broad
 nonlinear-memory and LLM claims remain false until multi-profile broad evals
 exist.
+
+`multi-profile-density-suite` is the general nonlinear-memory guard. It accepts
+one Rust density artifact plus additional independent profile artifacts such as
+contracts, business-flow, natural-text, or noisy/adversarial profiles. A single
+Rust artifact must remain blocked as
+`MULTI_PROFILE_DENSITY_BLOCKED_BY_SINGLE_PROFILE`. Only multiple independent
+passing profiles can produce
+`MULTI_PROFILE_NONLINEAR_MEMORY_PROVEN_NOT_LLM`. Passing that into
+`memory-final-proof --profile rust` may set `nonlinear_memory_proven=true`, but
+`llm_ready` remains false until broad LLM/chat evals exist.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
