@@ -36,6 +36,7 @@ pub(crate) struct MemoryFinalProofConfig {
     pub focus_packet: Option<PathBuf>,
     pub compile_evidence: Option<PathBuf>,
     pub heldout_eval: Option<PathBuf>,
+    pub strict_density_evidence: Option<PathBuf>,
 }
 
 #[derive(Serialize, Clone)]
@@ -87,10 +88,12 @@ pub(crate) struct BigCorpusGateReport {
     pub focus_packet_path: Option<String>,
     pub compile_evidence_path: Option<String>,
     pub heldout_eval_path: Option<String>,
+    pub strict_density_evidence_path: Option<String>,
     pub heldout_suite_ready: bool,
     pub route_balanced_focus_ready: bool,
     pub compile_test_evidence_bridge_ready: bool,
     pub heldout_inference_eval_ready: bool,
+    pub strict_density_profile_ready: bool,
     pub real_big_corpus_loaded: bool,
     pub route_balanced_focus_required: bool,
     pub verdict: &'static str,
@@ -119,6 +122,8 @@ pub(crate) struct FinalProofGateReport {
     pub heldout_inference_eval_ready: bool,
     pub profile_eval_ready: bool,
     pub strict_nonlinear_density_claim_gate_ready: bool,
+    pub rust_density_profile_ready: bool,
+    pub general_nonlinear_memory_claim_ready: bool,
     pub final_proof_gate_passed: bool,
     pub nonlinear_memory_proven: bool,
     pub llm_ready: bool,
@@ -142,11 +147,13 @@ struct ProfileEvidence {
     focus_packet_path: Option<String>,
     compile_evidence_path: Option<String>,
     heldout_eval_path: Option<String>,
+    strict_density_evidence_path: Option<String>,
     observed_facts: usize,
     heldout_suite_ready: bool,
     route_balanced_focus_ready: bool,
     compile_test_evidence_bridge_ready: bool,
     heldout_inference_eval_ready: bool,
+    strict_density_profile_ready: bool,
 }
 
 #[derive(Deserialize)]
@@ -205,6 +212,17 @@ struct RustHeldoutEvalMetricsSummary {
     heldout_inference_eval_ready: bool,
 }
 
+#[derive(Deserialize)]
+struct StrictDensityEvidencePayload {
+    gates: StrictDensityGatesSummary,
+}
+
+#[derive(Deserialize)]
+struct StrictDensityGatesSummary {
+    rust_density_profile_proven: bool,
+    general_nonlinear_memory_proven: bool,
+}
+
 pub(crate) fn build_memory_final_proof_report(
     config: MemoryFinalProofConfig,
 ) -> Result<MemoryFinalProofReport> {
@@ -233,7 +251,11 @@ pub(crate) fn build_memory_final_proof_report(
         && big_corpus_ready
         && compile_test_evidence_bridge_ready
         && heldout_inference_eval_ready;
-    let strict_nonlinear_density_claim_gate_ready = profile != MemoryProofProfile::Rust;
+    let rust_density_profile_ready =
+        profile == MemoryProofProfile::Rust && profile_evidence.strict_density_profile_ready;
+    let general_nonlinear_memory_claim_ready = profile != MemoryProofProfile::Rust;
+    let strict_nonlinear_density_claim_gate_ready =
+        profile != MemoryProofProfile::Rust || rust_density_profile_ready;
     let final_proof_gate_passed = controlled_chain_ready
         && field_recall_ready
         && llmwave_bridge_ready
@@ -242,7 +264,8 @@ pub(crate) fn build_memory_final_proof_report(
         && false_positive_rate_bounded
         && compile_test_evidence_bridge_ready
         && heldout_inference_eval_ready
-        && strict_nonlinear_density_claim_gate_ready;
+        && strict_nonlinear_density_claim_gate_ready
+        && general_nonlinear_memory_claim_ready;
     let missing_evidence = missing_final_evidence(
         field_recall_ready,
         llmwave_bridge_ready,
@@ -254,6 +277,8 @@ pub(crate) fn build_memory_final_proof_report(
     );
     let verdict = if final_proof_gate_passed {
         "FINAL_PROOF_GATE_PASS"
+    } else if profile == MemoryProofProfile::Rust && rust_density_profile_ready {
+        "FINAL_PROOF_GATE_RUST_DENSITY_PROFILE_READY_NOT_GENERAL_LLM"
     } else if profile == MemoryProofProfile::Rust && profile_eval_ready {
         "FINAL_PROOF_GATE_PROFILE_EVAL_READY_NOT_NONLINEAR_PROOF"
     } else if controlled_chain_ready && big_corpus_ready && !compile_test_evidence_bridge_ready {
@@ -292,6 +317,8 @@ pub(crate) fn build_memory_final_proof_report(
             heldout_inference_eval_ready,
             profile_eval_ready,
             strict_nonlinear_density_claim_gate_ready,
+            rust_density_profile_ready,
+            general_nonlinear_memory_claim_ready,
             final_proof_gate_passed,
             nonlinear_memory_proven: final_proof_gate_passed,
             llm_ready: final_proof_gate_passed,
@@ -304,6 +331,8 @@ pub(crate) fn build_memory_final_proof_report(
             llm_ready: final_proof_gate_passed,
             safe_claim: if final_proof_gate_passed {
                 "The configured final proof gate passed."
+            } else if profile == MemoryProofProfile::Rust && rust_density_profile_ready {
+                "Rust profile density evidence is ready, but general nonlinear-memory and LLM claims remain blocked until multiple profiles and broad corpus evals pass."
             } else if profile == MemoryProofProfile::Rust && profile_eval_ready {
                 "Rust corpus, focus, compile evidence, and held-out inference eval are ready as profile evidence, but nonlinear-memory and LLM claims remain blocked by the strict density claim gate."
             } else if profile == MemoryProofProfile::Rust {
@@ -407,6 +436,7 @@ fn build_big_corpus_gate(
                 "no_rust_route_balanced_focus_packet",
                 "no_compile_test_evidence_bridge",
                 "no_rust_heldout_inference_eval",
+                "no_strict_density_profile_evidence",
             ],
         ),
     };
@@ -424,6 +454,9 @@ fn build_big_corpus_gate(
     }
     if profile_evidence.heldout_inference_eval_ready {
         blocked_by.retain(|reason| *reason != "no_rust_heldout_inference_eval");
+    }
+    if profile_evidence.strict_density_profile_ready {
+        blocked_by.retain(|reason| *reason != "no_strict_density_profile_evidence");
     }
     let profile_loaded = profile_evidence.observed_facts > 0
         && profile_evidence.heldout_suite_ready
@@ -443,10 +476,12 @@ fn build_big_corpus_gate(
         focus_packet_path: profile_evidence.focus_packet_path.clone(),
         compile_evidence_path: profile_evidence.compile_evidence_path.clone(),
         heldout_eval_path: profile_evidence.heldout_eval_path.clone(),
+        strict_density_evidence_path: profile_evidence.strict_density_evidence_path.clone(),
         heldout_suite_ready: profile_evidence.heldout_suite_ready,
         route_balanced_focus_ready: profile_evidence.route_balanced_focus_ready,
         compile_test_evidence_bridge_ready: profile_evidence.compile_test_evidence_bridge_ready,
         heldout_inference_eval_ready: profile_evidence.heldout_inference_eval_ready,
+        strict_density_profile_ready: profile_evidence.strict_density_profile_ready,
         real_big_corpus_loaded: profile_loaded,
         route_balanced_focus_required: true,
         verdict,
@@ -502,6 +537,15 @@ fn load_profile_evidence(config: &MemoryFinalProofConfig) -> Result<ProfileEvide
             .with_context(|| format!("parse Rust held-out eval {}", path.display()))?;
         evidence.heldout_eval_path = Some(path.display().to_string());
         evidence.heldout_inference_eval_ready = payload.metrics.heldout_inference_eval_ready;
+    }
+    if let Some(path) = &config.strict_density_evidence {
+        let raw = fs::read_to_string(path)
+            .with_context(|| format!("read strict density evidence {}", path.display()))?;
+        let payload: StrictDensityEvidencePayload = serde_json::from_str(&raw)
+            .with_context(|| format!("parse strict density evidence {}", path.display()))?;
+        evidence.strict_density_evidence_path = Some(path.display().to_string());
+        evidence.strict_density_profile_ready = payload.gates.rust_density_profile_proven
+            && !payload.gates.general_nonlinear_memory_proven;
     }
     Ok(evidence)
 }
@@ -584,6 +628,13 @@ fn missing_final_evidence(
     {
         missing.push("strict_nonlinear_density_claim_gate_missing");
     }
+    if big_corpus_ready
+        && compile_test_evidence_bridge_ready
+        && heldout_inference_eval_ready
+        && strict_nonlinear_density_claim_gate_ready
+    {
+        missing.push("general_nonlinear_memory_multi_profile_eval_missing");
+    }
     missing
 }
 
@@ -600,6 +651,7 @@ mod tests {
             focus_packet: None,
             compile_evidence: None,
             heldout_eval: None,
+            strict_density_evidence: None,
         })
         .expect("final proof builds");
 
@@ -623,6 +675,7 @@ mod tests {
             focus_packet: None,
             compile_evidence: None,
             heldout_eval: None,
+            strict_density_evidence: None,
         })
         .expect("final proof builds");
 
@@ -645,6 +698,7 @@ mod tests {
             focus_packet: None,
             compile_evidence: None,
             heldout_eval: None,
+            strict_density_evidence: None,
         })
         .expect("final proof builds");
 

@@ -471,6 +471,15 @@ big_memory_final_proof_rust_eval_json="$("$llmwave_big" memory-final-proof --pro
 jq -e '.verdict == "FINAL_PROOF_GATE_PROFILE_EVAL_READY_NOT_NONLINEAR_PROOF" and .final_proof_gate.profile_eval_ready == true' <<<"$big_memory_final_proof_rust_eval_json" >/dev/null
 jq -e '.final_proof_gate.heldout_inference_eval_ready == true and .final_proof_gate.strict_nonlinear_density_claim_gate_ready == false and .claim_boundary.blocked_by == ["strict_nonlinear_density_claim_gate_missing"]' <<<"$big_memory_final_proof_rust_eval_json" >/dev/null
 jq -e '.claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_memory_final_proof_rust_eval_json" >/dev/null
+big_strict_density_json="$("$llmwave_big" strict-density-claim-gate --artifact "$tmp_rust_corpus/rust-corpus.json" --focus-packet "$tmp_rust_corpus/rust-focus.json" --heldout-eval "$tmp_rust_corpus/rust-heldout-eval.json" --compile-evidence "$tmp_rust_corpus/rust-compile-evidence.json" --out "$tmp_rust_corpus/strict-density.json" --format json)"
+jq -e '.mode == "llmwave-big-strict-density-claim-gate" and .profile == "rust" and .verdict == "STRICT_DENSITY_PROFILE_PROVEN"' <<<"$big_strict_density_json" >/dev/null
+jq -e '.gates.rust_density_profile_proven == true and .gates.general_nonlinear_memory_proven == false and .density.density_win_ratio > 1 and .quality.heldout_pass_rate >= 0.9' <<<"$big_strict_density_json" >/dev/null
+jq -e '.claim_boundary.rust_density_profile_proven == true and .claim_boundary.general_nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_strict_density_json" >/dev/null
+test -s "$tmp_rust_corpus/strict-density.json"
+big_memory_final_proof_rust_density_json="$("$llmwave_big" memory-final-proof --profile rust --artifact "$tmp_rust_corpus/rust-corpus.json" --heldout-suite "$tmp_rust_corpus/rust-heldout.json" --focus-packet "$tmp_rust_corpus/rust-focus.json" --compile-evidence "$tmp_rust_corpus/rust-compile-evidence.json" --heldout-eval "$tmp_rust_corpus/rust-heldout-eval.json" --strict-density-evidence "$tmp_rust_corpus/strict-density.json" --format json)"
+jq -e '.verdict == "FINAL_PROOF_GATE_RUST_DENSITY_PROFILE_READY_NOT_GENERAL_LLM" and .final_proof_gate.rust_density_profile_ready == true' <<<"$big_memory_final_proof_rust_density_json" >/dev/null
+jq -e '.final_proof_gate.final_proof_gate_passed == false and .final_proof_gate.general_nonlinear_memory_claim_ready == false and .claim_boundary.blocked_by == ["general_nonlinear_memory_multi_profile_eval_missing"]' <<<"$big_memory_final_proof_rust_density_json" >/dev/null
+jq -e '.claim_boundary.nonlinear_memory_proven == false and .claim_boundary.llm_ready == false' <<<"$big_memory_final_proof_rust_density_json" >/dev/null
 rm -rf "$tmp_rust_corpus"
 big_consolidate_json="$("$llmwave_big" consolidate --format json)"
 jq -e '.roadmap_block == "v206-v218" and .verdict == "CONSOLIDATION_SAFE"' <<<"$big_consolidate_json" >/dev/null

@@ -46,6 +46,7 @@ pub mod rust_heldout;
 pub mod rust_heldout_eval;
 pub mod schema_memory_growth;
 pub mod schemas;
+pub mod strict_density_claim_gate;
 pub mod surface_bank_build;
 pub mod surface_bank_fixture;
 pub mod surface_bank_validate;
@@ -212,6 +213,9 @@ enum LlmwaveBigCommand {
     /// Evaluate held-out Rust route-fact inference over a focus packet.
     #[command(name = "rust-heldout-eval", alias = "rust-inference-eval")]
     RustHeldoutEval(LlmwaveBigRustHeldoutEvalArgs),
+    /// Check strict Rust profile density evidence before nonlinear claims.
+    #[command(name = "strict-density-claim-gate", alias = "density-claim")]
+    StrictDensityClaimGate(LlmwaveBigStrictDensityClaimGateArgs),
     /// Ask a compiled LLMWave-Big training artifact.
     Ask(LlmwaveBigAskArgs),
     /// Evaluate ask behavior over a compiled training artifact.
@@ -579,6 +583,8 @@ struct LlmwaveBigMemoryFinalProofArgs {
     compile_evidence: Option<PathBuf>,
     #[arg(long = "heldout-eval")]
     heldout_eval: Option<PathBuf>,
+    #[arg(long = "strict-density-evidence")]
+    strict_density_evidence: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "general")]
     profile: memory_final_proof::MemoryProofProfile,
     #[arg(long, value_enum, default_value = "json")]
@@ -695,6 +701,22 @@ struct LlmwaveBigRustHeldoutEvalArgs {
     out: Option<PathBuf>,
     #[arg(long, default_value_t = 0.80)]
     pass_threshold: f64,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigStrictDensityClaimGateArgs {
+    #[arg(long)]
+    artifact: PathBuf,
+    #[arg(long = "focus-packet")]
+    focus_packet: PathBuf,
+    #[arg(long = "heldout-eval")]
+    heldout_eval: PathBuf,
+    #[arg(long = "compile-evidence")]
+    compile_evidence: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1111,6 +1133,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     focus_packet: args.focus_packet,
                     compile_evidence: args.compile_evidence,
                     heldout_eval: args.heldout_eval,
+                    strict_density_evidence: args.strict_density_evidence,
                 },
             )?;
             report::print_memory_final_proof_report(&report, &args.format)?;
@@ -1200,6 +1223,19 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 },
             )?;
             report::print_rust_heldout_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::StrictDensityClaimGate(args) => {
+            let report = strict_density_claim_gate::build_strict_density_claim_gate_report(
+                strict_density_claim_gate::StrictDensityClaimGateConfig {
+                    artifact: args.artifact,
+                    focus_packet: args.focus_packet,
+                    heldout_eval: args.heldout_eval,
+                    compile_evidence: args.compile_evidence,
+                    out: args.out,
+                },
+            )?;
+            report::print_strict_density_claim_gate_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Ask(args) => {

@@ -304,6 +304,14 @@ nanda-llmwave-big rust-heldout-eval \
   --out .nanda/llmwave-big-training/rust-heldout-eval.json \
   --format json
 
+nanda-llmwave-big strict-density-claim-gate \
+  --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
+  --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
+  --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json \
+  --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json \
+  --out .nanda/llmwave-big-training/strict-density.json \
+  --format json
+
 nanda-llmwave-big memory-final-proof \
   --profile rust \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
@@ -311,6 +319,7 @@ nanda-llmwave-big memory-final-proof \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
   --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json \
   --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json \
+  --strict-density-evidence .nanda/llmwave-big-training/strict-density.json \
   --format json
 
 nanda-llmwave-big nonlinear-memory-eval \
@@ -390,6 +399,17 @@ readiness". With compile evidence and held-out eval both passed into
 `memory-final-proof --profile rust`, the honest next verdict is
 `FINAL_PROOF_GATE_PROFILE_EVAL_READY_NOT_NONLINEAR_PROOF`: profile evidence is
 ready, but broad nonlinear-memory and LLM claims remain false.
+
+`strict-density-claim-gate` is the next Rust profile claim gate. It consumes
+the corpus artifact, focus packet, held-out eval, and compile evidence, then
+compares packed profile memory against a linear fact baseline. It requires
+schema reuse, residual saving, packed bytes beating linear bytes, route
+balance, held-out pass rate, false-shortcut rejection, and bounded collision
+pressure. A pass gives `STRICT_DENSITY_PROFILE_PROVEN`, not a global claim.
+When passed into `memory-final-proof --profile rust`, the honest next verdict
+is `FINAL_PROOF_GATE_RUST_DENSITY_PROFILE_READY_NOT_GENERAL_LLM`; broad
+nonlinear-memory and LLM claims remain false until multi-profile broad evals
+exist.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
