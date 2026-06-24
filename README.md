@@ -324,8 +324,15 @@ nanda-llmwave-big profile-density-build \
   --out .nanda/llmwave-big-training/contracts-density.json \
   --format json
 
+nanda-llmwave-big profile-density-build \
+  --profile adversarial \
+  --corpus examples/llmwave-big-adversarial-density-corpus.json \
+  --out .nanda/llmwave-big-training/adversarial-density.json \
+  --format json
+
 nanda-llmwave-big multi-profile-density-suite \
   --rust-density .nanda/llmwave-big-training/strict-density.json \
+  --profile-evidence adversarial=.nanda/llmwave-big-training/adversarial-density.json \
   --profile-evidence contracts=.nanda/llmwave-big-training/contracts-density.json \
   --profile-evidence business=.nanda/llmwave-big-training/business-density.json \
   --out .nanda/llmwave-big-training/multi-profile-density.json \
@@ -451,13 +458,16 @@ contracts, business-flow, natural-text, or noisy/adversarial profiles. A single
 Rust artifact must remain blocked as
 `MULTI_PROFILE_DENSITY_BLOCKED_BY_SINGLE_PROFILE`. Only multiple independent
 passing profiles can produce
-`MULTI_PROFILE_NONLINEAR_MEMORY_PROVEN_NOT_LLM`. Passing that into
-`memory-final-proof --profile rust` may set `nonlinear_memory_proven=true`, but
+`MULTI_PROFILE_NONLINEAR_MEMORY_PROVEN_NOT_LLM`. Passing that suite into
+`memory-final-proof --profile rust` is not enough by itself; final proof also
+requires a `density-proof-doctor` artifact with medium-or-better evidence.
 `llm_ready` remains false until broad LLM/chat evals exist.
 Independence is checked by source signature: generic profile artifacts expose
 `source.corpus_hash`, while legacy/strict artifacts fall back to a raw artifact
 hash. Duplicate source hashes or identical artifacts block the suite with
 `duplicate_or_missing_independent_profile_sources`.
+Use `examples/llmwave-big-adversarial-density-corpus.json` as the built-in
+route-collision, namespace, near-root, and shortcut-trap stress profile.
 Run `density-proof-doctor` over the suite before treating the evidence as
 strong. It reports `DENSITY_PROOF_BLOCKED`, `DENSITY_PROOF_WEAK`,
 `DENSITY_PROOF_MEDIUM`, or `DENSITY_PROOF_STRONG`; small fixture corpora should
