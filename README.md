@@ -240,6 +240,7 @@ nanda-field-audit --format json
 nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
+nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -735,6 +736,7 @@ nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src exampl
 nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
+nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1085,6 +1087,11 @@ and duplicate/noise rejection controls. It opens
 `raw_dictionary_is_not_primary_memory=true`, but keeps
 `nonlinear_memory_proven=false` and `llm_ready=false` until scale and held-out
 proof gates pass.
+`nanda-llmwave-big core-v1-nonlinear-proof` records Phase 4. It joins the
+memory-writer evidence with the fixed-basis density ladder and baseline gates.
+The current verdict is `CORE_V1_NONLINEAR_MEMORY_CANDIDATE_BLOCKED`: candidate
+evidence exists, but final proof remains blocked by missing writer-bound
+held-out quality, external corpus, leakage, and broad-noise evidence.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

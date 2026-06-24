@@ -13,6 +13,7 @@ pub mod consolidation;
 pub mod core_v1_contract;
 pub mod core_v1_field_cutover;
 pub mod core_v1_memory_writer;
+pub mod core_v1_nonlinear_proof;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
 pub mod density_ablation;
@@ -90,6 +91,9 @@ enum LlmwaveBigCommand {
     /// Print the Phase 3 LLMWave Core V1 memory writer report.
     #[command(name = "core-v1-memory-writer", alias = "core-memory-writer")]
     CoreV1MemoryWriter(LlmwaveBigCoreV1MemoryWriterArgs),
+    /// Print the Phase 4 LLMWave Core V1 nonlinear memory proof gate.
+    #[command(name = "core-v1-nonlinear-proof", alias = "core-nonlinear-proof")]
+    CoreV1NonlinearProof(LlmwaveBigCoreV1NonlinearProofArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -320,6 +324,12 @@ struct LlmwaveBigCoreV1FieldCutoverArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1MemoryWriterArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1NonlinearProofArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1145,6 +1155,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             report::print_core_v1_memory_writer_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::CoreV1NonlinearProof(args) => {
+            let report = core_v1_nonlinear_proof::build_core_v1_nonlinear_proof_report();
+            report::print_core_v1_nonlinear_proof_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::Contract(args) => {
             let report = build_contract_report();
             report::print_contract_report(&report, &args.format)?;
@@ -1875,6 +1890,31 @@ mod tests {
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert!(!report.claim_boundary.llm_ready);
         assert_eq!(report.next_phase, "phase-4-nonlinear-memory-proof-v1");
+    }
+
+    #[test]
+    fn core_v1_nonlinear_proof_blocks_final_claim_without_heldout_binding() {
+        let report = core_v1_nonlinear_proof::build_core_v1_nonlinear_proof_report();
+        assert_eq!(report.mode, "llmwave-core-v1-nonlinear-proof");
+        assert_eq!(report.verdict, "CORE_V1_NONLINEAR_MEMORY_CANDIDATE_BLOCKED");
+        assert!(
+            report
+                .proof_metrics
+                .bytes_per_useful_fact_falls_at_three_scale_points
+        );
+        assert!(report.proof_metrics.writer_beats_raw_dictionary_fixture);
+        assert!(report.proof_metrics.role_error_rate_bounded);
+        assert!(report.proof_metrics.false_positive_rate_bounded);
+        assert!(!report.proof_metrics.heldout_quality_bound_to_writer);
+        assert!(!report.eval_evidence.external_corpus_present);
+        assert!(report.claim_boundary.nonlinear_memory_candidate);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(report
+            .claim_boundary
+            .blocked_by
+            .contains(&"heldout_quality_not_bound_to_memory_writer"));
+        assert_eq!(report.next_phase, "phase-5-query-wave-v1");
     }
 
     #[test]

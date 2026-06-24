@@ -180,6 +180,7 @@ scripts/nanda-llmwave-memory density --counts 16,64,256,1024,4096 --facts 3
 scripts/nanda-llmwave-big core-v1-contract --format json
 scripts/nanda-llmwave-big core-v1-field-cutover --format json
 scripts/nanda-llmwave-big core-v1-memory-writer --format json
+scripts/nanda-llmwave-big core-v1-nonlinear-proof --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -592,6 +593,12 @@ not a flat raw UTF-8 dictionary. Treat
 `raw_dictionary_is_not_primary_memory=true` as a writer contract only. It still
 keeps `nonlinear_memory_proven=false` and `llm_ready=false` until scale ladder,
 held-out quality, query wave, and verifier evidence exist.
+`nanda-llmwave-big core-v1-nonlinear-proof` records Phase 4. It may produce
+`nonlinear_memory_candidate=true`, but it must keep
+`nonlinear_memory_proven=false` if held-out quality is not bound to the writer,
+external corpus evidence is absent, leakage control is absent, or broad-noise
+evidence is absent. Treat `CORE_V1_NONLINEAR_MEMORY_CANDIDATE_BLOCKED` as
+useful progress, not proof.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest

@@ -333,6 +333,7 @@ still needs legal/accounting review.
 nanda-llmwave-big core-v1-contract --format json
 nanda-llmwave-big core-v1-field-cutover --format json
 nanda-llmwave-big core-v1-memory-writer --format json
+nanda-llmwave-big core-v1-nonlinear-proof --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -376,6 +377,10 @@ of shared field operations while keeping `field_core_as_sole_llmwave_core_engine
 `core-v1-memory-writer` is the Phase 3 report from
 `LLMWAVE_CORE_V1_PHASE3_REPORT.md`. It records the schema residual plus surface
 family memory writer and keeps nonlinear memory proof closed until Phase 4.
+`core-v1-nonlinear-proof` is the Phase 4 report from
+`LLMWAVE_CORE_V1_PHASE4_REPORT.md`. It may mark a nonlinear-memory candidate,
+but it must keep `nonlinear_memory_proven=false` until held-out, external,
+leakage, and broad-noise gates are bound to the writer path.
 
 ## Word And Surface Memory
 

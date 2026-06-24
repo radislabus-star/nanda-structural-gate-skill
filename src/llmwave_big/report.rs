@@ -14,6 +14,7 @@ use super::consolidation::ConsolidationReport;
 use super::core_v1_contract::CoreV1ContractReport;
 use super::core_v1_field_cutover::CoreV1FieldCutoverReport;
 use super::core_v1_memory_writer::CoreV1MemoryWriterReport;
+use super::core_v1_nonlinear_proof::CoreV1NonlinearProofReport;
 use super::coupled_decode_loop::CoupledDecodeLoopReport;
 use super::demo_domain::DemoDomainReport;
 use super::density_ablation::DensityAblationReport;
@@ -127,6 +128,21 @@ pub(crate) fn print_core_v1_memory_writer_report(
         ),
         OutputFormat::Text => print_core_v1_memory_writer_text(report),
         OutputFormat::Md => print_core_v1_memory_writer_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_nonlinear_proof_report(
+    report: &CoreV1NonlinearProofReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_nonlinear_proof_text(report),
+        OutputFormat::Md => print_core_v1_nonlinear_proof_md(report),
     }
     Ok(())
 }
@@ -1823,6 +1839,25 @@ fn print_core_v1_memory_writer_text(report: &CoreV1MemoryWriterReport) {
     }
 }
 
+fn print_core_v1_nonlinear_proof_text(report: &CoreV1NonlinearProofReport) {
+    println!("LLMWave Core V1 Nonlinear Proof");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!(
+        "nonlinear_memory_candidate: {}",
+        report.claim_boundary.nonlinear_memory_candidate
+    );
+    println!(
+        "nonlinear_memory_proven: {}",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+    println!("blocked_by:");
+    for blocker in &report.claim_boundary.blocked_by {
+        println!("  - {blocker}");
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -2850,6 +2885,34 @@ fn print_core_v1_memory_writer_md(report: &CoreV1MemoryWriterReport) {
         "- surface family bytes: `{}`",
         report.byte_report.surface_family_bytes
     );
+    println!();
+    println!("## Still Blocked");
+    println!();
+    for blocker in &report.claim_boundary.blocked_by {
+        println!("- `{blocker}`");
+    }
+}
+
+fn print_core_v1_nonlinear_proof_md(report: &CoreV1NonlinearProofReport) {
+    println!("# LLMWave Core V1 Nonlinear Proof");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!(
+        "- nonlinear_memory_candidate: `{}`",
+        report.claim_boundary.nonlinear_memory_candidate
+    );
+    println!(
+        "- nonlinear_memory_proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+    println!();
+    println!("## Gates");
+    println!();
+    for gate in &report.proof_gates {
+        println!("- `{}`: `{}`", gate.gate, gate.passed);
+    }
     println!();
     println!("## Still Blocked");
     println!();
