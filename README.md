@@ -610,8 +610,8 @@ nanda-llmwave-big llmwave-readiness \
 ```
 
 This path can report `BROAD_DATASET_MEDIUM`,
-`BROAD_EVAL_GENERATION_READY_NOT_CHAT`, exact withheld-fact removal, and target
-baseline wins. With `broad-chat-loop-eval` and memory proof evidence,
+`BROAD_EVAL_GENERATION_READY_NOT_CHAT`, exact withheld-fact removal, near-duplicate
+leakage checks, and target baseline wins. With `broad-chat-loop-eval` and memory proof evidence,
 `llmwave-readiness` can report `LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM` while
 still keeping `llm_ready=false`. That boundary means constrained LLMWave
 cognition candidate over an external-medium corpus, not a general LLM.
@@ -621,10 +621,13 @@ Its companion manifest explicitly excludes user/private business data and local
 correspondence. The smaller 96-fact file remains a fast smoke seed only.
 The 1M public-safe corpus is generated under ignored `.nanda/`, not committed:
 1,000,000 facts, 10 domains, 50 routes, about 224 MiB as text and 382 MiB as
-the current JSON artifact. The local 1M path uses route-balanced held-out
-selection; a 1024-case held-out suite covered all 50 routes, produced a 15,000
-fact focus packet, and reached `LLMWAVE_READY_CANDIDATE_EXTERNAL_STRONG` while
-still keeping `llm_ready=false`.
+the current JSON artifact. The local 1M path uses domain-route balanced held-out
+and focus selection; the eval reports semantic diversity, domain coverage, route
+coverage, family coverage, and near-duplicate leakage before readiness is allowed
+to move. Current local measurement: 1024 held-out cases cover 10 domains, 50
+routes, and 8 eval families; the 15,000 fact focus packet covers 10 domains and
+50 routes with near-duplicate leakage 0. The current claim boundary remains
+`llm_ready=false`.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

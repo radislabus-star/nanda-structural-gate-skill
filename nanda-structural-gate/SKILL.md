@@ -246,6 +246,10 @@ scripts/nanda-llmwave-big broad-eval-run --corpus .nanda/llmwave-big-training/br
 scripts/nanda-llmwave-big broad-baseline-duel --eval-report .nanda/llmwave-big-training/broad-eval.json --out .nanda/llmwave-big-training/broad-baseline-duel.json --format json
 scripts/nanda-llmwave-big broad-chat-loop-eval --out .nanda/llmwave-big-training/broad-chat-loop.json --format json
 scripts/nanda-llmwave-big llmwave-readiness --memory-final-proof .nanda/llmwave-big-training/memory-final-proof.json --broad-dataset-doctor .nanda/llmwave-big-training/broad-dataset-doctor.json --broad-eval .nanda/llmwave-big-training/broad-eval.json --baseline-duel .nanda/llmwave-big-training/broad-baseline-duel.json --chat-loop .nanda/llmwave-big-training/broad-chat-loop.json --out .nanda/llmwave-big-training/llmwave-readiness.json --format json
+# Broad readiness is not a raw size gate: require semantic diversity,
+# domain/route/family held-out coverage, exact held-out removal, and low
+# near-duplicate leakage. The generated 1M corpus is public-safe and ignored
+# under .nanda; it is a stress artifact, not a general LLM proof.
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --format json

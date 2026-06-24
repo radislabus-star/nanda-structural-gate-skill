@@ -260,12 +260,12 @@ binary density evidence as present in final proof. It still does not make
 `broad-corpus-build`, `broad-dataset-doctor`, `broad-heldout-build`,
 `broad-focus-build`, `broad-eval-run`, `broad-baseline-duel`,
 `broad-chat-loop-eval`, and `llmwave-readiness` are the broad cognition path.
-They test corpus quality, exact held-out removal, route-balanced focus, recall,
-role binding, route reasoning, multi-hop context, answer generation,
-adversarial shortcut rejection, feedback, baseline duels, and constrained
-multi-turn correction/refusal. `broad-eval-suite-build` remains useful as a
-controlled smoke fixture; the external path should use held-out/focus
-artifacts. A full external-medium pass can open
+They test corpus quality, semantic diversity, exact held-out removal,
+domain-route-balanced focus, near-duplicate leakage, recall, role binding, route
+reasoning, multi-hop context, answer generation, adversarial shortcut rejection,
+feedback, baseline duels, and constrained multi-turn correction/refusal.
+`broad-eval-suite-build` remains useful as a controlled smoke fixture; the
+external path should use held-out/focus artifacts. A full external-medium pass can open
 `LLMWAVE_READY_CANDIDATE_EXTERNAL_MEDIUM`, but it still keeps
 `llm_ready=false`; this is a candidate boundary, not a general LLM proof.
 `examples/llmwave-big-broad-public-corpus-100k.txt` is the normal public-safe
@@ -277,9 +277,13 @@ For the local 1M stress corpus, generate under ignored `.nanda/` with
 machine this produced a 224 MiB text source and a 382 MiB JSON artifact;
 `broad-corpus-build` took about 3.8 seconds with about 2.1 GiB peak RSS, and
 `broad-dataset-doctor` took about 1.7 seconds with about 0.9 GiB peak RSS.
-The 1M held-out builder is route-balanced: a 1024-case held-out suite covered
-all 50 routes instead of taking the first ordered route. The full local 1M path
-reached `LLMWAVE_READY_CANDIDATE_EXTERNAL_STRONG` with `llm_ready=false`.
+The 1M held-out and focus builders are domain-route-balanced: reports must show
+domain coverage, route coverage, family coverage, and near-duplicate leakage
+before readiness is trusted. Current local 1M measurement: 1024 held-out cases
+cover 10 domains, 50 routes, and 8 eval families; the 15,000 fact focus packet
+has domain balance 1.0, route balance 1.0, and near-duplicate leakage 0. The
+full local 1M path can reach `LLMWAVE_READY_CANDIDATE_EXTERNAL_STRONG`, but only
+with `llm_ready=false`.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

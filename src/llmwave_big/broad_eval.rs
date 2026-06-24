@@ -195,9 +195,13 @@ pub(crate) struct BroadDatasetQuality {
     pub fact_count: usize,
     pub route_count: usize,
     pub domain_count: usize,
+    #[serde(default)]
+    pub relation_count: usize,
     pub route_balance: f64,
     pub hub_dominance: f64,
     pub duplicate_pressure: f64,
+    #[serde(default)]
+    pub semantic_diversity_score: f64,
     pub adversarial_route_present: bool,
     pub dialogue_route_present: bool,
     pub external_corpus_loaded: bool,
@@ -208,6 +212,8 @@ pub(crate) struct BroadDatasetGates {
     pub route_balanced: bool,
     pub hub_dominance_ok: bool,
     pub duplicate_pressure_ok: bool,
+    #[serde(default)]
+    pub semantic_diversity_ok: bool,
     pub adversarial_coverage: bool,
     pub dialogue_coverage: bool,
     pub medium_or_better: bool,
@@ -238,6 +244,14 @@ pub(crate) struct BroadHeldoutMetrics {
     pub generated_case_count: usize,
     pub withheld_fact_count: usize,
     pub covered_routes: usize,
+    #[serde(default)]
+    pub covered_domains: usize,
+    #[serde(default)]
+    pub route_balance: f64,
+    #[serde(default)]
+    pub family_count: usize,
+    #[serde(default)]
+    pub family_distribution: BTreeMap<String, usize>,
     pub negative_shortcut_count: usize,
 }
 
@@ -274,9 +288,21 @@ pub(crate) struct BroadFocusPacket {
 pub(crate) struct BroadFocusMetrics {
     pub route_balance_before: f64,
     pub route_balance_after: f64,
+    #[serde(default)]
+    pub domain_balance_before: f64,
+    #[serde(default)]
+    pub domain_balance_after: f64,
+    #[serde(default)]
+    pub covered_domains_after: usize,
+    #[serde(default)]
+    pub covered_routes_after: usize,
     pub hub_dominance_before: f64,
     pub hub_dominance_after: f64,
     pub exact_withheld_facts_removed: usize,
+    #[serde(default)]
+    pub near_duplicate_leakage_count: usize,
+    #[serde(default)]
+    pub near_duplicate_leakage_rate: f64,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -607,9 +633,20 @@ pub(crate) fn build_broad_dataset_doctor_report(
 ) -> Result<BroadDatasetDoctorReport> {
     let corpus = load_json::<BroadCorpusArtifact>(&config.corpus)?;
     let route_distribution = route_distribution(&corpus.facts);
-    let route_balance = route_balance(&route_distribution);
+    let domain_distribution = domain_distribution(&corpus.facts);
+    let route_balance_score = route_balance(&route_distribution);
+    let domain_balance_score = route_balance(&domain_distribution);
     let hub_dominance = hub_dominance(&route_distribution, corpus.fact_count);
     let duplicate_pressure = duplicate_pressure(&corpus.facts);
+    let relation_count = relation_count(&corpus.facts);
+    let semantic_diversity_score = semantic_diversity_score(
+        corpus.fact_count,
+        corpus.domain_count,
+        corpus.route_count,
+        relation_count,
+        route_balance_score,
+        domain_balance_score,
+    );
     let adversarial_route_present = corpus
         .facts
         .iter()
@@ -618,20 +655,22 @@ pub(crate) fn build_broad_dataset_doctor_report(
         .facts
         .iter()
         .any(|fact| fact.domain == "dialogue" || fact.route.contains("dialogue"));
-    let route_balanced = route_balance >= 0.55;
+    let route_balanced = route_balance_score >= 0.55;
     let hub_dominance_ok = hub_dominance <= 0.35;
     let duplicate_pressure_ok = duplicate_pressure <= 0.20;
+    let semantic_diversity_ok = semantic_diversity_score >= 0.70;
     let medium_or_better = corpus.fact_count >= config.medium_min_facts
         && route_balanced
         && hub_dominance_ok
         && duplicate_pressure_ok
+        && semantic_diversity_ok
         && adversarial_route_present
         && dialogue_route_present;
     let strong = medium_or_better
         && corpus.fact_count >= config.strong_min_facts
         && corpus.route_count >= 8
         && corpus.domain_count >= 5
-        && route_balance >= 0.70;
+        && route_balance_score >= 0.70;
     let mut weak_spots = Vec::new();
     if corpus.fact_count < config.medium_min_facts {
         weak_spots.push("corpus_too_small".to_string());
@@ -644,6 +683,9 @@ pub(crate) fn build_broad_dataset_doctor_report(
     }
     if !duplicate_pressure_ok {
         weak_spots.push("duplicate_pressure_high".to_string());
+    }
+    if !semantic_diversity_ok {
+        weak_spots.push("semantic_diversity_low".to_string());
     }
     if !adversarial_route_present {
         weak_spots.push("adversarial_coverage_missing".to_string());
@@ -669,9 +711,11 @@ pub(crate) fn build_broad_dataset_doctor_report(
             fact_count: corpus.fact_count,
             route_count: corpus.route_count,
             domain_count: corpus.domain_count,
-            route_balance,
+            relation_count,
+            route_balance: route_balance_score,
             hub_dominance,
             duplicate_pressure,
+            semantic_diversity_score,
             adversarial_route_present,
             dialogue_route_present,
             external_corpus_loaded: corpus.claim_boundary.external_corpus_loaded,
@@ -680,6 +724,7 @@ pub(crate) fn build_broad_dataset_doctor_report(
             route_balanced,
             hub_dominance_ok,
             duplicate_pressure_ok,
+            semantic_diversity_ok,
             adversarial_coverage: adversarial_route_present,
             dialogue_coverage: dialogue_route_present,
             medium_or_better,
@@ -716,7 +761,7 @@ pub(crate) fn build_broad_heldout_report(
     ];
     let mut cases = Vec::new();
     let mut withheld_fact_ids = Vec::new();
-    let selected_facts = route_balanced_heldout_facts(&corpus.facts, config.max_cases);
+    let selected_facts = domain_route_balanced_heldout_facts(&corpus.facts, config.max_cases);
     for (idx, fact) in selected_facts.into_iter().enumerate() {
         let family = families[idx % families.len()];
         withheld_fact_ids.push(fact.fact_id.clone());
@@ -727,6 +772,17 @@ pub(crate) fn build_broad_heldout_report(
         .flat_map(|case| case.expected.required_routes.iter().map(String::as_str))
         .collect::<BTreeSet<_>>()
         .len();
+    let heldout_facts = withheld_fact_ids
+        .iter()
+        .filter_map(|id| corpus.facts.iter().find(|fact| fact.fact_id == *id))
+        .collect::<Vec<_>>();
+    let heldout_route_distribution = route_distribution_refs(&heldout_facts);
+    let covered_domains = heldout_facts
+        .iter()
+        .map(|fact| fact.domain.as_str())
+        .collect::<BTreeSet<_>>()
+        .len();
+    let family_distribution = family_distribution(&cases);
     let negative_shortcut_count = cases
         .iter()
         .map(|case| case.negative_shortcuts.len())
@@ -769,6 +825,10 @@ pub(crate) fn build_broad_heldout_report(
             generated_case_count: suite.case_count,
             withheld_fact_count: suite.withheld_fact_ids.len(),
             covered_routes,
+            covered_domains,
+            route_balance: route_balance(&heldout_route_distribution),
+            family_count: family_distribution.len(),
+            family_distribution,
             negative_shortcut_count,
         },
         claim_boundary: BroadHeldoutClaimBoundary {
@@ -784,13 +844,16 @@ pub(crate) fn build_broad_heldout_report(
     Ok(report)
 }
 
-fn route_balanced_heldout_facts(facts: &[BroadFact], max_cases: usize) -> Vec<&BroadFact> {
+fn domain_route_balanced_heldout_facts(facts: &[BroadFact], max_cases: usize) -> Vec<&BroadFact> {
     if max_cases == 0 {
         return Vec::new();
     }
-    let mut buckets: BTreeMap<&str, Vec<&BroadFact>> = BTreeMap::new();
+    let mut buckets: BTreeMap<(&str, &str), Vec<&BroadFact>> = BTreeMap::new();
     for fact in facts {
-        buckets.entry(fact.route.as_str()).or_default().push(fact);
+        buckets
+            .entry((fact.domain.as_str(), fact.route.as_str()))
+            .or_default()
+            .push(fact);
     }
     let mut selected = Vec::new();
     let mut offset = 0usize;
@@ -813,6 +876,50 @@ fn route_balanced_heldout_facts(facts: &[BroadFact], max_cases: usize) -> Vec<&B
     selected
 }
 
+fn domain_route_balanced_focus_facts(
+    facts: &[BroadFact],
+    withheld: &BTreeSet<&str>,
+    max_facts: usize,
+    route_fact_cap: usize,
+) -> (Vec<BroadFact>, Vec<String>) {
+    let mut buckets: BTreeMap<(&str, &str), Vec<&BroadFact>> = BTreeMap::new();
+    let mut removed_heldout_fact_ids = Vec::new();
+    for fact in facts {
+        if withheld.contains(fact.fact_id.as_str()) {
+            removed_heldout_fact_ids.push(fact.fact_id.clone());
+            continue;
+        }
+        buckets
+            .entry((fact.domain.as_str(), fact.route.as_str()))
+            .or_default()
+            .push(fact);
+    }
+    let mut route_counts: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut selected = Vec::new();
+    let mut offset = 0usize;
+    while selected.len() < max_facts {
+        let mut progressed = false;
+        for ((_, route), bucket) in &buckets {
+            if selected.len() >= max_facts {
+                break;
+            }
+            if route_counts.get(route).copied().unwrap_or(0) >= route_fact_cap {
+                continue;
+            }
+            if let Some(fact) = bucket.get(offset) {
+                *route_counts.entry(route).or_insert(0) += 1;
+                selected.push((*fact).clone());
+                progressed = true;
+            }
+        }
+        if !progressed {
+            break;
+        }
+        offset += 1;
+    }
+    (selected, removed_heldout_fact_ids)
+}
+
 pub(crate) fn build_broad_focus_report(
     config: BroadFocusBuildConfig,
 ) -> Result<BroadFocusBuildReport> {
@@ -824,25 +931,22 @@ pub(crate) fn build_broad_focus_report(
         .map(String::as_str)
         .collect::<BTreeSet<_>>();
     let before_distribution = route_distribution(&corpus.facts);
-    let mut route_counts: BTreeMap<String, usize> = BTreeMap::new();
-    let mut selected_facts = Vec::new();
-    let mut removed_heldout_fact_ids = Vec::new();
-    for fact in &corpus.facts {
-        if withheld.contains(fact.fact_id.as_str()) {
-            removed_heldout_fact_ids.push(fact.fact_id.clone());
-            continue;
-        }
-        if selected_facts.len() >= config.max_facts {
-            break;
-        }
-        let count = route_counts.entry(fact.route.clone()).or_insert(0);
-        if *count >= config.route_fact_cap {
-            continue;
-        }
-        *count += 1;
-        selected_facts.push(fact.clone());
-    }
+    let before_domain_distribution = domain_distribution(&corpus.facts);
+    let (selected_facts, removed_heldout_fact_ids) = domain_route_balanced_focus_facts(
+        &corpus.facts,
+        &withheld,
+        config.max_facts,
+        config.route_fact_cap,
+    );
     let after_distribution = route_distribution(&selected_facts);
+    let after_domain_distribution = domain_distribution(&selected_facts);
+    let withheld_facts = suite
+        .withheld_fact_ids
+        .iter()
+        .filter_map(|id| corpus.facts.iter().find(|fact| fact.fact_id == *id))
+        .collect::<Vec<_>>();
+    let near_duplicate_leakage_count =
+        near_duplicate_leakage_count(&withheld_facts, &selected_facts);
     let focus = BroadFocusPacket {
         packet_kind: "broad-route-balanced-focus".to_string(),
         selected_fact_count: selected_facts.len(),
@@ -866,9 +970,18 @@ pub(crate) fn build_broad_focus_report(
         metrics: BroadFocusMetrics {
             route_balance_before: route_balance(&before_distribution),
             route_balance_after: route_balance(&after_distribution),
+            domain_balance_before: route_balance(&before_domain_distribution),
+            domain_balance_after: route_balance(&after_domain_distribution),
+            covered_domains_after: after_domain_distribution.len(),
+            covered_routes_after: after_distribution.len(),
             hub_dominance_before: hub_dominance(&before_distribution, corpus.fact_count),
             hub_dominance_after: hub_dominance(&after_distribution, focus.selected_fact_count),
             exact_withheld_facts_removed: exact_removed,
+            near_duplicate_leakage_count,
+            near_duplicate_leakage_rate: safe_rate(
+                near_duplicate_leakage_count,
+                suite.withheld_fact_ids.len(),
+            ),
         },
         claim_boundary: BroadFocusClaimBoundary {
             route_balanced_focus_ready: exact_removed == suite.withheld_fact_ids.len()
@@ -1950,6 +2063,76 @@ fn route_distribution(facts: &[BroadFact]) -> BTreeMap<String, usize> {
     distribution
 }
 
+fn route_distribution_refs(facts: &[&BroadFact]) -> BTreeMap<String, usize> {
+    let mut distribution = BTreeMap::new();
+    for fact in facts {
+        *distribution.entry(fact.route.clone()).or_insert(0) += 1;
+    }
+    distribution
+}
+
+fn domain_distribution(facts: &[BroadFact]) -> BTreeMap<String, usize> {
+    let mut distribution = BTreeMap::new();
+    for fact in facts {
+        *distribution.entry(fact.domain.clone()).or_insert(0) += 1;
+    }
+    distribution
+}
+
+fn relation_count(facts: &[BroadFact]) -> usize {
+    facts
+        .iter()
+        .map(|fact| fact.relation.as_str())
+        .collect::<BTreeSet<_>>()
+        .len()
+}
+
+fn semantic_diversity_score(
+    fact_count: usize,
+    domain_count: usize,
+    route_count: usize,
+    relation_count: usize,
+    route_balance: f64,
+    domain_balance: f64,
+) -> f64 {
+    if fact_count == 0 {
+        return 0.0;
+    }
+    let domain_score = (domain_count as f64 / 8.0).min(1.0);
+    let route_score = (route_count as f64 / 32.0).min(1.0);
+    let relation_score = (relation_count as f64 / 8.0).min(1.0);
+    round4((domain_score + route_score + relation_score + route_balance + domain_balance) / 5.0)
+}
+
+fn family_distribution(cases: &[BroadEvalCase]) -> BTreeMap<String, usize> {
+    let mut distribution = BTreeMap::new();
+    for case in cases {
+        *distribution.entry(case.family.clone()).or_insert(0) += 1;
+    }
+    distribution
+}
+
+fn near_duplicate_leakage_count(
+    withheld_facts: &[&BroadFact],
+    selected_facts: &[BroadFact],
+) -> usize {
+    let selected_keys = selected_facts
+        .iter()
+        .map(near_duplicate_key)
+        .collect::<BTreeSet<_>>();
+    withheld_facts
+        .iter()
+        .filter(|fact| selected_keys.contains(&near_duplicate_key(fact)))
+        .count()
+}
+
+fn near_duplicate_key(fact: &BroadFact) -> String {
+    format!(
+        "{}|{}|{}|{}",
+        fact.domain, fact.route, fact.subject, fact.relation
+    )
+}
+
 fn route_balance(distribution: &BTreeMap<String, usize>) -> f64 {
     if distribution.is_empty() {
         return 0.0;
@@ -2261,11 +2444,22 @@ mod tests {
             ("adversarial", "adversarial_shortcut"),
             ("finance", "payment_route"),
         ];
+        let relations = [
+            "owns_route",
+            "requires_evidence",
+            "blocks_shortcut",
+            "verifies_output",
+            "routes_to",
+            "rejects_swap",
+            "keeps_context",
+            "repairs_with",
+        ];
         let mut lines = Vec::new();
         for (idx, (domain, route)) in domains.iter().enumerate() {
             for item in 0..3 {
+                let relation = relations[(idx + item) % relations.len()];
                 lines.push(format!(
-                    "{domain}|{route}|subject-{idx}-{item}|relates_to|object-{idx}-{item}|fixture evidence {idx}-{item}"
+                    "{domain}|{route}|subject-{idx}-{item}|{relation}|object-{idx}-{item}|fixture evidence {idx}-{item}"
                 ));
             }
         }
