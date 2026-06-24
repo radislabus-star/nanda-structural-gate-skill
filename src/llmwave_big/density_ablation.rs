@@ -26,6 +26,7 @@ pub(crate) struct DensityAblationReport {
     pub verdict: &'static str,
     pub suite_path: String,
     pub baseline_duel: DensityBaselineDuel,
+    pub runtime_path: DensityRuntimePath,
     pub ablations: Vec<ProfileAblation>,
     pub claim_boundary: DensityAblationClaimBoundary,
 }
@@ -37,6 +38,16 @@ pub(crate) struct DensityBaselineDuel {
     pub packed_beats_linear_baseline: bool,
     pub weakest_profile: Option<String>,
     pub strongest_profile: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct DensityRuntimePath {
+    pub runtime_path_kind: &'static str,
+    pub l2_profile_surfaces: Vec<String>,
+    pub l3_proof_axes: Vec<&'static str>,
+    pub active_packet_records: usize,
+    pub hot_loop_ready: bool,
+    pub claim_boundary: &'static str,
 }
 
 #[derive(Serialize, Clone)]
@@ -111,6 +122,24 @@ pub(crate) fn build_density_ablation_report(
         weakest_profile,
         strongest_profile,
     };
+    let runtime_path = DensityRuntimePath {
+        runtime_path_kind: "density-suite-l2-l3-readonly-active-packet",
+        l2_profile_surfaces: suite
+            .profiles
+            .iter()
+            .map(|profile| profile.profile.clone())
+            .collect(),
+        l3_proof_axes: vec![
+            "density_win",
+            "heldout_quality",
+            "anti_shortcut_rejection",
+            "collision_pressure",
+            "profile_independence",
+        ],
+        active_packet_records: suite.profiles.len(),
+        hot_loop_ready: false,
+        claim_boundary: "L2/L3 runtime path is represented as a read-only suite packet; it is not a hot-loop or cache-resident proof.",
+    };
     let ablations = suite
         .profiles
         .iter()
@@ -183,6 +212,7 @@ pub(crate) fn build_density_ablation_report(
         verdict,
         suite_path: config.suite.display().to_string(),
         baseline_duel,
+        runtime_path,
         ablations,
         claim_boundary: DensityAblationClaimBoundary {
             density_ablation_implemented: true,

@@ -231,6 +231,9 @@ that as local medium evidence only: it may unlock
 linear-baseline duel. It does not rerun field inference and does not prove
 nonlinear memory by itself. Its JSON output is still wrapped in the unified
 field projection, so agents can compare it with other field-aware reports.
+The report also exposes a read-only `runtime_path`: L2 profile surfaces plus L3
+proof axes. `hot_loop_ready=false` there is intentional until a binary active
+packet exists.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

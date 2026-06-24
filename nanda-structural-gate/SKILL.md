@@ -807,6 +807,9 @@ Use `density-ablation` to inspect suite-level profile criticality and the
 exposed linear-baseline duel. It does not rerun field inference and does not
 prove nonlinear memory by itself. The JSON output is still wrapped in the
 unified field projection for agent-side comparison.
+Its `runtime_path` is a read-only L2/L3 packet summary: L2 profile surfaces
+plus L3 proof axes. `hot_loop_ready=false` is intentional until a binary active
+packet exists.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a

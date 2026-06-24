@@ -492,6 +492,9 @@ Run `density-ablation` when you need to know whether a suite depends on one
 critical profile and whether the exposed density metrics beat the linear
 baseline. It is a suite-level hook, not a proof by itself. The JSON output is
 still wrapped in the unified field projection for agent-side comparison.
+Its `runtime_path` is a read-only L2/L3 packet summary: L2 profile surfaces
+plus L3 proof axes. `hot_loop_ready=false` is intentional until a binary active
+packet exists.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
