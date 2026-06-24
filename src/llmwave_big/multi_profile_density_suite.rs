@@ -56,6 +56,9 @@ pub(crate) struct ProfileDensityResult {
     pub source_name: Option<String>,
     pub source_kind: Option<String>,
     pub source_fact_count: Option<usize>,
+    pub source_heldout_count: Option<usize>,
+    pub source_negative_count: Option<usize>,
+    pub source_noise_count: Option<usize>,
     pub present: bool,
     pub rust_density_profile_proven: bool,
     pub profile_density_proven: bool,
@@ -127,6 +130,12 @@ struct ProfileSource {
     source_name: Option<String>,
     #[serde(default)]
     fact_count: Option<usize>,
+    #[serde(default)]
+    heldout_count: Option<usize>,
+    #[serde(default)]
+    negative_count: Option<usize>,
+    #[serde(default)]
+    noise_count: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -323,6 +332,18 @@ fn read_profile(profile: &str, path: &PathBuf) -> Result<ProfileDensityResult> {
             .as_ref()
             .and_then(|source| source.source_kind.clone()),
         source_fact_count: payload.source.as_ref().and_then(|source| source.fact_count),
+        source_heldout_count: payload
+            .source
+            .as_ref()
+            .and_then(|source| source.heldout_count),
+        source_negative_count: payload
+            .source
+            .as_ref()
+            .and_then(|source| source.negative_count),
+        source_noise_count: payload
+            .source
+            .as_ref()
+            .and_then(|source| source.noise_count),
         present: true,
         rust_density_profile_proven: payload.gates.rust_density_profile_proven,
         profile_density_proven,
@@ -509,6 +530,9 @@ mod tests {
             source_name: None,
             source_kind: None,
             source_fact_count: None,
+            source_heldout_count: None,
+            source_negative_count: None,
+            source_noise_count: None,
             present: true,
             rust_density_profile_proven: true,
             profile_density_proven: true,
@@ -589,6 +613,9 @@ mod tests {
             source_name: None,
             source_kind: None,
             source_fact_count: None,
+            source_heldout_count: None,
+            source_negative_count: None,
+            source_noise_count: None,
             present: true,
             rust_density_profile_proven: profile == "rust",
             profile_density_proven: true,

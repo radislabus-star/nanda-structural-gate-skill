@@ -45,6 +45,7 @@ pub(crate) struct ProfileDiversityReport {
     pub unique_source_kinds: usize,
     pub smallest_profile_fact_count: Option<usize>,
     pub small_profile_count: usize,
+    pub adversarial_profile_count: usize,
     pub profiles: Vec<DoctorProfileSummary>,
 }
 
@@ -54,6 +55,9 @@ pub(crate) struct DoctorProfileSummary {
     pub source_name: Option<String>,
     pub source_kind: Option<String>,
     pub source_fact_count: Option<usize>,
+    pub source_heldout_count: Option<usize>,
+    pub source_negative_count: Option<usize>,
+    pub source_noise_count: Option<usize>,
     pub profile_density_proven: bool,
     pub density_win_ratio: f64,
     pub heldout_pass_rate: f64,
@@ -77,6 +81,7 @@ pub(crate) struct DensityProofDoctorGates {
     pub enough_profiles_for_strong: bool,
     pub profile_sources_diverse: bool,
     pub profile_facts_large_enough: bool,
+    pub adversarial_profile_present: bool,
     pub density_margin_strong: bool,
     pub heldout_quality_strong: bool,
     pub false_shortcuts_strong: bool,
@@ -127,6 +132,12 @@ struct SuiteProfile {
     source_kind: Option<String>,
     #[serde(default)]
     source_fact_count: Option<usize>,
+    #[serde(default)]
+    source_heldout_count: Option<usize>,
+    #[serde(default)]
+    source_negative_count: Option<usize>,
+    #[serde(default)]
+    source_noise_count: Option<usize>,
     profile_density_proven: bool,
     density_win_ratio: f64,
     heldout_pass_rate: f64,
@@ -191,6 +202,18 @@ pub(crate) fn build_density_proof_doctor_report(
         && unique_source_names >= medium_profile_min.saturating_sub(1);
     let profile_facts_large_enough =
         profile_count > 0 && small_profile_count == 0 && smallest_profile_fact_count.is_some();
+    let adversarial_profile_count = suite
+        .profiles
+        .iter()
+        .filter(|profile| {
+            profile.source_fact_count.unwrap_or(0) >= min_fact_count
+                && profile.source_heldout_count.unwrap_or(0) >= 6
+                && profile.source_negative_count.unwrap_or(0) >= 8
+                && profile.source_noise_count.unwrap_or(0) >= 8
+                && profile.false_shortcut_rejection_rate >= 1.0
+        })
+        .count();
+    let adversarial_profile_present = adversarial_profile_count > 0;
     let density_margin_strong = suite.aggregate.min_density_win_ratio >= 1.50;
     let heldout_quality_strong = suite.aggregate.min_heldout_pass_rate >= 0.95;
     let false_shortcuts_strong = suite
@@ -207,6 +230,7 @@ pub(crate) fn build_density_proof_doctor_report(
         enough_profiles_for_medium,
         profile_sources_diverse,
         profile_facts_large_enough,
+        adversarial_profile_present,
         density_margin_strong,
         heldout_quality_strong,
         false_shortcuts_strong,
@@ -216,7 +240,7 @@ pub(crate) fn build_density_proof_doctor_report(
             score += 1.0;
         }
     }
-    let quality_score = round4(score / 9.0);
+    let quality_score = round4(score / 10.0);
     let weak_spots = weak_spots(WeakSpotInputs {
         suite_general: suite.gates.general_nonlinear_memory_proven,
         independent_profile_sources: suite.gates.independent_profile_sources,
@@ -224,6 +248,7 @@ pub(crate) fn build_density_proof_doctor_report(
         enough_profiles_for_strong,
         profile_sources_diverse,
         profile_facts_large_enough,
+        adversarial_profile_present,
         density_margin_strong,
         heldout_quality_strong,
         false_shortcuts_strong,
@@ -234,6 +259,7 @@ pub(crate) fn build_density_proof_doctor_report(
     } else if enough_profiles_for_strong
         && profile_sources_diverse
         && profile_facts_large_enough
+        && adversarial_profile_present
         && density_margin_strong
         && heldout_quality_strong
         && false_shortcuts_strong
@@ -244,6 +270,7 @@ pub(crate) fn build_density_proof_doctor_report(
         && suite.gates.independent_profile_sources
         && profile_sources_diverse
         && profile_facts_large_enough
+        && adversarial_profile_present
         && density_margin_strong
         && heldout_quality_strong
         && false_shortcuts_strong
@@ -260,6 +287,7 @@ pub(crate) fn build_density_proof_doctor_report(
         enough_profiles_for_strong,
         profile_sources_diverse,
         profile_facts_large_enough,
+        adversarial_profile_present,
         density_margin_strong,
         heldout_quality_strong,
         false_shortcuts_strong,
@@ -278,6 +306,7 @@ pub(crate) fn build_density_proof_doctor_report(
         unique_source_kinds,
         smallest_profile_fact_count,
         small_profile_count,
+        adversarial_profile_count,
         profiles: suite
             .profiles
             .iter()
@@ -286,6 +315,9 @@ pub(crate) fn build_density_proof_doctor_report(
                 source_name: profile.source_name.clone(),
                 source_kind: profile.source_kind.clone(),
                 source_fact_count: profile.source_fact_count,
+                source_heldout_count: profile.source_heldout_count,
+                source_negative_count: profile.source_negative_count,
+                source_noise_count: profile.source_noise_count,
                 profile_density_proven: profile.profile_density_proven,
                 density_win_ratio: profile.density_win_ratio,
                 heldout_pass_rate: profile.heldout_pass_rate,
@@ -344,6 +376,7 @@ struct WeakSpotInputs {
     enough_profiles_for_strong: bool,
     profile_sources_diverse: bool,
     profile_facts_large_enough: bool,
+    adversarial_profile_present: bool,
     density_margin_strong: bool,
     heldout_quality_strong: bool,
     false_shortcuts_strong: bool,
@@ -370,6 +403,9 @@ fn weak_spots(input: WeakSpotInputs) -> Vec<&'static str> {
     if !input.profile_facts_large_enough {
         spots.push("profile_corpora_too_small_or_unknown");
     }
+    if !input.adversarial_profile_present {
+        spots.push("adversarial_profile_missing");
+    }
     if !input.density_margin_strong {
         spots.push("density_margin_too_low");
     }
@@ -392,7 +428,8 @@ fn next_profile_needed(state: &str, weak_spots: &[&'static str]) -> &'static str
         "larger-real-corpus-profile"
     } else if weak_spots.contains(&"profile_source_diversity_too_low") {
         "new-domain-profile"
-    } else if weak_spots.contains(&"false_shortcut_rejection_too_low")
+    } else if weak_spots.contains(&"adversarial_profile_missing")
+        || weak_spots.contains(&"false_shortcut_rejection_too_low")
         || weak_spots.contains(&"collision_pressure_too_high")
     {
         "adversarial-noise-profile"
