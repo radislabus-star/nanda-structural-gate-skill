@@ -39,6 +39,7 @@ pub(crate) struct MemoryFinalProofConfig {
     pub strict_density_evidence: Option<PathBuf>,
     pub multi_profile_density_evidence: Option<PathBuf>,
     pub density_doctor_evidence: Option<PathBuf>,
+    pub density_hot_packet: Option<PathBuf>,
 }
 
 #[derive(Serialize, Clone)]
@@ -93,6 +94,7 @@ pub(crate) struct BigCorpusGateReport {
     pub strict_density_evidence_path: Option<String>,
     pub multi_profile_density_evidence_path: Option<String>,
     pub density_doctor_evidence_path: Option<String>,
+    pub density_hot_packet_path: Option<String>,
     pub heldout_suite_ready: bool,
     pub route_balanced_focus_ready: bool,
     pub compile_test_evidence_bridge_ready: bool,
@@ -101,6 +103,7 @@ pub(crate) struct BigCorpusGateReport {
     pub multi_profile_density_ready: bool,
     pub density_doctor_medium_or_better: bool,
     pub density_doctor_strong: bool,
+    pub density_hot_artifact_ready: bool,
     pub real_big_corpus_loaded: bool,
     pub route_balanced_focus_required: bool,
     pub verdict: &'static str,
@@ -132,6 +135,7 @@ pub(crate) struct FinalProofGateReport {
     pub rust_density_profile_ready: bool,
     pub density_proof_doctor_ready: bool,
     pub density_proof_doctor_strong: bool,
+    pub density_hot_artifact_ready: bool,
     pub general_nonlinear_memory_claim_ready: bool,
     pub broad_llm_claim_ready: bool,
     pub final_proof_gate_passed: bool,
@@ -160,6 +164,7 @@ struct ProfileEvidence {
     strict_density_evidence_path: Option<String>,
     multi_profile_density_evidence_path: Option<String>,
     density_doctor_evidence_path: Option<String>,
+    density_hot_packet_path: Option<String>,
     observed_facts: usize,
     heldout_suite_ready: bool,
     route_balanced_focus_ready: bool,
@@ -169,6 +174,7 @@ struct ProfileEvidence {
     multi_profile_density_ready: bool,
     density_doctor_medium_or_better: bool,
     density_doctor_strong: bool,
+    density_hot_artifact_ready: bool,
 }
 
 struct MissingEvidenceInputs {
@@ -313,6 +319,7 @@ pub(crate) fn build_memory_final_proof_report(
         profile == MemoryProofProfile::Rust && profile_evidence.strict_density_profile_ready;
     let density_proof_doctor_ready = profile_evidence.density_doctor_medium_or_better;
     let density_proof_doctor_strong = profile_evidence.density_doctor_strong;
+    let density_hot_artifact_ready = profile_evidence.density_hot_artifact_ready;
     let general_nonlinear_memory_claim_ready =
         profile_evidence.multi_profile_density_ready && density_proof_doctor_ready;
     let broad_llm_claim_ready = false;
@@ -391,6 +398,7 @@ pub(crate) fn build_memory_final_proof_report(
             rust_density_profile_ready,
             density_proof_doctor_ready,
             density_proof_doctor_strong,
+            density_hot_artifact_ready,
             general_nonlinear_memory_claim_ready,
             broad_llm_claim_ready,
             final_proof_gate_passed,
@@ -569,6 +577,7 @@ fn build_big_corpus_gate(
             .multi_profile_density_evidence_path
             .clone(),
         density_doctor_evidence_path: profile_evidence.density_doctor_evidence_path.clone(),
+        density_hot_packet_path: profile_evidence.density_hot_packet_path.clone(),
         heldout_suite_ready: profile_evidence.heldout_suite_ready,
         route_balanced_focus_ready: profile_evidence.route_balanced_focus_ready,
         compile_test_evidence_bridge_ready: profile_evidence.compile_test_evidence_bridge_ready,
@@ -577,6 +586,7 @@ fn build_big_corpus_gate(
         multi_profile_density_ready: profile_evidence.multi_profile_density_ready,
         density_doctor_medium_or_better: profile_evidence.density_doctor_medium_or_better,
         density_doctor_strong: profile_evidence.density_doctor_strong,
+        density_hot_artifact_ready: profile_evidence.density_hot_artifact_ready,
         real_big_corpus_loaded: profile_loaded,
         route_balanced_focus_required: true,
         verdict,
@@ -662,6 +672,13 @@ fn load_profile_evidence(config: &MemoryFinalProofConfig) -> Result<ProfileEvide
         evidence.density_doctor_strong = payload.gates.density_proof_doctor_strong
             && payload.claim_boundary.general_nonlinear_memory_proven
             && !payload.gates.llm_ready;
+    }
+    if let Some(path) = &config.density_hot_packet {
+        let bytes = fs::read(path)
+            .with_context(|| format!("read density hot packet {}", path.display()))?;
+        evidence.density_hot_packet_path = Some(path.display().to_string());
+        evidence.density_hot_artifact_ready =
+            bytes.len() >= 16 && bytes.starts_with(b"NDABLTN1") && (bytes.len() - 16) % 16 == 0;
     }
     Ok(evidence)
 }
@@ -787,6 +804,7 @@ mod tests {
             strict_density_evidence: None,
             multi_profile_density_evidence: None,
             density_doctor_evidence: None,
+            density_hot_packet: None,
         })
         .expect("final proof builds");
 
@@ -813,6 +831,7 @@ mod tests {
             strict_density_evidence: None,
             multi_profile_density_evidence: None,
             density_doctor_evidence: None,
+            density_hot_packet: None,
         })
         .expect("final proof builds");
 
@@ -838,6 +857,7 @@ mod tests {
             strict_density_evidence: None,
             multi_profile_density_evidence: None,
             density_doctor_evidence: None,
+            density_hot_packet: None,
         })
         .expect("final proof builds");
 

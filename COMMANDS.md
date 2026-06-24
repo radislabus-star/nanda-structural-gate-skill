@@ -137,7 +137,7 @@ nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-bi
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --strict-density-evidence .nanda/llmwave-big-training/strict-density.json --format json
-nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --strict-density-evidence .nanda/llmwave-big-training/strict-density.json --multi-profile-density-evidence .nanda/llmwave-big-training/multi-profile-density.json --density-doctor-evidence .nanda/llmwave-big-training/density-proof-doctor.json --format json
+nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --strict-density-evidence .nanda/llmwave-big-training/strict-density.json --multi-profile-density-evidence .nanda/llmwave-big-training/multi-profile-density.json --density-doctor-evidence .nanda/llmwave-big-training/density-proof-doctor.json --density-hot-packet .nanda/llmwave-big-training/density-ablation.hot --format json
 nanda-llmwave-big nonlinear-memory-eval --format json
 nanda-llmwave-big nonlinear-memory-eval \
   --corpus examples/llmwave-big-nonlinear-memory-corpus.json \
@@ -237,6 +237,9 @@ packet exists.
 With `--out-hot-packet`, the command writes a compact binary packet with a
 16-byte header and 16-byte fixed records. This proves artifact materialization,
 not hot-loop execution.
+Pass that packet to `memory-final-proof` with `--density-hot-packet` to mark the
+binary density evidence as present in final proof. It still does not make
+`llm_ready=true`.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

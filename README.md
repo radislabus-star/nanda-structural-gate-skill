@@ -364,6 +364,7 @@ nanda-llmwave-big memory-final-proof \
   --strict-density-evidence .nanda/llmwave-big-training/strict-density.json \
   --multi-profile-density-evidence .nanda/llmwave-big-training/multi-profile-density.json \
   --density-doctor-evidence .nanda/llmwave-big-training/density-proof-doctor.json \
+  --density-hot-packet .nanda/llmwave-big-training/density-ablation.hot \
   --format json
 
 nanda-llmwave-big nonlinear-memory-eval \
@@ -499,6 +500,8 @@ packet exists.
 With `--out-hot-packet`, it writes a compact binary packet with a 16-byte
 header and 16-byte fixed records. That proves artifact materialization, not
 hot-loop execution.
+Pass that packet to `memory-final-proof` with `--density-hot-packet` to mark
+binary density evidence as present. It still does not make `llm_ready=true`.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it
