@@ -351,6 +351,7 @@ nanda-llmwave-big density-proof-doctor \
 
 nanda-llmwave-big density-ablation \
   --suite .nanda/llmwave-big-training/multi-profile-density.json \
+  --out-hot-packet .nanda/llmwave-big-training/density-ablation.hot \
   --format json
 
 nanda-llmwave-big memory-final-proof \
@@ -495,6 +496,9 @@ still wrapped in the unified field projection for agent-side comparison.
 Its `runtime_path` is a read-only L2/L3 packet summary: L2 profile surfaces
 plus L3 proof axes. `hot_loop_ready=false` is intentional until a binary active
 packet exists.
+With `--out-hot-packet`, it writes a compact binary packet with a 16-byte
+header and 16-byte fixed records. That proves artifact materialization, not
+hot-loop execution.
 
 For nonlinear memory, inspect `corpus_driven_memory` before reading the broader
 claim fields. That section is the actual fixture-driven density check: it

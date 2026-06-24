@@ -229,7 +229,7 @@ scripts/nanda-llmwave-big profile-density-build --profile adversarial --corpus e
 scripts/nanda-llmwave-big multi-profile-density-suite --rust-density .nanda/llmwave-big-training/strict-density.json --profile-evidence adversarial=.nanda/llmwave-big-training/adversarial-density.json --profile-evidence contracts=.nanda/llmwave-big-training/contracts-density.json --profile-evidence business=.nanda/llmwave-big-training/business-density.json --out .nanda/llmwave-big-training/multi-profile-density.json --format json
 scripts/nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi-profile-density.json --out .nanda/llmwave-big-training/density-proof-doctor.json --format json
 scripts/nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi-profile-density.json --min-fact-count 10 --out .nanda/llmwave-big-training/density-proof-doctor-medium.json --format json
-scripts/nanda-llmwave-big density-ablation --suite .nanda/llmwave-big-training/multi-profile-density.json --format json
+scripts/nanda-llmwave-big density-ablation --suite .nanda/llmwave-big-training/multi-profile-density.json --out-hot-packet .nanda/llmwave-big-training/density-ablation.hot --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 scripts/nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --format json
@@ -810,6 +810,9 @@ unified field projection for agent-side comparison.
 Its `runtime_path` is a read-only L2/L3 packet summary: L2 profile surfaces
 plus L3 proof axes. `hot_loop_ready=false` is intentional until a binary active
 packet exists.
+With `--out-hot-packet`, it writes a compact binary packet with a 16-byte
+header and 16-byte fixed records. That proves artifact materialization, not
+hot-loop execution.
 `nanda-llmwave-big pack-hot` writes the trained artifact into a compact binary
 hot pack with numeric fixed-size records only. It is the command to use when
 checking whether the actual hot artifact fits the budget rather than trusting a

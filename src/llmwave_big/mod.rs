@@ -787,6 +787,8 @@ struct LlmwaveBigDensityProofDoctorArgs {
 struct LlmwaveBigDensityAblationArgs {
     #[arg(long)]
     suite: PathBuf,
+    #[arg(long = "out-hot-packet")]
+    out_hot_packet: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1348,7 +1350,10 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         }
         LlmwaveBigCommand::DensityAblation(args) => {
             let report = density_ablation::build_density_ablation_report(
-                density_ablation::DensityAblationConfig { suite: args.suite },
+                density_ablation::DensityAblationConfig {
+                    suite: args.suite,
+                    out_hot_packet: args.out_hot_packet,
+                },
             )?;
             report::print_density_ablation_report(&report, &args.format)?;
             Ok(EXIT_PASS)

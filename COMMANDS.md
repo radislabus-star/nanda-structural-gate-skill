@@ -132,7 +132,7 @@ nanda-llmwave-big profile-density-build --profile adversarial --corpus examples/
 nanda-llmwave-big multi-profile-density-suite --rust-density .nanda/llmwave-big-training/strict-density.json --profile-evidence adversarial=.nanda/llmwave-big-training/adversarial-density.json --profile-evidence contracts=.nanda/llmwave-big-training/contracts-density.json --profile-evidence business=.nanda/llmwave-big-training/business-density.json --out .nanda/llmwave-big-training/multi-profile-density.json --format json
 nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi-profile-density.json --out .nanda/llmwave-big-training/density-proof-doctor.json --format json
 nanda-llmwave-big density-proof-doctor --suite .nanda/llmwave-big-training/multi-profile-density.json --min-fact-count 10 --out .nanda/llmwave-big-training/density-proof-doctor-medium.json --format json
-nanda-llmwave-big density-ablation --suite .nanda/llmwave-big-training/multi-profile-density.json --format json
+nanda-llmwave-big density-ablation --suite .nanda/llmwave-big-training/multi-profile-density.json --out-hot-packet .nanda/llmwave-big-training/density-ablation.hot --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 nanda-llmwave-big memory-final-proof --profile rust --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --format json
@@ -234,6 +234,9 @@ field projection, so agents can compare it with other field-aware reports.
 The report also exposes a read-only `runtime_path`: L2 profile surfaces plus L3
 proof axes. `hot_loop_ready=false` there is intentional until a binary active
 packet exists.
+With `--out-hot-packet`, the command writes a compact binary packet with a
+16-byte header and 16-byte fixed records. This proves artifact materialization,
+not hot-loop execution.
 
 Scale-amortized mode is the local density result after fixed-basis overhead is
 amortized. It does not unlock the general nonlinear-memory claim.

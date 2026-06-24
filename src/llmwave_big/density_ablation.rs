@@ -7,6 +7,7 @@
 
 use std::collections::BTreeSet;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -17,6 +18,7 @@ pub(crate) const DENSITY_ABLATION_VERSION: &str = "llmwave-big-v-next-density-ab
 #[derive(Clone)]
 pub(crate) struct DensityAblationConfig {
     pub suite: PathBuf,
+    pub out_hot_packet: Option<PathBuf>,
 }
 
 #[derive(Serialize, Clone)]
@@ -27,6 +29,7 @@ pub(crate) struct DensityAblationReport {
     pub suite_path: String,
     pub baseline_duel: DensityBaselineDuel,
     pub runtime_path: DensityRuntimePath,
+    pub hot_artifact: DensityHotArtifact,
     pub ablations: Vec<ProfileAblation>,
     pub claim_boundary: DensityAblationClaimBoundary,
 }
@@ -48,6 +51,18 @@ pub(crate) struct DensityRuntimePath {
     pub active_packet_records: usize,
     pub hot_loop_ready: bool,
     pub claim_boundary: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct DensityHotArtifact {
+    pub hot_packet_written: bool,
+    pub hot_packet_path: Option<String>,
+    pub hot_packet_bytes: usize,
+    pub header_size_bytes: usize,
+    pub record_size_bytes: usize,
+    pub record_count: usize,
+    pub contains_json: bool,
+    pub hot_loop_ready: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -140,6 +155,7 @@ pub(crate) fn build_density_ablation_report(
         hot_loop_ready: false,
         claim_boundary: "L2/L3 runtime path is represented as a read-only suite packet; it is not a hot-loop or cache-resident proof.",
     };
+    let hot_artifact = write_hot_packet_if_requested(&config.out_hot_packet, &suite.profiles)?;
     let ablations = suite
         .profiles
         .iter()
@@ -213,6 +229,7 @@ pub(crate) fn build_density_ablation_report(
         suite_path: config.suite.display().to_string(),
         baseline_duel,
         runtime_path,
+        hot_artifact,
         ablations,
         claim_boundary: DensityAblationClaimBoundary {
             density_ablation_implemented: true,
@@ -246,4 +263,56 @@ fn suite_passes(profiles: &[SuiteProfile], min_profiles: usize) -> bool {
         && profiles
             .iter()
             .all(|profile| profile.collision_pressure <= 0.35)
+}
+
+fn write_hot_packet_if_requested(
+    out_hot_packet: &Option<PathBuf>,
+    profiles: &[SuiteProfile],
+) -> Result<DensityHotArtifact> {
+    const HEADER_SIZE: usize = 16;
+    const RECORD_SIZE: usize = 16;
+    let Some(path) = out_hot_packet else {
+        return Ok(DensityHotArtifact {
+            hot_packet_written: false,
+            hot_packet_path: None,
+            hot_packet_bytes: 0,
+            header_size_bytes: HEADER_SIZE,
+            record_size_bytes: RECORD_SIZE,
+            record_count: profiles.len(),
+            contains_json: false,
+            hot_loop_ready: false,
+        });
+    };
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("create density hot packet dir {}", parent.display()))?;
+    }
+    let mut bytes = Vec::with_capacity(HEADER_SIZE + profiles.len() * RECORD_SIZE);
+    bytes.extend_from_slice(b"NDABLTN1");
+    bytes.extend_from_slice(&(profiles.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&(RECORD_SIZE as u32).to_le_bytes());
+    for profile in profiles {
+        bytes.extend_from_slice(&scale_metric(profile.density_win_ratio).to_le_bytes());
+        bytes.extend_from_slice(&scale_metric(profile.heldout_pass_rate).to_le_bytes());
+        bytes.extend_from_slice(&scale_metric(profile.false_shortcut_rejection_rate).to_le_bytes());
+        bytes.extend_from_slice(&scale_metric(profile.collision_pressure).to_le_bytes());
+    }
+    let mut file = fs::File::create(path)
+        .with_context(|| format!("create density hot packet {}", path.display()))?;
+    file.write_all(&bytes)
+        .with_context(|| format!("write density hot packet {}", path.display()))?;
+    Ok(DensityHotArtifact {
+        hot_packet_written: true,
+        hot_packet_path: Some(path.display().to_string()),
+        hot_packet_bytes: bytes.len(),
+        header_size_bytes: HEADER_SIZE,
+        record_size_bytes: RECORD_SIZE,
+        record_count: profiles.len(),
+        contains_json: false,
+        hot_loop_ready: false,
+    })
+}
+
+fn scale_metric(value: f64) -> u32 {
+    (value.max(0.0) * 10_000.0).round().min(u32::MAX as f64) as u32
 }
