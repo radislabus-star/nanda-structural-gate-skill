@@ -13,6 +13,7 @@ use super::broad_eval::{
 use super::consolidation::ConsolidationReport;
 use super::core_v1_active_retrieval::CoreV1ActiveRetrievalReport;
 use super::core_v1_answer_verifier::CoreV1AnswerVerifierReport;
+use super::core_v1_broad_eval_harness::CoreV1BroadEvalHarnessReport;
 use super::core_v1_consolidation_sleep::CoreV1ConsolidationSleepReport;
 use super::core_v1_contract::CoreV1ContractReport;
 use super::core_v1_feedback_learning::CoreV1FeedbackLearningReport;
@@ -255,6 +256,21 @@ pub(crate) fn print_core_v1_consolidation_sleep_report(
         ),
         OutputFormat::Text => print_core_v1_consolidation_sleep_text(report),
         OutputFormat::Md => print_core_v1_consolidation_sleep_md(report),
+    }
+    Ok(())
+}
+
+pub(crate) fn print_core_v1_broad_eval_harness_report(
+    report: &CoreV1BroadEvalHarnessReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => print_core_v1_broad_eval_harness_text(report),
+        OutputFormat::Md => print_core_v1_broad_eval_harness_md(report),
     }
     Ok(())
 }
@@ -2094,6 +2110,30 @@ fn print_core_v1_consolidation_sleep_text(report: &CoreV1ConsolidationSleepRepor
     }
 }
 
+fn print_core_v1_broad_eval_harness_text(report: &CoreV1BroadEvalHarnessReport) {
+    println!("LLMWave Core V1 Broad Eval Harness");
+    println!("version: {}", report.version);
+    println!("phase: {}", report.phase);
+    println!("verdict: {}", report.verdict);
+    println!("input: {}", report.input_text);
+    println!("suite: {}", report.suite.suite_id);
+    println!("cases: {}", report.suite.cases.len());
+    println!("passed: {}", report.suite.passed);
+    println!("failed: {}", report.suite.failed);
+    println!(
+        "false_positive_count: {}",
+        report.suite.false_positive_count
+    );
+    println!(
+        "false_negative_count: {}",
+        report.suite.false_negative_count
+    );
+    println!("exit_criteria:");
+    for criterion in &report.exit_criteria {
+        println!("  - {}: {}", criterion.criterion, criterion.passed);
+    }
+}
+
 fn print_atlas_text(report: &AtlasReport) {
     println!("LLMWave-Big Wave Atlas");
     println!("version: {}", report.version);
@@ -3460,6 +3500,47 @@ fn print_core_v1_consolidation_sleep_md(report: &CoreV1ConsolidationSleepReport)
     println!(
         "- general chat ready: `{}`",
         report.claim_boundary.general_chat_ready
+    );
+    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+    println!(
+        "- nonlinear memory proven: `{}`",
+        report.claim_boundary.nonlinear_memory_proven
+    );
+}
+
+fn print_core_v1_broad_eval_harness_md(report: &CoreV1BroadEvalHarnessReport) {
+    println!("# LLMWave Core V1 Broad Eval Harness");
+    println!();
+    println!("- version: `{}`", report.version);
+    println!("- phase: `{}`", report.phase);
+    println!("- verdict: `{}`", report.verdict);
+    println!("- input: `{}`", report.input_text);
+    println!("- suite: `{}`", report.suite.suite_id);
+    println!("- cases: `{}`", report.suite.cases.len());
+    println!("- passed: `{}`", report.suite.passed);
+    println!("- failed: `{}`", report.suite.failed);
+    println!("- false positives: `{}`", report.suite.false_positive_count);
+    println!("- false negatives: `{}`", report.suite.false_negative_count);
+    println!();
+    println!("## Exit Criteria");
+    println!();
+    for criterion in &report.exit_criteria {
+        println!("- `{}`: `{}`", criterion.criterion, criterion.passed);
+    }
+    println!();
+    println!("## Claim Boundary");
+    println!();
+    println!(
+        "- local core v1 pipeline ready: `{}`",
+        report.claim_boundary.local_core_v1_pipeline_ready
+    );
+    println!(
+        "- real broad corpus loaded: `{}`",
+        report.claim_boundary.real_broad_corpus_loaded
+    );
+    println!(
+        "- broad generalization proven: `{}`",
+        report.claim_boundary.broad_generalization_proven
     );
     println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
     println!(

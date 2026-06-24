@@ -248,6 +248,7 @@ nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goo
 nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-consolidation-sleep --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-broad-eval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -751,6 +752,7 @@ nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goo
 nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-consolidation-sleep --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-broad-eval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -1145,6 +1147,12 @@ duplicate local feedback, decays unsafe WATCH forms, preserves the negative
 shortcut lane, and verifies that the post-sleep field remains safe. It is a
 local sleep pass, not broad eval, broad training, LLM readiness, or
 nonlinear-memory proof.
+`nanda-llmwave-big core-v1-broad-eval` records Phase 12. It runs the embedded
+Core V1 broad-control harness over query, retrieval, schema, surface, verifier,
+feedback, consolidation, shortcut, role-swap, and hard-claim blockers. It can
+mark the local Core V1 pipeline ready, but still blocks broad generalization,
+LLM readiness, and nonlinear-memory proof until a real broad corpus and density
+proof are supplied.
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

@@ -341,6 +341,7 @@ nanda-llmwave-big core-v1-surface-generation --text "Has customs cleared the goo
 nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-consolidation-sleep --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v1-broad-eval --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -415,6 +416,10 @@ broad learning, LLM readiness, and nonlinear-memory proof closed.
 `core-v1-consolidation-sleep` is the Phase 11 report from
 `LLMWAVE_CORE_V1_PHASE11_REPORT.md`. It merges local feedback safely, preserves
 negative shortcut memory, and keeps broad eval/training and hard claims closed.
+`core-v1-broad-eval` is the Phase 12 report from
+`LLMWAVE_CORE_V1_PHASE12_REPORT.md`. It runs embedded broad controls for the
+Core V1 local pipeline and explicitly keeps real broad-corpus generalization,
+LLM readiness, and nonlinear-memory proof blocked.
 
 ## Word And Surface Memory
 

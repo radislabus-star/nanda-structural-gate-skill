@@ -12,6 +12,7 @@ pub mod broad_eval;
 pub mod consolidation;
 pub mod core_v1_active_retrieval;
 pub mod core_v1_answer_verifier;
+pub mod core_v1_broad_eval_harness;
 pub mod core_v1_consolidation_sleep;
 pub mod core_v1_contract;
 pub mod core_v1_feedback_learning;
@@ -125,6 +126,9 @@ enum LlmwaveBigCommand {
         alias = "core-consolidation-sleep"
     )]
     CoreV1ConsolidationSleep(LlmwaveBigCoreV1ConsolidationSleepArgs),
+    /// Print the Phase 12 LLMWave Core V1 broad eval harness gate.
+    #[command(name = "core-v1-broad-eval", alias = "core-broad-eval")]
+    CoreV1BroadEvalHarness(LlmwaveBigCoreV1BroadEvalHarnessArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -415,6 +419,14 @@ struct LlmwaveBigCoreV1FeedbackLearningArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV1ConsolidationSleepArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV1BroadEvalHarnessArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
     #[arg(long, value_enum, default_value = "json")]
@@ -1283,6 +1295,12 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 core_v1_consolidation_sleep::build_core_v1_consolidation_sleep_report(args.text);
             report::print_core_v1_consolidation_sleep_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV1BroadEvalHarness(args) => {
+            let report =
+                core_v1_broad_eval_harness::build_core_v1_broad_eval_harness_report(args.text);
+            report::print_core_v1_broad_eval_harness_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Contract(args) => {
@@ -2395,6 +2413,46 @@ mod tests {
         assert!(!report.claim_boundary.llm_ready);
         assert!(!report.claim_boundary.nonlinear_memory_proven);
         assert_eq!(report.next_phase, "phase-12-broad-eval-harness-v1");
+    }
+
+    #[test]
+    fn core_v1_broad_eval_harness_passes_local_controls_without_hard_claims() {
+        let report = core_v1_broad_eval_harness::build_core_v1_broad_eval_harness_report(
+            "Has customs cleared the goods?".to_string(),
+        );
+        assert_eq!(report.mode, "llmwave-core-v1-broad-eval-harness");
+        assert_eq!(report.verdict, "CORE_V1_BROAD_EVAL_HARNESS_READY_NOT_LLM");
+        assert_eq!(
+            core::mem::size_of::<core_v1_broad_eval_harness::CoreV1EvalCaseRecord32>(),
+            32
+        );
+        assert_eq!(report.suite.cases.len(), 10);
+        assert_eq!(report.suite.failed, 0);
+        assert_eq!(report.suite.false_positive_count, 0);
+        assert_eq!(report.suite.false_negative_count, 0);
+        assert!(report
+            .suite
+            .cases
+            .iter()
+            .any(|case| case.case_id == "broad_corpus_claim_blocked"
+                && case.observed == "BROAD_CORPUS_MISSING"
+                && case.passed));
+        assert!(report.blockers.iter().all(|blocker| blocker.active));
+        assert!(report
+            .exit_criteria
+            .iter()
+            .all(|criterion| criterion.passed));
+        assert!(report.claim_boundary.broad_eval_harness_v1_implemented);
+        assert!(report.claim_boundary.local_core_v1_pipeline_ready);
+        assert!(report.claim_boundary.safety_controls_ready);
+        assert!(!report.claim_boundary.real_broad_corpus_loaded);
+        assert!(!report.claim_boundary.broad_generalization_proven);
+        assert!(!report.claim_boundary.llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert_eq!(
+            report.next_phase,
+            "core-v1-real-broad-corpus-and-density-proof"
+        );
     }
 
     #[test]
