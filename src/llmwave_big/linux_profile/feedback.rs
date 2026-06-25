@@ -100,6 +100,7 @@ pub(crate) fn build_linux_feedback_report(
         residual_pack: config.residual_pack,
         text: config.text.clone(),
         max_facts: 4,
+        runtime_snapshot: None,
     })?;
     let decision = normalize_decision(&config.decision);
     let packet = LinuxFeedbackPacket {
@@ -148,6 +149,7 @@ pub(crate) fn build_linux_feedback_apply_report(
         residual_pack: config.residual_pack,
         text: config.text,
         max_facts: config.max_facts.max(1),
+        runtime_snapshot: None,
     })?;
     let applied = match_lanes(&packet, &before);
     let after = after_decision(&before, &applied);

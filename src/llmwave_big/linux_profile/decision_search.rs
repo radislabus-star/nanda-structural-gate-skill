@@ -16,6 +16,7 @@ pub(crate) struct LinuxDecisionSearchConfig {
     pub residual_pack: PathBuf,
     pub text: String,
     pub max_facts: usize,
+    pub runtime_snapshot: Option<PathBuf>,
     pub out: Option<PathBuf>,
 }
 
@@ -57,6 +58,7 @@ pub(crate) fn build_linux_decision_search_report(
         residual_pack: config.residual_pack,
         text: config.text.clone(),
         max_facts: config.max_facts.max(1),
+        runtime_snapshot: config.runtime_snapshot,
     })?;
     let decision_search = decision_search_from_reason(&reason);
     let ready = !decision_search.safe_next_checks.is_empty() || reason.decision.answer_allowed;
@@ -92,36 +94,38 @@ fn decision_search_from_reason(reason: &LinuxReasonReport) -> LinuxDecisionSearc
     let mut checks = Vec::new();
     match reason.query_wave.intent.as_str() {
         "external_exposure" => {
-            push_missing(
-                &mut missing,
-                "matching firewall allow for same endpoint/port",
-            );
-            push_missing(&mut missing, "effective runtime service or process state");
-            push_missing(&mut missing, "network namespace/interface boundary");
-            checks.push(check(
-                "runtime-sockets",
-                "list listening sockets with process context",
-                "linux.socket.runtime",
-                "ss -lntp",
-            ));
-            checks.push(check(
-                "service-state",
-                "confirm service activity for the listener owner",
-                "linux.systemd.exec",
-                "systemctl is-active <service>",
-            ));
-            checks.push(check(
-                "firewall-rules",
-                "confirm effective allow/drop rules for the observed port",
-                "linux.firewall.runtime",
-                "nft list ruleset / ufw status",
-            ));
-            checks.push(check(
-                "route-scope",
-                "confirm interface and route scope before claiming internet reachability",
-                "linux.routing.runtime",
-                "ip route; ip addr show",
-            ));
+            if reason.decision.state != "EXPOSURE_CONFIRMED_REVIEW" {
+                push_missing(
+                    &mut missing,
+                    "matching firewall allow for same endpoint/port",
+                );
+                push_missing(&mut missing, "effective runtime service or process state");
+                push_missing(&mut missing, "network namespace/interface boundary");
+                checks.push(check(
+                    "runtime-sockets",
+                    "list listening sockets with process context",
+                    "linux.socket.runtime",
+                    "ss -lntp",
+                ));
+                checks.push(check(
+                    "service-state",
+                    "confirm service activity for the listener owner",
+                    "linux.systemd.exec",
+                    "systemctl is-active <service>",
+                ));
+                checks.push(check(
+                    "firewall-rules",
+                    "confirm effective allow/drop rules for the observed port",
+                    "linux.firewall.runtime",
+                    "nft list ruleset / ufw status",
+                ));
+                checks.push(check(
+                    "route-scope",
+                    "confirm interface and route scope before claiming internet reachability",
+                    "linux.routing.runtime",
+                    "ip route; ip addr show",
+                ));
+            }
         }
         "package_runtime_boundary" => {
             push_missing(&mut missing, "runtime process/service evidence");

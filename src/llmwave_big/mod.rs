@@ -48,6 +48,7 @@ pub mod linux_exposure;
 pub mod linux_hot_packet;
 pub mod linux_profile;
 pub mod linux_residual_memory;
+pub mod linux_runtime_snapshot;
 pub mod loader;
 pub mod mature_anti_wave;
 pub mod memory_final_proof;
@@ -412,6 +413,9 @@ enum LlmwaveBigCommand {
     /// Run boundary-aware Linux exposure reasoning over the residual packet.
     #[command(name = "linux-exposure-run", alias = "linux-exposure")]
     LinuxExposureRun(LlmwaveBigLinuxExposureRunArgs),
+    /// Import a side-effect-free Linux runtime snapshot as temporary profile facts.
+    #[command(name = "linux-snapshot-import")]
+    LinuxSnapshotImport(LlmwaveBigLinuxSnapshotImportArgs),
     /// Run constrained Linux-profile chat/readout over schema/residual memory.
     #[command(name = "linux-chat-run", alias = "linux-chat")]
     LinuxChatRun(LlmwaveBigLinuxChatRunArgs),
@@ -1321,6 +1325,20 @@ struct LlmwaveBigLinuxExposureRunArgs {
     residual_pack: PathBuf,
     #[arg(long = "max-candidates", default_value_t = 16)]
     max_candidates: usize,
+    #[arg(long = "runtime-snapshot")]
+    runtime_snapshot: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxSnapshotImportArgs {
+    #[arg(long)]
+    snapshot: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1391,6 +1409,8 @@ struct LlmwaveBigLinuxReasonRunArgs {
     text: String,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
+    #[arg(long = "runtime-snapshot")]
+    runtime_snapshot: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1491,6 +1511,8 @@ struct LlmwaveBigLinuxDecisionSearchArgs {
     text: String,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
+    #[arg(long = "runtime-snapshot")]
+    runtime_snapshot: Option<PathBuf>,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -3009,7 +3031,14 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 linux_exposure::build_linux_exposure_report(linux_exposure::LinuxExposureConfig {
                     residual_pack: args.residual_pack,
                     max_candidates: args.max_candidates,
+                    runtime_snapshot: args.runtime_snapshot,
                 })?;
+            if let Some(out) = args.out.as_ref() {
+                if let Some(parent) = out.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::write(out, serde_json::to_string_pretty(&report)?)?;
+            }
             match args.format {
                 OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
                 OutputFormat::Text => {
@@ -3055,6 +3084,42 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- vulnerability scan ready: `{}`",
                         report.claim_boundary.vulnerability_scan_ready
                     );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxSnapshotImport(args) => {
+            let report = linux_runtime_snapshot::build_linux_runtime_snapshot_import_report(
+                linux_runtime_snapshot::LinuxRuntimeSnapshotImportConfig {
+                    snapshot: args.snapshot,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("facts: {}", report.overlay.fact_count);
+                    println!(
+                        "firewall_allow_facts: {}",
+                        report.overlay.firewall_allow_fact_count
+                    );
+                    println!("commands_executed: {}", report.overlay.commands_executed);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Runtime Snapshot Import");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- facts: `{}`", report.overlay.fact_count);
+                    println!(
+                        "- firewall allow facts: `{}`",
+                        report.overlay.firewall_allow_fact_count
+                    );
+                    println!(
+                        "- commands executed: `{}`",
+                        report.overlay.commands_executed
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }
             }
             Ok(EXIT_PASS)
@@ -3214,6 +3279,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     residual_pack: args.residual_pack,
                     text: args.text,
                     max_facts: args.max_facts,
+                    runtime_snapshot: args.runtime_snapshot,
                 })?;
             match args.format {
                 OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
@@ -3439,6 +3505,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     residual_pack: args.residual_pack,
                     text: args.text,
                     max_facts: args.max_facts,
+                    runtime_snapshot: args.runtime_snapshot,
                     out: args.out,
                 },
             )?;

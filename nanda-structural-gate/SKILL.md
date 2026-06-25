@@ -259,6 +259,8 @@ scripts/nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux
 scripts/nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
 scripts/nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
 scripts/nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-candidates 16 --format json
+scripts/nanda-llmwave-big linux-snapshot-import --snapshot .nanda/linux-active/runtime-snapshot.json --format json
+scripts/nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --max-candidates 16 --format json
 scripts/nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -995,6 +997,13 @@ evidence, service context, and negative boundary facts. Treat
 `LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER` as exposure-reasoning readiness
 only. It is not a network scanner, exploit path, vulnerability proof, or broad
 chat LLM.
+Use `nanda-llmwave-big linux-snapshot-import --snapshot .nanda/linux-active/runtime-snapshot.json --format json`
+to convert a user-provided JSON runtime snapshot into temporary Linux-profile
+facts. The import is side-effect-free: it does not run `ss`, `nft`, `ufw`,
+`iptables`, `systemctl`, or any scanner, and it does not rewrite `.lrf` memory.
+Pass the same file with `--runtime-snapshot` to `linux-exposure-run`,
+`linux-reason-run`, or `linux-decision-search` when runtime firewall/listener/
+service evidence should participate in one field pass.
 Use `nanda-llmwave-big linux-chat-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-facts 4 --format json`
 to run constrained Linux-profile multi-turn chat/readout over the `.lrf`
 schema/residual memory. It checks grounded package/provider answers, listener
@@ -1009,7 +1018,8 @@ not retrieval or answer permission.
 Use `nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is ssh externally exposed?" --max-facts 4 --format json`
 to apply the query wave to `.lrf` schema/residual memory, build an evidence
 chain, apply anti-wave shortcut suppression, and return a grounded decision for
-that one prompt.
+that one prompt. Add `--runtime-snapshot <snapshot.json>` when the prompt needs
+side-effect-free runtime evidence that is not persisted in the `.lrf` packet.
 Use `nanda-llmwave-big linux-broad-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-broad-suite.json --format json`
 to generate a Linux-profile eval suite from active facts.
 Use `nanda-llmwave-big linux-broad-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-broad-suite.json --out .nanda/linux-active/linux-broad-eval.json --max-facts 4 --format json`
@@ -1037,7 +1047,9 @@ gradient training.
 Use `nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json`
 when the useful output is not yes/no but missing evidence and side-effect-free
 next checks. It may suggest `ss`, `systemctl`, `nft`, or `ip` as evidence
-routes, but it does not run them and is not a network scanner.
+routes, but it does not run them and is not a network scanner. With
+`--runtime-snapshot`, already-provided runtime evidence can turn the state into
+`ANSWER_ALREADY_GROUNDED` instead of proposing redundant checks.
 Use `nanda-llmwave-big linux-relation-profile --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
 to inspect Linux relation-family coverage and missing relation routes. Use it
 to grow the corpus by causal relation type rather than raw fact count.

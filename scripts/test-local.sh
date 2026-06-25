@@ -392,6 +392,23 @@ jq -e '.mode == "llmwave-big-linux-query-wave" and .verdict == "LINUX_QUERY_WAVE
 big_linux_reason_json="$("$llmwave_big" linux-reason-run --residual-pack "$tmp_linux_chat_residual" --text "Is this machine externally exposed?" --max-facts 4 --format json)"
 jq -e '.mode == "llmwave-big-linux-reason-run" and .verdict == "LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM" and .decision.state == "EXPOSURE_NOT_CONFIRMED" and (.decision.answer | ascii_downcase | contains("not confirmed")) and .claim_boundary.linux_profile_reasoning_ready == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_reason_json" >/dev/null
 jq -e '.anti_wave_hits[] | select(.shortcut == "listener_implies_external_exposure")' <<<"$big_linux_reason_json" >/dev/null
+tmp_linux_runtime_snapshot="$tmp_linux_chat/runtime-snapshot.json"
+cat >"$tmp_linux_runtime_snapshot" <<JSON
+{
+  "firewall": {
+    "engine": "ufw",
+    "rules": [
+      {"action": "allow", "port": 22, "protocol": "tcp", "scope": "external"}
+    ]
+  }
+}
+JSON
+big_linux_snapshot_import_json="$("$llmwave_big" linux-snapshot-import --snapshot "$tmp_linux_runtime_snapshot" --format json)"
+jq -e '.mode == "llmwave-big-linux-snapshot-import" and .verdict == "LINUX_RUNTIME_SNAPSHOT_IMPORTED_NOT_SCANNER" and .overlay.fact_count == 1 and .overlay.firewall_allow_fact_count == 1 and .overlay.commands_executed == false and .claim_boundary.side_effect_free == true and .claim_boundary.confirms_exposure_by_itself == false' <<<"$big_linux_snapshot_import_json" >/dev/null
+big_linux_exposure_snapshot_json="$("$llmwave_big" linux-exposure-run --residual-pack "$tmp_linux_chat_residual" --runtime-snapshot "$tmp_linux_runtime_snapshot" --max-candidates 8 --format json)"
+jq -e '.mode == "llmwave-big-linux-exposure-run" and .exposure_field.state == "EXPOSURE_CONFIRMED_REVIEW" and .runtime_snapshot_overlay.firewall_allow_fact_count == 1 and .claim_boundary.external_exposure_confirmed == true and .claim_boundary.vulnerability_scan_ready == false' <<<"$big_linux_exposure_snapshot_json" >/dev/null
+big_linux_reason_snapshot_json="$("$llmwave_big" linux-reason-run --residual-pack "$tmp_linux_chat_residual" --runtime-snapshot "$tmp_linux_runtime_snapshot" --text "Is this machine externally exposed?" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-reason-run" and .decision.state == "EXPOSURE_CONFIRMED_REVIEW" and .runtime_snapshot_overlay.firewall_allow_fact_count == 1 and (.evidence_chain[] | select(.route == "linux.firewall.runtime")) and .claim_boundary.network_scanner_ready == false' <<<"$big_linux_reason_snapshot_json" >/dev/null
 tmp_linux_profile_suite="$tmp_linux_chat/linux-profile-suite.json"
 big_linux_profile_suite_json="$("$llmwave_big" linux-broad-suite-build --residual-pack "$tmp_linux_chat_residual" --cases 32 --out "$tmp_linux_profile_suite" --format json)"
 jq -e '.mode == "llmwave-big-linux-broad-suite-build" and .verdict == "LINUX_BROAD_SUITE_READY_NOT_EVAL" and .suite.case_count == 32 and .claim_boundary.general_llm_ready == false' <<<"$big_linux_profile_suite_json" >/dev/null
@@ -418,6 +435,8 @@ big_linux_feedback_apply_json="$("$llmwave_big" linux-feedback-apply --residual-
 jq -e '.mode == "llmwave-big-linux-feedback-apply" and .verdict == "LINUX_FEEDBACK_MEMORY_APPLIED_NOT_GENERAL_TRAINING" and .applied.negative_lanes_matched > 0 and .after.learned_negative_lanes_active == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_feedback_apply_json" >/dev/null
 big_linux_decision_search_json="$("$llmwave_big" linux-decision-search --residual-pack "$tmp_linux_chat_residual" --text "Is this machine externally exposed?" --max-facts 4 --format json)"
 jq -e '.mode == "llmwave-big-linux-decision-search" and .verdict == "LINUX_DECISION_SEARCH_READY_NOT_SCANNER" and (.decision_search.safe_next_checks | length) > 0 and (.decision_search.missing_evidence | index("matching firewall allow for same endpoint/port")) and .claim_boundary.network_scanner_ready == false' <<<"$big_linux_decision_search_json" >/dev/null
+big_linux_decision_search_snapshot_json="$("$llmwave_big" linux-decision-search --residual-pack "$tmp_linux_chat_residual" --runtime-snapshot "$tmp_linux_runtime_snapshot" --text "Is this machine externally exposed?" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-decision-search" and .verdict == "LINUX_DECISION_SEARCH_READY_NOT_SCANNER" and .decision_search.state == "ANSWER_ALREADY_GROUNDED" and (.decision_search.safe_next_checks | length) == 0 and (.decision_search.missing_evidence | length) == 0 and .claim_boundary.network_scanner_ready == false' <<<"$big_linux_decision_search_snapshot_json" >/dev/null
 big_linux_relation_profile_json="$("$llmwave_big" linux-relation-profile --residual-pack "$tmp_linux_chat_residual" --format json)"
 jq -e '.mode == "llmwave-big-linux-relation-profile" and .verdict == "LINUX_RELATION_PROFILE_READY_NOT_CORPUS_COMPLETE" and (.causal_chains[] | select(.chain_id == "vulnerability_boundary" and .present == true)) and .claim_boundary.general_llm_ready == false' <<<"$big_linux_relation_profile_json" >/dev/null
 big_small_domain_claim_json="$("$llmwave_big" claim-gate --claim small-domain-llmwave --format json)"

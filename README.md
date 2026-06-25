@@ -402,6 +402,16 @@ nanda-llmwave-big linux-exposure-run \
   --max-candidates 16 \
   --format json
 
+nanda-llmwave-big linux-snapshot-import \
+  --snapshot .nanda/linux-active/runtime-snapshot.json \
+  --format json
+
+nanda-llmwave-big linux-exposure-run \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --runtime-snapshot .nanda/linux-active/runtime-snapshot.json \
+  --max-candidates 16 \
+  --format json
+
 nanda-llmwave-big strict-density-claim-gate \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
@@ -689,6 +699,14 @@ does not prove firewall allows external packets". Treat
 say whether the fact field supports an exposure reading, but it is not a network
 scanner, exploit path, vulnerability proof, or broad chat model.
 
+`linux-snapshot-import` is the side-effect-free runtime overlay path. It reads a
+user-provided JSON snapshot, converts firewall/listener/service-state entries
+into temporary Linux-profile facts, and reports `commands_executed=false`. It
+does not run `ss`, `nft`, `ufw`, `iptables`, `systemctl`, or any scanner, and it
+does not rewrite the `.lrf` memory. Pass the snapshot with `--runtime-snapshot`
+to `linux-exposure-run`, `linux-reason-run`, or `linux-decision-search` when you
+want the field to consider runtime evidence without mutating the machine.
+
 `linux-chat-run` is the constrained Linux-profile chat/readout layer over the
 same `.lrf` schema/residual memory. It answers package/provider questions,
 summarizes listener evidence, refuses unsupported exposure shortcuts, and checks
@@ -713,10 +731,13 @@ listener/exposure shortcuts, and endpoint-scope checks. `linux-feedback-build`
 and `linux-feedback-apply` write and replay local profile memory packets, so a
 reject can reinforce learned anti-wave lanes on the next pass. `linux-decision-search`
 does not scan the machine; it maps a question to missing evidence and safe next
-checks. `linux-relation-profile` reports which Linux relation families and
-causal chains are covered by the active `.lrf`, so corpus growth can target
-missing relation types instead of raw fact count. This is still not general LLM
-readiness, open-domain chat, a network scanner, or vulnerability proof.
+checks. With `--runtime-snapshot`, already-provided firewall/listener/service
+evidence can turn the search state into `ANSWER_ALREADY_GROUNDED` instead of
+suggesting redundant checks. `linux-relation-profile` reports which Linux
+relation families and causal chains are covered by the active `.lrf`, so corpus
+growth can target missing relation types instead of raw fact count. This is
+still not general LLM readiness, open-domain chat, a network scanner, or
+vulnerability proof.
 
 ```bash
 nanda-llmwave-big linux-chat-run \
@@ -730,6 +751,13 @@ nanda-llmwave-big linux-query-wave \
 
 nanda-llmwave-big linux-reason-run \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --text "Is ssh externally exposed?" \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-reason-run \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --runtime-snapshot .nanda/linux-active/runtime-snapshot.json \
   --text "Is ssh externally exposed?" \
   --max-facts 4 \
   --format json
@@ -781,6 +809,13 @@ nanda-llmwave-big linux-feedback-apply \
 
 nanda-llmwave-big linux-decision-search \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --text "Is this machine externally exposed?" \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-decision-search \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --runtime-snapshot .nanda/linux-active/runtime-snapshot.json \
   --text "Is this machine externally exposed?" \
   --max-facts 4 \
   --format json

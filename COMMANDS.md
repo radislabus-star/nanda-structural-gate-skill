@@ -136,9 +136,12 @@ nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-
 nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
 nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-candidates 16 --format json
+nanda-llmwave-big linux-snapshot-import --snapshot .nanda/linux-active/runtime-snapshot.json --format json
+nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --max-candidates 16 --format json
 nanda-llmwave-big linux-chat-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-facts 4 --format json
 nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json
 nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is ssh externally exposed?" --max-facts 4 --format json
+nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --text "Is ssh externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-broad-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-broad-suite.json --format json
 nanda-llmwave-big linux-broad-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-broad-suite.json --out .nanda/linux-active/linux-broad-eval.json --max-facts 4 --format json
 nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --format json
@@ -147,6 +150,7 @@ nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/lin
 nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
 nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json
+nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-relation-profile --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
@@ -293,6 +297,13 @@ facts, service context, and negative boundary facts. Treat
 `LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER` as exposure-reasoning readiness
 only. It is not a network scan, exploit, vulnerability proof, or broad chat
 LLM.
+`linux-snapshot-import` converts a user-provided JSON runtime snapshot into
+temporary Linux-profile facts. It never runs `ss`, `nft`, `ufw`, `iptables`,
+`systemctl`, or any other runtime command. Pass the same snapshot to
+`linux-exposure-run`, `linux-reason-run`, or `linux-decision-search` with
+`--runtime-snapshot` when the `.lrf` packet needs side-effect-free runtime
+evidence such as firewall allow rules, listeners, or service state. This overlay
+does not rewrite hot memory and does not prove exposure by itself.
 `linux-chat-run` reads the same `.lrf` schema/residual memory and runs a
 constrained Linux-profile multi-turn readout: grounded package/provider answers,
 listener/exposure boundary answers, context recall, and false-shortcut refusal.
@@ -322,7 +333,8 @@ feedback, not gradient training.
 `linux-decision-search` turns a Linux question into missing evidence and
 side-effect-free next checks. It proposes commands such as `ss`, `systemctl`,
 `nft`, or `ip` as evidence routes, but it does not run them and is not a
-scanner.
+scanner. If a runtime snapshot already closes the missing evidence route, the
+state becomes `ANSWER_ALREADY_GROUNDED` instead of proposing redundant checks.
 `linux-relation-profile` reports relation-family coverage and missing routes
 over the `.lrf` packet so the corpus can grow by causal relation type instead
 of raw fact count alone.

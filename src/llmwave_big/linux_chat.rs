@@ -160,6 +160,7 @@ pub(crate) fn build_linux_chat_report(config: LinuxChatConfig) -> Result<LinuxCh
     let exposure = build_linux_exposure_report(LinuxExposureConfig {
         residual_pack: config.residual_pack,
         max_candidates: 16,
+        runtime_snapshot: None,
     })?;
     let prompts = if config.prompt.is_empty() {
         builtin_linux_chat_cases()

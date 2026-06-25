@@ -14,6 +14,7 @@ use super::linux_residual_memory::{
     load_linux_residual_decoded_packet, LinuxResidualDecodedFact, LinuxResidualDecodedSummary,
     LINUX_RESIDUAL_MEMORY_VERSION,
 };
+use super::linux_runtime_snapshot::{load_runtime_snapshot_overlay, LinuxRuntimeSnapshotOverlay};
 
 pub(crate) const LINUX_EXPOSURE_VERSION: &str = "llmwave-big-v-next-linux-exposure";
 
@@ -21,6 +22,7 @@ pub(crate) const LINUX_EXPOSURE_VERSION: &str = "llmwave-big-v-next-linux-exposu
 pub(crate) struct LinuxExposureConfig {
     pub residual_pack: PathBuf,
     pub max_candidates: usize,
+    pub runtime_snapshot: Option<PathBuf>,
 }
 
 #[derive(Serialize, Clone)]
@@ -30,6 +32,7 @@ pub(crate) struct LinuxExposureReport {
     pub residual_memory_version: &'static str,
     pub verdict: &'static str,
     pub residual_pack: LinuxResidualDecodedSummary,
+    pub runtime_snapshot_overlay: Option<LinuxRuntimeSnapshotOverlay>,
     pub route_distribution: BTreeMap<String, usize>,
     pub exposure_field: LinuxExposureField,
     pub eval: LinuxExposureEvalSummary,
@@ -144,32 +147,55 @@ pub(crate) fn build_linux_exposure_report(
     config: LinuxExposureConfig,
 ) -> Result<LinuxExposureReport> {
     let packet = load_linux_residual_decoded_packet(&config.residual_pack)?;
-    let route_distribution = count_routes(&packet.facts);
-    let field = build_exposure_field(&packet.facts, config.max_candidates.max(1));
-    let eval = eval_exposure_field(&field, &packet.facts);
+    let mut facts = packet.facts;
+    let runtime_snapshot_overlay = if let Some(path) = config.runtime_snapshot {
+        let (overlay, overlay_facts) = load_runtime_snapshot_overlay(&path)?;
+        facts.extend(overlay_facts);
+        Some(overlay)
+    } else {
+        None
+    };
+    Ok(build_linux_exposure_report_from_facts(
+        packet.summary,
+        &facts,
+        runtime_snapshot_overlay,
+        config.max_candidates,
+    ))
+}
+
+pub(crate) fn build_linux_exposure_report_from_facts(
+    summary: LinuxResidualDecodedSummary,
+    facts: &[LinuxResidualDecodedFact],
+    runtime_snapshot_overlay: Option<LinuxRuntimeSnapshotOverlay>,
+    max_candidates: usize,
+) -> LinuxExposureReport {
+    let route_distribution = count_routes(facts);
+    let field = build_exposure_field(facts, max_candidates.max(1));
+    let eval = eval_exposure_field(&field, facts);
     let exposure_reasoning_eval_passed =
         eval.metrics.total > 0 && eval.metrics.total == eval.metrics.passed;
-    let linux_profile_nonlinear_memory_proven = packet.summary.binary_hot_sections_fit_6m
-        && packet.summary.schema_record_count > 0
-        && packet.summary.residual_record_count > 0
-        && packet.summary.beats_direct_fixed64;
+    let linux_profile_nonlinear_memory_proven = summary.binary_hot_sections_fit_6m
+        && summary.schema_record_count > 0
+        && summary.residual_record_count > 0
+        && summary.beats_direct_fixed64;
     let exposure_layer_ready =
         linux_profile_nonlinear_memory_proven && exposure_reasoning_eval_passed;
     let external_exposure_confirmed = field.safe_to_claim_external_exposure;
     let verdict = if exposure_layer_ready {
         "LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER"
-    } else if !packet.facts.is_empty() {
+    } else if !facts.is_empty() {
         "LINUX_EXPOSURE_REASONING_REVIEW"
     } else {
         "LINUX_EXPOSURE_REASONING_BLOCKED"
     };
 
-    Ok(LinuxExposureReport {
+    LinuxExposureReport {
         mode: "llmwave-big-linux-exposure-run",
         version: LINUX_EXPOSURE_VERSION,
         residual_memory_version: LINUX_RESIDUAL_MEMORY_VERSION,
         verdict,
-        residual_pack: packet.summary,
+        residual_pack: summary,
+        runtime_snapshot_overlay,
         route_distribution,
         exposure_field: field,
         eval,
@@ -205,7 +231,7 @@ pub(crate) fn build_linux_exposure_report(
                 ]
             },
         },
-    })
+    }
 }
 
 fn build_exposure_field(
@@ -625,6 +651,7 @@ mod tests {
         let report = build_linux_exposure_report(LinuxExposureConfig {
             residual_pack: out,
             max_candidates: 8,
+            runtime_snapshot: None,
         })
         .unwrap();
         assert_eq!(report.verdict, "LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER");
@@ -651,6 +678,7 @@ mod tests {
         let report = build_linux_exposure_report(LinuxExposureConfig {
             residual_pack: out,
             max_candidates: 8,
+            runtime_snapshot: None,
         })
         .unwrap();
         assert_eq!(report.exposure_field.state, "NO_RUNTIME_SOCKET_EVIDENCE");

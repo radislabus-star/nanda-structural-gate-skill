@@ -18,12 +18,14 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::linux_exposure::{
-    build_linux_exposure_report, LinuxExposureConfig, LinuxExposureReport,
+    build_linux_exposure_report, build_linux_exposure_report_from_facts, LinuxExposureConfig,
+    LinuxExposureReport,
 };
 use super::linux_residual_memory::{
     load_linux_residual_decoded_packet, LinuxResidualDecodedFact, LinuxResidualDecodedSummary,
     LINUX_RESIDUAL_MEMORY_VERSION,
 };
+use super::linux_runtime_snapshot::{load_runtime_snapshot_overlay, LinuxRuntimeSnapshotOverlay};
 
 pub(crate) const LINUX_PROFILE_VERSION: &str = "llmwave-big-v-next-linux-profile-reasoning";
 
@@ -37,6 +39,7 @@ pub(crate) struct LinuxReasonRunConfig {
     pub residual_pack: PathBuf,
     pub text: String,
     pub max_facts: usize,
+    pub runtime_snapshot: Option<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -90,6 +93,7 @@ pub(crate) struct LinuxReasonReport {
     pub residual_memory_version: &'static str,
     pub verdict: &'static str,
     pub residual_pack: LinuxResidualDecodedSummary,
+    pub runtime_snapshot_overlay: Option<LinuxRuntimeSnapshotOverlay>,
     pub query_wave: LinuxQueryWave,
     pub decision: LinuxReasonDecision,
     pub evidence_chain: Vec<LinuxEvidenceStep>,
@@ -272,13 +276,24 @@ pub(crate) fn build_linux_query_wave_report(config: LinuxQueryWaveConfig) -> Lin
 
 pub(crate) fn build_linux_reason_report(config: LinuxReasonRunConfig) -> Result<LinuxReasonReport> {
     let packet = load_linux_residual_decoded_packet(&config.residual_pack)?;
-    let exposure = build_linux_exposure_report(LinuxExposureConfig {
-        residual_pack: config.residual_pack,
-        max_candidates: config.max_facts.max(1),
-    })?;
+    let mut facts = packet.facts;
+    let runtime_snapshot_overlay = if let Some(path) = config.runtime_snapshot {
+        let (overlay, overlay_facts) = load_runtime_snapshot_overlay(&path)?;
+        facts.extend(overlay_facts);
+        Some(overlay)
+    } else {
+        None
+    };
+    let exposure = build_linux_exposure_report_from_facts(
+        packet.summary.clone(),
+        &facts,
+        runtime_snapshot_overlay.clone(),
+        config.max_facts.max(1),
+    );
     Ok(build_linux_reason_from_parts(
         packet.summary,
-        &packet.facts,
+        &facts,
+        runtime_snapshot_overlay,
         &exposure,
         &config.text,
         config.max_facts.max(1),
@@ -288,6 +303,7 @@ pub(crate) fn build_linux_reason_report(config: LinuxReasonRunConfig) -> Result<
 fn build_linux_reason_from_parts(
     summary: LinuxResidualDecodedSummary,
     facts: &[LinuxResidualDecodedFact],
+    runtime_snapshot_overlay: Option<LinuxRuntimeSnapshotOverlay>,
     exposure: &LinuxExposureReport,
     text: &str,
     max_facts: usize,
@@ -312,6 +328,7 @@ fn build_linux_reason_from_parts(
         residual_memory_version: LINUX_RESIDUAL_MEMORY_VERSION,
         verdict,
         residual_pack: summary,
+        runtime_snapshot_overlay,
         query_wave,
         decision,
         evidence_chain,
@@ -379,12 +396,14 @@ pub(crate) fn build_linux_broad_eval_report(
     let exposure = build_linux_exposure_report(LinuxExposureConfig {
         residual_pack: config.residual_pack.clone(),
         max_candidates: config.max_facts.max(1),
+        runtime_snapshot: None,
     })?;
     let mut results = Vec::new();
     for case in &suite_report.suite.cases {
         let reason = build_linux_reason_from_parts(
             packet.summary.clone(),
             &packet.facts,
+            None,
             &exposure,
             &case.prompt,
             config.max_facts.max(1),
@@ -748,12 +767,17 @@ fn build_evidence_chain(
             );
         }
         "listener_summary" | "bind_scope" | "external_exposure" => {
+            let exposure_anchors = if query.intent == "external_exposure" {
+                &[][..]
+            } else {
+                query.anchors.as_slice()
+            };
             push_matching(
                 &mut steps,
                 facts,
                 "listener",
                 &["linux.socket.runtime", "linux.systemd.socket"],
-                &query.anchors,
+                exposure_anchors,
                 max_facts,
             );
             push_matching(
@@ -761,7 +785,7 @@ fn build_evidence_chain(
                 facts,
                 "firewall",
                 &["linux.firewall.runtime"],
-                &query.anchors,
+                exposure_anchors,
                 max_facts,
             );
             push_matching(
@@ -1692,16 +1716,14 @@ mod tests {
                 residual_pack: residual.clone(),
                 text: "Is this machine externally exposed?".to_string(),
                 max_facts: 4,
+                runtime_snapshot: None,
                 out: None,
             },
         )
         .unwrap();
         assert_eq!(search.verdict, "LINUX_DECISION_SEARCH_READY_NOT_SCANNER");
-        assert!(search
-            .decision_search
-            .safe_next_checks
-            .iter()
-            .any(|check| check.expected_route == "linux.firewall.runtime"));
+        assert_eq!(search.decision_search.state, "ANSWER_ALREADY_GROUNDED");
+        assert!(search.decision_search.safe_next_checks.is_empty());
         let relation =
             relations::build_linux_relation_profile_report(relations::LinuxRelationProfileConfig {
                 residual_pack: residual,
@@ -1717,11 +1739,95 @@ mod tests {
     }
 
     fn fixture_root(prefix: &str) -> PathBuf {
+        fixture_root_with_firewall(prefix, true)
+    }
+
+    #[test]
+    fn linux_reason_uses_runtime_snapshot_overlay_for_firewall_evidence() {
+        let root = fixture_root_with_firewall("linux-profile-runtime-snapshot", false);
+        let residual = root.join("linux-profile.lrf");
+        build_linux_residual_pack_report(LinuxResidualPackConfig {
+            atlas_dir: root.clone(),
+            max_active_facts: 16,
+            promotion_threshold: 2,
+            out: residual.clone(),
+        })
+        .unwrap();
+
+        let no_snapshot = build_linux_reason_report(LinuxReasonRunConfig {
+            residual_pack: residual.clone(),
+            text: "Is this machine externally exposed?".to_string(),
+            max_facts: 4,
+            runtime_snapshot: None,
+        })
+        .unwrap();
+        assert_eq!(no_snapshot.decision.state, "EXPOSURE_NOT_CONFIRMED");
+        assert!(no_snapshot
+            .decision
+            .missing_evidence
+            .contains(&"linux.firewall.runtime".to_string()));
+
+        let snapshot = root.join("runtime-snapshot.json");
+        fs::write(
+            &snapshot,
+            r#"{
+              "firewall": {
+                "engine": "ufw",
+                "rules": [
+                  {"action": "allow", "port": 22, "protocol": "tcp", "scope": "external"}
+                ]
+              }
+            }"#,
+        )
+        .unwrap();
+        let with_snapshot = build_linux_reason_report(LinuxReasonRunConfig {
+            residual_pack: residual.clone(),
+            text: "Is this machine externally exposed?".to_string(),
+            max_facts: 4,
+            runtime_snapshot: Some(snapshot.clone()),
+        })
+        .unwrap();
+        assert_eq!(with_snapshot.decision.state, "EXPOSURE_CONFIRMED_REVIEW");
+        assert_eq!(
+            with_snapshot
+                .runtime_snapshot_overlay
+                .as_ref()
+                .unwrap()
+                .firewall_allow_fact_count,
+            1
+        );
+        assert!(with_snapshot
+            .decision
+            .missing_evidence
+            .iter()
+            .all(|route| route != "linux.firewall.runtime"));
+        assert!(with_snapshot
+            .evidence_chain
+            .iter()
+            .any(|step| step.route == "linux.firewall.runtime"));
+
+        let search = decision_search::build_linux_decision_search_report(
+            decision_search::LinuxDecisionSearchConfig {
+                residual_pack: residual,
+                text: "Is this machine externally exposed?".to_string(),
+                max_facts: 4,
+                runtime_snapshot: Some(snapshot),
+                out: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(search.decision_search.state, "ANSWER_ALREADY_GROUNDED");
+        assert!(search.decision_search.safe_next_checks.is_empty());
+        assert!(search.decision_search.missing_evidence.is_empty());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    fn fixture_root_with_firewall(prefix: &str, include_firewall: bool) -> PathBuf {
         let root = unique_tmp_dir(prefix);
         let facts_dir = root.join("facts");
         fs::create_dir_all(&facts_dir).unwrap();
         let facts_path = facts_dir.join("fixture.jsonl");
-        let facts = vec![
+        let mut facts = vec![
             test_fact(
                 "linux.apt.command.provider",
                 "bash",
@@ -1748,13 +1854,6 @@ mod tests {
                 "tcp",
                 "listens on",
                 "00000000:0016",
-                "positive",
-            ),
-            test_fact(
-                "linux.firewall.runtime",
-                "ufw",
-                "allows port",
-                "22/tcp",
                 "positive",
             ),
             test_fact(
@@ -1786,6 +1885,15 @@ mod tests {
                 "negative",
             ),
         ];
+        if include_firewall {
+            facts.push(test_fact(
+                "linux.firewall.runtime",
+                "ufw",
+                "allows port",
+                "22/tcp",
+                "positive",
+            ));
+        }
         let mut file = fs::File::create(&facts_path).unwrap();
         for fact in facts {
             serde_json::to_writer(&mut file, &fact).unwrap();
