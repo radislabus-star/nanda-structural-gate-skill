@@ -397,6 +397,11 @@ nanda-llmwave-big linux-residual-proof \
   --samples 5 \
   --format json
 
+nanda-llmwave-big linux-exposure-run \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --max-candidates 16 \
+  --format json
+
 nanda-llmwave-big strict-density-claim-gate \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
@@ -674,6 +679,15 @@ the active Linux field is genuinely written and retrieved through binary
 schema/residual memory, fits the 6 MiB hot budget, saves bytes versus fixed64,
 and keeps the Linux-domain eval green. It is still not broad chat readiness and
 not exposure reasoning.
+
+`linux-exposure-run` is the first Linux exposure reasoning layer over that
+schema/residual memory. It reconstructs the `.lrf` facts for explanation, then
+separates package facts, local listeners, external bind scope, firewall allow
+evidence, service context, and negative boundary facts such as "port listening
+does not prove firewall allows external packets". Treat
+`LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER` as a reasoning gate only: it can
+say whether the fact field supports an exposure reading, but it is not a network
+scanner, exploit path, vulnerability proof, or broad chat model.
 
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
 The implemented external-medium path is:

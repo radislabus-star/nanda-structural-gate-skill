@@ -281,6 +281,43 @@ pub(crate) struct LinuxResidualProofClaimBoundary {
     pub blocked_claims: Vec<&'static str>,
 }
 
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxResidualDecodedPacket {
+    pub summary: LinuxResidualDecodedSummary,
+    pub facts: Vec<LinuxResidualDecodedFact>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxResidualDecodedSummary {
+    pub path: String,
+    pub file_bytes: usize,
+    pub wave_dim: u32,
+    pub represented_fact_count: usize,
+    pub schema_record_count: usize,
+    pub residual_record_count: usize,
+    pub fallback_record_count: usize,
+    pub route_count: usize,
+    pub corpus_hash64: u64,
+    pub promotion_threshold: usize,
+    pub binary_hot_sections_bytes: usize,
+    pub direct_fixed_baseline_bytes: usize,
+    pub cold_label_count: usize,
+    pub cold_label_table_bytes: usize,
+    pub binary_hot_sections_fit_6m: bool,
+    pub beats_direct_fixed64: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxResidualDecodedFact {
+    pub route: String,
+    pub subject: String,
+    pub relation: String,
+    pub object: String,
+    pub polarity: &'static str,
+    pub confidence: u8,
+    pub memory_kind: &'static str,
+}
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct SchemaKey {
     route: String,
@@ -672,6 +709,91 @@ pub(crate) fn build_linux_residual_proof_report(
                 ]
             },
         },
+    })
+}
+
+pub(crate) fn load_linux_residual_decoded_packet(
+    residual_pack: &PathBuf,
+) -> Result<LinuxResidualDecodedPacket> {
+    let bytes = fs::read(residual_pack)
+        .with_context(|| format!("read linux residual packet {}", residual_pack.display()))?;
+    let packet = parse_lrf_packet(&bytes)?;
+    let sections = parse_lrf_sections_only(residual_pack)?;
+    let binary_hot_sections_bytes = sections.schemas.len() * SCHEMA_RECORD_BYTES
+        + sections.residuals.len() * RESIDUAL_RECORD_BYTES
+        + sections.fallbacks.len() * FALLBACK_RECORD_BYTES;
+    let direct_fixed_baseline_bytes =
+        sections.header.represented_fact_count * DIRECT_FIXED_RECORD_BYTES;
+    let mut facts = Vec::with_capacity(sections.header.represented_fact_count);
+    for residual in &packet.residuals {
+        let Some(schema) = packet.schemas.get(residual.schema_index as usize) else {
+            continue;
+        };
+        let Some(route) = label(&packet.labels, u32::from(schema.route_id)) else {
+            continue;
+        };
+        let Some(relation) = label(&packet.labels, u32::from(schema.relation_id)) else {
+            continue;
+        };
+        let Some(subject) = label(&packet.labels, residual.subject_id) else {
+            continue;
+        };
+        let Some(object) = label(&packet.labels, residual.object_id) else {
+            continue;
+        };
+        facts.push(LinuxResidualDecodedFact {
+            route: route.to_string(),
+            subject: subject.to_string(),
+            relation: relation.to_string(),
+            object: object.to_string(),
+            polarity: polarity_label(schema.polarity_id),
+            confidence: residual.confidence,
+            memory_kind: "residual",
+        });
+    }
+    for fallback in &packet.fallbacks {
+        let Some(route) = label(&packet.labels, fallback.route_id) else {
+            continue;
+        };
+        let Some(subject) = label(&packet.labels, fallback.subject_id) else {
+            continue;
+        };
+        let Some(relation) = label(&packet.labels, fallback.relation_id) else {
+            continue;
+        };
+        let Some(object) = label(&packet.labels, fallback.object_id) else {
+            continue;
+        };
+        facts.push(LinuxResidualDecodedFact {
+            route: route.to_string(),
+            subject: subject.to_string(),
+            relation: relation.to_string(),
+            object: object.to_string(),
+            polarity: polarity_label(fallback.polarity_id),
+            confidence: fallback.confidence,
+            memory_kind: "fallback",
+        });
+    }
+    Ok(LinuxResidualDecodedPacket {
+        summary: LinuxResidualDecodedSummary {
+            path: residual_pack.display().to_string(),
+            file_bytes: sections.actual_file_bytes,
+            wave_dim: sections.header.wave_dim,
+            represented_fact_count: sections.header.represented_fact_count,
+            schema_record_count: sections.schemas.len(),
+            residual_record_count: sections.residuals.len(),
+            fallback_record_count: sections.fallbacks.len(),
+            route_count: sections.header.route_count,
+            corpus_hash64: sections.header.corpus_hash,
+            promotion_threshold: sections.header.promotion_threshold,
+            binary_hot_sections_bytes,
+            direct_fixed_baseline_bytes,
+            cold_label_count: sections.header.label_count,
+            cold_label_table_bytes: sections.cold_label_table_bytes,
+            binary_hot_sections_fit_6m: binary_hot_sections_bytes <= SIX_MIB_BYTES,
+            beats_direct_fixed64: binary_hot_sections_bytes < direct_fixed_baseline_bytes,
+        },
+        facts,
     })
 }
 

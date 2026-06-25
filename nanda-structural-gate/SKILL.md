@@ -258,6 +258,7 @@ scripts/nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-
 scripts/nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
 scripts/nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
 scripts/nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
+scripts/nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-candidates 16 --format json
 scripts/nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -987,6 +988,13 @@ Treat `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory
 proof only: schema/residual binary storage is real, retrieval works on the
 Linux eval, and bytes beat fixed64. It is not broad chat readiness and not
 exposure reasoning.
+Use `nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
+to run boundary-aware Linux exposure reasoning over that schema/residual packet.
+It separates package facts, runtime sockets, bind scope, firewall allow
+evidence, service context, and negative boundary facts. Treat
+`LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER` as exposure-reasoning readiness
+only. It is not a network scanner, exploit path, vulnerability proof, or broad
+chat LLM.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`
 to compare Rust profile packed memory against a linear fact baseline. It checks
 schema reuse, residual saving, packed bytes versus linear bytes, route balance,

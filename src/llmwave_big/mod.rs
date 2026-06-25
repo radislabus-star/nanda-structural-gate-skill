@@ -43,6 +43,7 @@ pub mod lens_scan;
 pub mod lexical_birth;
 pub mod linux_active_field;
 pub mod linux_atlas;
+pub mod linux_exposure;
 pub mod linux_hot_packet;
 pub mod linux_residual_memory;
 pub mod loader;
@@ -406,6 +407,9 @@ enum LlmwaveBigCommand {
     /// Prove Linux schema/residual binary memory over the residual packet.
     #[command(name = "linux-residual-proof", alias = "linux-nonlinear-proof")]
     LinuxResidualProof(LlmwaveBigLinuxResidualProofArgs),
+    /// Run boundary-aware Linux exposure reasoning over the residual packet.
+    #[command(name = "linux-exposure-run", alias = "linux-exposure")]
+    LinuxExposureRun(LlmwaveBigLinuxExposureRunArgs),
 }
 
 #[derive(Parser)]
@@ -1266,6 +1270,19 @@ struct LlmwaveBigLinuxResidualProofArgs {
     warmup_iterations: usize,
     #[arg(long = "samples", default_value_t = 5)]
     samples: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxExposureRunArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "max-candidates", default_value_t = 16)]
+    max_candidates: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -2759,6 +2776,61 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- exposure ready: `{}`",
                         report.claim_boundary.exposure_layer_ready
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxExposureRun(args) => {
+            let report =
+                linux_exposure::build_linux_exposure_report(linux_exposure::LinuxExposureConfig {
+                    residual_pack: args.residual_pack,
+                    max_candidates: args.max_candidates,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "exposure_layer_ready: {}",
+                        report.claim_boundary.exposure_layer_ready
+                    );
+                    println!("state: {}", report.exposure_field.state);
+                    println!("candidates: {}", report.exposure_field.candidate_count);
+                    println!(
+                        "external_binding_count: {}",
+                        report.exposure_field.external_binding_count
+                    );
+                    println!(
+                        "safe_to_claim_external_exposure: {}",
+                        report.exposure_field.safe_to_claim_external_exposure
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Exposure Reasoning");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- exposure layer ready: `{}`",
+                        report.claim_boundary.exposure_layer_ready
+                    );
+                    println!("- state: `{}`", report.exposure_field.state);
+                    println!("- candidates: `{}`", report.exposure_field.candidate_count);
+                    println!(
+                        "- external bindings: `{}`",
+                        report.exposure_field.external_binding_count
+                    );
+                    println!(
+                        "- firewall allow facts: `{}`",
+                        report.exposure_field.firewall_allow_fact_count
+                    );
+                    println!(
+                        "- broad chat ready: `{}`",
+                        report.claim_boundary.broad_chat_llm_ready
+                    );
+                    println!(
+                        "- vulnerability scan ready: `{}`",
+                        report.claim_boundary.vulnerability_scan_ready
                     );
                 }
             }
