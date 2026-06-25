@@ -333,6 +333,18 @@ nanda-llmwave-big rust-heldout-eval \
   --out .nanda/llmwave-big-training/rust-heldout-eval.json \
   --format json
 
+nanda-llmwave-big linux-atlas-build \
+  --out-dir .nanda/linux-atlas \
+  --pack-kind base \
+  --max-facts 1000000 \
+  --format json
+
+nanda-llmwave-big linux-atlas-build \
+  --out-dir .nanda/linux-atlas \
+  --pack-kind delta \
+  --max-facts 1000000 \
+  --format json
+
 nanda-llmwave-big strict-density-claim-gate \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
@@ -531,6 +543,18 @@ header and 16-byte fixed records. That proves artifact materialization, not
 hot-loop execution.
 Pass that packet to `memory-final-proof` with `--density-hot-packet` to mark
 binary density evidence as present. It still does not make `llm_ready=true`.
+
+`linux-atlas-build` is the first Linux SysField data layer. It builds an
+append-only local atlas from safe Linux metadata: dpkg status, package file
+lists, manpage names, selected systemd unit fields, OS identity, resolver,
+route/socket summaries, and built-in negative route-boundary facts. `base`
+creates the first pack; `delta` loads the known fact-id index and writes only
+new facts into the same atlas without requiring a full rebuild of the active
+memory. It writes JSONL facts plus `manifest.json`,
+`consolidated/linux-atlas-current.json`, route indexes, `indexes/fact-ids.txt`,
+and `packs.jsonl` under `.nanda/linux-atlas/`. Treat this as knowledge-atlas
+memory only: active 65k packing, exposure analysis, LLM readiness, and
+nonlinear-memory proof remain closed until later gates.
 
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
 The implemented external-medium path is:

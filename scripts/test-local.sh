@@ -299,6 +299,17 @@ big_field_claim_json="$("$llmwave_big" claim-gate --claim field-core-sole-engine
 jq -e '.mode == "llmwave-big-claim-gate" and .claim == "field-core-sole-engine" and .verdict == "CLAIM_ALLOWED" and .allowed == true' <<<"$big_field_claim_json" >/dev/null
 big_active65k_claim_json="$("$llmwave_big" claim-gate --claim active-65k-runtime --format json)"
 jq -e '.mode == "llmwave-big-claim-gate" and .claim == "active-65k-runtime" and .verdict == "CLAIM_ALLOWED_LOCAL_RUNTIME_ONLY" and .allowed == true and .claim_boundary.active_65k_runtime_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_active65k_claim_json" >/dev/null
+tmp_linux_atlas="$(mktemp -d)"
+big_linux_atlas_json="$("$llmwave_big" linux-atlas-build --out-dir "$tmp_linux_atlas" --pack-kind base --max-facts 64 --format json)"
+jq -e '.mode == "llmwave-big-linux-atlas-build" and (.verdict | startswith("LINUX_ATLAS_")) and .pack_kind == "base" and .artifact.fact_count > 0 and .artifact.previous_fact_count == 0 and .artifact.append_only == true and .artifact.delta_ready == true' <<<"$big_linux_atlas_json" >/dev/null
+jq -e '.claim_boundary.append_only_memory_ready == true and .claim_boundary.active_65k_pack_ready == false and .claim_boundary.exposure_layer_ready == false and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_linux_atlas_json" >/dev/null
+test -s "$(jq -r '.outputs.facts_path' <<<"$big_linux_atlas_json")"
+test -s "$(jq -r '.outputs.manifest_path' <<<"$big_linux_atlas_json")"
+test -s "$(jq -r '.outputs.fact_id_index_path' <<<"$big_linux_atlas_json")"
+test -s "$(jq -r '.outputs.pack_log_path' <<<"$big_linux_atlas_json")"
+big_linux_atlas_delta_json="$("$llmwave_big" linux-atlas-build --out-dir "$tmp_linux_atlas" --pack-kind delta --max-facts 128 --format json)"
+jq -e '.pack_kind == "delta" and .artifact.fact_count > 0 and .artifact.previous_fact_count > 0 and .artifact.delta_new_facts == .artifact.fact_count and .artifact.append_only == true and .claim_boundary.append_only_memory_ready == true' <<<"$big_linux_atlas_delta_json" >/dev/null
+test -s "$(jq -r '.outputs.facts_path' <<<"$big_linux_atlas_delta_json")"
 big_small_domain_claim_json="$("$llmwave_big" claim-gate --claim small-domain-llmwave --format json)"
 jq -e '.claim == "small-domain-llmwave" and .verdict == "CLAIM_ALLOWED_LOCAL_ONLY" and .allowed == true and (.missing_evidence | index("broad unscripted chat eval"))' <<<"$big_small_domain_claim_json" >/dev/null
 set +e

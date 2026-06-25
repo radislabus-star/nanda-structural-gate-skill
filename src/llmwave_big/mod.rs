@@ -41,6 +41,7 @@ pub mod l3_schema_bind;
 pub mod l3_schema_field;
 pub mod lens_scan;
 pub mod lexical_birth;
+pub mod linux_atlas;
 pub mod loader;
 pub mod mature_anti_wave;
 pub mod memory_final_proof;
@@ -375,6 +376,9 @@ enum LlmwaveBigCommand {
     /// Build and evaluate the bundled one-command small-domain demo.
     #[command(name = "demo-domain")]
     DemoDomain(LlmwaveBigDemoDomainArgs),
+    /// Build an append-only local Linux knowledge atlas from system metadata.
+    #[command(name = "linux-atlas-build", alias = "linux-atlas")]
+    LinuxAtlasBuild(LlmwaveBigLinuxAtlasBuildArgs),
 }
 
 #[derive(Parser)]
@@ -1098,6 +1102,20 @@ struct LlmwaveBigBroadCorpusBuildArgs {
     profile: String,
     #[arg(long)]
     out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxAtlasBuildArgs {
+    #[arg(long, default_value = "/")]
+    root: PathBuf,
+    #[arg(long = "out-dir", default_value = ".nanda/linux-atlas")]
+    out_dir: PathBuf,
+    #[arg(long = "pack-kind", default_value = "base")]
+    pack_kind: String,
+    #[arg(long = "max-facts", default_value_t = 1_000_000)]
+    max_facts: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -2141,6 +2159,50 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 args.top_k,
             )?;
             report::print_demo_domain_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxAtlasBuild(args) => {
+            let pack_kind = match args.pack_kind.as_str() {
+                "base" => linux_atlas::LinuxAtlasPackKind::Base,
+                "delta" => linux_atlas::LinuxAtlasPackKind::Delta,
+                other => anyhow::bail!("unknown linux atlas pack kind: {other}; use base or delta"),
+            };
+            let report =
+                linux_atlas::build_linux_atlas_report(linux_atlas::LinuxAtlasBuildConfig {
+                    root: args.root,
+                    out_dir: args.out_dir,
+                    pack_kind,
+                    max_facts: args.max_facts,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("facts: {}", report.artifact.fact_count);
+                    println!("routes: {}", report.artifact.route_count);
+                    println!("facts_path: {}", report.outputs.facts_path);
+                    println!("current_path: {}", report.outputs.current_path);
+                    println!(
+                        "active_65k_pack_ready: {}",
+                        report.claim_boundary.active_65k_pack_ready
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Atlas");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- facts: `{}`", report.artifact.fact_count);
+                    println!("- routes: `{}`", report.artifact.route_count);
+                    println!("- append only: `{}`", report.artifact.append_only);
+                    println!("- facts path: `{}`", report.outputs.facts_path);
+                    println!("- current path: `{}`", report.outputs.current_path);
+                    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+                    println!(
+                        "- nonlinear memory proven: `{}`",
+                        report.claim_boundary.nonlinear_memory_proven
+                    );
+                }
+            }
             Ok(EXIT_PASS)
         }
     }

@@ -125,6 +125,8 @@ nanda-llmwave-big rust-heldout-build --artifact .nanda/llmwave-big-training/rust
 nanda-llmwave-big rust-focus-build --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --out .nanda/llmwave-big-training/rust-focus-packet.json --format json
 nanda-llmwave-big rust-compile-evidence-build --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --check-evidence .nanda/llmwave-big-training/cargo-check.json --test-evidence .nanda/llmwave-big-training/cargo-test.json --clippy-evidence .nanda/llmwave-big-training/cargo-clippy.json --out .nanda/llmwave-big-training/rust-compile-evidence.json --format json
 nanda-llmwave-big rust-heldout-eval --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --out .nanda/llmwave-big-training/rust-heldout-eval.json --format json
+nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind base --max-facts 1000000 --format json
+nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind delta --max-facts 1000000 --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -210,6 +212,17 @@ pass rate and false-shortcut rejection. With both compile evidence and held-out
 eval passed into final proof, the Rust profile can reach
 `FINAL_PROOF_GATE_PROFILE_EVAL_READY_NOT_NONLINEAR_PROOF`; nonlinear-memory and
 LLM claims still remain blocked by the strict density claim gate.
+`linux-atlas-build` starts the Linux SysField data path. It reads local Linux
+metadata without secret-bearing config scans: dpkg package status, package file
+lists, manpage index, systemd unit fields, `/etc/os-release`, resolver/routes,
+socket summaries, and built-in negative boundary facts. The output is
+append-only under `.nanda/linux-atlas/`: `facts/base-*.jsonl` or
+`facts/delta-*.jsonl`, `manifest.json`, `consolidated/linux-atlas-current.json`,
+route indexes, `indexes/fact-ids.txt`, and `packs.jsonl`. Delta packs skip
+previously known fact IDs and write only new facts discovered after the base
+pack. Treat `LINUX_ATLAS_BASE_READY` as a knowledge-atlas result only; active
+65k packing, exposure analysis, LLM readiness, and nonlinear-memory proof remain
+closed.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,
