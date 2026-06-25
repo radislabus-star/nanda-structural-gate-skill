@@ -823,7 +823,18 @@ nanda-llmwave-big linux-decision-search \
 nanda-llmwave-big linux-relation-profile \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
   --format json
+
+nanda-llmwave-big daybreak-duel \
+  --format json
 ```
+
+`daybreak-duel` is the safe competition harness for the Linux-profile core. It
+runs local defensive fixtures inspired by a Daybreak-style remediation loop:
+reject listener/exposure shortcuts, accept side-effect-free runtime snapshot
+evidence, stop decision-search when evidence is already grounded, and keep
+patch generation plus post-patch verification explicitly blocked. Treat
+`DAYBREAK_DUEL_BASELINE_READY_NOT_COMPETITIVE` as an honest scoreboard, not a
+claim that NANDA matches GPT-5.5-Cyber/Daybreak.
 
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
 The implemented external-medium path is:

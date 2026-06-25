@@ -25,6 +25,7 @@ pub mod core_v1_surface_generation;
 pub mod core_v2;
 pub mod core_v3;
 pub mod coupled_decode_loop;
+pub mod daybreak_duel;
 pub mod demo_domain;
 pub mod density_ablation;
 pub mod density_proof_doctor;
@@ -416,6 +417,9 @@ enum LlmwaveBigCommand {
     /// Import a side-effect-free Linux runtime snapshot as temporary profile facts.
     #[command(name = "linux-snapshot-import")]
     LinuxSnapshotImport(LlmwaveBigLinuxSnapshotImportArgs),
+    /// Run a safe Daybreak-style defensive benchmark over the Linux-profile core.
+    #[command(name = "daybreak-duel")]
+    DaybreakDuel(LlmwaveBigDaybreakDuelArgs),
     /// Run constrained Linux-profile chat/readout over schema/residual memory.
     #[command(name = "linux-chat-run", alias = "linux-chat")]
     LinuxChatRun(LlmwaveBigLinuxChatRunArgs),
@@ -1337,6 +1341,14 @@ struct LlmwaveBigLinuxExposureRunArgs {
 struct LlmwaveBigLinuxSnapshotImportArgs {
     #[arg(long)]
     snapshot: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigDaybreakDuelArgs {
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -3118,6 +3130,51 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- commands executed: `{}`",
                         report.overlay.commands_executed
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::DaybreakDuel(args) => {
+            let report =
+                daybreak_duel::build_daybreak_duel_report(daybreak_duel::DaybreakDuelConfig {
+                    out: args.out,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "passed: {}/{}",
+                        report.scoreboard.passed, report.scoreboard.total
+                    );
+                    println!("blocked: {}", report.scoreboard.blocked);
+                    println!(
+                        "daybreak_competitive: {}",
+                        report.claim_boundary.daybreak_competitive
+                    );
+                    println!(
+                        "patch_generation_ready: {}",
+                        report.claim_boundary.patch_generation_ready
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Daybreak Duel");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- passed: `{}/{}`",
+                        report.scoreboard.passed, report.scoreboard.total
+                    );
+                    println!("- blocked: `{}`", report.scoreboard.blocked);
+                    println!(
+                        "- daybreak competitive: `{}`",
+                        report.claim_boundary.daybreak_competitive
+                    );
+                    println!(
+                        "- patch generation ready: `{}`",
+                        report.claim_boundary.patch_generation_ready
                     );
                     println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }

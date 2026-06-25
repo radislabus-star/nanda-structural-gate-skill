@@ -152,6 +152,7 @@ nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux
 nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-relation-profile --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json
+nanda-llmwave-big daybreak-duel --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -338,6 +339,12 @@ state becomes `ANSWER_ALREADY_GROUNDED` instead of proposing redundant checks.
 `linux-relation-profile` reports relation-family coverage and missing routes
 over the `.lrf` packet so the corpus can grow by causal relation type instead
 of raw fact count alone.
+`daybreak-duel` runs a safe Daybreak-style defensive baseline over local
+fixtures. It checks shortcut rejection, side-effect-free runtime snapshot
+evidence, and grounded decision-search stopping, then keeps patch generation
+and remediation verification explicitly blocked. Treat
+`DAYBREAK_DUEL_BASELINE_READY_NOT_COMPETITIVE` as a scoreboard, not a claim
+that NANDA matches GPT-5.5-Cyber/Daybreak.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,
