@@ -46,6 +46,7 @@ pub mod linux_atlas;
 pub mod linux_chat;
 pub mod linux_exposure;
 pub mod linux_hot_packet;
+pub mod linux_profile;
 pub mod linux_residual_memory;
 pub mod loader;
 pub mod mature_anti_wave;
@@ -414,6 +415,21 @@ enum LlmwaveBigCommand {
     /// Run constrained Linux-profile chat/readout over schema/residual memory.
     #[command(name = "linux-chat-run", alias = "linux-chat")]
     LinuxChatRun(LlmwaveBigLinuxChatRunArgs),
+    /// Compile a Linux question into a typed Linux-profile query wave.
+    #[command(name = "linux-query-wave")]
+    LinuxQueryWave(LlmwaveBigLinuxQueryWaveArgs),
+    /// Build a Linux-profile broad eval suite from residual memory.
+    #[command(name = "linux-broad-suite-build")]
+    LinuxBroadSuiteBuild(LlmwaveBigLinuxBroadSuiteBuildArgs),
+    /// Run Linux-profile broad eval over residual memory.
+    #[command(name = "linux-broad-eval-run")]
+    LinuxBroadEvalRun(LlmwaveBigLinuxBroadEvalRunArgs),
+    /// Run Linux-profile evidence-chain reasoning for one question.
+    #[command(name = "linux-reason-run")]
+    LinuxReasonRun(LlmwaveBigLinuxReasonRunArgs),
+    /// Gate Linux-profile reasoning claims from memory and broad eval evidence.
+    #[command(name = "linux-profile-claim-gate")]
+    LinuxProfileClaimGate(LlmwaveBigLinuxProfileClaimGateArgs),
 }
 
 #[derive(Parser)]
@@ -1302,6 +1318,76 @@ struct LlmwaveBigLinuxChatRunArgs {
     prompt: Vec<String>,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxQueryWaveArgs {
+    #[arg(long = "text")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxBroadSuiteBuildArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "cases", default_value_t = 100)]
+    cases: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxBroadEvalRunArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long)]
+    suite: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxReasonRunArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "text")]
+    text: String,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxProfileClaimGateArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "broad-eval")]
+    broad_eval: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -2906,6 +2992,176 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- false positive rate: `{}`",
                         report.eval.metrics.false_positive_rate
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxQueryWave(args) => {
+            let report =
+                linux_profile::build_linux_query_wave_report(linux_profile::LinuxQueryWaveConfig {
+                    text: args.text,
+                });
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("intent: {}", report.query_wave.intent);
+                    println!("anchors: {}", report.query_wave.anchors.join(","));
+                    println!("answer_policy: {}", report.query_wave.answer_policy);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Query Wave");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- intent: `{}`", report.query_wave.intent);
+                    println!("- anchors: `{}`", report.query_wave.anchors.join(", "));
+                    println!(
+                        "- forbidden shortcuts: `{}`",
+                        report.query_wave.forbidden_shortcuts.join(", ")
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxBroadSuiteBuild(args) => {
+            let report = linux_profile::build_linux_broad_suite_report(
+                linux_profile::LinuxBroadSuiteBuildConfig {
+                    residual_pack: args.residual_pack,
+                    cases: args.cases,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("cases: {}", report.suite.case_count);
+                    println!("families: {}", report.suite.families.len());
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Broad Suite");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- cases: `{}`", report.suite.case_count);
+                    println!("- families: `{}`", report.suite.families.len());
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxBroadEvalRun(args) => {
+            let report = linux_profile::build_linux_broad_eval_report(
+                linux_profile::LinuxBroadEvalRunConfig {
+                    residual_pack: args.residual_pack,
+                    suite: args.suite,
+                    out: args.out,
+                    max_facts: args.max_facts,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("passed: {}/{}", report.metrics.passed, report.metrics.total);
+                    println!(
+                        "false_positive_rate: {}",
+                        report.metrics.false_positive_rate
+                    );
+                    println!(
+                        "shortcut_rejection_rate: {}",
+                        report.metrics.shortcut_rejection_rate
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Broad Eval");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- passed: `{}/{}`",
+                        report.metrics.passed, report.metrics.total
+                    );
+                    println!("- pass rate: `{}`", report.metrics.pass_rate);
+                    println!(
+                        "- exposure overclaim rate: `{}`",
+                        report.metrics.exposure_overclaim_rate
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxReasonRun(args) => {
+            let report =
+                linux_profile::build_linux_reason_report(linux_profile::LinuxReasonRunConfig {
+                    residual_pack: args.residual_pack,
+                    text: args.text,
+                    max_facts: args.max_facts,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("intent: {}", report.query_wave.intent);
+                    println!("state: {}", report.decision.state);
+                    println!("answer_allowed: {}", report.decision.answer_allowed);
+                    println!("answer: {}", report.decision.answer);
+                    println!("evidence_steps: {}", report.evidence_chain.len());
+                    println!("anti_wave_hits: {}", report.anti_wave_hits.len());
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Reason Run");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- intent: `{}`", report.query_wave.intent);
+                    println!("- state: `{}`", report.decision.state);
+                    println!("- answer allowed: `{}`", report.decision.answer_allowed);
+                    println!("- answer: {}", report.decision.answer);
+                    println!("- evidence steps: `{}`", report.evidence_chain.len());
+                    println!("- anti-wave hits: `{}`", report.anti_wave_hits.len());
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxProfileClaimGate(args) => {
+            let report = linux_profile::build_linux_profile_claim_gate_report(
+                linux_profile::LinuxProfileClaimGateConfig {
+                    residual_pack: args.residual_pack,
+                    broad_eval: args.broad_eval,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "linux_profile_reasoning_ready: {}",
+                        report.claim_boundary.linux_profile_reasoning_ready
+                    );
+                    println!(
+                        "linux_profile_broad_chat_ready: {}",
+                        report.claim_boundary.linux_profile_broad_chat_ready
+                    );
+                    println!(
+                        "general_llm_ready: {}",
+                        report.claim_boundary.general_llm_ready
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Profile Claim Gate");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- Linux-profile reasoning ready: `{}`",
+                        report.claim_boundary.linux_profile_reasoning_ready
+                    );
+                    println!(
+                        "- Linux-profile broad chat ready: `{}`",
+                        report.claim_boundary.linux_profile_broad_chat_ready
+                    );
+                    println!(
+                        "- general LLM ready: `{}`",
+                        report.claim_boundary.general_llm_ready
                     );
                     println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }

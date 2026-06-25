@@ -387,6 +387,21 @@ tmp_linux_chat_residual="$tmp_linux_chat/linux-chat.lrf"
 big_linux_chat_json="$("$llmwave_big" linux-chat-run --residual-pack "$tmp_linux_chat_residual" --max-facts 4 --format json)"
 jq -e '.mode == "llmwave-big-linux-chat-run" and .verdict == "LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM" and .eval.metrics.total == 5 and .eval.metrics.passed == 5 and .claim_boundary.broad_chat_llm_ready == true and .claim_boundary.linux_profile_broad_chat_ready == true and .claim_boundary.general_llm_ready == false and .claim_boundary.vulnerability_scan_ready == false' <<<"$big_linux_chat_json" >/dev/null
 jq -e '.turns[] | select(.intent == "external_exposure" and (.answer | ascii_downcase | contains("not confirmed")))' <<<"$big_linux_chat_json" >/dev/null
+big_linux_query_wave_json="$("$llmwave_big" linux-query-wave --text "Is ssh externally exposed?" --format json)"
+jq -e '.mode == "llmwave-big-linux-query-wave" and .verdict == "LINUX_QUERY_WAVE_READY_NOT_ANSWER" and .query_wave.intent == "external_exposure" and (.query_wave.forbidden_shortcuts | index("listener_implies_external_exposure")) and .claim_boundary.general_llm_ready == false' <<<"$big_linux_query_wave_json" >/dev/null
+big_linux_reason_json="$("$llmwave_big" linux-reason-run --residual-pack "$tmp_linux_chat_residual" --text "Is this machine externally exposed?" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-reason-run" and .verdict == "LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM" and .decision.state == "EXPOSURE_NOT_CONFIRMED" and (.decision.answer | ascii_downcase | contains("not confirmed")) and .claim_boundary.linux_profile_reasoning_ready == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_reason_json" >/dev/null
+jq -e '.anti_wave_hits[] | select(.shortcut == "listener_implies_external_exposure")' <<<"$big_linux_reason_json" >/dev/null
+tmp_linux_profile_suite="$tmp_linux_chat/linux-profile-suite.json"
+big_linux_profile_suite_json="$("$llmwave_big" linux-broad-suite-build --residual-pack "$tmp_linux_chat_residual" --cases 32 --out "$tmp_linux_profile_suite" --format json)"
+jq -e '.mode == "llmwave-big-linux-broad-suite-build" and .verdict == "LINUX_BROAD_SUITE_READY_NOT_EVAL" and .suite.case_count == 32 and .claim_boundary.general_llm_ready == false' <<<"$big_linux_profile_suite_json" >/dev/null
+test -s "$tmp_linux_profile_suite"
+tmp_linux_profile_eval="$tmp_linux_chat/linux-profile-eval.json"
+big_linux_profile_eval_json="$("$llmwave_big" linux-broad-eval-run --residual-pack "$tmp_linux_chat_residual" --suite "$tmp_linux_profile_suite" --out "$tmp_linux_profile_eval" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-broad-eval-run" and .verdict == "LINUX_PROFILE_BROAD_EVAL_PASS_NOT_GENERAL_LLM" and .metrics.total == 32 and .metrics.passed == 32 and .metrics.shortcut_rejection_rate == 1 and .metrics.exposure_overclaim_rate == 0 and .claim_boundary.linux_profile_broad_eval_ready == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_profile_eval_json" >/dev/null
+test -s "$tmp_linux_profile_eval"
+big_linux_profile_claim_json="$("$llmwave_big" linux-profile-claim-gate --residual-pack "$tmp_linux_chat_residual" --broad-eval "$tmp_linux_profile_eval" --format json)"
+jq -e '.mode == "llmwave-big-linux-profile-claim-gate" and .verdict == "LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM" and .requirements.linux_profile_nonlinear_memory_proven == true and .requirements.broad_eval_pass_rate_ok == true and .claim_boundary.linux_profile_reasoning_ready == true and .claim_boundary.linux_profile_broad_chat_ready == true and .claim_boundary.general_llm_ready == false and .claim_boundary.vulnerability_scanner_ready == false' <<<"$big_linux_profile_claim_json" >/dev/null
 big_small_domain_claim_json="$("$llmwave_big" claim-gate --claim small-domain-llmwave --format json)"
 jq -e '.claim == "small-domain-llmwave" and .verdict == "CLAIM_ALLOWED_LOCAL_ONLY" and .allowed == true and (.missing_evidence | index("broad unscripted chat eval"))' <<<"$big_small_domain_claim_json" >/dev/null
 set +e

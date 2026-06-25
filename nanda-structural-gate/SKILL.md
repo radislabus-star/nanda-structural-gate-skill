@@ -1002,6 +1002,23 @@ evidence, exposure-boundary refusal, and a small context recall loop. Treat
 `LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM` as Linux-profile readiness only:
 it is not open-domain chat, not a general GPT-style model, not a network scanner,
 and not a vulnerability proof.
+Use `nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json`
+to compile one Linux-profile prompt into intent, anchors, route priors, negative
+boundaries, forbidden shortcuts, and answer policy. This is input shaping only,
+not retrieval or answer permission.
+Use `nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is ssh externally exposed?" --max-facts 4 --format json`
+to apply the query wave to `.lrf` schema/residual memory, build an evidence
+chain, apply anti-wave shortcut suppression, and return a grounded decision for
+that one prompt.
+Use `nanda-llmwave-big linux-broad-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-broad-suite.json --format json`
+to generate a Linux-profile eval suite from active facts.
+Use `nanda-llmwave-big linux-broad-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-broad-suite.json --out .nanda/linux-active/linux-broad-eval.json --max-facts 4 --format json`
+to execute that suite against `.lrf`.
+Use `nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --format json`
+to allow `LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` only when both
+schema/residual memory proof and broad Linux-profile eval thresholds pass. These
+commands expand the Linux-profile reasoning proof surface, but they still do
+not unlock general LLM, open-domain chat, scanner, or exploit claims.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`
 to compare Rust profile packed memory against a linear fact baseline. It checks
 schema reuse, residual saving, packed bytes versus linear bytes, route balance,

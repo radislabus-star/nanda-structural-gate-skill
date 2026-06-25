@@ -137,6 +137,11 @@ nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-activ
 nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-candidates 16 --format json
 nanda-llmwave-big linux-chat-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-facts 4 --format json
+nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json
+nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is ssh externally exposed?" --max-facts 4 --format json
+nanda-llmwave-big linux-broad-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-broad-suite.json --format json
+nanda-llmwave-big linux-broad-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-broad-suite.json --out .nanda/linux-active/linux-broad-eval.json --max-facts 4 --format json
+nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -288,6 +293,19 @@ listener/exposure boundary answers, context recall, and false-shortcut refusal.
 Treat `LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM` as Linux-profile chat
 readiness only. It is not open-domain chat, not a general GPT-style model, not a
 network scanner, and not a vulnerability proof.
+`linux-query-wave` compiles one Linux-profile prompt into intent, anchors,
+route priors, negative boundaries, forbidden shortcuts, and answer policy. It is
+input shaping only, not retrieval.
+`linux-reason-run` applies that query wave to `.lrf` schema/residual memory,
+builds an evidence chain, applies anti-wave shortcut suppression, and returns a
+grounded decision for that one prompt.
+`linux-broad-suite-build` generates a Linux-profile eval suite from the active
+facts; `linux-broad-eval-run` executes the suite against `.lrf`; and
+`linux-profile-claim-gate` only allows
+`LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` when schema/residual memory
+proof and broad Linux-profile eval thresholds both pass. These commands expand
+the Linux-profile reasoning proof surface, but they still do not unlock general
+LLM, open-domain chat, scanner, or exploit claims.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,

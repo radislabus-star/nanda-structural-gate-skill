@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::linux_active_field::{
@@ -287,7 +287,7 @@ pub(crate) struct LinuxResidualDecodedPacket {
     pub facts: Vec<LinuxResidualDecodedFact>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct LinuxResidualDecodedSummary {
     pub path: String,
     pub file_bytes: usize,

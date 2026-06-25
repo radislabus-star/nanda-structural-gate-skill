@@ -697,10 +697,49 @@ one small multi-turn context recall loop. Treat
 it is not open-domain chat, not a general GPT-style model, not a network
 scanner, and not a vulnerability proof.
 
+`linux-query-wave`, `linux-reason-run`, `linux-broad-suite-build`,
+`linux-broad-eval-run`, and `linux-profile-claim-gate` turn that readout into a
+profile proof surface. The query wave fixes intent, anchors, route priors,
+negative boundaries, forbidden shortcuts, and answer policy. The reason run
+builds an evidence chain from `.lrf` schema/residual memory and applies anti-wave
+suppression to false shortcuts. The broad suite/eval pair checks generated
+Linux-profile questions, and the claim gate only allows
+`LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` when both schema/residual memory
+and broad Linux-profile eval pass. This is still not general LLM readiness,
+open-domain chat, a network scanner, or vulnerability proof.
+
 ```bash
 nanda-llmwave-big linux-chat-run \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
   --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-query-wave \
+  --text "Is ssh externally exposed?" \
+  --format json
+
+nanda-llmwave-big linux-reason-run \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --text "Is ssh externally exposed?" \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-broad-suite-build \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --cases 100 \
+  --out .nanda/linux-active/linux-broad-suite.json \
+  --format json
+
+nanda-llmwave-big linux-broad-eval-run \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --suite .nanda/linux-active/linux-broad-suite.json \
+  --out .nanda/linux-active/linux-broad-eval.json \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-profile-claim-gate \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --broad-eval .nanda/linux-active/linux-broad-eval.json \
   --format json
 ```
 
