@@ -43,6 +43,7 @@ pub mod lens_scan;
 pub mod lexical_birth;
 pub mod linux_active_field;
 pub mod linux_atlas;
+pub mod linux_hot_packet;
 pub mod loader;
 pub mod mature_anti_wave;
 pub mod memory_final_proof;
@@ -383,6 +384,18 @@ enum LlmwaveBigCommand {
     /// Build a route-balanced Linux Active Field over the append-only Linux Atlas.
     #[command(name = "linux-active-field", alias = "linux-field")]
     LinuxActiveField(LlmwaveBigLinuxActiveFieldArgs),
+    /// Pack the Linux Active Field into a binary fixed-record hot packet.
+    #[command(name = "linux-pack-hot", alias = "linux-hot-pack")]
+    LinuxPackHot(LlmwaveBigLinuxPackHotArgs),
+    /// Scan a binary Linux hot packet without JSON.
+    #[command(name = "linux-ask-hot", alias = "linux-hot-scan")]
+    LinuxAskHot(LlmwaveBigLinuxAskHotArgs),
+    /// Run Linux hot-packet domain eval and lexical baseline duel.
+    #[command(name = "linux-hot-eval")]
+    LinuxHotEval(LlmwaveBigLinuxHotEvalArgs),
+    /// Run the constrained Linux Domain LLMWave path over a hot packet.
+    #[command(name = "linux-domain-run")]
+    LinuxDomainRun(LlmwaveBigLinuxDomainRunArgs),
 }
 
 #[derive(Parser)]
@@ -1134,6 +1147,61 @@ struct LlmwaveBigLinuxActiveFieldArgs {
     query: Vec<String>,
     #[arg(long)]
     out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxPackHotArgs {
+    #[arg(long = "atlas-dir", default_value = ".nanda/linux-atlas")]
+    atlas_dir: PathBuf,
+    #[arg(long = "max-active-facts", default_value_t = 65_536)]
+    max_active_facts: usize,
+    #[arg(long, default_value = ".nanda/linux-active/linux-active-65k.laf")]
+    out: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxAskHotArgs {
+    #[arg(
+        long = "hot-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.laf"
+    )]
+    hot_pack: PathBuf,
+    #[arg(long = "query")]
+    query: String,
+    #[arg(long = "top-k", default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxHotEvalArgs {
+    #[arg(
+        long = "hot-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.laf"
+    )]
+    hot_pack: PathBuf,
+    #[arg(long = "top-k", default_value_t = 5)]
+    top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxDomainRunArgs {
+    #[arg(
+        long = "hot-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.laf"
+    )]
+    hot_pack: PathBuf,
+    #[arg(long = "query")]
+    query: String,
+    #[arg(long = "top-k", default_value_t = 5)]
+    top_k: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -2281,6 +2349,167 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                             probe.query, probe.state, probe.top_score
                         );
                     }
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxPackHot(args) => {
+            let report = linux_hot_packet::build_linux_hot_pack_report(
+                linux_hot_packet::LinuxHotPackConfig {
+                    atlas_dir: args.atlas_dir,
+                    max_active_facts: args.max_active_facts,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("selected_facts: {}", report.source.selected_facts);
+                    println!(
+                        "fixed_records_fit_6m: {}",
+                        report.packet.fixed_records_fit_6m
+                    );
+                    println!("hot_loop_bytes: {}", report.packet.hot_loop_record_bytes);
+                    println!("cold_label_bytes: {}", report.packet.cold_label_table_bytes);
+                    println!("out: {}", report.out);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Hot Packet");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- selected facts: `{}`", report.source.selected_facts);
+                    println!(
+                        "- fixed records fit 6 MiB: `{}`",
+                        report.packet.fixed_records_fit_6m
+                    );
+                    println!(
+                        "- hot-loop bytes: `{}`",
+                        report.packet.hot_loop_record_bytes
+                    );
+                    println!(
+                        "- cold label bytes: `{}`",
+                        report.packet.cold_label_table_bytes
+                    );
+                    println!(
+                        "- cache-only execution proven: `{}`",
+                        report.claim_boundary.cache_only_execution_proven
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxAskHot(args) => {
+            let report = linux_hot_packet::build_linux_hot_ask_report(
+                linux_hot_packet::LinuxHotAskConfig {
+                    hot_pack: args.hot_pack,
+                    query: args.query,
+                    top_k: args.top_k,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("state: {}", report.field.state);
+                    println!("top_score: {}", report.field.top_score);
+                    println!("safe_to_answer: {}", report.answer.safe_to_answer);
+                    println!("answer: {}", report.answer.text);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Hot Scan");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- state: `{}`", report.field.state);
+                    println!("- top score: `{}`", report.field.top_score);
+                    println!("- safe to answer: `{}`", report.answer.safe_to_answer);
+                    println!("- answer: `{}`", report.answer.text);
+                    println!(
+                        "- JSON used in hot scan: `{}`",
+                        report.claim_boundary.json_used_in_hot_scan
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxHotEval(args) => {
+            let report = linux_hot_packet::build_linux_hot_eval_report(
+                linux_hot_packet::LinuxHotEvalConfig {
+                    hot_pack: args.hot_pack,
+                    top_k: args.top_k,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("passed: {}/{}", report.metrics.passed, report.metrics.total);
+                    println!(
+                        "lexical_duel_wins: {}/{}",
+                        report.metrics.lexical_duel_wins, report.metrics.lexical_duel_total
+                    );
+                    println!(
+                        "false_positive_rate: {}",
+                        report.metrics.false_positive_rate
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Hot Eval");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- passed: `{}/{}`",
+                        report.metrics.passed, report.metrics.total
+                    );
+                    println!(
+                        "- lexical duel wins: `{}/{}`",
+                        report.metrics.lexical_duel_wins, report.metrics.lexical_duel_total
+                    );
+                    println!(
+                        "- false positive rate: `{}`",
+                        report.metrics.false_positive_rate
+                    );
+                    println!(
+                        "- nonlinear memory proven: `{}`",
+                        report.claim_boundary.nonlinear_memory_proven
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxDomainRun(args) => {
+            let report = linux_hot_packet::build_linux_domain_run_report(
+                linux_hot_packet::LinuxDomainRunConfig {
+                    hot_pack: args.hot_pack,
+                    query: args.query,
+                    top_k: args.top_k,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("route_hint: {}", report.query_wave.route_hint);
+                    println!("field_state: {}", report.reasoning_loop.field_state);
+                    println!("answer_allowed: {}", report.verifier.answer_allowed);
+                    println!("answer: {}", report.answer_surface.text);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Domain Run");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- route hint: `{}`", report.query_wave.route_hint);
+                    println!("- field state: `{}`", report.reasoning_loop.field_state);
+                    println!("- answer allowed: `{}`", report.verifier.answer_allowed);
+                    println!("- answer: `{}`", report.answer_surface.text);
+                    println!(
+                        "- broad chat ready: `{}`",
+                        report.claim_boundary.broad_chat_llm_ready
+                    );
+                    println!(
+                        "- nonlinear memory proven: `{}`",
+                        report.claim_boundary.nonlinear_memory_proven
+                    );
                 }
             }
             Ok(EXIT_PASS)

@@ -351,6 +351,29 @@ nanda-llmwave-big linux-active-field \
   --query "which package provides command bash" \
   --format json
 
+nanda-llmwave-big linux-pack-hot \
+  --atlas-dir .nanda/linux-atlas \
+  --max-active-facts 65536 \
+  --out .nanda/linux-active/linux-active-65k.laf \
+  --format json
+
+nanda-llmwave-big linux-ask-hot \
+  --hot-pack .nanda/linux-active/linux-active-65k.laf \
+  --query "which package provides command bash" \
+  --top-k 5 \
+  --format json
+
+nanda-llmwave-big linux-hot-eval \
+  --hot-pack .nanda/linux-active/linux-active-65k.laf \
+  --top-k 5 \
+  --format json
+
+nanda-llmwave-big linux-domain-run \
+  --hot-pack .nanda/linux-active/linux-active-65k.laf \
+  --query "which package provides command bash" \
+  --top-k 5 \
+  --format json
+
 nanda-llmwave-big strict-density-claim-gate \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
@@ -572,6 +595,35 @@ binary is running" and "port listening does not prove firewall exposure".
 Treat `LINUX_ACTIVE_FIELD_READY_NOT_LLM` as active projection readiness only:
 binary hot execution, exposure analysis, broad eval, LLM readiness, and
 nonlinear-memory proof remain closed until separate gates prove them.
+
+`linux-pack-hot` is the next Linux SysField layer. It does not rebuild the
+atlas. It consumes the route-balanced active window and writes a `.laf` binary
+packet with fixed 64-byte fact records. The report splits the packet into
+hot-loop record bytes and a cold label table: fixed records are the 6 MiB
+runtime projection, labels are present so operators can inspect the top facts.
+Treat `LINUX_HOT_PACKET_READY_NOT_CACHE_ONLY_PROOF` as binary fixed-record
+materialization only. It does not prove full cache-only execution, exposure
+analysis, a general LLM, or nonlinear memory.
+
+`linux-ask-hot` scans the `.laf` fixed records and reports focused Linux facts
+for queries such as command-provider lookup or negative boundary checks. It may
+use the embedded cold labels for display, but it does not read JSON in the scan
+path. Treat `LINUX_HOT_SCAN_READY_NOT_LLM` as a Linux hot-field query result,
+not broad chat readiness.
+
+`linux-hot-eval` runs a compact Linux-domain eval over the `.laf` packet and
+compares the field against a lexical overlap baseline. The current built-in
+controls include command-provider traps (`bash` vs `checkbashisms`,
+`systemctl` vs `which.debianutils`) plus negative boundary facts. Treat
+`LINUX_HOT_EVAL_PASS_NOT_LLM` as local Linux-domain eval readiness only.
+
+`linux-domain-run` is the operator-facing constrained Linux path. It builds a
+query wave, scans fixed records, selects a route peak, checks the lexical
+baseline duel, materializes a constrained answer surface, verifies it, and emits
+a feedback preview for lexical traps. Treat
+`LINUX_DOMAIN_LLMWAVE_READY_NOT_GENERAL_LLM` as Linux-domain readiness only:
+not broad chat, not full cache-only proof, not an exposure scanner, and not
+nonlinear-memory proof.
 
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
 The implemented external-medium path is:

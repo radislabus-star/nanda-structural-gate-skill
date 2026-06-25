@@ -128,22 +128,43 @@ pub(crate) struct LinuxActiveClaimBoundary {
     pub blocked_by: Vec<&'static str>,
 }
 
-#[derive(Default)]
-struct AtlasScan {
-    fact_count: usize,
-    route_counts: BTreeMap<String, usize>,
-    layer_counts: BTreeMap<String, usize>,
-    corpus_hash: String,
+#[derive(Default, Clone)]
+pub(crate) struct LinuxActiveAtlasScan {
+    pub fact_count: usize,
+    pub route_counts: BTreeMap<String, usize>,
+    pub layer_counts: BTreeMap<String, usize>,
+    pub corpus_hash: String,
+}
+
+#[derive(Clone)]
+pub(crate) struct LinuxActiveFactWindow {
+    pub fact_paths: Vec<PathBuf>,
+    pub scan: LinuxActiveAtlasScan,
+    pub route_quotas: BTreeMap<String, usize>,
+    pub active_facts: Vec<LinuxAtlasFact>,
+}
+
+pub(crate) struct LinuxFactScoreTerms<'a> {
+    pub query: &'a str,
+    pub route: &'a str,
+    pub subject: &'a str,
+    pub relation: &'a str,
+    pub object: &'a str,
+    pub polarity: &'a str,
+    pub layer: &'a str,
+    pub confidence: u8,
 }
 
 pub(crate) fn build_linux_active_field_report(
     config: LinuxActiveFieldConfig,
 ) -> Result<LinuxActiveFieldReport> {
     let max_active_facts = config.max_active_facts.max(1);
-    let fact_paths = discover_fact_paths(&config.atlas_dir)?;
-    let scan = scan_fact_paths(&fact_paths)?;
-    let route_quotas = balanced_route_quotas(&scan.route_counts, max_active_facts);
-    let active_facts = select_active_facts(&fact_paths, &route_quotas, max_active_facts)?;
+    let LinuxActiveFactWindow {
+        fact_paths,
+        scan,
+        route_quotas,
+        active_facts,
+    } = build_linux_active_fact_window(&config.atlas_dir, max_active_facts)?;
     let route_distribution = count_selected_routes(&active_facts);
     let selected_route_count = route_distribution.len();
     let active_records_bytes = active_facts.len() * PACKED_ACTIVE_RECORD_BYTES;
@@ -234,6 +255,23 @@ pub(crate) fn build_linux_active_field_report(
     Ok(report)
 }
 
+pub(crate) fn build_linux_active_fact_window(
+    atlas_dir: &Path,
+    max_active_facts: usize,
+) -> Result<LinuxActiveFactWindow> {
+    let max_active_facts = max_active_facts.max(1);
+    let fact_paths = discover_fact_paths(atlas_dir)?;
+    let scan = scan_fact_paths(&fact_paths)?;
+    let route_quotas = balanced_route_quotas(&scan.route_counts, max_active_facts);
+    let active_facts = select_active_facts(&fact_paths, &route_quotas, max_active_facts)?;
+    Ok(LinuxActiveFactWindow {
+        fact_paths,
+        scan,
+        route_quotas,
+        active_facts,
+    })
+}
+
 fn discover_fact_paths(atlas_dir: &Path) -> Result<Vec<PathBuf>> {
     let pack_log = atlas_dir.join("packs.jsonl");
     let mut paths = BTreeSet::new();
@@ -292,8 +330,8 @@ fn resolve_fact_path(atlas_dir: &Path, raw_path: &str) -> PathBuf {
     atlas_dir.join(path)
 }
 
-fn scan_fact_paths(paths: &[PathBuf]) -> Result<AtlasScan> {
-    let mut scan = AtlasScan::default();
+fn scan_fact_paths(paths: &[PathBuf]) -> Result<LinuxActiveAtlasScan> {
+    let mut scan = LinuxActiveAtlasScan::default();
     let mut hash = Sha256::new();
     for path in paths {
         let file = fs::File::open(path).with_context(|| format!("open {}", path.display()))?;
@@ -455,12 +493,25 @@ fn run_probe_queries(facts: &[LinuxAtlasFact], queries: &[String]) -> Vec<LinuxA
 }
 
 fn score_fact(query: &str, fact: &LinuxAtlasFact) -> i64 {
-    let query_lower = query.to_ascii_lowercase();
-    let subject = fact.subject.to_ascii_lowercase();
-    let relation = fact.relation.to_ascii_lowercase();
-    let object = fact.object.to_ascii_lowercase();
-    let route = fact.route.to_ascii_lowercase();
-    let mut score = i64::from(fact.confidence) / 10;
+    score_linux_fact_terms(LinuxFactScoreTerms {
+        query,
+        route: &fact.route,
+        subject: &fact.subject,
+        relation: &fact.relation,
+        object: &fact.object,
+        polarity: &fact.polarity,
+        layer: &fact.layer,
+        confidence: fact.confidence,
+    })
+}
+
+pub(crate) fn score_linux_fact_terms(terms: LinuxFactScoreTerms<'_>) -> i64 {
+    let query_lower = terms.query.to_ascii_lowercase();
+    let subject = terms.subject.to_ascii_lowercase();
+    let relation = terms.relation.to_ascii_lowercase();
+    let object = terms.object.to_ascii_lowercase();
+    let route = terms.route.to_ascii_lowercase();
+    let mut score = i64::from(terms.confidence) / 10;
     if let Some(command) = command_query_target(&query_lower) {
         if !route_can_answer_command_provider(&route) {
             return 0;
@@ -492,13 +543,13 @@ fn score_fact(query: &str, fact: &LinuxAtlasFact) -> i64 {
     {
         score += 34;
     }
-    if query_lower.contains("runtime") && fact.layer.contains("runtime") {
+    if query_lower.contains("runtime") && terms.layer.contains("runtime") {
         score += 24;
     }
     if (query_lower.contains("not prove")
         || query_lower.contains("does not prove")
         || query_lower.contains("prove"))
-        && (fact.polarity == "negative" || route.contains("boundary"))
+        && (terms.polarity == "negative" || route.contains("boundary"))
     {
         score += 42;
     }

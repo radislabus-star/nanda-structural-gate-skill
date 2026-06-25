@@ -128,6 +128,10 @@ nanda-llmwave-big rust-heldout-eval --focus-packet .nanda/llmwave-big-training/r
 nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind base --max-facts 1000000 --format json
 nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind delta --max-facts 1000000 --format json
 nanda-llmwave-big linux-active-field --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --query "which package provides command bash" --format json
+nanda-llmwave-big linux-pack-hot --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.laf --format json
+nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
+nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --top-k 5 --format json
+nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -232,6 +236,23 @@ systemd exec hints, and negative boundary checks. Treat
 `LINUX_ACTIVE_FIELD_READY_NOT_LLM` as active-field readiness only: binary hot
 packet execution, exposure analysis, broad eval, LLM readiness, and nonlinear
 memory proof remain blocked.
+`linux-pack-hot` materializes that active window as a `.laf` binary packet with
+64-byte fixed records. The report separates hot-loop record bytes from the cold
+label table used for explanation. Treat
+`LINUX_HOT_PACKET_READY_NOT_CACHE_ONLY_PROOF` as binary fixed-record readiness:
+it does not prove full cache-only execution, exposure analysis, LLM readiness,
+or nonlinear memory.
+`linux-ask-hot` scans the `.laf` fixed records and uses the embedded cold label
+table only to explain the top facts. Treat `LINUX_HOT_SCAN_READY_NOT_LLM` as a
+Linux hot-field query result, not a general answer engine.
+`linux-hot-eval` runs built-in Linux domain probes over that packet and compares
+the field against a lexical overlap baseline. Treat
+`LINUX_HOT_EVAL_PASS_NOT_LLM` as a local Linux-domain eval gate only.
+`linux-domain-run` ties the Linux query wave, fixed-record hot scan, route peak,
+lexical duel, constrained answer surface, verifier, and feedback preview into
+one operator-facing report. Treat
+`LINUX_DOMAIN_LLMWAVE_READY_NOT_GENERAL_LLM` as constrained Linux-domain
+readiness only.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,

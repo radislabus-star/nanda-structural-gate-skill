@@ -251,6 +251,10 @@ scripts/nanda-llmwave-big rust-heldout-eval --focus-packet .nanda/llmwave-big-tr
 scripts/nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind base --max-facts 1000000 --format json
 scripts/nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind delta --max-facts 1000000 --format json
 scripts/nanda-llmwave-big linux-active-field --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --query "which package provides command bash" --format json
+scripts/nanda-llmwave-big linux-pack-hot --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.laf --format json
+scripts/nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
+scripts/nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --top-k 5 --format json
+scripts/nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 scripts/nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -935,6 +939,28 @@ systemd exec hints, and negative boundary facts. Treat
 `LINUX_ACTIVE_FIELD_READY_NOT_LLM` as active projection readiness only: binary
 hot packet execution, exposure analysis, broad eval, LLM readiness, and
 nonlinear-memory proof remain blocked.
+Use `nanda-llmwave-big linux-pack-hot --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.laf --format json`
+to materialize the Linux Active Field as a binary `.laf` packet with fixed
+64-byte records. Inspect `packet.hot_loop_record_bytes`,
+`packet.fixed_records_fit_6m`, and `packet.cold_label_table_bytes`: fixed
+records are the hot projection, labels are cold explain data. Treat
+`LINUX_HOT_PACKET_READY_NOT_CACHE_ONLY_PROOF` as binary fixed-record readiness
+only; it does not prove cache-only execution, exposure analysis, LLM readiness,
+or nonlinear memory.
+Use `nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --format json`
+to scan the `.laf` fixed records without JSON and report focused Linux facts.
+Treat `LINUX_HOT_SCAN_READY_NOT_LLM` as Linux hot-field query readiness only,
+not broad chat readiness.
+Use `nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --format json`
+to run the compact Linux-domain eval and lexical baseline duel. Treat
+`LINUX_HOT_EVAL_PASS_NOT_LLM` as a local domain gate; it is not a broad LLM,
+not full cache-only execution proof, and not nonlinear-memory proof.
+Use `nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --format json`
+to run the constrained Linux Domain LLMWave path: query wave, fixed-record hot
+scan, route peak, lexical duel, constrained answer surface, verifier, and
+feedback preview. Treat `LINUX_DOMAIN_LLMWAVE_READY_NOT_GENERAL_LLM` as local
+Linux-domain readiness only; broad chat, full cache-only execution,
+vulnerability scanning, and nonlinear-memory proof remain blocked.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`
 to compare Rust profile packed memory against a linear fact baseline. It checks
 schema reuse, residual saving, packed bytes versus linear bytes, route balance,
