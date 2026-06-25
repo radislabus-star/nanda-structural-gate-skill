@@ -377,9 +377,13 @@ Use `nanda-dogfood . --refactor-plan --format json` before repository
 refactors. It returns top-level `agent_decision`, `codex_failure_field`,
 `repair_queue`, route map, linked branch checks, and a repo-level
 `repo-code-map` with `risk_files`.
-Use `nanda-map-code` before or during Rust refactors. On a file, it clusters
-functions, reports cross-cluster dependencies, suggests target files, and marks
-extraction risk. On a directory, it returns a repo-level `repo-code-map`.
+Use `nanda-map-code` before or during Rust/C/header refactors. On a file, it
+clusters symbols, reports cross-cluster dependencies, suggests target files,
+and marks extraction risk. On a directory, it returns a route-balanced
+repo-level `repo-code-map`. For C/kernel trees it recognizes routes such as
+VFS path lookup, VFS open/permission, BPF verifier/speculation, io_uring
+restrictions, LSM/security, and nospec headers. Treat this as an architectural
+map, not proof of a vulnerability.
 Hotkey/FSM/event/state-machine code is route-critical even when dependency
 count is small.
 Use `nanda-boundary-economics` before split/merge refactors. It enforces

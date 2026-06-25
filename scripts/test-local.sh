@@ -1616,6 +1616,57 @@ jq -e '.clusters | length > 0' <<<"$code_map_json" >/dev/null
 jq -e '.clusters[] | select(.cluster == "cli-router")' <<<"$code_map_json" >/dev/null
 code_map_repo_json="$("$code_mapper" "$root" --format json)"
 jq -e '.mode == "repo-code-map" and (.input | length) > 0 and .total_files > 0 and (.routes | length) > 0 and (.risk_files | length) > 0' <<<"$code_map_repo_json" >/dev/null
+tmp_kernel_repo="$(mktemp -d)"
+mkdir -p "$tmp_kernel_repo/fs" "$tmp_kernel_repo/kernel/bpf" "$tmp_kernel_repo/io_uring" "$tmp_kernel_repo/include/uapi/linux"
+cat >"$tmp_kernel_repo/fs/namei.c" <<'EOF_KERNEL_NAMEI'
+static int nd_jump_root(struct nameidata *nd)
+{
+    if (nd->flags & LOOKUP_BENEATH)
+        return -EXDEV;
+    return 0;
+}
+
+static bool path_connected(struct vfsmount *mnt, struct dentry *dentry)
+{
+    return is_subdir(dentry, mnt->mnt_root);
+}
+EOF_KERNEL_NAMEI
+cat >"$tmp_kernel_repo/kernel/bpf/verifier.c" <<'EOF_KERNEL_BPF'
+static int sanitize_speculative_path(struct bpf_verifier_env *env)
+{
+    return push_stack(env, 1, 0, true);
+}
+
+static int sanitize_ptr_alu(struct bpf_verifier_env *env)
+{
+    return sanitize_speculative_path(env);
+}
+EOF_KERNEL_BPF
+cat >"$tmp_kernel_repo/io_uring/register.c" <<'EOF_KERNEL_URING'
+static int io_register_restrictions(struct io_ring_ctx *ctx)
+{
+    if (!(ctx->flags & IORING_SETUP_R_DISABLED))
+        return -EBADFD;
+    return 0;
+}
+
+static inline bool io_check_restriction(struct io_ring_ctx *ctx)
+{
+    return test_bit(ctx->opcode, ctx->restrictions.sqe_op);
+}
+EOF_KERNEL_URING
+cat >"$tmp_kernel_repo/include/uapi/linux/openat2.h" <<'EOF_KERNEL_OPENAT2'
+#define RESOLVE_BENEATH 0x08
+#define RESOLVE_IN_ROOT 0x10
+EOF_KERNEL_OPENAT2
+kernel_code_map_json="$("$code_mapper" "$tmp_kernel_repo" --format json)"
+jq -e '.mode == "repo-code-map" and .total_files == 4 and .selected_files == 4' <<<"$kernel_code_map_json" >/dev/null
+jq -e '.routes | index("kernel-vfs-path-flow") and index("kernel-bpf-verifier-flow") and index("kernel-io-uring-flow")' <<<"$kernel_code_map_json" >/dev/null
+jq -e '.clusters[] | select(.input_file == "fs/namei.c" and .cluster == "kernel-vfs-path" and .risk == "HIGH" and (.symbol_kinds | index("function")))' <<<"$kernel_code_map_json" >/dev/null
+jq -e '.clusters[] | select(.input_file == "kernel/bpf/verifier.c" and .cluster == "kernel-bpf-speculation" and .risk == "HIGH")' <<<"$kernel_code_map_json" >/dev/null
+jq -e '.clusters[] | select(.input_file == "io_uring/register.c" and .cluster == "kernel-io-uring-restrictions" and .risk == "HIGH")' <<<"$kernel_code_map_json" >/dev/null
+jq -e '.clusters[] | select(.input_file == "include/uapi/linux/openat2.h" and .cluster == "kernel-vfs-path" and (.symbol_kinds | index("macro")))' <<<"$kernel_code_map_json" >/dev/null
+rm -rf "$tmp_kernel_repo"
 route_field_json="$("$mapper" "$root/examples/triad-packet.route-field-owner-conflict.json" --input-format json --format json)"
 jq -e '.route_field.routes.correction.owners | index("core-correction-owner")' <<<"$route_field_json" >/dev/null
 jq -e '.owner_gravity.conflicts[] | select(.kind == "duplicate_decision_owner" and .route == "correction")' <<<"$route_field_json" >/dev/null

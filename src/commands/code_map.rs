@@ -22,6 +22,8 @@ pub(crate) struct MapCodeArgs {
 #[derive(Clone)]
 struct FunctionSymbol {
     name: String,
+    kind: String,
+    language: String,
     line_start: usize,
     line_end: usize,
     cluster: String,
@@ -55,8 +57,8 @@ pub(crate) fn report(
     max_functions: usize,
 ) -> Result<Value> {
     let source = fs::read_to_string(input)
-        .with_context(|| format!("read Rust source for code map: {}", input.display()))?;
-    let functions = parse_functions(&source);
+        .with_context(|| format!("read source for code map: {}", input.display()))?;
+    let functions = parse_functions(&source, input);
     let mut by_name = BTreeMap::<String, String>::new();
     for function in &functions {
         by_name.insert(function.name.clone(), function.cluster.clone());
@@ -99,7 +101,9 @@ pub(crate) fn report(
             .first()
             .map(|function| function.suggested_file.as_str())
             .unwrap_or("src/main.rs");
-        let route_critical = is_route_critical_file(input) || is_route_critical_cluster(&cluster);
+        let route_critical = is_route_critical_file(input)
+            || is_security_critical_file(input)
+            || is_route_critical_cluster(&cluster);
         let risk = if route_critical {
             "HIGH"
         } else if stats.deps.len() <= 2 {
@@ -110,7 +114,7 @@ pub(crate) fn report(
             "HIGH"
         };
         let risk_reason = if route_critical {
-            "ROUTE_CRITICAL state-machine or runtime route boundary"
+            "ROUTE_CRITICAL state-machine, security hook, or kernel route boundary"
         } else if risk == "HIGH" {
             "many cross-cluster dependencies"
         } else if risk == "MEDIUM" {
@@ -121,14 +125,37 @@ pub(crate) fn report(
         let functions = stats
             .functions
             .iter()
+            .filter(|function| function.kind == "function")
+            .chain(
+                stats
+                    .functions
+                    .iter()
+                    .filter(|function| function.kind != "function"),
+            )
             .take(max_functions)
             .map(|function| {
                 json!({
                     "name": function.name,
+                    "kind": function.kind,
+                    "language": function.language,
                     "line_start": function.line_start,
                     "line_end": function.line_end
                 })
             })
+            .collect::<Vec<_>>();
+        let languages = stats
+            .functions
+            .iter()
+            .map(|function| function.language.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let symbol_kinds = stats
+            .functions
+            .iter()
+            .map(|function| function.kind.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
             .collect::<Vec<_>>();
         cluster_rows.push(json!({
             "cluster": cluster,
@@ -137,6 +164,8 @@ pub(crate) fn report(
             "suggested_file": suggested_file,
             "risk": risk,
             "risk_reason": risk_reason,
+            "languages": languages,
+            "symbol_kinds": symbol_kinds,
             "external_deps": stats.deps.iter().cloned().collect::<Vec<_>>(),
             "sample_functions": functions
         }));
@@ -188,11 +217,11 @@ pub(crate) fn repo_report(
     max_functions: usize,
 ) -> Result<Value> {
     let mut files = vec![];
-    collect_rust_files(repo_root, repo_root, &mut files)?;
+    collect_code_files(repo_root, repo_root, &mut files)?;
     let total_files = files.len();
     let mut route_counts = BTreeMap::<String, usize>::new();
     for rel in &files {
-        let route = super::dogfood::auto_route_for_path(&rel.to_string_lossy());
+        let route = auto_route_for_code_path(&rel.to_string_lossy());
         *route_counts.entry(route).or_insert(0) += 1;
     }
     let routes = route_counts.keys().cloned().collect::<Vec<_>>();
@@ -205,12 +234,7 @@ pub(crate) fn repo_report(
             })
         })
         .collect::<Vec<_>>();
-    files.sort_by(|left, right| {
-        risk_file_rank(left)
-            .cmp(&risk_file_rank(right))
-            .then_with(|| left.cmp(right))
-    });
-    files.truncate(12);
+    files = select_repo_files(&files, 12);
     let selected_files = files.len();
 
     let mut file_reports = vec![];
@@ -275,7 +299,7 @@ pub(crate) fn repo_report(
     }))
 }
 
-fn collect_rust_files(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+fn collect_code_files(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(_) => return Ok(()),
@@ -293,30 +317,101 @@ fn collect_rust_files(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result
             continue;
         }
         if path.is_dir() {
-            collect_rust_files(root, &path, out)?;
-        } else if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+            collect_code_files(root, &path, out)?;
+        } else if is_code_file(&path) {
             out.push(path.strip_prefix(root).unwrap_or(&path).to_path_buf());
         }
     }
     Ok(())
 }
 
+fn is_code_file(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some("rs" | "c" | "h")
+    )
+}
+
+fn auto_route_for_code_path(path: &str) -> String {
+    let lower = path.to_ascii_lowercase();
+    if path_matches(&lower, "fs/namei.c")
+        || path_matches(&lower, "include/linux/namei.h")
+        || path_matches(&lower, "include/uapi/linux/openat2.h")
+    {
+        "kernel-vfs-path-flow".to_string()
+    } else if path_matches(&lower, "fs/open.c") {
+        "kernel-vfs-open-flow".to_string()
+    } else if lower.contains("kernel/bpf") {
+        "kernel-bpf-verifier-flow".to_string()
+    } else if lower.contains("io_uring") {
+        "kernel-io-uring-flow".to_string()
+    } else if lower.contains("security/") || lower.contains("lsm") {
+        "kernel-lsm-flow".to_string()
+    } else if path_matches(&lower, "include/linux/nospec.h") {
+        "kernel-nospec-flow".to_string()
+    } else if lower.ends_with(".c") || lower.ends_with(".h") {
+        "c-source-flow".to_string()
+    } else {
+        super::dogfood::auto_route_for_path(path)
+    }
+}
+
+fn select_repo_files(files: &[PathBuf], max_files: usize) -> Vec<PathBuf> {
+    let mut sorted = files.to_vec();
+    sorted.sort_by(|left, right| {
+        risk_file_rank(left)
+            .cmp(&risk_file_rank(right))
+            .then_with(|| left.cmp(right))
+    });
+
+    let mut selected = Vec::<PathBuf>::new();
+    let mut selected_paths = BTreeSet::<String>::new();
+    let mut seen_routes = BTreeSet::<String>::new();
+
+    for rel in &sorted {
+        let route = auto_route_for_code_path(&rel.to_string_lossy());
+        let key = rel.to_string_lossy().to_string();
+        if seen_routes.insert(route) && selected_paths.insert(key) {
+            selected.push(rel.clone());
+            if selected.len() >= max_files {
+                return selected;
+            }
+        }
+    }
+
+    for rel in sorted {
+        let key = rel.to_string_lossy().to_string();
+        if selected_paths.insert(key) {
+            selected.push(rel);
+            if selected.len() >= max_files {
+                break;
+            }
+        }
+    }
+
+    selected
+}
+
 fn risk_file_rank(path: &Path) -> usize {
     let lower = path.to_string_lossy().to_ascii_lowercase();
-    if is_route_critical_path(&lower)
+    if is_exact_kernel_security_path(&lower) {
+        0
+    } else if is_security_critical_path(&lower) {
+        1
+    } else if is_route_critical_path(&lower)
         || lower.contains("dogfood")
         || lower.contains("map_gate")
         || lower.contains("report")
     {
-        0
-    } else if lower.ends_with("main.rs") || lower.contains("/bin/") {
-        1
-    } else if lower.contains("commands") || lower.contains("runtime") || lower.contains("daemon") {
         2
-    } else if lower.contains("model") {
+    } else if lower.ends_with("main.rs") || lower.contains("/bin/") {
         3
-    } else {
+    } else if lower.contains("commands") || lower.contains("runtime") || lower.contains("daemon") {
         4
+    } else if lower.contains("model") {
+        5
+    } else {
+        6
     }
 }
 
@@ -334,8 +429,54 @@ fn is_route_critical_path(lower: &str) -> bool {
         || lower.contains("state_machine")
 }
 
+fn is_security_critical_file(path: &Path) -> bool {
+    is_security_critical_path(&path.to_string_lossy().to_ascii_lowercase())
+}
+
+fn is_security_critical_path(lower: &str) -> bool {
+    lower.contains("security")
+        || lower.contains("lsm")
+        || lower.contains("permission")
+        || lower.contains("cred")
+        || lower.contains("capable")
+        || lower.contains("nospec")
+        || lower.contains("speculat")
+        || lower.contains("sanitize")
+        || lower.contains("verifier")
+        || lower.contains("io_uring")
+        || lower.contains("namei")
+        || lower.contains("openat2")
+        || path_matches(lower, "fs/open.c")
+        || path_matches(lower, "fs/namei.c")
+}
+
+fn is_exact_kernel_security_path(lower: &str) -> bool {
+    path_matches(lower, "fs/namei.c")
+        || path_matches(lower, "fs/open.c")
+        || path_matches(lower, "kernel/bpf/verifier.c")
+        || path_matches(lower, "io_uring/register.c")
+        || path_matches(lower, "io_uring/io_uring.c")
+        || path_matches(lower, "include/linux/nospec.h")
+        || path_matches(lower, "include/linux/namei.h")
+        || path_matches(lower, "include/uapi/linux/openat2.h")
+}
+
+fn path_matches(lower: &str, suffix: &str) -> bool {
+    lower == suffix || lower.ends_with(&format!("/{suffix}"))
+}
+
 fn is_route_critical_cluster(cluster: &str) -> bool {
-    matches!(cluster, "state-machine" | "manual-trigger")
+    matches!(
+        cluster,
+        "state-machine"
+            | "manual-trigger"
+            | "kernel-vfs-path"
+            | "kernel-vfs-open"
+            | "kernel-bpf-speculation"
+            | "kernel-io-uring-restrictions"
+            | "kernel-lsm-security"
+            | "kernel-nospec"
+    )
 }
 
 fn max_cluster_risk(clusters: &Value) -> &'static str {
@@ -399,7 +540,14 @@ fn repo_risk_files(clusters: &[Value]) -> Value {
     json!(rows)
 }
 
-fn parse_functions(source: &str) -> Vec<FunctionSymbol> {
+fn parse_functions(source: &str, input: &Path) -> Vec<FunctionSymbol> {
+    match source_language(input) {
+        "c" | "header" => parse_c_symbols(source, input),
+        _ => parse_rust_functions(source, input),
+    }
+}
+
+fn parse_rust_functions(source: &str, input: &Path) -> Vec<FunctionSymbol> {
     let lines = source.lines().collect::<Vec<_>>();
     let mut starts = vec![];
     for (idx, line) in lines.iter().enumerate() {
@@ -415,17 +563,103 @@ fn parse_functions(source: &str) -> Vec<FunctionSymbol> {
             .map(|(next_idx, _)| *next_idx)
             .unwrap_or(lines.len());
         let body = lines[*idx..next_start].join("\n");
-        let cluster = classify_cluster(name);
+        let cluster = classify_cluster(name, input);
         out.push(FunctionSymbol {
             name: name.clone(),
+            kind: "function".to_string(),
+            language: "rust".to_string(),
             line_start: idx + 1,
             line_end: next_start,
-            suggested_file: suggested_file(&cluster).to_string(),
+            suggested_file: suggested_file(&cluster, input, "rust"),
             cluster,
             body,
         });
     }
     out
+}
+
+fn parse_c_symbols(source: &str, input: &Path) -> Vec<FunctionSymbol> {
+    let lines = source.lines().collect::<Vec<_>>();
+    let mut out = vec![];
+
+    for (idx, line) in lines.iter().enumerate() {
+        if let Some(name) = c_macro_name(line) {
+            let cluster = classify_cluster(&name, input);
+            out.push(FunctionSymbol {
+                name,
+                kind: "macro".to_string(),
+                language: source_language(input).to_string(),
+                line_start: idx + 1,
+                line_end: idx + 1,
+                suggested_file: suggested_file(&cluster, input, source_language(input)),
+                cluster,
+                body: line.to_string(),
+            });
+        }
+    }
+
+    let mut idx = 0usize;
+    while idx < lines.len() {
+        if !looks_like_c_signature_start(lines[idx]) {
+            idx += 1;
+            continue;
+        }
+
+        let start_idx = idx;
+        let mut signature = String::new();
+        let mut found_body = None;
+        let max_sig_end = (idx + 8).min(lines.len());
+        let mut sig_idx = idx;
+        while sig_idx < max_sig_end {
+            let line = lines[sig_idx].trim();
+            if line.starts_with('#') {
+                break;
+            }
+            signature.push(' ');
+            signature.push_str(line);
+            if line.contains(';') && !line.contains('{') {
+                break;
+            }
+            if line.contains('{') {
+                found_body = Some(sig_idx);
+                break;
+            }
+            sig_idx += 1;
+        }
+
+        let Some(body_start) = found_body else {
+            idx += 1;
+            continue;
+        };
+        let Some(name) = c_function_name(&signature) else {
+            idx += 1;
+            continue;
+        };
+        let end = c_block_end(&lines, body_start);
+        let body = lines[start_idx..end].join("\n");
+        let cluster = classify_cluster(&name, input);
+        out.push(FunctionSymbol {
+            name,
+            kind: "function".to_string(),
+            language: source_language(input).to_string(),
+            line_start: start_idx + 1,
+            line_end: end,
+            suggested_file: suggested_file(&cluster, input, source_language(input)),
+            cluster,
+            body,
+        });
+        idx = end.max(idx + 1);
+    }
+
+    out
+}
+
+fn source_language(input: &Path) -> &'static str {
+    match input.extension().and_then(|ext| ext.to_str()) {
+        Some("c") => "c",
+        Some("h") => "header",
+        _ => "rust",
+    }
 }
 
 fn function_name(line: &str) -> Option<String> {
@@ -443,9 +677,172 @@ fn function_name(line: &str) -> Option<String> {
     (!name.is_empty()).then_some(name)
 }
 
-fn classify_cluster(name: &str) -> String {
+fn c_macro_name(line: &str) -> Option<String> {
+    let trimmed = line.trim_start();
+    let rest = trimmed.strip_prefix("#define ")?;
+    let name = rest
+        .chars()
+        .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+        .collect::<String>();
+    (!name.is_empty()).then_some(name)
+}
+
+fn looks_like_c_signature_start(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    if trimmed.is_empty()
+        || trimmed.starts_with('#')
+        || trimmed.starts_with('*')
+        || trimmed.starts_with("//")
+        || trimmed.starts_with("/*")
+        || trimmed.ends_with(';')
+    {
+        return false;
+    }
+    trimmed.contains('(')
+        || trimmed.starts_with("static ")
+        || trimmed.starts_with("__")
+        || trimmed.starts_with("int ")
+        || trimmed.starts_with("void ")
+        || trimmed.starts_with("bool ")
+        || trimmed.starts_with("long ")
+        || trimmed.starts_with("unsigned ")
+        || trimmed.starts_with("struct ")
+        || trimmed.starts_with("enum ")
+        || trimmed.starts_with("const ")
+}
+
+fn c_function_name(signature: &str) -> Option<String> {
+    let signature = signature.trim();
+    if signature.contains(" = ") || signature.contains(" typedef ") {
+        return None;
+    }
+    if let Some(name) = syscall_macro_name(signature) {
+        return Some(name);
+    }
+    let open = signature.find('(')?;
+    let before = signature[..open].trim();
+    let name = before
+        .split_whitespace()
+        .last()?
+        .trim_start_matches('*')
+        .trim_start_matches('&')
+        .to_string();
+    if name.is_empty()
+        || name.contains('(')
+        || name.contains(')')
+        || c_keyword(&name)
+        || name
+            .chars()
+            .any(|ch| !(ch.is_ascii_alphanumeric() || ch == '_'))
+    {
+        return None;
+    }
+    Some(name)
+}
+
+fn syscall_macro_name(signature: &str) -> Option<String> {
+    for prefix in [
+        "SYSCALL_DEFINE",
+        "COMPAT_SYSCALL_DEFINE",
+        "BPF_CALL_",
+        "TRACE_EVENT",
+    ] {
+        let Some(pos) = signature.find(prefix) else {
+            continue;
+        };
+        let rest = &signature[pos..];
+        let Some(open) = rest.find('(') else {
+            continue;
+        };
+        let after = &rest[open + 1..];
+        let name = after
+            .chars()
+            .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+            .collect::<String>();
+        if !name.is_empty() {
+            return Some(format!("{prefix}{name}"));
+        }
+    }
+    None
+}
+
+fn c_keyword(name: &str) -> bool {
+    matches!(
+        name,
+        "if" | "for" | "while" | "switch" | "return" | "sizeof" | "case"
+    )
+}
+
+fn c_block_end(lines: &[&str], body_start: usize) -> usize {
+    let mut depth = 0isize;
+    let mut seen_open = false;
+    for (idx, line) in lines.iter().enumerate().skip(body_start) {
+        for ch in line.chars() {
+            match ch {
+                '{' => {
+                    depth += 1;
+                    seen_open = true;
+                }
+                '}' => {
+                    depth -= 1;
+                    if seen_open && depth <= 0 {
+                        return idx + 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    lines.len()
+}
+
+fn classify_cluster(name: &str, input: &Path) -> String {
     let lower = name.to_ascii_lowercase();
-    let cluster = if matches!(name, "main" | "run" | "run_check") {
+    let path = input.to_string_lossy().to_ascii_lowercase();
+    let cluster = if path.contains("kernel/bpf")
+        || lower.contains("sanitize")
+        || lower.contains("speculative")
+        || lower.contains("nospec")
+        || lower.contains("bypass_spec")
+        || lower.contains("verifier")
+    {
+        "kernel-bpf-speculation"
+    } else if path.contains("io_uring")
+        || lower.contains("io_")
+        || lower.contains("uring")
+        || lower.contains("restriction")
+        || lower.contains("ioring")
+    {
+        "kernel-io-uring-restrictions"
+    } else if path.contains("security/")
+        || path.contains("lsm")
+        || lower.starts_with("security_")
+        || lower.contains("lsm")
+    {
+        "kernel-lsm-security"
+    } else if path_matches(&path, "include/linux/nospec.h") || lower.contains("array_index_nospec")
+    {
+        "kernel-nospec"
+    } else if path_matches(&path, "fs/namei.c")
+        || path_matches(&path, "include/linux/namei.h")
+        || path_matches(&path, "include/uapi/linux/openat2.h")
+        || lower.contains("lookup")
+        || lower.contains("dotdot")
+        || lower.contains("path_connected")
+        || lower.contains("jump_root")
+        || lower.contains("resolve_")
+        || lower.contains("lookup_")
+    {
+        "kernel-vfs-path"
+    } else if path_matches(&path, "fs/open.c")
+        || lower.contains("may_open")
+        || lower.contains("vfs_open")
+        || lower.contains("dentry_open")
+        || lower.contains("inode_permission")
+        || lower.contains("security_file_open")
+    {
+        "kernel-vfs-open"
+    } else if matches!(name, "main" | "run" | "run_check") {
         "cli-router"
     } else if lower.contains("manual_trigger")
         || lower.contains("double_shift")
@@ -517,7 +914,10 @@ fn classify_cluster(name: &str) -> String {
     cluster.to_string()
 }
 
-fn suggested_file(cluster: &str) -> &str {
+fn suggested_file(cluster: &str, input: &Path, language: &str) -> String {
+    if matches!(language, "c" | "header") {
+        return input.display().to_string();
+    }
     match cluster {
         "manual-trigger" => "src/runtime/manual_trigger.rs",
         "state-machine" => "src/runtime/state_machine.rs",
@@ -534,6 +934,7 @@ fn suggested_file(cluster: &str) -> &str {
         "cli-router" => "src/main.rs",
         _ => "src/main.rs",
     }
+    .to_string()
 }
 
 fn print_text(out: &Value) {

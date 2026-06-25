@@ -1206,14 +1206,17 @@ For code projects, add `--normalize-paths` to collapse paths such as
 exists, it builds a low-confidence repo auto-field. Auto-field is review-only
 until the agent provides a precise `action_id`, evidence, and route-specific
 verification.
-`nanda-map-code` is the refactor planning pass for Rust files or repositories.
-On a file, it clusters functions, reports cross-cluster dependencies, suggests
-target files, and marks extraction risk. On a directory, it returns a
-repo-level `repo-code-map`. Use `nanda-dogfood . --refactor-plan` when you want
-the normal structural verdict plus repository-level code-boundary
-recommendations in one packet. The dogfood refactor plan scans multiple Rust
-files and reports `risk_files`; it should not treat `src/main.rs` as the whole
-repository.
+`nanda-map-code` is the refactor planning pass for Rust/C/header files or
+repositories. On a file, it clusters symbols, reports cross-cluster
+dependencies, suggests target files, and marks extraction risk. On a directory,
+it returns a route-balanced repo-level `repo-code-map`. The repo mapper includes
+C/kernel-aware routes such as VFS path lookup, VFS open/permission, BPF
+verifier/speculation, io_uring restrictions, LSM/security, and nospec headers.
+This is an architectural map, not proof of a bug. Use
+`nanda-dogfood . --refactor-plan` when you want the normal structural verdict
+plus repository-level code-boundary recommendations in one packet. The dogfood
+refactor plan scans multiple source files and reports `risk_files`; it should
+not treat `src/main.rs` as the whole repository.
 `nanda-boundary-economics` is the refactor boundary layer. It does not suggest
 split/merge from file size. It applies `NO EVIDENCE => NO CUT` and returns a
 JSON `boundary_decision` with verdict, score components, evidence, allowed
