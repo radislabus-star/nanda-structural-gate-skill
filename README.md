@@ -689,6 +689,21 @@ does not prove firewall allows external packets". Treat
 say whether the fact field supports an exposure reading, but it is not a network
 scanner, exploit path, vulnerability proof, or broad chat model.
 
+`linux-chat-run` is the constrained Linux-profile chat/readout layer over the
+same `.lrf` schema/residual memory. It answers package/provider questions,
+summarizes listener evidence, refuses unsupported exposure shortcuts, and checks
+one small multi-turn context recall loop. Treat
+`LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM` as Linux-profile readiness only:
+it is not open-domain chat, not a general GPT-style model, not a network
+scanner, and not a vulnerability proof.
+
+```bash
+nanda-llmwave-big linux-chat-run \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --max-facts 4 \
+  --format json
+```
+
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
 The implemented external-medium path is:
 

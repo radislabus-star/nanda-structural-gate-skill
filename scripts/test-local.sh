@@ -369,6 +369,24 @@ tmp_linux_exposure_residual="$tmp_linux_exposure/linux-exposure.lrf"
 big_linux_exposure_json="$("$llmwave_big" linux-exposure-run --residual-pack "$tmp_linux_exposure_residual" --max-candidates 8 --format json)"
 jq -e '.mode == "llmwave-big-linux-exposure-run" and .verdict == "LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER" and .exposure_field.state == "EXPOSURE_CONFIRMED_REVIEW" and .exposure_field.safe_to_claim_external_exposure == true and .exposure_field.firewall_allow_fact_count == 1 and .eval.metrics.total == 4 and .eval.metrics.passed == 4 and .claim_boundary.exposure_layer_ready == true and .claim_boundary.vulnerability_scan_ready == false and .claim_boundary.broad_chat_llm_ready == false' <<<"$big_linux_exposure_json" >/dev/null
 jq -e '.exposure_field.candidates[] | select(.endpoint == "0100007F:1F90" and .verdict == "LOCAL_ONLY_NOT_EXTERNAL_EXPOSURE")' <<<"$big_linux_exposure_json" >/dev/null
+tmp_linux_chat="$(mktemp -d)"
+mkdir -p "$tmp_linux_chat/facts"
+tmp_linux_chat_facts="$tmp_linux_chat/facts/base.jsonl"
+cat >"$tmp_linux_chat_facts" <<JSONL
+{"fact_id":"linux.chat.bash","layer":"linux-knowledge","domain":"apt-command-index","route":"linux.apt.command.provider","subject":"bash","relation":"provided by package","object":"bash","polarity":"positive","confidence":90,"evidence":{"source_kind":"fixture","path":"fixture","line":1,"extractor":"fixture"}}
+{"fact_id":"linux.chat.systemctl","layer":"linux-knowledge","domain":"package-file-list","route":"linux.package.binary","subject":"systemd","relation":"provides binary","object":"/usr/bin/systemctl","polarity":"positive","confidence":90,"evidence":{"source_kind":"fixture","path":"fixture","line":2,"extractor":"fixture"}}
+{"fact_id":"linux.chat.socket.any","layer":"runtime-snapshot","domain":"runtime-socket","route":"linux.socket.runtime","subject":"tcp","relation":"listens on","object":"00000000:0016","polarity":"positive","confidence":90,"evidence":{"source_kind":"fixture","path":"fixture","line":3,"extractor":"fixture"}}
+{"fact_id":"linux.chat.socket.local","layer":"runtime-snapshot","domain":"runtime-socket","route":"linux.socket.runtime","subject":"tcp","relation":"listens on","object":"0100007F:1F90","polarity":"positive","confidence":90,"evidence":{"source_kind":"fixture","path":"fixture","line":4,"extractor":"fixture"}}
+{"fact_id":"linux.chat.systemd.ssh","layer":"linux-knowledge","domain":"systemd","route":"linux.systemd.exec","subject":"ssh.service","relation":"execstart","object":"/usr/sbin/sshd","polarity":"positive","confidence":88,"evidence":{"source_kind":"fixture","path":"fixture","line":5,"extractor":"fixture"}}
+{"fact_id":"linux.chat.boundary.socket","layer":"negative-boundary","domain":"linux-boundary","route":"linux.boundary.socket","subject":"port listening","relation":"does not prove","object":"firewall allows external packets","polarity":"negative","confidence":95,"evidence":{"source_kind":"fixture","path":"fixture","line":6,"extractor":"fixture"}}
+{"fact_id":"linux.chat.boundary.package","layer":"negative-boundary","domain":"linux-boundary","route":"linux.boundary.package","subject":"package installed","relation":"does not prove","object":"binary is running","polarity":"negative","confidence":95,"evidence":{"source_kind":"fixture","path":"fixture","line":7,"extractor":"fixture"}}
+{"fact_id":"linux.chat.boundary.cve","layer":"negative-boundary","domain":"linux-boundary","route":"linux.boundary.cve","subject":"vulnerable package","relation":"does not prove","object":"runtime exposure","polarity":"negative","confidence":95,"evidence":{"source_kind":"fixture","path":"fixture","line":8,"extractor":"fixture"}}
+JSONL
+tmp_linux_chat_residual="$tmp_linux_chat/linux-chat.lrf"
+"$llmwave_big" linux-pack-residual --atlas-dir "$tmp_linux_chat" --max-active-facts 8 --out "$tmp_linux_chat_residual" --format json >/dev/null
+big_linux_chat_json="$("$llmwave_big" linux-chat-run --residual-pack "$tmp_linux_chat_residual" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-chat-run" and .verdict == "LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM" and .eval.metrics.total == 5 and .eval.metrics.passed == 5 and .claim_boundary.broad_chat_llm_ready == true and .claim_boundary.linux_profile_broad_chat_ready == true and .claim_boundary.general_llm_ready == false and .claim_boundary.vulnerability_scan_ready == false' <<<"$big_linux_chat_json" >/dev/null
+jq -e '.turns[] | select(.intent == "external_exposure" and (.answer | ascii_downcase | contains("not confirmed")))' <<<"$big_linux_chat_json" >/dev/null
 big_small_domain_claim_json="$("$llmwave_big" claim-gate --claim small-domain-llmwave --format json)"
 jq -e '.claim == "small-domain-llmwave" and .verdict == "CLAIM_ALLOWED_LOCAL_ONLY" and .allowed == true and (.missing_evidence | index("broad unscripted chat eval"))' <<<"$big_small_domain_claim_json" >/dev/null
 set +e

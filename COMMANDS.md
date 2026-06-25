@@ -136,6 +136,7 @@ nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-
 nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
 nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-candidates 16 --format json
+nanda-llmwave-big linux-chat-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-facts 4 --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -281,6 +282,12 @@ facts, service context, and negative boundary facts. Treat
 `LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER` as exposure-reasoning readiness
 only. It is not a network scan, exploit, vulnerability proof, or broad chat
 LLM.
+`linux-chat-run` reads the same `.lrf` schema/residual memory and runs a
+constrained Linux-profile multi-turn readout: grounded package/provider answers,
+listener/exposure boundary answers, context recall, and false-shortcut refusal.
+Treat `LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM` as Linux-profile chat
+readiness only. It is not open-domain chat, not a general GPT-style model, not a
+network scanner, and not a vulnerability proof.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,

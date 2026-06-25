@@ -43,6 +43,7 @@ pub mod lens_scan;
 pub mod lexical_birth;
 pub mod linux_active_field;
 pub mod linux_atlas;
+pub mod linux_chat;
 pub mod linux_exposure;
 pub mod linux_hot_packet;
 pub mod linux_residual_memory;
@@ -410,6 +411,9 @@ enum LlmwaveBigCommand {
     /// Run boundary-aware Linux exposure reasoning over the residual packet.
     #[command(name = "linux-exposure-run", alias = "linux-exposure")]
     LinuxExposureRun(LlmwaveBigLinuxExposureRunArgs),
+    /// Run constrained Linux-profile chat/readout over schema/residual memory.
+    #[command(name = "linux-chat-run", alias = "linux-chat")]
+    LinuxChatRun(LlmwaveBigLinuxChatRunArgs),
 }
 
 #[derive(Parser)]
@@ -1283,6 +1287,21 @@ struct LlmwaveBigLinuxExposureRunArgs {
     residual_pack: PathBuf,
     #[arg(long = "max-candidates", default_value_t = 16)]
     max_candidates: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxChatRunArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "prompt")]
+    prompt: Vec<String>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -2832,6 +2851,63 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- vulnerability scan ready: `{}`",
                         report.claim_boundary.vulnerability_scan_ready
                     );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxChatRun(args) => {
+            let report = linux_chat::build_linux_chat_report(linux_chat::LinuxChatConfig {
+                residual_pack: args.residual_pack,
+                prompt: args.prompt,
+                max_facts: args.max_facts,
+            })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "linux_profile_broad_chat_ready: {}",
+                        report.claim_boundary.linux_profile_broad_chat_ready
+                    );
+                    println!(
+                        "broad_chat_llm_ready: {}",
+                        report.claim_boundary.broad_chat_llm_ready
+                    );
+                    println!(
+                        "general_llm_ready: {}",
+                        report.claim_boundary.general_llm_ready
+                    );
+                    println!(
+                        "eval_passed: {}/{}",
+                        report.eval.metrics.passed, report.eval.metrics.total
+                    );
+                    println!("turns: {}", report.turns.len());
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Profile Chat");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- Linux-profile broad chat ready: `{}`",
+                        report.claim_boundary.linux_profile_broad_chat_ready
+                    );
+                    println!(
+                        "- broad chat ready: `{}`",
+                        report.claim_boundary.broad_chat_llm_ready
+                    );
+                    println!(
+                        "- general LLM ready: `{}`",
+                        report.claim_boundary.general_llm_ready
+                    );
+                    println!(
+                        "- eval passed: `{}/{}`",
+                        report.eval.metrics.passed, report.eval.metrics.total
+                    );
+                    println!(
+                        "- false positive rate: `{}`",
+                        report.eval.metrics.false_positive_rate
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }
             }
             Ok(EXIT_PASS)

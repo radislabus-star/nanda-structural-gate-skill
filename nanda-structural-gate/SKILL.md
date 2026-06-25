@@ -995,6 +995,13 @@ evidence, service context, and negative boundary facts. Treat
 `LINUX_EXPOSURE_REASONING_READY_NOT_SCANNER` as exposure-reasoning readiness
 only. It is not a network scanner, exploit path, vulnerability proof, or broad
 chat LLM.
+Use `nanda-llmwave-big linux-chat-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-facts 4 --format json`
+to run constrained Linux-profile multi-turn chat/readout over the `.lrf`
+schema/residual memory. It checks grounded package/provider answers, listener
+evidence, exposure-boundary refusal, and a small context recall loop. Treat
+`LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM` as Linux-profile readiness only:
+it is not open-domain chat, not a general GPT-style model, not a network scanner,
+and not a vulnerability proof.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`
 to compare Rust profile packed memory against a linear fact baseline. It checks
 schema reuse, residual saving, packed bytes versus linear bytes, route balance,
