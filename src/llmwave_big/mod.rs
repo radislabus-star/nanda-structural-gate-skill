@@ -23,6 +23,7 @@ pub mod core_v1_query_wave;
 pub mod core_v1_schema_reasoning;
 pub mod core_v1_surface_generation;
 pub mod core_v2;
+pub mod core_v3;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
 pub mod density_ablation;
@@ -154,6 +155,18 @@ enum LlmwaveBigCommand {
     /// Print the LLMWave Core V2 hard claim gate.
     #[command(name = "core-v2-claim-gate")]
     CoreV2ClaimGate(LlmwaveBigCoreV2ClaimGateArgs),
+    /// Print the LLMWave Core V3 Goal/Action/Constraint/Solution plan.
+    #[command(name = "core-v3-plan")]
+    CoreV3Plan(LlmwaveBigCoreV3PlanArgs),
+    /// Run the LLMWave Core V3 solution-search field.
+    #[command(name = "core-v3-solution-search")]
+    CoreV3SolutionSearch(LlmwaveBigCoreV3SolutionSearchArgs),
+    /// Check the LLMWave Core V3 1M active projection against the 6 MiB budget.
+    #[command(name = "core-v3-pack-1m")]
+    CoreV3Pack1m(LlmwaveBigCoreV3Pack1mArgs),
+    /// Print the LLMWave Core V3 hard claim gate.
+    #[command(name = "core-v3-claim-gate")]
+    CoreV3ClaimGate(LlmwaveBigCoreV3ClaimGateArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -504,6 +517,46 @@ struct LlmwaveBigCoreV2PackHotArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreV2ClaimGateArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV3PlanArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV3SolutionSearchArgs {
+    #[arg(long, default_value = "confirm customs clearance")]
+    goal: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV3Pack1mArgs {
+    #[arg(long, default_value = core_v3::DEFAULT_1M_MANIFEST)]
+    manifest: PathBuf,
+    #[arg(long, default_value = core_v3::DEFAULT_1M_FOCUS)]
+    focus: PathBuf,
+    #[arg(long, default_value = core_v3::DEFAULT_1M_HELDOUT)]
+    heldout: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV3ClaimGateArgs {
+    #[arg(long, default_value = "confirm customs clearance")]
+    goal: String,
+    #[arg(long, default_value = core_v3::DEFAULT_1M_MANIFEST)]
+    manifest: PathBuf,
+    #[arg(long, default_value = core_v3::DEFAULT_1M_FOCUS)]
+    focus: PathBuf,
+    #[arg(long, default_value = core_v3::DEFAULT_1M_HELDOUT)]
+    heldout: PathBuf,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1454,6 +1507,56 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 &report,
                 &args.format,
                 "LLMWave Core V2 Claim Gate",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV3Plan(args) => {
+            let report = core_v3::build_core_v3_plan_report();
+            report::print_core_v3_report(
+                &report,
+                &args.format,
+                "LLMWave Core V3 Plan",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV3SolutionSearch(args) => {
+            let report = core_v3::build_core_v3_solution_search_report(args.goal);
+            report::print_core_v3_report(
+                &report,
+                &args.format,
+                "LLMWave Core V3 Solution Search",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV3Pack1m(args) => {
+            let paths = core_v3::CoreV3ExternalPaths {
+                manifest: args.manifest,
+                focus: args.focus,
+                heldout: args.heldout,
+            };
+            let report = core_v3::build_core_v3_million_pack_report(&paths)?;
+            report::print_core_v3_report(
+                &report,
+                &args.format,
+                "LLMWave Core V3 1M Active Projection",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV3ClaimGate(args) => {
+            let paths = core_v3::CoreV3ExternalPaths {
+                manifest: args.manifest,
+                focus: args.focus,
+                heldout: args.heldout,
+            };
+            let report = core_v3::build_core_v3_claim_gate_report(args.goal, &paths)?;
+            report::print_core_v3_report(
+                &report,
+                &args.format,
+                "LLMWave Core V3 Claim Gate",
                 report.verdict,
             )?;
             Ok(EXIT_PASS)

@@ -257,6 +257,10 @@ nanda-llmwave-big core-v2-density --format json
 nanda-llmwave-big core-v2-run --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v2-pack-hot --format json
 nanda-llmwave-big core-v2-claim-gate --format json
+nanda-llmwave-big core-v3-plan --format json
+nanda-llmwave-big core-v3-solution-search --goal "confirm customs clearance" --format json
+nanda-llmwave-big core-v3-pack-1m --format json
+nanda-llmwave-big core-v3-claim-gate --goal "confirm customs clearance" --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -1169,6 +1173,17 @@ fixture pipeline is wired and guarded, while `llm_ready=false`,
 `nonlinear_memory_proven=false`, `real_broad_corpus_loaded=false`, and
 `cache_only_execution_proven=false` remain explicit. See
 [`LLMWAVE_CORE_V2_REPORT.md`](LLMWAVE_CORE_V2_REPORT.md).
+
+`nanda-llmwave-big core-v3-*` adds the Goal/Action/Constraint/Solution Search
+Field and binds the local public-safe 1M corpus artifact as a 6 MiB active
+projection. The intended passing claim gate is
+`CORE_V3_SOLUTION_AND_1M_PROJECTION_READY_NOT_LLM`: it can return the steps
+needed to make a goal possible and can count the active projection budget, but
+it still keeps `llm_ready=false`, `nonlinear_memory_proven=false`,
+`cache_only_execution_proven=false`, and
+`lossless_million_fact_hot_storage=false`. See
+[`LLMWAVE_CORE_V3_REPORT.md`](LLMWAVE_CORE_V3_REPORT.md).
+
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

@@ -299,6 +299,30 @@ pub(crate) fn print_core_v2_report<T: Serialize>(
     Ok(())
 }
 
+pub(crate) fn print_core_v3_report<T: Serialize>(
+    report: &T,
+    format: &OutputFormat,
+    title: &str,
+    verdict: &str,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!(
+            "{}",
+            serde_json::to_string_pretty(&with_unified_field(report)?)?
+        ),
+        OutputFormat::Text => {
+            println!("{title}");
+            println!("verdict: {verdict}");
+        }
+        OutputFormat::Md => {
+            println!("# {title}");
+            println!();
+            println!("- verdict: `{verdict}`");
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn print_atlas_report(report: &AtlasReport, format: &OutputFormat) -> Result<()> {
     match format {
         OutputFormat::Json => println!(

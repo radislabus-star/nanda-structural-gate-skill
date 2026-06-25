@@ -197,6 +197,10 @@ scripts/nanda-llmwave-big core-v2-density --format json
 scripts/nanda-llmwave-big core-v2-run --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v2-pack-hot --format json
 scripts/nanda-llmwave-big core-v2-claim-gate --format json
+scripts/nanda-llmwave-big core-v3-plan --format json
+scripts/nanda-llmwave-big core-v3-solution-search --goal "confirm customs clearance" --format json
+scripts/nanda-llmwave-big core-v3-pack-1m --format json
+scripts/nanda-llmwave-big core-v3-claim-gate --goal "confirm customs clearance" --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -670,6 +674,18 @@ density candidate controls, an evidence-bound local run, and compact hot-packet
 storage. Treat `CORE_V2_LOCAL_PIPELINE_READY_NOT_LLM` as a local pipeline gate
 only: `llm_ready`, `nonlinear_memory_proven`, real broad-corpus generalization,
 and cache-only execution proof must stay false.
+
+`nanda-llmwave-big core-v3-plan`, `core-v3-solution-search`, `core-v3-pack-1m`,
+and `core-v3-claim-gate` are the Core V3 Goal/Action/Constraint/Solution Search
+pipeline. Use it when the next step is no longer "is this answer allowed?" but
+"which actions and evidence would make the goal allowed?". `core-v3-pack-1m`
+reads the local public-safe 1M manifest, route-balanced 15k focus packet, and
+held-out suite, then counts the 6 MiB active projection budget. Treat
+`CORE_V3_SOLUTION_AND_1M_PROJECTION_READY_NOT_LLM` as a solution-search plus
+active-projection readiness state only: `llm_ready`, `nonlinear_memory_proven`,
+`cache_only_execution_proven`, and `lossless_million_fact_hot_storage` must stay
+false.
+
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest
