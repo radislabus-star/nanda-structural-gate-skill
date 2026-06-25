@@ -402,6 +402,24 @@ jq -e '.mode == "llmwave-big-linux-broad-eval-run" and .verdict == "LINUX_PROFIL
 test -s "$tmp_linux_profile_eval"
 big_linux_profile_claim_json="$("$llmwave_big" linux-profile-claim-gate --residual-pack "$tmp_linux_chat_residual" --broad-eval "$tmp_linux_profile_eval" --format json)"
 jq -e '.mode == "llmwave-big-linux-profile-claim-gate" and .verdict == "LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM" and .requirements.linux_profile_nonlinear_memory_proven == true and .requirements.broad_eval_pass_rate_ok == true and .claim_boundary.linux_profile_reasoning_ready == true and .claim_boundary.linux_profile_broad_chat_ready == true and .claim_boundary.general_llm_ready == false and .claim_boundary.vulnerability_scanner_ready == false' <<<"$big_linux_profile_claim_json" >/dev/null
+tmp_linux_heldout_suite="$tmp_linux_chat/linux-heldout-suite.json"
+big_linux_heldout_suite_json="$("$llmwave_big" linux-heldout-suite-build --residual-pack "$tmp_linux_chat_residual" --cases 32 --out "$tmp_linux_heldout_suite" --format json)"
+jq -e '.mode == "llmwave-big-linux-heldout-suite-build" and .verdict == "LINUX_HELDOUT_SUITE_READY_NOT_EVAL" and .suite.case_count == 32 and .controls.near_collision_cases > 0 and .controls.shortcut_control_cases > 0 and .claim_boundary.general_llm_ready == false' <<<"$big_linux_heldout_suite_json" >/dev/null
+test -s "$tmp_linux_heldout_suite"
+tmp_linux_heldout_eval="$tmp_linux_chat/linux-heldout-eval.json"
+big_linux_heldout_eval_json="$("$llmwave_big" linux-heldout-eval-run --residual-pack "$tmp_linux_chat_residual" --suite "$tmp_linux_heldout_suite" --out "$tmp_linux_heldout_eval" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-heldout-eval-run" and .verdict == "LINUX_PROFILE_HELDOUT_EVAL_PASS_NOT_GENERAL_LLM" and .metrics.total == 32 and .metrics.passed == 32 and .metrics.false_positive_rate == 0 and .claim_boundary.general_llm_ready == false' <<<"$big_linux_heldout_eval_json" >/dev/null
+test -s "$tmp_linux_heldout_eval"
+tmp_linux_feedback="$tmp_linux_chat/linux-feedback.json"
+big_linux_feedback_build_json="$("$llmwave_big" linux-feedback-build --residual-pack "$tmp_linux_chat_residual" --text "Is this machine externally exposed?" --decision reject --note "profile shortcut rejection" --out "$tmp_linux_feedback" --format json)"
+jq -e '.mode == "llmwave-big-linux-feedback-build" and .verdict == "LINUX_FEEDBACK_PACKET_READY_NOT_TRAINING" and (.packet.negative_lanes | length) > 0 and .claim_boundary.general_llm_ready == false' <<<"$big_linux_feedback_build_json" >/dev/null
+test -s "$tmp_linux_feedback"
+big_linux_feedback_apply_json="$("$llmwave_big" linux-feedback-apply --residual-pack "$tmp_linux_chat_residual" --feedback "$tmp_linux_feedback" --text "Is this machine externally exposed?" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-feedback-apply" and .verdict == "LINUX_FEEDBACK_MEMORY_APPLIED_NOT_GENERAL_TRAINING" and .applied.negative_lanes_matched > 0 and .after.learned_negative_lanes_active == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_feedback_apply_json" >/dev/null
+big_linux_decision_search_json="$("$llmwave_big" linux-decision-search --residual-pack "$tmp_linux_chat_residual" --text "Is this machine externally exposed?" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-decision-search" and .verdict == "LINUX_DECISION_SEARCH_READY_NOT_SCANNER" and (.decision_search.safe_next_checks | length) > 0 and (.decision_search.missing_evidence | index("matching firewall allow for same endpoint/port")) and .claim_boundary.network_scanner_ready == false' <<<"$big_linux_decision_search_json" >/dev/null
+big_linux_relation_profile_json="$("$llmwave_big" linux-relation-profile --residual-pack "$tmp_linux_chat_residual" --format json)"
+jq -e '.mode == "llmwave-big-linux-relation-profile" and .verdict == "LINUX_RELATION_PROFILE_READY_NOT_CORPUS_COMPLETE" and (.causal_chains[] | select(.chain_id == "vulnerability_boundary" and .present == true)) and .claim_boundary.general_llm_ready == false' <<<"$big_linux_relation_profile_json" >/dev/null
 big_small_domain_claim_json="$("$llmwave_big" claim-gate --claim small-domain-llmwave --format json)"
 jq -e '.claim == "small-domain-llmwave" and .verdict == "CLAIM_ALLOWED_LOCAL_ONLY" and .allowed == true and (.missing_evidence | index("broad unscripted chat eval"))' <<<"$big_small_domain_claim_json" >/dev/null
 set +e

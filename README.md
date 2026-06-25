@@ -705,8 +705,18 @@ builds an evidence chain from `.lrf` schema/residual memory and applies anti-wav
 suppression to false shortcuts. The broad suite/eval pair checks generated
 Linux-profile questions, and the claim gate only allows
 `LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` when both schema/residual memory
-and broad Linux-profile eval pass. This is still not general LLM readiness,
-open-domain chat, a network scanner, or vulnerability proof.
+and broad Linux-profile eval pass.
+
+`linux-heldout-suite-build` and `linux-heldout-eval-run` add stricter controls:
+exact route facts, near-name collisions, package/runtime shortcuts,
+listener/exposure shortcuts, and endpoint-scope checks. `linux-feedback-build`
+and `linux-feedback-apply` write and replay local profile memory packets, so a
+reject can reinforce learned anti-wave lanes on the next pass. `linux-decision-search`
+does not scan the machine; it maps a question to missing evidence and safe next
+checks. `linux-relation-profile` reports which Linux relation families and
+causal chains are covered by the active `.lrf`, so corpus growth can target
+missing relation types instead of raw fact count. This is still not general LLM
+readiness, open-domain chat, a network scanner, or vulnerability proof.
 
 ```bash
 nanda-llmwave-big linux-chat-run \
@@ -740,6 +750,43 @@ nanda-llmwave-big linux-broad-eval-run \
 nanda-llmwave-big linux-profile-claim-gate \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
   --broad-eval .nanda/linux-active/linux-broad-eval.json \
+  --format json
+
+nanda-llmwave-big linux-heldout-suite-build \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --cases 100 \
+  --out .nanda/linux-active/linux-heldout-suite.json \
+  --format json
+
+nanda-llmwave-big linux-heldout-eval-run \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --suite .nanda/linux-active/linux-heldout-suite.json \
+  --out .nanda/linux-active/linux-heldout-eval.json \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-feedback-build \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --text "Is this machine externally exposed?" \
+  --decision reject \
+  --out .nanda/linux-active/linux-feedback.json \
+  --format json
+
+nanda-llmwave-big linux-feedback-apply \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --feedback .nanda/linux-active/linux-feedback.json \
+  --text "Is this machine externally exposed?" \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-decision-search \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --text "Is this machine externally exposed?" \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-relation-profile \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
   --format json
 ```
 

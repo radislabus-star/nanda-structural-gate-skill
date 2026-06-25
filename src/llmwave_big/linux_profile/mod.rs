@@ -5,6 +5,11 @@
 //! generation, broad eval, and a profile claim gate. It is still not a general
 //! LLM and not a vulnerability scanner.
 
+pub(crate) mod decision_search;
+pub(crate) mod feedback;
+pub(crate) mod heldout;
+pub(crate) mod relations;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
@@ -1623,7 +1628,7 @@ mod tests {
         );
         assert_eq!(eval.metrics.passed, eval.metrics.total);
         let claim = build_linux_profile_claim_gate_report(LinuxProfileClaimGateConfig {
-            residual_pack: residual,
+            residual_pack: residual.clone(),
             broad_eval: Some(eval_path),
             out: None,
         })
@@ -1634,6 +1639,80 @@ mod tests {
         );
         assert!(claim.claim_boundary.linux_profile_reasoning_ready);
         assert!(!claim.claim_boundary.general_llm_ready);
+        let heldout_path = root.join("heldout.json");
+        let heldout =
+            heldout::build_linux_heldout_suite_report(heldout::LinuxHeldoutSuiteBuildConfig {
+                residual_pack: residual.clone(),
+                cases: 32,
+                out: Some(heldout_path.clone()),
+            })
+            .unwrap();
+        assert_eq!(heldout.verdict, "LINUX_HELDOUT_SUITE_READY_NOT_EVAL");
+        assert!(heldout.controls.near_collision_cases > 0);
+        assert!(heldout.controls.shortcut_control_cases > 0);
+        let heldout_eval =
+            heldout::build_linux_heldout_eval_report(heldout::LinuxHeldoutEvalRunConfig {
+                residual_pack: residual.clone(),
+                suite: heldout_path,
+                out: None,
+                max_facts: 4,
+            })
+            .unwrap();
+        assert_eq!(
+            heldout_eval.verdict,
+            "LINUX_PROFILE_HELDOUT_EVAL_PASS_NOT_GENERAL_LLM"
+        );
+        let feedback_path = root.join("feedback.json");
+        let feedback = feedback::build_linux_feedback_report(feedback::LinuxFeedbackBuildConfig {
+            residual_pack: residual.clone(),
+            text: "Is this machine externally exposed?".to_string(),
+            decision: "reject".to_string(),
+            note: Some("profile shortcut rejection".to_string()),
+            out: Some(feedback_path.clone()),
+        })
+        .unwrap();
+        assert_eq!(feedback.verdict, "LINUX_FEEDBACK_PACKET_READY_NOT_TRAINING");
+        assert!(!feedback.packet.negative_lanes.is_empty());
+        let applied =
+            feedback::build_linux_feedback_apply_report(feedback::LinuxFeedbackApplyConfig {
+                residual_pack: residual.clone(),
+                feedback: feedback_path,
+                text: "Is this machine externally exposed?".to_string(),
+                max_facts: 4,
+                out: None,
+            })
+            .unwrap();
+        assert_eq!(
+            applied.verdict,
+            "LINUX_FEEDBACK_MEMORY_APPLIED_NOT_GENERAL_TRAINING"
+        );
+        assert!(applied.after.learned_negative_lanes_active);
+        let search = decision_search::build_linux_decision_search_report(
+            decision_search::LinuxDecisionSearchConfig {
+                residual_pack: residual.clone(),
+                text: "Is this machine externally exposed?".to_string(),
+                max_facts: 4,
+                out: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(search.verdict, "LINUX_DECISION_SEARCH_READY_NOT_SCANNER");
+        assert!(search
+            .decision_search
+            .safe_next_checks
+            .iter()
+            .any(|check| check.expected_route == "linux.firewall.runtime"));
+        let relation =
+            relations::build_linux_relation_profile_report(relations::LinuxRelationProfileConfig {
+                residual_pack: residual,
+                out: None,
+            })
+            .unwrap();
+        assert_eq!(
+            relation.verdict,
+            "LINUX_RELATION_PROFILE_READY_NOT_CORPUS_COMPLETE"
+        );
+        assert!(relation.causal_chains.iter().any(|chain| chain.present));
         let _ = fs::remove_dir_all(root);
     }
 

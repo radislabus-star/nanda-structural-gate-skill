@@ -142,6 +142,12 @@ nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-act
 nanda-llmwave-big linux-broad-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-broad-suite.json --format json
 nanda-llmwave-big linux-broad-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-broad-suite.json --out .nanda/linux-active/linux-broad-eval.json --max-facts 4 --format json
 nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --format json
+nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json
+nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-heldout-suite.json --out .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --format json
+nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
+nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json
+nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json
+nanda-llmwave-big linux-relation-profile --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -306,6 +312,20 @@ facts; `linux-broad-eval-run` executes the suite against `.lrf`; and
 proof and broad Linux-profile eval thresholds both pass. These commands expand
 the Linux-profile reasoning proof surface, but they still do not unlock general
 LLM, open-domain chat, scanner, or exploit claims.
+`linux-heldout-suite-build` adds a stricter profile suite: exact facts,
+near-name collisions, shortcut controls, and endpoint-scope checks. Use
+`linux-heldout-eval-run` before trusting the profile on noisy Linux facts.
+`linux-feedback-build` writes a local profile memory packet from accept/reject
+decisions, and `linux-feedback-apply` shows how the packet changes the next
+field pass through learned positive lanes or anti-wave lanes. This is local
+feedback, not gradient training.
+`linux-decision-search` turns a Linux question into missing evidence and
+side-effect-free next checks. It proposes commands such as `ss`, `systemctl`,
+`nft`, or `ip` as evidence routes, but it does not run them and is not a
+scanner.
+`linux-relation-profile` reports relation-family coverage and missing routes
+over the `.lrf` packet so the corpus can grow by causal relation type instead
+of raw fact count alone.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,

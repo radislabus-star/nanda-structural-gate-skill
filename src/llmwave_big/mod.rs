@@ -430,6 +430,24 @@ enum LlmwaveBigCommand {
     /// Gate Linux-profile reasoning claims from memory and broad eval evidence.
     #[command(name = "linux-profile-claim-gate")]
     LinuxProfileClaimGate(LlmwaveBigLinuxProfileClaimGateArgs),
+    /// Build a Linux-profile held-out eval suite with near-collision controls.
+    #[command(name = "linux-heldout-suite-build")]
+    LinuxHeldoutSuiteBuild(LlmwaveBigLinuxHeldoutSuiteBuildArgs),
+    /// Run the Linux-profile held-out eval suite.
+    #[command(name = "linux-heldout-eval-run")]
+    LinuxHeldoutEvalRun(LlmwaveBigLinuxHeldoutEvalRunArgs),
+    /// Build a Linux-profile local feedback memory packet.
+    #[command(name = "linux-feedback-build")]
+    LinuxFeedbackBuild(LlmwaveBigLinuxFeedbackBuildArgs),
+    /// Apply a Linux-profile feedback memory packet to a new field pass.
+    #[command(name = "linux-feedback-apply")]
+    LinuxFeedbackApply(LlmwaveBigLinuxFeedbackApplyArgs),
+    /// Search for missing evidence/actions needed to make a Linux decision.
+    #[command(name = "linux-decision-search")]
+    LinuxDecisionSearch(LlmwaveBigLinuxDecisionSearchArgs),
+    /// Report Linux relation-family coverage over a residual packet.
+    #[command(name = "linux-relation-profile")]
+    LinuxRelationProfile(LlmwaveBigLinuxRelationProfileArgs),
 }
 
 #[derive(Parser)]
@@ -1386,6 +1404,106 @@ struct LlmwaveBigLinuxProfileClaimGateArgs {
     residual_pack: PathBuf,
     #[arg(long = "broad-eval")]
     broad_eval: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxHeldoutSuiteBuildArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "cases", default_value_t = 100)]
+    cases: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxHeldoutEvalRunArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long)]
+    suite: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxFeedbackBuildArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "text")]
+    text: String,
+    #[arg(long = "decision", default_value = "reject")]
+    decision: String,
+    #[arg(long)]
+    note: Option<String>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxFeedbackApplyArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long)]
+    feedback: PathBuf,
+    #[arg(long = "text")]
+    text: String,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxDecisionSearchArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "text")]
+    text: String,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxRelationProfileArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -3164,6 +3282,228 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         report.claim_boundary.general_llm_ready
                     );
                     println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxHeldoutSuiteBuild(args) => {
+            let report = linux_profile::heldout::build_linux_heldout_suite_report(
+                linux_profile::heldout::LinuxHeldoutSuiteBuildConfig {
+                    residual_pack: args.residual_pack,
+                    cases: args.cases,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("cases: {}", report.suite.case_count);
+                    println!(
+                        "near_collision_cases: {}",
+                        report.controls.near_collision_cases
+                    );
+                    println!(
+                        "shortcut_control_cases: {}",
+                        report.controls.shortcut_control_cases
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Held-Out Suite");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- cases: `{}`", report.suite.case_count);
+                    println!(
+                        "- near-collision cases: `{}`",
+                        report.controls.near_collision_cases
+                    );
+                    println!(
+                        "- shortcut-control cases: `{}`",
+                        report.controls.shortcut_control_cases
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxHeldoutEvalRun(args) => {
+            let report = linux_profile::heldout::build_linux_heldout_eval_report(
+                linux_profile::heldout::LinuxHeldoutEvalRunConfig {
+                    residual_pack: args.residual_pack,
+                    suite: args.suite,
+                    out: args.out,
+                    max_facts: args.max_facts,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("passed: {}/{}", report.metrics.passed, report.metrics.total);
+                    println!(
+                        "false_positive_rate: {}",
+                        report.metrics.false_positive_rate
+                    );
+                    println!(
+                        "shortcut_rejection_rate: {}",
+                        report.metrics.shortcut_rejection_rate
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Held-Out Eval");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- passed: `{}/{}`",
+                        report.metrics.passed, report.metrics.total
+                    );
+                    println!("- pass rate: `{}`", report.metrics.pass_rate);
+                    println!(
+                        "- false-positive rate: `{}`",
+                        report.metrics.false_positive_rate
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxFeedbackBuild(args) => {
+            let report = linux_profile::feedback::build_linux_feedback_report(
+                linux_profile::feedback::LinuxFeedbackBuildConfig {
+                    residual_pack: args.residual_pack,
+                    text: args.text,
+                    decision: args.decision,
+                    note: args.note,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("negative_lanes: {}", report.packet.negative_lanes.len());
+                    println!("positive_lanes: {}", report.packet.positive_lanes.len());
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Feedback Build");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- negative lanes: `{}`", report.packet.negative_lanes.len());
+                    println!("- positive lanes: `{}`", report.packet.positive_lanes.len());
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxFeedbackApply(args) => {
+            let report = linux_profile::feedback::build_linux_feedback_apply_report(
+                linux_profile::feedback::LinuxFeedbackApplyConfig {
+                    residual_pack: args.residual_pack,
+                    feedback: args.feedback,
+                    text: args.text,
+                    max_facts: args.max_facts,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "negative_lanes_matched: {}",
+                        report.applied.negative_lanes_matched
+                    );
+                    println!(
+                        "positive_lanes_matched: {}",
+                        report.applied.positive_lanes_matched
+                    );
+                    println!("after_state: {}", report.after.state);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Feedback Apply");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- negative lanes matched: `{}`",
+                        report.applied.negative_lanes_matched
+                    );
+                    println!(
+                        "- positive lanes matched: `{}`",
+                        report.applied.positive_lanes_matched
+                    );
+                    println!("- after state: `{}`", report.after.state);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxDecisionSearch(args) => {
+            let report = linux_profile::decision_search::build_linux_decision_search_report(
+                linux_profile::decision_search::LinuxDecisionSearchConfig {
+                    residual_pack: args.residual_pack,
+                    text: args.text,
+                    max_facts: args.max_facts,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("state: {}", report.decision_search.state);
+                    println!(
+                        "missing_evidence: {}",
+                        report.decision_search.missing_evidence.len()
+                    );
+                    println!(
+                        "safe_next_checks: {}",
+                        report.decision_search.safe_next_checks.len()
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Decision Search");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- state: `{}`", report.decision_search.state);
+                    println!();
+                    println!("## Safe Next Checks");
+                    for check in &report.decision_search.safe_next_checks {
+                        println!(
+                            "- `{}` -> `{}` ({})",
+                            check.check_id, check.expected_route, check.command_hint
+                        );
+                    }
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxRelationProfile(args) => {
+            let report = linux_profile::relations::build_linux_relation_profile_report(
+                linux_profile::relations::LinuxRelationProfileConfig {
+                    residual_pack: args.residual_pack,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("families: {}", report.relation_families.len());
+                    println!(
+                        "present_chains: {}",
+                        report
+                            .causal_chains
+                            .iter()
+                            .filter(|chain| chain.present)
+                            .count()
+                    );
+                    println!("missing_routes: {}", report.missing_relation_routes.len());
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Relation Profile");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- families: `{}`", report.relation_families.len());
+                    println!(
+                        "- missing routes: `{}`",
+                        report.missing_relation_routes.len()
+                    );
                 }
             }
             Ok(EXIT_PASS)

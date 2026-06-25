@@ -1019,6 +1019,28 @@ to allow `LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` only when both
 schema/residual memory proof and broad Linux-profile eval thresholds pass. These
 commands expand the Linux-profile reasoning proof surface, but they still do
 not unlock general LLM, open-domain chat, scanner, or exploit claims.
+Use `nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json`
+to build a stricter Linux-profile held-out suite with exact route facts,
+near-name collisions, shortcut controls, and endpoint-scope checks.
+Use `nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-heldout-suite.json --out .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --format json`
+to run that suite. Treat
+`LINUX_PROFILE_HELDOUT_EVAL_PASS_NOT_GENERAL_LLM` as profile evidence only; it
+does not unlock general LLM, scanner, exploit, or open-domain chat claims.
+Use `nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json`
+to write a local Linux-profile feedback memory packet from an accept/reject
+decision.
+Use `nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json`
+to replay that memory on the next field pass. Inspect
+`applied.negative_lanes_matched`, `anti_wave_strength_before/after`, and
+`after.learned_negative_lanes_active`; this is local profile feedback, not
+gradient training.
+Use `nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json`
+when the useful output is not yes/no but missing evidence and side-effect-free
+next checks. It may suggest `ss`, `systemctl`, `nft`, or `ip` as evidence
+routes, but it does not run them and is not a network scanner.
+Use `nanda-llmwave-big linux-relation-profile --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
+to inspect Linux relation-family coverage and missing relation routes. Use it
+to grow the corpus by causal relation type rather than raw fact count.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`
 to compare Rust profile packed memory against a linear fact baseline. It checks
 schema reuse, residual saving, packed bytes versus linear bytes, route balance,
