@@ -132,6 +132,7 @@ nanda-llmwave-big linux-pack-hot --atlas-dir .nanda/linux-atlas --max-active-fac
 nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --top-k 5 --format json
 nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
+nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -253,6 +254,13 @@ lexical duel, constrained answer surface, verifier, and feedback preview into
 one operator-facing report. Treat
 `LINUX_DOMAIN_LLMWAVE_READY_NOT_GENERAL_LLM` as constrained Linux-domain
 readiness only.
+`linux-cache-proof` reads only the `.laf` header plus fixed-record section,
+excludes the cold label table, compiles the query to numeric hash anchors, and
+benchmarks repeated full scans of fixed 64-byte records. Treat
+`LINUX_CACHE_ONLY_EXECUTION_PROVEN` as software cache-budget runtime proof for
+the hot loop: no JSON, labels, file I/O, heap allocation, or per-record score
+arrays in the measured loop. It is not broad chat readiness, nonlinear-memory
+proof, exposure analysis, or hardware PMU cache-miss proof.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,

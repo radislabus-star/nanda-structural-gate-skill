@@ -374,6 +374,14 @@ nanda-llmwave-big linux-domain-run \
   --top-k 5 \
   --format json
 
+nanda-llmwave-big linux-cache-proof \
+  --hot-pack .nanda/linux-active/linux-active-65k.laf \
+  --query "which package provides command bash" \
+  --iterations 64 \
+  --warmup-iterations 8 \
+  --samples 5 \
+  --format json
+
 nanda-llmwave-big strict-density-claim-gate \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
@@ -623,6 +631,17 @@ baseline duel, materializes a constrained answer surface, verifies it, and emits
 a feedback preview for lexical traps. Treat
 `LINUX_DOMAIN_LLMWAVE_READY_NOT_GENERAL_LLM` as Linux-domain readiness only:
 not broad chat, not full cache-only proof, not an exposure scanner, and not
+nonlinear-memory proof.
+
+`linux-cache-proof` is the physical runtime proof for the Linux hot packet. It
+does not use the label table path from `linux-ask-hot`: it reads only the `.laf`
+header plus fixed-record section, compiles the query into numeric hash anchors,
+warms the loop, then measures repeated full scans over `PackedLinuxFact64`
+records. The measured loop has no JSON, no label decode, no file I/O, no heap
+allocation, and no per-record score arrays. Treat
+`LINUX_CACHE_ONLY_EXECUTION_PROVEN` as a software cache-budget proof for the
+fixed-record hot loop under the 6 MiB budget. It is still not PMU cache-miss
+counter evidence, not broad chat readiness, not exposure analysis, and not
 nonlinear-memory proof.
 
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.

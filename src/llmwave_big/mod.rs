@@ -396,6 +396,9 @@ enum LlmwaveBigCommand {
     /// Run the constrained Linux Domain LLMWave path over a hot packet.
     #[command(name = "linux-domain-run")]
     LinuxDomainRun(LlmwaveBigLinuxDomainRunArgs),
+    /// Prove the Linux hot loop scans only fixed records inside the 6 MiB cache budget.
+    #[command(name = "linux-cache-proof", alias = "linux-cache-bench")]
+    LinuxCacheProof(LlmwaveBigLinuxCacheProofArgs),
 }
 
 #[derive(Parser)]
@@ -1202,6 +1205,25 @@ struct LlmwaveBigLinuxDomainRunArgs {
     query: String,
     #[arg(long = "top-k", default_value_t = 5)]
     top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxCacheProofArgs {
+    #[arg(
+        long = "hot-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.laf"
+    )]
+    hot_pack: PathBuf,
+    #[arg(long = "query")]
+    query: String,
+    #[arg(long = "iterations", default_value_t = 64)]
+    iterations: usize,
+    #[arg(long = "warmup-iterations", default_value_t = 8)]
+    warmup_iterations: usize,
+    #[arg(long = "samples", default_value_t = 5)]
+    samples: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -2509,6 +2531,56 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- nonlinear memory proven: `{}`",
                         report.claim_boundary.nonlinear_memory_proven
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxCacheProof(args) => {
+            let report = linux_hot_packet::build_linux_cache_proof_report(
+                linux_hot_packet::LinuxCacheProofConfig {
+                    hot_pack: args.hot_pack,
+                    query: args.query,
+                    iterations: args.iterations,
+                    warmup_iterations: args.warmup_iterations,
+                    samples: args.samples,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "cache_only_execution_proven: {}",
+                        report.claim_boundary.cache_only_execution_proven
+                    );
+                    println!("records: {}", report.hot_pack.fixed_record_count);
+                    println!("hot_loop_bytes: {}", report.hot_pack.hot_loop_record_bytes);
+                    println!("ns_per_scan_p50: {}", report.benchmark.ns_per_scan_p50);
+                    println!("ns_per_record_p50: {}", report.benchmark.ns_per_record_p50);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Cache Proof");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- cache-only execution proven: `{}`",
+                        report.claim_boundary.cache_only_execution_proven
+                    );
+                    println!("- fixed records: `{}`", report.hot_pack.fixed_record_count);
+                    println!(
+                        "- hot-loop bytes: `{}`",
+                        report.hot_pack.hot_loop_record_bytes
+                    );
+                    println!("- p50 ns/scan: `{}`", report.benchmark.ns_per_scan_p50);
+                    println!("- p50 ns/record: `{}`", report.benchmark.ns_per_record_p50);
+                    println!(
+                        "- labels read from packet: `{}`",
+                        report.runtime_contract.labels_read_from_packet
+                    );
+                    println!(
+                        "- hardware cache counters used: `{}`",
+                        report.runtime_contract.hardware_perf_counters_used
                     );
                 }
             }

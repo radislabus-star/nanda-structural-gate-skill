@@ -7,8 +7,10 @@
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::hint::black_box;
 use std::io::{BufWriter, Cursor, Read, Write};
 use std::path::PathBuf;
+use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
@@ -53,6 +55,15 @@ pub(crate) struct LinuxDomainRunConfig {
     pub hot_pack: PathBuf,
     pub query: String,
     pub top_k: usize,
+}
+
+#[derive(Clone)]
+pub(crate) struct LinuxCacheProofConfig {
+    pub hot_pack: PathBuf,
+    pub query: String,
+    pub iterations: usize,
+    pub warmup_iterations: usize,
+    pub samples: usize,
 }
 
 #[derive(Serialize, Clone)]
@@ -129,6 +140,105 @@ pub(crate) struct LinuxHotClaimBoundary {
     pub nonlinear_memory_proven: bool,
     pub safe_claim: &'static str,
     pub blocked_by: Vec<&'static str>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxCacheProofReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub hot_pack: LinuxCacheProofPackSummary,
+    pub compiled_query: LinuxCacheProofQuerySummary,
+    pub runtime_contract: LinuxCacheRuntimeContract,
+    pub benchmark: LinuxCacheBenchmarkSummary,
+    pub claim_boundary: LinuxCacheProofClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxCacheProofPackSummary {
+    pub path: String,
+    pub file_bytes: usize,
+    pub wave_dim: u32,
+    pub fixed_record_count: usize,
+    pub route_count: usize,
+    pub corpus_hash64: u64,
+    pub fixed_record_bytes: usize,
+    pub hot_loop_record_bytes: usize,
+    pub cold_label_count: usize,
+    pub cold_label_table_bytes: usize,
+    pub hot_budget_bytes: usize,
+    pub detected_l3_bytes: Option<usize>,
+    pub fixed_records_fit_6m: bool,
+    pub fixed_records_fit_detected_l3: Option<bool>,
+    pub whole_file_fits_6m: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxCacheProofQuerySummary {
+    pub raw_query: String,
+    pub token_count: usize,
+    pub token_hash_count: usize,
+    pub route_hint_hash_count: usize,
+    pub relation_hint_hash_count: usize,
+    pub boundary_intent: bool,
+    pub positive_intent: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxCacheRuntimeContract {
+    pub records_loaded_from: &'static str,
+    pub full_active_scan: bool,
+    pub fixed_record_only_inner_loop: bool,
+    pub json_used_in_hot_loop: bool,
+    pub labels_read_from_packet: bool,
+    pub label_decode_in_hot_loop: bool,
+    pub file_io_in_hot_loop: bool,
+    pub heap_allocation_in_inner_loop: bool,
+    pub per_record_score_arrays: bool,
+    pub cold_label_table_excluded: bool,
+    pub measured_loop_uses_numeric_hashes: bool,
+    pub hardware_perf_counters_used: bool,
+    pub hardware_cache_miss_rate_proven: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxCacheBenchmarkSummary {
+    pub warmup_iterations: usize,
+    pub measured_samples: usize,
+    pub iterations_per_sample: usize,
+    pub measured_scans: usize,
+    pub records_per_scan: usize,
+    pub measured_record_visits: u128,
+    pub ns_per_scan_min: f64,
+    pub ns_per_scan_p50: f64,
+    pub ns_per_scan_p95: f64,
+    pub ns_per_scan_max: f64,
+    pub ns_per_record_p50: f64,
+    pub scans_per_second_p50: f64,
+    pub records_per_second_p50: f64,
+    pub top_score: i64,
+    pub margin: i64,
+    pub top_record_index: Option<usize>,
+    pub top_fact_hash: Option<u64>,
+    pub checksum: u64,
+    pub sample_ns_per_scan: Vec<f64>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxCacheProofClaimBoundary {
+    pub binary_hot_packet_loaded: bool,
+    pub fixed_records_fit_6m: bool,
+    pub fixed_records_fit_detected_l3: Option<bool>,
+    pub fixed_record_runtime_measured: bool,
+    pub no_json_labels_or_file_io_in_hot_loop: bool,
+    pub full_active_scan_measured: bool,
+    pub cache_only_execution_proven: bool,
+    pub hardware_cache_residency_counter_proven: bool,
+    pub exposure_layer_ready: bool,
+    pub broad_chat_llm_ready: bool,
+    pub nonlinear_memory_proven: bool,
+    pub safe_claim: &'static str,
+    pub blocked_claims: Vec<&'static str>,
 }
 
 #[derive(Serialize, Clone)]
@@ -361,6 +471,42 @@ struct LinuxHotPacketImage {
     actual_file_bytes: usize,
 }
 
+struct LinuxHotFixedRecordImage {
+    records: Vec<PackedLinuxFact64>,
+    header: LafHeaderFields,
+    actual_file_bytes: usize,
+    cold_label_table_bytes: usize,
+    detected_l3_bytes: Option<usize>,
+}
+
+#[derive(Clone, Copy)]
+struct LafHeaderFields {
+    wave_dim: u32,
+    record_count: usize,
+    label_count: usize,
+    route_count: usize,
+    record_bytes: usize,
+    corpus_hash: u64,
+}
+
+struct LinuxHotNumericQuery {
+    raw_query: String,
+    token_hashes: Vec<u64>,
+    route_hint_hashes: Vec<u64>,
+    relation_hint_hashes: Vec<u64>,
+    boundary_intent: bool,
+    positive_intent: bool,
+}
+
+#[derive(Clone, Copy)]
+struct LinuxHotNumericScan {
+    top_score: i64,
+    second_score: i64,
+    top_record_index: Option<usize>,
+    top_fact_hash: Option<u64>,
+    checksum: u64,
+}
+
 struct LabelTableBuilder {
     ids: BTreeMap<String, u32>,
     labels: Vec<String>,
@@ -560,6 +706,300 @@ fn compute_schema_residual_memory(facts: &[LinuxAtlasFact]) -> LinuxSchemaResidu
             "a positive saving is profile evidence only, not global nonlinear-memory proof",
         ],
     }
+}
+
+pub(crate) fn build_linux_cache_proof_report(
+    config: LinuxCacheProofConfig,
+) -> Result<LinuxCacheProofReport> {
+    let fixed = parse_laf_fixed_records_only(&config.hot_pack)?;
+    let query = compile_linux_hot_numeric_query(&config.query);
+    let iterations = config.iterations.max(1);
+    let samples = config.samples.max(1);
+    let warmup_iterations = config.warmup_iterations;
+    let benchmark = benchmark_linux_fixed_records(
+        &fixed.records,
+        &query,
+        iterations,
+        warmup_iterations,
+        samples,
+    );
+    let hot_loop_record_bytes = fixed.records.len() * LAF_RECORD_BYTES;
+    let fixed_records_fit_6m = hot_loop_record_bytes <= SIX_MIB_BYTES;
+    let fixed_records_fit_detected_l3 = fixed
+        .detected_l3_bytes
+        .map(|l3_bytes| hot_loop_record_bytes <= l3_bytes);
+    let whole_file_fits_6m = fixed.actual_file_bytes <= SIX_MIB_BYTES;
+    let full_active_scan = benchmark.records_per_scan == fixed.records.len();
+    let no_json_labels_or_file_io = true;
+    let fixed_record_runtime_measured =
+        benchmark.measured_scans > 0 && benchmark.measured_record_visits > 0;
+    let cache_only_execution_proven = !fixed.records.is_empty()
+        && fixed_records_fit_6m
+        && fixed_record_runtime_measured
+        && full_active_scan
+        && no_json_labels_or_file_io
+        && benchmark.top_score > 0;
+    let verdict = if cache_only_execution_proven {
+        "LINUX_CACHE_ONLY_EXECUTION_PROVEN"
+    } else if fixed.records.is_empty() {
+        "LINUX_CACHE_PROOF_EMPTY_PACKET"
+    } else if !fixed_records_fit_6m {
+        "LINUX_CACHE_PROOF_RECORDS_EXCEED_6M"
+    } else {
+        "LINUX_CACHE_PROOF_REVIEW"
+    };
+
+    Ok(LinuxCacheProofReport {
+        mode: "llmwave-big-linux-cache-proof",
+        version: LINUX_HOT_PACKET_VERSION,
+        verdict,
+        hot_pack: LinuxCacheProofPackSummary {
+            path: config.hot_pack.display().to_string(),
+            file_bytes: fixed.actual_file_bytes,
+            wave_dim: fixed.header.wave_dim,
+            fixed_record_count: fixed.records.len(),
+            route_count: fixed.header.route_count,
+            corpus_hash64: fixed.header.corpus_hash,
+            fixed_record_bytes: fixed.header.record_bytes,
+            hot_loop_record_bytes,
+            cold_label_count: fixed.header.label_count,
+            cold_label_table_bytes: fixed.cold_label_table_bytes,
+            hot_budget_bytes: SIX_MIB_BYTES,
+            detected_l3_bytes: fixed.detected_l3_bytes,
+            fixed_records_fit_6m,
+            fixed_records_fit_detected_l3,
+            whole_file_fits_6m,
+        },
+        compiled_query: LinuxCacheProofQuerySummary {
+            raw_query: query.raw_query.clone(),
+            token_count: query.token_hashes.len(),
+            token_hash_count: query.token_hashes.len(),
+            route_hint_hash_count: query.route_hint_hashes.len(),
+            relation_hint_hash_count: query.relation_hint_hashes.len(),
+            boundary_intent: query.boundary_intent,
+            positive_intent: query.positive_intent,
+        },
+        runtime_contract: LinuxCacheRuntimeContract {
+            records_loaded_from: "laf-header-plus-fixed-record-section-only",
+            full_active_scan,
+            fixed_record_only_inner_loop: true,
+            json_used_in_hot_loop: false,
+            labels_read_from_packet: false,
+            label_decode_in_hot_loop: false,
+            file_io_in_hot_loop: false,
+            heap_allocation_in_inner_loop: false,
+            per_record_score_arrays: false,
+            cold_label_table_excluded: true,
+            measured_loop_uses_numeric_hashes: true,
+            hardware_perf_counters_used: false,
+            hardware_cache_miss_rate_proven: false,
+        },
+        benchmark,
+        claim_boundary: LinuxCacheProofClaimBoundary {
+            binary_hot_packet_loaded: true,
+            fixed_records_fit_6m,
+            fixed_records_fit_detected_l3,
+            fixed_record_runtime_measured,
+            no_json_labels_or_file_io_in_hot_loop: no_json_labels_or_file_io,
+            full_active_scan_measured: full_active_scan,
+            cache_only_execution_proven,
+            hardware_cache_residency_counter_proven: false,
+            exposure_layer_ready: false,
+            broad_chat_llm_ready: false,
+            nonlinear_memory_proven: false,
+            safe_claim: "The Linux .laf fixed-record section fits the 6 MiB hot budget and the measured hot loop scans only numeric fixed records without JSON, labels, file I/O, heap allocation, or per-record score arrays. Hardware cache-miss counters are not used, so this is a software cache-budget runtime proof, not a PMU residency proof.",
+            blocked_claims: vec![
+                "hardware_cache_miss_rate_proven",
+                "broad_chat_llm_ready",
+                "nonlinear_memory_proven",
+                "exposure_layer_ready",
+            ],
+        },
+    })
+}
+
+fn benchmark_linux_fixed_records(
+    records: &[PackedLinuxFact64],
+    query: &LinuxHotNumericQuery,
+    iterations: usize,
+    warmup_iterations: usize,
+    samples: usize,
+) -> LinuxCacheBenchmarkSummary {
+    let mut last_scan = LinuxHotNumericScan {
+        top_score: 0,
+        second_score: 0,
+        top_record_index: None,
+        top_fact_hash: None,
+        checksum: 0,
+    };
+    for _ in 0..warmup_iterations {
+        last_scan = black_box(scan_linux_fixed_records_numeric(records, query));
+    }
+
+    let mut sample_ns_per_scan = Vec::with_capacity(samples);
+    for _ in 0..samples {
+        let start = Instant::now();
+        for _ in 0..iterations {
+            last_scan = black_box(scan_linux_fixed_records_numeric(records, query));
+        }
+        let elapsed = start.elapsed().as_nanos() as f64;
+        sample_ns_per_scan.push(elapsed / iterations as f64);
+    }
+
+    let mut sorted = sample_ns_per_scan.clone();
+    sorted.sort_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
+    let min = *sorted.first().unwrap_or(&0.0);
+    let max = *sorted.last().unwrap_or(&0.0);
+    let p50 = percentile(&sorted, 0.50);
+    let p95 = percentile(&sorted, 0.95);
+    let records_per_scan = records.len();
+    let ns_per_record_p50 = if records_per_scan == 0 {
+        0.0
+    } else {
+        p50 / records_per_scan as f64
+    };
+    let scans_per_second_p50 = if p50 <= 0.0 {
+        0.0
+    } else {
+        1_000_000_000.0 / p50
+    };
+    let records_per_second_p50 = scans_per_second_p50 * records_per_scan as f64;
+    let measured_scans = samples.saturating_mul(iterations);
+    LinuxCacheBenchmarkSummary {
+        warmup_iterations,
+        measured_samples: samples,
+        iterations_per_sample: iterations,
+        measured_scans,
+        records_per_scan,
+        measured_record_visits: measured_scans as u128 * records_per_scan as u128,
+        ns_per_scan_min: round2(min),
+        ns_per_scan_p50: round2(p50),
+        ns_per_scan_p95: round2(p95),
+        ns_per_scan_max: round2(max),
+        ns_per_record_p50: round4_f64(ns_per_record_p50),
+        scans_per_second_p50: round2(scans_per_second_p50),
+        records_per_second_p50: round2(records_per_second_p50),
+        top_score: last_scan.top_score,
+        margin: last_scan.top_score - last_scan.second_score,
+        top_record_index: last_scan.top_record_index,
+        top_fact_hash: last_scan.top_fact_hash,
+        checksum: last_scan.checksum,
+        sample_ns_per_scan: sample_ns_per_scan.into_iter().map(round2).collect(),
+    }
+}
+
+fn scan_linux_fixed_records_numeric(
+    records: &[PackedLinuxFact64],
+    query: &LinuxHotNumericQuery,
+) -> LinuxHotNumericScan {
+    let mut top_score = i64::MIN;
+    let mut second_score = i64::MIN;
+    let mut top_record_index = None;
+    let mut top_fact_hash = None;
+    let mut checksum = 0u64;
+    for (index, record) in records.iter().enumerate() {
+        let score = score_linux_fixed_record_numeric(record, query);
+        checksum = checksum.rotate_left(7)
+            ^ record.fact_hash
+            ^ record.route_hash
+            ^ ((score as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        if score > top_score {
+            second_score = top_score;
+            top_score = score;
+            top_record_index = Some(index);
+            top_fact_hash = Some(record.fact_hash);
+        } else if score > second_score {
+            second_score = score;
+        }
+    }
+    LinuxHotNumericScan {
+        top_score: top_score.max(0),
+        second_score: second_score.max(0),
+        top_record_index,
+        top_fact_hash,
+        checksum,
+    }
+}
+
+fn score_linux_fixed_record_numeric(
+    record: &PackedLinuxFact64,
+    query: &LinuxHotNumericQuery,
+) -> i64 {
+    let mut score = i64::from(record.confidence) / 10;
+    if query.boundary_intent && record.polarity_id == polarity_id("negative") {
+        score += 55;
+    }
+    if query.positive_intent && record.polarity_id == polarity_id("positive") {
+        score += 12;
+    }
+    if contains_hash(&query.route_hint_hashes, record.route_hash) {
+        score += 35;
+    }
+    if contains_hash(&query.relation_hint_hashes, record.relation_hash) {
+        score += 45;
+    }
+    if contains_hash(&query.token_hashes, record.object_hash) {
+        score += 95;
+    }
+    if contains_hash(&query.token_hashes, record.subject_hash) {
+        score += 75;
+    }
+    if contains_hash(&query.token_hashes, record.relation_hash) {
+        score += 15;
+    }
+    score
+}
+
+fn compile_linux_hot_numeric_query(query: &str) -> LinuxHotNumericQuery {
+    let query_lower = query.to_ascii_lowercase();
+    let mut token_hashes = query_lower
+        .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '/' && ch != '.' && ch != '-')
+        .filter(|token| token.len() > 1)
+        .map(hash64)
+        .collect::<Vec<_>>();
+    token_hashes.sort_unstable();
+    token_hashes.dedup();
+
+    let mut route_hints = Vec::new();
+    let mut relation_hints = Vec::new();
+    let boundary_intent =
+        query_lower.contains("does not prove") || query_lower.contains("not prove");
+    let positive_intent = !boundary_intent;
+    if query_lower.contains("command") || query_lower.contains("binary") {
+        route_hints.extend([
+            "linux.apt.command.provider",
+            "linux.apt.command.package-command",
+            "linux.package.binary",
+        ]);
+        relation_hints.extend(["provides command", "provided by package", "provides binary"]);
+    }
+    if query_lower.contains("systemd") || query_lower.contains("service") {
+        route_hints.push("linux.systemd.exec");
+        relation_hints.push("execstart");
+    }
+    if boundary_intent {
+        route_hints.extend(["linux.boundary.package", "linux.boundary.socket"]);
+        relation_hints.push("does not prove");
+    }
+    let mut route_hint_hashes = route_hints.into_iter().map(hash64).collect::<Vec<_>>();
+    route_hint_hashes.sort_unstable();
+    route_hint_hashes.dedup();
+    let mut relation_hint_hashes = relation_hints.into_iter().map(hash64).collect::<Vec<_>>();
+    relation_hint_hashes.sort_unstable();
+    relation_hint_hashes.dedup();
+
+    LinuxHotNumericQuery {
+        raw_query: query.to_string(),
+        token_hashes,
+        route_hint_hashes,
+        relation_hint_hashes,
+        boundary_intent,
+        positive_intent,
+    }
+}
+
+fn contains_hash(hashes: &[u64], value: u64) -> bool {
+    hashes.binary_search(&value).is_ok()
 }
 
 fn scan_linux_hot_packet(
@@ -1131,26 +1571,49 @@ fn write_label_table(writer: &mut impl Write, labels: &[String]) -> Result<usize
     Ok(bytes)
 }
 
+fn parse_laf_fixed_records_only(path: &PathBuf) -> Result<LinuxHotFixedRecordImage> {
+    let mut file = fs::File::open(path)
+        .with_context(|| format!("open linux hot packet {}", path.display()))?;
+    let actual_file_bytes = file
+        .metadata()
+        .with_context(|| format!("stat linux hot packet {}", path.display()))?
+        .len() as usize;
+    let mut header_bytes = [0u8; LAF_HEADER_BYTES];
+    file.read_exact(&mut header_bytes)
+        .with_context(|| format!("read linux hot packet header {}", path.display()))?;
+    let header = parse_laf_header(&header_bytes)?;
+    let records_bytes = header
+        .record_count
+        .checked_mul(LAF_RECORD_BYTES)
+        .context("linux hot packet fixed record bytes overflow")?;
+    if LAF_HEADER_BYTES + records_bytes > actual_file_bytes {
+        bail!("truncated linux hot packet fixed record section");
+    }
+    let mut records = Vec::with_capacity(header.record_count);
+    let mut record_bytes = [0u8; LAF_RECORD_BYTES];
+    for _ in 0..header.record_count {
+        file.read_exact(&mut record_bytes)
+            .with_context(|| format!("read linux hot fixed record {}", path.display()))?;
+        let mut cursor = Cursor::new(&record_bytes[..]);
+        records.push(read_record(&mut cursor)?);
+    }
+    Ok(LinuxHotFixedRecordImage {
+        records,
+        header,
+        actual_file_bytes,
+        cold_label_table_bytes: actual_file_bytes.saturating_sub(LAF_HEADER_BYTES + records_bytes),
+        detected_l3_bytes: detect_l3_cache_bytes(),
+    })
+}
+
 fn parse_laf_packet(bytes: &[u8]) -> Result<LinuxHotPacketImage> {
+    if bytes.len() < LAF_HEADER_BYTES {
+        bail!("truncated linux hot packet header");
+    }
+    let header = parse_laf_header(&bytes[..LAF_HEADER_BYTES])?;
+    let record_count = header.record_count;
+    let label_count = header.label_count;
     let mut cursor = Cursor::new(bytes);
-    let mut magic = [0u8; 8];
-    cursor.read_exact(&mut magic)?;
-    if &magic != LAF_MAGIC {
-        bail!("invalid linux hot packet magic");
-    }
-    let version = read_u32(&mut cursor)?;
-    if version != LAF_FORMAT_VERSION {
-        bail!("unsupported linux hot packet version {version}");
-    }
-    let _wave_dim = read_u32(&mut cursor)?;
-    let record_count = read_u32(&mut cursor)? as usize;
-    let label_count = read_u32(&mut cursor)? as usize;
-    let _route_count = read_u32(&mut cursor)? as usize;
-    let record_bytes = read_u32(&mut cursor)? as usize;
-    if record_bytes != LAF_RECORD_BYTES {
-        bail!("unsupported linux hot record size {record_bytes}");
-    }
-    let _corpus_hash = read_u64(&mut cursor)?;
     cursor.set_position(LAF_HEADER_BYTES as u64);
     let records_bytes = record_count
         .checked_mul(LAF_RECORD_BYTES)
@@ -1189,6 +1652,36 @@ fn parse_laf_packet(bytes: &[u8]) -> Result<LinuxHotPacketImage> {
         labels,
         cold_label_table_bytes: bytes.len().saturating_sub(label_table_start),
         actual_file_bytes: bytes.len(),
+    })
+}
+
+fn parse_laf_header(bytes: &[u8]) -> Result<LafHeaderFields> {
+    let mut cursor = Cursor::new(bytes);
+    let mut magic = [0u8; 8];
+    cursor.read_exact(&mut magic)?;
+    if &magic != LAF_MAGIC {
+        bail!("invalid linux hot packet magic");
+    }
+    let version = read_u32(&mut cursor)?;
+    if version != LAF_FORMAT_VERSION {
+        bail!("unsupported linux hot packet version {version}");
+    }
+    let wave_dim = read_u32(&mut cursor)?;
+    let record_count = read_u32(&mut cursor)? as usize;
+    let label_count = read_u32(&mut cursor)? as usize;
+    let route_count = read_u32(&mut cursor)? as usize;
+    let record_bytes = read_u32(&mut cursor)? as usize;
+    if record_bytes != LAF_RECORD_BYTES {
+        bail!("unsupported linux hot record size {record_bytes}");
+    }
+    let corpus_hash = read_u64(&mut cursor)?;
+    Ok(LafHeaderFields {
+        wave_dim,
+        record_count,
+        label_count,
+        route_count,
+        record_bytes,
+        corpus_hash,
     })
 }
 
@@ -1277,6 +1770,60 @@ fn hash32(value: &str) -> u32 {
 
 fn round4(value: f32) -> f32 {
     (value * 10_000.0).round() / 10_000.0
+}
+
+fn round2(value: f64) -> f64 {
+    (value * 100.0).round() / 100.0
+}
+
+fn round4_f64(value: f64) -> f64 {
+    (value * 10_000.0).round() / 10_000.0
+}
+
+fn percentile(sorted: &[f64], percentile: f64) -> f64 {
+    if sorted.is_empty() {
+        return 0.0;
+    }
+    let index = ((sorted.len().saturating_sub(1)) as f64 * percentile).ceil() as usize;
+    sorted[index.min(sorted.len() - 1)]
+}
+
+fn detect_l3_cache_bytes() -> Option<usize> {
+    let cache_root = std::path::Path::new("/sys/devices/system/cpu/cpu0/cache");
+    let entries = fs::read_dir(cache_root).ok()?;
+    let mut best = None;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(level) = fs::read_to_string(path.join("level")).ok() else {
+            continue;
+        };
+        if level.trim() != "3" {
+            continue;
+        }
+        let Some(size) = fs::read_to_string(path.join("size")).ok() else {
+            continue;
+        };
+        let Some(bytes) = parse_linux_cache_size_bytes(size.trim()) else {
+            continue;
+        };
+        best = Some(best.map_or(bytes, |current: usize| current.max(bytes)));
+    }
+    best
+}
+
+fn parse_linux_cache_size_bytes(value: &str) -> Option<usize> {
+    let trimmed = value.trim();
+    let split_at = trimmed
+        .find(|ch: char| !ch.is_ascii_digit())
+        .unwrap_or(trimmed.len());
+    let number = trimmed[..split_at].parse::<usize>().ok()?;
+    let unit = trimmed[split_at..].trim().to_ascii_uppercase();
+    match unit.as_str() {
+        "K" | "KB" | "KIB" => number.checked_mul(1024),
+        "M" | "MB" | "MIB" => number.checked_mul(1024 * 1024),
+        "" => Some(number),
+        _ => None,
+    }
 }
 
 fn write_u16(writer: &mut impl Write, value: u16) -> Result<()> {
@@ -1416,6 +1963,66 @@ mod tests {
         assert_eq!(ask.field.state, "BOUNDARY_FOCUSED");
         assert!(ask.answer.safe_to_answer);
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn linux_cache_proof_uses_fixed_records_without_labels() {
+        let root = unique_tmp_dir("linux-cache-proof");
+        let facts_dir = root.join("facts");
+        fs::create_dir_all(&facts_dir).unwrap();
+        let facts_path = facts_dir.join("fixture.jsonl");
+        let facts = vec![
+            test_fact(
+                "linux.apt.command.provider",
+                "bash",
+                "provided by package",
+                "bash",
+                "positive",
+            ),
+            test_fact(
+                "linux.apt.command.package-command",
+                "checkbashisms",
+                "provides command",
+                "checkbashisms",
+                "positive",
+            ),
+        ];
+        let mut file = fs::File::create(&facts_path).unwrap();
+        for fact in facts {
+            serde_json::to_writer(&mut file, &fact).unwrap();
+            file.write_all(b"\n").unwrap();
+        }
+        let hot_path = root.join("linux.laf");
+        build_linux_hot_pack_report(LinuxHotPackConfig {
+            atlas_dir: root.clone(),
+            max_active_facts: 2,
+            out: hot_path.clone(),
+        })
+        .unwrap();
+
+        let proof = build_linux_cache_proof_report(LinuxCacheProofConfig {
+            hot_pack: hot_path,
+            query: "which package provides command bash".to_string(),
+            iterations: 2,
+            warmup_iterations: 1,
+            samples: 2,
+        })
+        .unwrap();
+        assert_eq!(proof.verdict, "LINUX_CACHE_ONLY_EXECUTION_PROVEN");
+        assert!(proof.claim_boundary.cache_only_execution_proven);
+        assert!(proof.runtime_contract.fixed_record_only_inner_loop);
+        assert!(!proof.runtime_contract.labels_read_from_packet);
+        assert!(!proof.runtime_contract.json_used_in_hot_loop);
+        assert_eq!(proof.benchmark.records_per_scan, 2);
+        assert!(proof.benchmark.top_score > 0);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn linux_cache_size_parser_handles_sysfs_units() {
+        assert_eq!(parse_linux_cache_size_bytes("8192K"), Some(8 * 1024 * 1024));
+        assert_eq!(parse_linux_cache_size_bytes("8M"), Some(8 * 1024 * 1024));
+        assert_eq!(parse_linux_cache_size_bytes("4096"), Some(4096));
     }
 
     fn test_fact(

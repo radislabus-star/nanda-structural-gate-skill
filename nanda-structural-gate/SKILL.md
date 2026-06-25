@@ -255,6 +255,7 @@ scripts/nanda-llmwave-big linux-pack-hot --atlas-dir .nanda/linux-atlas --max-ac
 scripts/nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 scripts/nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --top-k 5 --format json
 scripts/nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
+scripts/nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
 scripts/nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -961,6 +962,16 @@ scan, route peak, lexical duel, constrained answer surface, verifier, and
 feedback preview. Treat `LINUX_DOMAIN_LLMWAVE_READY_NOT_GENERAL_LLM` as local
 Linux-domain readiness only; broad chat, full cache-only execution,
 vulnerability scanning, and nonlinear-memory proof remain blocked.
+Use `nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --format json`
+when the question is physical hot-loop runtime rather than answer quality. It
+reads only the `.laf` header plus fixed-record section, excludes the cold label
+table, compiles the query into numeric hash anchors, and benchmarks repeated
+full scans of `PackedLinuxFact64` records. Treat
+`LINUX_CACHE_ONLY_EXECUTION_PROVEN` as software cache-budget execution proof
+for the fixed-record loop under the 6 MiB budget: measured loop has no JSON,
+no labels, no file I/O, no heap allocation, and no per-record score arrays.
+It is not hardware PMU cache-miss proof, not broad chat readiness, not exposure
+analysis, and not nonlinear-memory proof.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`
 to compare Rust profile packed memory against a linear fact baseline. It checks
 schema reuse, residual saving, packed bytes versus linear bytes, route balance,
