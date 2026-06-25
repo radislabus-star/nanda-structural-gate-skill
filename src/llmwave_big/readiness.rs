@@ -21,6 +21,7 @@ pub(crate) struct ReadinessLevel {
 #[derive(Serialize, Clone)]
 pub(crate) struct ReadinessClaims {
     pub field_core_as_sole_engine: bool,
+    pub active_65k_runtime_ready: bool,
     pub fixture_reasoning_ready: bool,
     pub artifact_grounded_qa_ready: bool,
     pub constrained_answer_generation_ready: bool,
@@ -35,6 +36,8 @@ pub(crate) struct ReadinessClaims {
 pub(crate) enum ClaimGateKind {
     #[value(name = "field-core-sole-engine")]
     FieldCoreSoleEngine,
+    #[value(name = "active-65k-runtime")]
+    Active65kRuntime,
     #[value(name = "fixture-reasoning")]
     FixtureReasoning,
     #[value(name = "artifact-grounded-qa")]
@@ -174,6 +177,27 @@ pub(crate) fn build_claim_gate_report(claim: ClaimGateKind) -> ClaimGateReport {
             missing_evidence: vec![],
             claim_boundary: claims,
         },
+        ClaimGateKind::Active65kRuntime => ClaimGateReport {
+            mode: "llmwave-big-claim-gate",
+            version: "llmwave-big-v-next-claim-gate",
+            claim: "active-65k-runtime",
+            verdict: "CLAIM_ALLOWED_LOCAL_RUNTIME_ONLY",
+            allowed: true,
+            evidence: vec![
+                "nanda_6m active field capacity is 65,536 PackedTriad32 records",
+                "PackedActive65kArena uses bounded cacheline-aligned workspace",
+                "streaming discovery uses route/group accumulators instead of per-record score arrays",
+                "proof rescan verifies selected route/group peaks over the full active field",
+                "bench evidence command: nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json",
+            ],
+            missing_evidence: vec![
+                "hardware perf-counter cache residency evidence",
+                "broad corpus answer-quality evidence",
+                "general nonlinear-memory proof",
+                "general LLM/chat readiness",
+            ],
+            claim_boundary: claims,
+        },
         ClaimGateKind::FixtureReasoning => ClaimGateReport {
             mode: "llmwave-big-claim-gate",
             version: "llmwave-big-v-next-claim-gate",
@@ -268,6 +292,7 @@ pub(crate) fn build_claim_gate_report(claim: ClaimGateKind) -> ClaimGateReport {
 fn readiness_claims() -> ReadinessClaims {
     ReadinessClaims {
         field_core_as_sole_engine: true,
+        active_65k_runtime_ready: true,
         fixture_reasoning_ready: true,
         artifact_grounded_qa_ready: true,
         constrained_answer_generation_ready: true,

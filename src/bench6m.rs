@@ -20,6 +20,8 @@ pub(super) struct Bench6mArgs {
     lane_sweep_iterations: u64,
     #[arg(long, default_value_t = 100)]
     support_build_iterations: u64,
+    #[arg(long, default_value_t = 1)]
+    active_65k_iterations: u64,
     #[arg(long, default_value_t = 64)]
     lane_sweep_width: usize,
     #[arg(long, default_value_t = 64)]
@@ -43,6 +45,8 @@ enum Bench6mMode {
     SupportBucketBuild,
     SupportBucketBuildCompileSweep,
     HotCycle,
+    #[value(name = "active-65k")]
+    Active65k,
     ActiveCore,
     WriteDensity,
     Consolidate,
@@ -81,6 +85,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
         Bench6mMode::SupportBucketBuildCompileSweep | Bench6mMode::All
     );
     let include_hot_cycle = matches!(args.mode, Bench6mMode::HotCycle | Bench6mMode::All);
+    let include_active65k = matches!(args.mode, Bench6mMode::Active65k);
     let include_active_core = matches!(args.mode, Bench6mMode::ActiveCore | Bench6mMode::All);
     let include_write_density = matches!(args.mode, Bench6mMode::WriteDensity | Bench6mMode::All);
     let include_consolidate = matches!(args.mode, Bench6mMode::Consolidate | Bench6mMode::All);
@@ -199,6 +204,11 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
+    let active65k = if include_active65k {
+        Some(bench6m_active65k(args.active_65k_iterations.max(1)))
+    } else {
+        None
+    };
     let active_core = if include_active_core {
         Some(bench6m_active_core(args.support_build_iterations))
     } else {
@@ -222,7 +232,8 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
-    let packed_cutover_bench_evidence = include_hot_cycle || include_active_core;
+    let packed_cutover_bench_evidence =
+        include_hot_cycle || include_active65k || include_active_core;
     let out = json!({
         "mode": "nanda-6m-hot-benchmark",
         "core_version": CORE_VERSION,
@@ -243,6 +254,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "support_bucket_build": support_bucket_build,
             "support_bucket_build_compile_sweep": support_bucket_build_compile_sweep,
             "hot_cycle": hot_cycle,
+            "active_65k": active65k,
             "active_core": active_core,
             "write_density": write_density,
             "consolidate": consolidate,
@@ -254,7 +266,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "bench_evidence_present": packed_cutover_bench_evidence,
             "requires_before_packed_cutover": [
                 "packed_field_record_view",
-                "hot_cycle_or_active_core_bench",
+                "hot_cycle_or_active_65k_or_active_core_bench",
                 "no_json_string_heap_in_inner_loop"
             ],
             "field_core_as_packed_sole_engine_allowed": packed_cutover_bench_evidence,
@@ -262,7 +274,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "reason": if packed_cutover_bench_evidence {
                 "bench evidence is present; packed-only field-core cutover is allowed while global sole-engine remains blocked"
             } else {
-                "run --mode hot-cycle or --mode active-core before any packed hot cutover"
+                "run --mode active-65k, --mode hot-cycle, or --mode active-core before any packed hot cutover"
             }
         },
         "interpretation": {
@@ -279,6 +291,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "support_bucket_build": "Build cached support scores, bucket them by route/group, then assemble fields from bucket ranges.",
             "support_bucket_build_compile_sweep": "Build cached support score buckets, assemble fields, compile aligned lanes, and apply the sweep.",
             "hot_cycle": "Single typed hot-cycle call: score cache, route/group buckets, support fields, lane compilation, and aligned sweep.",
+            "active_65k": "Full 65,536-record active field scan with streaming route/group accumulators and a proof rescan; no per-record score arrays.",
             "active_core": "LLMWave-Big v171-v180 typed active-core sample cycle: schema/residual projection, settle/peak/veto/reconstruct.",
             "write_density": "LLMWave-Big v191-v205 typed reconstructability/write-density microbenchmark.",
             "consolidate": "LLMWave-Big v206-v218 typed consolidation count/merge/decay microbenchmark.",
@@ -309,6 +322,104 @@ fn bench6m_active_core(iterations: u64) -> Value {
             "json_parsing",
             "atlas_loading",
             "report_serialization"
+        ]
+    })
+}
+
+fn bench6m_active65k(iterations: u64) -> Value {
+    let memory = bench6m_triads(nanda_6m::ACTIVE_FIELD_RECORDS);
+    let query = nanda_6m::project_triads(&memory[..8]);
+    let mut arena = nanda_6m::PackedActive65kArena::new();
+    let arena_layout = arena.layout();
+    let mut checksum: u64 = 0;
+    let mut last = nanda_6m::PackedActive65kRun::default();
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let run = nanda_6m::run_packed_active65k_cycle(
+            black_box(memory.as_slice()),
+            black_box(&query),
+            &mut arena,
+            18,
+            0,
+        );
+        checksum = checksum
+            .wrapping_add(run.discovery.checksum)
+            .wrapping_add(run.proof.checksum)
+            .wrapping_add(run.proof.lane_sweep.checksum)
+            .wrapping_add(u64::from(run.decision.safe_to_answer));
+        last = run;
+    }
+    let elapsed = start.elapsed();
+    let total_ns = elapsed.as_nanos() as f64;
+    let ns_per_op = total_ns / iterations as f64;
+    let scanned_per_iteration =
+        u64::from(last.discovery.records_scanned) + u64::from(last.proof.records_scanned);
+    json!({
+        "mode": "active-65k-full-field",
+        "kernel": "run_packed_active65k_cycle",
+        "iterations": iterations,
+        "active_records": nanda_6m::ACTIVE_FIELD_RECORDS,
+        "records_scanned_per_iteration": scanned_per_iteration,
+        "discovery_records_scanned": last.discovery.records_scanned,
+        "proof_records_scanned": last.proof.records_scanned,
+        "total_ns": elapsed.as_nanos(),
+        "ns_per_op": ns_per_op,
+        "ns_per_record_scanned": ns_per_op / scanned_per_iteration.max(1) as f64,
+        "ops_per_second": 1_000_000_000.0 / ns_per_op.max(1.0),
+        "records_scanned_per_second": (scanned_per_iteration as f64 * iterations as f64) / elapsed.as_secs_f64().max(1e-9),
+        "arena": "packed-active-65k-arena",
+        "arena_allocated_bytes": arena_layout.allocated_bytes,
+        "arena_alignment_bytes": arena_layout.alignment_bytes,
+        "arena_all_cacheline_aligned": arena_layout.all_cacheline_aligned,
+        "workspace_bounded": arena_layout.allocated_bytes <= nanda_6m::WORKSPACE_BYTES,
+        "workspace_budget_bytes": nanda_6m::WORKSPACE_BYTES,
+        "no_per_record_score_arrays": true,
+        "json_used_in_hot_loop": false,
+        "heap_allocations_in_hot_loop": 0,
+        "runtime_contract": active65k_usage_json(last.usage),
+        "route_peak": axis_peak_json(last.discovery.route_peak),
+        "group_peak": axis_peak_json(last.discovery.group_peak),
+        "top_record": {
+            "record_index": last.discovery.top_record.record_index,
+            "route_id": last.discovery.top_record.route_id,
+            "group_id": last.discovery.top_record.group_id,
+            "dot": last.discovery.top_record.dot
+        },
+        "proof": {
+            "fields_built": last.proof.fields_built,
+            "lanes_compiled": last.proof.lanes_compiled,
+            "route_considered": last.proof.route_summary.considered,
+            "route_support": last.proof.route_summary.support_count,
+            "route_anti": last.proof.route_summary.anti_count,
+            "group_considered": last.proof.group_summary.considered,
+            "group_support": last.proof.group_summary.support_count,
+            "group_anti": last.proof.group_summary.anti_count,
+            "lane_applied": last.proof.lane_sweep.applied,
+            "lane_improved": last.proof.lane_sweep.improved,
+            "lane_focused": last.proof.lane_sweep.focused
+        },
+        "peak_decision": {
+            "state": last.decision.state.as_str(),
+            "verdict": last.decision.verdict_str(),
+            "safe_to_answer": last.decision.safe_to_answer,
+            "reason": last.decision.reason()
+        },
+        "claim_boundary": {
+            "active_65k_ready": last.usage.ready() && last.ran,
+            "full_active_scan": last.usage.full_active_scan,
+            "streaming_discovery": last.usage.streaming_discovery,
+            "proof_rescan": last.usage.proof_rescan,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false,
+            "cache_only_execution_proven": false
+        },
+        "checksum": checksum,
+        "not_measured": [
+            "cli_startup",
+            "json_parsing",
+            "training_artifact_loading",
+            "report_serialization",
+            "hardware_perf_counters"
         ]
     })
 }
@@ -1039,6 +1150,36 @@ fn runtime_usage_json(usage: nanda_6m::PackedRuntimeUsage) -> Value {
     })
 }
 
+fn active65k_usage_json(usage: nanda_6m::PackedActive65kUsage) -> Value {
+    json!({
+        "state": usage.state.as_str(),
+        "ready": usage.ready(),
+        "active_records": usage.active_records,
+        "required_records": usage.required_records,
+        "centroids": usage.centroids,
+        "resident_lanes": usage.resident_lanes,
+        "active_hot_bytes": usage.active_hot_bytes,
+        "workspace_required_bytes": usage.workspace_required_bytes,
+        "workspace_budget_bytes": usage.workspace_budget_bytes,
+        "fits_l3": usage.fits_l3,
+        "workspace_fits": usage.workspace_fits,
+        "full_active_scan": usage.full_active_scan,
+        "streaming_discovery": usage.streaming_discovery,
+        "proof_rescan": usage.proof_rescan
+    })
+}
+
+fn axis_peak_json(peak: nanda_6m::PackedAxisPeak) -> Value {
+    json!({
+        "top_id": peak.top_id,
+        "top_score": peak.top_score,
+        "second_id": peak.second_id,
+        "second_score": peak.second_score,
+        "margin": peak.margin,
+        "state": peak.state.as_str()
+    })
+}
+
 fn bench6m_triads(count: usize) -> Vec<nanda_6m::PackedTriad32> {
     (0..count)
         .map(|idx| {
@@ -1214,6 +1355,17 @@ fn print_bench6m_text(out: &Value) {
             support["ops_per_second"].as_f64().unwrap_or(0.0)
         );
     }
+    if !out["benchmarks"]["active_65k"].is_null() {
+        let active = &out["benchmarks"]["active_65k"];
+        println!(
+            "active-65k: {} iters / {} active records / {:.2} ns/op / {:.2} ns/record / {:.0} records/s",
+            active["iterations"].as_u64().unwrap_or(0),
+            active["active_records"].as_u64().unwrap_or(0),
+            active["ns_per_op"].as_f64().unwrap_or(0.0),
+            active["ns_per_record_scanned"].as_f64().unwrap_or(0.0),
+            active["records_scanned_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
     println!("scope: no JSON, no file IO, no process spawn");
 }
 
@@ -1354,6 +1506,16 @@ fn print_bench6m_md(out: &Value) {
             support["fields"].as_u64().unwrap_or(0),
             support["ns_per_op"].as_f64().unwrap_or(0.0),
             support["ns_per_field"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["active_65k"].is_null() {
+        let active = &out["benchmarks"]["active_65k"];
+        println!(
+            "- active-65k: `{}` iterations, `{}` active records, `{:.2}` ns/op, `{:.2}` ns/record",
+            active["iterations"].as_u64().unwrap_or(0),
+            active["active_records"].as_u64().unwrap_or(0),
+            active["ns_per_op"].as_f64().unwrap_or(0.0),
+            active["ns_per_record_scanned"].as_f64().unwrap_or(0.0)
         );
     }
     println!("- scope: no JSON, no file IO, no process spawn");

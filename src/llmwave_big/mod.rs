@@ -4018,6 +4018,20 @@ mod tests {
     }
 
     #[test]
+    fn active65k_runtime_claim_stays_local_only() {
+        let report = readiness::build_claim_gate_report(readiness::ClaimGateKind::Active65kRuntime);
+        assert_eq!(report.claim, "active-65k-runtime");
+        assert_eq!(report.verdict, "CLAIM_ALLOWED_LOCAL_RUNTIME_ONLY");
+        assert!(report.allowed);
+        assert!(report.claim_boundary.active_65k_runtime_ready);
+        assert!(!report.claim_boundary.broad_chat_llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(report
+            .missing_evidence
+            .contains(&"general LLM/chat readiness"));
+    }
+
+    #[test]
     fn training_compiles_real_text_into_field_records() {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)

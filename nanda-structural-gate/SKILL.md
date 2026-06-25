@@ -122,7 +122,8 @@ scripts/nanda-pack6m .nanda/index.json --input-format json
 scripts/nanda-pack6m .nanda/index.json --input-format json --field-engine candidate
 scripts/nanda-pack6m .nanda/index.json --input-format json --field-engine cutover
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
-scripts/nanda-bench6m --mode density --support-build-iterations 1000 --triads 15000 --format json
+scripts/nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json
+scripts/nanda-bench6m --mode density --support-build-iterations 1000 --triads 65536 --format json
 scripts/nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
 scripts/nanda-cache list .nanda/cache
 scripts/nanda-focus .nanda/index.json --input-format json --query-file query.json --query-format json --out .nanda/focus.json
@@ -232,6 +233,7 @@ scripts/nanda-llmwave-big run --evidence-mode release-confirmed --decision accep
 scripts/nanda-llmwave-big core-eval --format json
 scripts/nanda-llmwave-big readiness-ladder --format json
 scripts/nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
+scripts/nanda-llmwave-big claim-gate --claim active-65k-runtime --format json
 scripts/nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
 scripts/nanda-llmwave-big claim-gate --claim llm-ready --format json
 scripts/nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
@@ -731,6 +733,13 @@ Use `nanda-llmwave-big readiness-ladder --format json` to inspect the readiness
 level, and `nanda-llmwave-big claim-gate --claim llm-ready --format json` or
 `--claim nonlinear-memory` before making public claims. Treat blocked claim
 gates as WATCH.
+Use `nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json`
+when the question is whether the packed hot runtime can scan the full 65,536
+record active field. Inspect `active_65k.runtime_contract.full_active_scan`,
+`streaming_discovery`, `proof_rescan`, `workspace_bounded`, and
+`no_per_record_score_arrays`. `claim-gate --claim active-65k-runtime` allows
+only the local runtime claim; it still keeps broad chat readiness, global
+nonlinear-memory proof, and hardware cache-residency proof closed.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
 should point to `field_core::peak::FieldPeakResult`,
 `field_core::coherence::FieldCoherenceResult`, and

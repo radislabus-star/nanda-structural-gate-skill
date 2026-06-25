@@ -1560,6 +1560,7 @@ Use it when you need real kernel timing rather than wrapper timing:
 
 ```bash
 nanda-bench6m --format text
+nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json
 nanda-bench6m --mode replay --replay-iterations 5000000 --format json
 nanda-bench6m --mode projection --projection-iterations 20000 --triads 64
 nanda-bench6m --mode lane --lane-iterations 5000000 --format json
@@ -1573,8 +1574,18 @@ nanda-bench6m --mode support-score-build-compile-sweep --support-build-iteration
 nanda-bench6m --mode support-bucket-build --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
 nanda-bench6m --mode support-bucket-build-compile-sweep --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
 nanda-bench6m --mode hot-cycle --support-build-iterations 1000 --lane-sweep-width 64 --triads 64 --format json
-nanda-bench6m --mode density --support-build-iterations 1000 --triads 15000 --format json
+nanda-bench6m --mode density --support-build-iterations 1000 --triads 65536 --format json
+nanda-llmwave-big claim-gate --claim active-65k-runtime --format json
 ```
+
+`active-65k` is the full active-field runtime check. It builds exactly 65,536
+`PackedTriad32` records, scans the whole field with streaming route/group
+accumulators, runs a second proof rescan over the same active field, and keeps
+the hot workspace bounded without per-record score arrays. A passing
+`active-65k-runtime` claim means the local runtime path exists; it does not
+claim broad chat readiness, global nonlinear-memory proof, or hardware
+cache-residency proof.
+
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,
 `{"command":"search","packet":...}`, or

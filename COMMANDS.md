@@ -569,8 +569,10 @@ nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src exampl
 ## Benchmarks
 
 ```bash
+nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json
 nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
 nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json
-nanda-bench6m --mode density --support-build-iterations 1000 --triads 15000 --format json
+nanda-bench6m --mode density --support-build-iterations 1000 --triads 65536 --format json
+nanda-llmwave-big claim-gate --claim active-65k-runtime --format json
 ```

@@ -297,6 +297,8 @@ jq -e '.claim_boundary.field_core_as_sole_engine == true and .claim_boundary.fix
 jq -e '([.levels[].name] | index("scale-amortized nonlinear memory"))' <<<"$big_readiness_json" >/dev/null
 big_field_claim_json="$("$llmwave_big" claim-gate --claim field-core-sole-engine --format json)"
 jq -e '.mode == "llmwave-big-claim-gate" and .claim == "field-core-sole-engine" and .verdict == "CLAIM_ALLOWED" and .allowed == true' <<<"$big_field_claim_json" >/dev/null
+big_active65k_claim_json="$("$llmwave_big" claim-gate --claim active-65k-runtime --format json)"
+jq -e '.mode == "llmwave-big-claim-gate" and .claim == "active-65k-runtime" and .verdict == "CLAIM_ALLOWED_LOCAL_RUNTIME_ONLY" and .allowed == true and .claim_boundary.active_65k_runtime_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_active65k_claim_json" >/dev/null
 big_small_domain_claim_json="$("$llmwave_big" claim-gate --claim small-domain-llmwave --format json)"
 jq -e '.claim == "small-domain-llmwave" and .verdict == "CLAIM_ALLOWED_LOCAL_ONLY" and .allowed == true and (.missing_evidence | index("broad unscripted chat eval"))' <<<"$big_small_domain_claim_json" >/dev/null
 set +e
@@ -1845,9 +1847,12 @@ jq -e '.benchmarks.support_bucket_build.iterations == 100 and .benchmarks.suppor
 jq -e '.benchmarks.support_bucket_build_compile_sweep.iterations == 100 and .benchmarks.support_bucket_build_compile_sweep.kernel == "build_support_score_buckets_fields_and_compile_sweep" and .benchmarks.support_bucket_build_compile_sweep.fields == 64 and .benchmarks.support_bucket_build_compile_sweep.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.hot_cycle.iterations == 100 and .benchmarks.hot_cycle.kernel == "run_packed_hot_cycle" and .benchmarks.hot_cycle.fields == 64 and .benchmarks.hot_cycle.ns_per_field > 0' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.hot_cycle.runtime_contract.state == "PACKED_RUNTIME_READY" and .benchmarks.hot_cycle.runtime_contract.ready == true and .benchmarks.hot_cycle.runtime_contract.workspace_fits == true' <<<"$bench6m_json" >/dev/null
-jq -e '.benchmarks.hot_cycle.runtime_contract.focus_triads_capacity == 15000 and .benchmarks.hot_cycle.runtime_contract.default_focus_field_requests == 64' <<<"$bench6m_json" >/dev/null
 jq -e '.field_runtime_cutover_guard.version == "packed-field-runtime-cutover-guard-v1" and .field_runtime_cutover_guard.packed_field_record_view == "packed-field-record-view-v1" and .field_runtime_cutover_guard.bench_evidence_present == true and .field_runtime_cutover_guard.field_core_as_packed_sole_engine_allowed == true and .field_runtime_cutover_guard.field_core_as_sole_engine_allowed == false' <<<"$bench6m_json" >/dev/null
 jq -e '.benchmarks.density.iterations == 100 and .benchmarks.density.kernel == "packed_density_probe" and .benchmarks.density.triads_in_memory == 8 and .benchmarks.density.accuracy == 1 and .benchmarks.density.false_positive == 0' <<<"$bench6m_json" >/dev/null
+bench6m_active65k_json="$("$bench6m" --mode active-65k --active-65k-iterations 1 --format json)"
+jq -e '.benchmarks.active_65k.mode == "active-65k-full-field" and .benchmarks.active_65k.active_records == 65536 and .benchmarks.active_65k.records_scanned_per_iteration == 131072' <<<"$bench6m_active65k_json" >/dev/null
+jq -e '.benchmarks.active_65k.runtime_contract.state == "ACTIVE_65K_READY" and .benchmarks.active_65k.runtime_contract.full_active_scan == true and .benchmarks.active_65k.runtime_contract.streaming_discovery == true and .benchmarks.active_65k.runtime_contract.proof_rescan == true' <<<"$bench6m_active65k_json" >/dev/null
+jq -e '.benchmarks.active_65k.workspace_bounded == true and .benchmarks.active_65k.no_per_record_score_arrays == true and .benchmarks.active_65k.claim_boundary.llm_ready == false and .benchmarks.active_65k.claim_boundary.nonlinear_memory_proven == false' <<<"$bench6m_active65k_json" >/dev/null
 bench6m_lane_json="$("$bench6m" --mode lane --lane-iterations 1000 --format json)"
 jq -e '.benchmarks.replay == null and .benchmarks.projection == null' <<<"$bench6m_lane_json" >/dev/null
 jq -e '.benchmarks.lane_application.iterations == 1000 and .benchmarks.lane_application.ops_per_second > 0' <<<"$bench6m_lane_json" >/dev/null

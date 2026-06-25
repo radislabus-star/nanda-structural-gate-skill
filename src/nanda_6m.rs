@@ -42,6 +42,7 @@ pub const LANE_FOCUSED_NET_DOT: i64 = 128;
 pub const LANE_FOCUSED_DELTA_DOT: i64 = 64;
 
 pub const TRIAD_CAPACITY: usize = TRIAD_ARENA_BYTES / TRIAD_BYTES;
+pub const ACTIVE_FIELD_RECORDS: usize = TRIAD_CAPACITY;
 pub const CENTROID_CAPACITY: usize = CENTROID_ARENA_BYTES / CENTROID_BYTES;
 pub const LANE_CAPACITY: usize = LANE_ARENA_BYTES / LANE_BYTES;
 pub const SCORE_BUCKET_CAPACITY: usize = CENTROID_CAPACITY;
@@ -51,6 +52,8 @@ pub const RUNTIME_SCORE_ARRAYS: usize = 3;
 pub const RUNTIME_OFFSET_ARRAYS: usize = 2;
 pub const RUNTIME_CURSOR_ARRAYS: usize = 1;
 pub const HOT_WORKSPACE_ALIGNMENT: usize = 64;
+pub const ACTIVE65K_PROOF_FIELDS: usize = 2;
+pub const ACTIVE65K_TOP_RECORDS: usize = 16;
 
 pub const RESERVED_CORE_BYTES: usize = HEADER_BYTES
     + TRIAD_ARENA_BYTES
@@ -574,6 +577,93 @@ impl PackedHotWorkspaceArena {
     }
 }
 
+pub struct PackedActive65kArena {
+    query_wave: AlignedHotBuffer<i16>,
+    route_accumulators: AlignedHotBuffer<PackedActiveAccumulator>,
+    group_accumulators: AlignedHotBuffer<PackedActiveAccumulator>,
+    top_records: AlignedHotBuffer<PackedActiveRecordCandidate>,
+    proof_fields: AlignedHotBuffer<PackedSupportField>,
+    lanes: AlignedHotBuffer<PackedLane64>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedActive65kArenaLayout {
+    pub active_records: usize,
+    pub route_accumulators: usize,
+    pub group_accumulators: usize,
+    pub top_records: usize,
+    pub proof_fields: usize,
+    pub alignment_bytes: usize,
+    pub allocated_bytes: usize,
+    pub all_cacheline_aligned: bool,
+}
+
+impl PackedActive65kArena {
+    pub fn new() -> Self {
+        Self {
+            query_wave: AlignedHotBuffer::zeroed(WAVE_DIM),
+            route_accumulators: AlignedHotBuffer::zeroed(SCORE_BUCKET_CAPACITY),
+            group_accumulators: AlignedHotBuffer::zeroed(SCORE_BUCKET_CAPACITY),
+            top_records: AlignedHotBuffer::zeroed(ACTIVE65K_TOP_RECORDS),
+            proof_fields: AlignedHotBuffer::zeroed(ACTIVE65K_PROOF_FIELDS),
+            lanes: AlignedHotBuffer::zeroed(ACTIVE65K_PROOF_FIELDS),
+        }
+    }
+
+    pub fn query_wave_mut(&mut self) -> &mut [i16] {
+        self.query_wave.as_mut_slice()
+    }
+
+    pub fn reset(&mut self) {
+        self.query_wave.fill(0);
+        self.route_accumulators
+            .fill(PackedActiveAccumulator::default());
+        self.group_accumulators
+            .fill(PackedActiveAccumulator::default());
+        self.top_records
+            .fill(PackedActiveRecordCandidate::default());
+        self.proof_fields.fill(PackedSupportField::default());
+        self.lanes.fill(PackedLane64::default());
+    }
+
+    pub fn layout(&self) -> PackedActive65kArenaLayout {
+        PackedActive65kArenaLayout {
+            active_records: ACTIVE_FIELD_RECORDS,
+            route_accumulators: self.route_accumulators.len(),
+            group_accumulators: self.group_accumulators.len(),
+            top_records: self.top_records.len(),
+            proof_fields: self.proof_fields.len(),
+            alignment_bytes: HOT_WORKSPACE_ALIGNMENT,
+            allocated_bytes: self.allocated_bytes(),
+            all_cacheline_aligned: self.all_cacheline_aligned(),
+        }
+    }
+
+    pub fn allocated_bytes(&self) -> usize {
+        self.query_wave.bytes()
+            + self.route_accumulators.bytes()
+            + self.group_accumulators.bytes()
+            + self.top_records.bytes()
+            + self.proof_fields.bytes()
+            + self.lanes.bytes()
+    }
+
+    pub fn all_cacheline_aligned(&self) -> bool {
+        self.query_wave.is_aligned()
+            && self.route_accumulators.is_aligned()
+            && self.group_accumulators.is_aligned()
+            && self.top_records.is_aligned()
+            && self.proof_fields.is_aligned()
+            && self.lanes.is_aligned()
+    }
+}
+
+impl Default for PackedActive65kArena {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct AlignedHotBuffer<T: Copy> {
     ptr: NonNull<T>,
     len: usize,
@@ -626,6 +716,10 @@ impl<T: Copy> AlignedHotBuffer<T> {
         // arena gives out one mutable workspace borrow at a time.
         unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
     }
+
+    fn fill(&mut self, value: T) {
+        self.as_mut_slice().fill(value);
+    }
 }
 
 impl<T: Copy> Drop for AlignedHotBuffer<T> {
@@ -657,6 +751,110 @@ pub struct PackedHotCycle {
     pub lanes_compiled: u16,
     pub lane_sweep: PackedLaneSweep,
     pub checksum: u64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedActiveAccumulator {
+    pub id: u16,
+    pub considered: u32,
+    pub support_count: u32,
+    pub anti_count: u32,
+    pub positive_dot: i64,
+    pub negative_dot: i64,
+    pub net_dot: i64,
+    pub top_record: u16,
+    pub top_dot: i64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedActiveRecordCandidate {
+    pub record_index: u16,
+    pub route_id: u16,
+    pub group_id: u16,
+    pub dot: i64,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PackedActive65kState {
+    Ready = 1,
+    PartialActive = 2,
+    EmptyMemory = 3,
+    EmptyQuery = 4,
+    SpillRequired = 5,
+    WorkspaceTooSmall = 6,
+    #[default]
+    Review = 255,
+}
+
+impl PackedActive65kState {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Ready => "ACTIVE_65K_READY",
+            Self::PartialActive => "ACTIVE_65K_PARTIAL_ACTIVE_RECORDS",
+            Self::EmptyMemory => "ACTIVE_65K_EMPTY_MEMORY",
+            Self::EmptyQuery => "ACTIVE_65K_EMPTY_QUERY",
+            Self::SpillRequired => "ACTIVE_65K_SPILL_REQUIRED",
+            Self::WorkspaceTooSmall => "ACTIVE_65K_WORKSPACE_TOO_SMALL",
+            Self::Review => "ACTIVE_65K_REVIEW",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedActive65kUsage {
+    pub state: PackedActive65kState,
+    pub active_records: usize,
+    pub required_records: usize,
+    pub centroids: usize,
+    pub resident_lanes: usize,
+    pub active_hot_bytes: usize,
+    pub workspace_required_bytes: usize,
+    pub workspace_budget_bytes: usize,
+    pub fits_l3: bool,
+    pub workspace_fits: bool,
+    pub full_active_scan: bool,
+    pub streaming_discovery: bool,
+    pub proof_rescan: bool,
+}
+
+impl PackedActive65kUsage {
+    pub fn ready(self) -> bool {
+        self.state == PackedActive65kState::Ready
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PackedActive65kDiscovery {
+    pub records_scanned: u32,
+    pub positive_records: u32,
+    pub anti_records: u32,
+    pub route_peak: PackedAxisPeak,
+    pub group_peak: PackedAxisPeak,
+    pub top_record: PackedActiveRecordCandidate,
+    pub checksum: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedActive65kProof {
+    pub records_scanned: u32,
+    pub route_summary: PackedSupportSummary,
+    pub group_summary: PackedSupportSummary,
+    pub fields_built: u16,
+    pub lanes_compiled: u16,
+    pub lane_sweep: PackedLaneSweep,
+    pub checksum: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PackedActive65kRun {
+    pub usage: PackedActive65kUsage,
+    pub discovery: PackedActive65kDiscovery,
+    pub proof: PackedActive65kProof,
+    pub decision: PackedPeakDecision,
+    pub ran: bool,
 }
 
 #[repr(u8)]
@@ -765,6 +963,14 @@ pub const fn packed_runtime_workspace_bytes(memory_records: usize, field_request
                 + core::mem::size_of::<PackedLane64>()))
 }
 
+pub const fn packed_active65k_workspace_bytes() -> usize {
+    QUERY_WAVE_BYTES
+        + (SCORE_BUCKET_CAPACITY * core::mem::size_of::<PackedActiveAccumulator>() * 2)
+        + (ACTIVE65K_TOP_RECORDS * core::mem::size_of::<PackedActiveRecordCandidate>())
+        + (ACTIVE65K_PROOF_FIELDS
+            * (core::mem::size_of::<PackedSupportField>() + core::mem::size_of::<PackedLane64>()))
+}
+
 pub const fn max_runtime_memory_records_for_requests(field_requests: usize) -> usize {
     let per_record = RUNTIME_SCORE_ARRAYS * core::mem::size_of::<PackedTriadSupportScore>();
     let fixed = packed_runtime_workspace_bytes(0, field_requests);
@@ -772,6 +978,57 @@ pub const fn max_runtime_memory_records_for_requests(field_requests: usize) -> u
         0
     } else {
         (WORKSPACE_BYTES - fixed) / per_record
+    }
+}
+
+pub fn validate_active65k_runtime(
+    active_records: usize,
+    centroids: usize,
+    resident_lanes: usize,
+) -> PackedActive65kUsage {
+    let active_hot_bytes = BudgetUsage {
+        active_triads: active_records,
+        centroids,
+        lanes: resident_lanes,
+    }
+    .estimated_hot_bytes();
+    let workspace_required_bytes = packed_active65k_workspace_bytes();
+    let fits_l3 = BudgetUsage {
+        active_triads: active_records,
+        centroids,
+        lanes: resident_lanes,
+    }
+    .fits();
+    let workspace_fits = workspace_required_bytes <= WORKSPACE_BYTES;
+    let state = if active_records == 0 {
+        PackedActive65kState::EmptyMemory
+    } else if active_records > ACTIVE_FIELD_RECORDS
+        || centroids > CENTROID_CAPACITY
+        || resident_lanes > LANE_CAPACITY
+        || active_hot_bytes > BUDGET_BYTES
+    {
+        PackedActive65kState::SpillRequired
+    } else if !workspace_fits {
+        PackedActive65kState::WorkspaceTooSmall
+    } else if active_records != ACTIVE_FIELD_RECORDS {
+        PackedActive65kState::PartialActive
+    } else {
+        PackedActive65kState::Ready
+    };
+    PackedActive65kUsage {
+        state,
+        active_records,
+        required_records: ACTIVE_FIELD_RECORDS,
+        centroids,
+        resident_lanes,
+        active_hot_bytes,
+        workspace_required_bytes,
+        workspace_budget_bytes: WORKSPACE_BYTES,
+        fits_l3,
+        workspace_fits,
+        full_active_scan: state == PackedActive65kState::Ready,
+        streaming_discovery: state == PackedActive65kState::Ready,
+        proof_rescan: state == PackedActive65kState::Ready,
     }
 }
 
@@ -1375,6 +1632,321 @@ pub fn run_packed_hot_cycle(
     }
 }
 
+pub fn run_packed_active65k_cycle(
+    memory: &[PackedTriad32],
+    query: &PackedWave1024,
+    arena: &mut PackedActive65kArena,
+    centroids: usize,
+    resident_lanes: usize,
+) -> PackedActive65kRun {
+    let mut usage = validate_active65k_runtime(memory.len(), centroids, resident_lanes);
+    let layout = arena.layout();
+    if layout.allocated_bytes < usage.workspace_required_bytes || !layout.all_cacheline_aligned {
+        usage.state = PackedActive65kState::WorkspaceTooSmall;
+        usage.workspace_fits = false;
+        return PackedActive65kRun {
+            usage,
+            ..PackedActive65kRun::default()
+        };
+    }
+    if query.energy_i64() <= 0 {
+        usage.state = PackedActive65kState::EmptyQuery;
+        return PackedActive65kRun {
+            usage,
+            ..PackedActive65kRun::default()
+        };
+    }
+    if !usage.ready() {
+        return PackedActive65kRun {
+            usage,
+            ..PackedActive65kRun::default()
+        };
+    }
+
+    arena.reset();
+    let discovery = run_active65k_discovery(
+        memory,
+        query,
+        arena.route_accumulators.as_mut_slice(),
+        arena.group_accumulators.as_mut_slice(),
+        arena.top_records.as_mut_slice(),
+    );
+    let proof = run_active65k_proof_rescan(
+        memory,
+        query,
+        discovery.route_peak.top_id,
+        discovery.group_peak.top_id,
+        arena.proof_fields.as_mut_slice(),
+        arena.lanes.as_mut_slice(),
+    );
+    let decision = evaluate_packed_peak_decision(
+        discovery.route_peak,
+        discovery.group_peak,
+        query.energy_i64().max(0) as u64,
+        memory.len(),
+        1,
+    );
+    PackedActive65kRun {
+        usage,
+        discovery,
+        proof,
+        decision,
+        ran: true,
+    }
+}
+
+fn run_active65k_discovery(
+    memory: &[PackedTriad32],
+    query: &PackedWave1024,
+    route_accumulators: &mut [PackedActiveAccumulator],
+    group_accumulators: &mut [PackedActiveAccumulator],
+    top_records: &mut [PackedActiveRecordCandidate],
+) -> PackedActive65kDiscovery {
+    route_accumulators.fill(PackedActiveAccumulator::default());
+    group_accumulators.fill(PackedActiveAccumulator::default());
+    top_records.fill(PackedActiveRecordCandidate::default());
+
+    let query_energy = query.energy_i64();
+    let mut records_scanned = 0u32;
+    let mut positive_records = 0u32;
+    let mut anti_records = 0u32;
+    let mut checksum = 0u64;
+    for (index, triad) in memory.iter().copied().enumerate() {
+        let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
+        let record_index = index.min(usize::from(u16::MAX)) as u16;
+        records_scanned = records_scanned.saturating_add(1);
+        if score.dot > 0 {
+            positive_records = positive_records.saturating_add(1);
+        } else if score.dot < 0 {
+            anti_records = anti_records.saturating_add(1);
+        }
+        accumulate_active_axis(route_accumulators, triad.route_id, record_index, score.dot);
+        accumulate_active_axis(group_accumulators, triad.group_id, record_index, score.dot);
+        offer_active_top_record(
+            top_records,
+            PackedActiveRecordCandidate {
+                record_index,
+                route_id: triad.route_id,
+                group_id: triad.group_id,
+                dot: score.dot,
+            },
+        );
+        checksum = checksum
+            .wrapping_add(score.dot as u64)
+            .wrapping_add(u64::from(triad.route_id) << 7)
+            .wrapping_add(u64::from(triad.group_id) << 17)
+            .wrapping_add(u64::from(record_index));
+    }
+    PackedActive65kDiscovery {
+        records_scanned,
+        positive_records,
+        anti_records,
+        route_peak: active_axis_peak(route_accumulators, query_energy),
+        group_peak: active_axis_peak(group_accumulators, query_energy),
+        top_record: top_records
+            .iter()
+            .copied()
+            .max_by(active_record_order)
+            .unwrap_or_default(),
+        checksum,
+    }
+}
+
+fn run_active65k_proof_rescan(
+    memory: &[PackedTriad32],
+    query: &PackedWave1024,
+    route_id: u16,
+    group_id: u16,
+    fields_out: &mut [PackedSupportField],
+    lanes_out: &mut [PackedLane64],
+) -> PackedActive65kProof {
+    fields_out.fill(PackedSupportField::default());
+    lanes_out.fill(PackedLane64::default());
+    if fields_out.len() < ACTIVE65K_PROOF_FIELDS {
+        return PackedActive65kProof::default();
+    }
+    fields_out[0] = PackedSupportField {
+        top_id: route_id,
+        key_hash: u32::from(route_id) | 0x6500_0000,
+        ..PackedSupportField::default()
+    };
+    fields_out[1] = PackedSupportField {
+        top_id: group_id,
+        key_hash: u32::from(group_id) | 0x6501_0000,
+        ..PackedSupportField::default()
+    };
+
+    let query_energy = query.energy_i64();
+    let mut route_considered = 0u16;
+    let mut route_support = 0u16;
+    let mut route_anti = 0u16;
+    let mut group_considered = 0u16;
+    let mut group_support = 0u16;
+    let mut group_anti = 0u16;
+    let mut records_scanned = 0u32;
+    let mut checksum = 0u64;
+    for (index, triad) in memory.iter().copied().enumerate() {
+        let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
+        records_scanned = records_scanned.saturating_add(1);
+        if route_id != 0 && triad.route_id == route_id {
+            accumulate_support_field_with_dot(
+                &mut fields_out[0],
+                score.dot,
+                index,
+                &mut route_considered,
+                &mut route_support,
+                &mut route_anti,
+            );
+        }
+        if group_id != 0 && triad.group_id == group_id {
+            accumulate_support_field_with_dot(
+                &mut fields_out[1],
+                score.dot,
+                index,
+                &mut group_considered,
+                &mut group_support,
+                &mut group_anti,
+            );
+        }
+        checksum = checksum
+            .wrapping_add(score.dot as u64)
+            .wrapping_add(u64::from(triad.route_id) << 11)
+            .wrapping_add(u64::from(triad.group_id) << 19);
+    }
+    let fields_built = ACTIVE65K_PROOF_FIELDS.min(fields_out.len()) as u16;
+    let lane_count = usize::from(fields_built).min(lanes_out.len());
+    let lane_sweep =
+        compile_and_apply_aligned_suppress_anti_lane_sweep(&fields_out[..lane_count], lanes_out);
+    PackedActive65kProof {
+        records_scanned,
+        route_summary: PackedSupportSummary {
+            field: fields_out[0],
+            considered: route_considered,
+            support_count: route_support,
+            anti_count: route_anti,
+        },
+        group_summary: PackedSupportSummary {
+            field: fields_out[1],
+            considered: group_considered,
+            support_count: group_support,
+            anti_count: group_anti,
+        },
+        fields_built,
+        lanes_compiled: lane_sweep.lanes.min(usize::from(u16::MAX)) as u16,
+        lane_sweep,
+        checksum: checksum
+            .wrapping_add(fields_out[0].positive_dot as u64)
+            .wrapping_add(fields_out[0].negative_dot as u64)
+            .wrapping_add(fields_out[1].positive_dot as u64)
+            .wrapping_add(fields_out[1].negative_dot as u64)
+            .wrapping_add(lane_sweep.checksum),
+    }
+}
+
+fn accumulate_active_axis(
+    accumulators: &mut [PackedActiveAccumulator],
+    id: u16,
+    record_index: u16,
+    dot: i64,
+) {
+    let Some(accumulator) = accumulators.get_mut(usize::from(id)) else {
+        return;
+    };
+    accumulator.id = id;
+    let was_empty = accumulator.considered == 0;
+    accumulator.considered = accumulator.considered.saturating_add(1);
+    accumulator.net_dot = accumulator.net_dot.saturating_add(dot);
+    if dot > 0 {
+        accumulator.positive_dot = accumulator.positive_dot.saturating_add(dot);
+        accumulator.support_count = accumulator.support_count.saturating_add(1);
+    } else if dot < 0 {
+        accumulator.negative_dot = accumulator.negative_dot.saturating_add(dot);
+        accumulator.anti_count = accumulator.anti_count.saturating_add(1);
+    }
+    if was_empty || dot > accumulator.top_dot {
+        accumulator.top_dot = dot;
+        accumulator.top_record = record_index;
+    }
+}
+
+fn active_axis_peak(accumulators: &[PackedActiveAccumulator], query_energy: i64) -> PackedAxisPeak {
+    let mut top_id = 0u16;
+    let mut top_score = 0.0f64;
+    let mut second_id = 0u16;
+    let mut second_score = 0.0f64;
+    for accumulator in accumulators.iter().copied() {
+        if accumulator.id == 0 || accumulator.considered == 0 || accumulator.net_dot <= 0 {
+            continue;
+        }
+        let score = active_axis_score(accumulator, query_energy);
+        if score > top_score {
+            second_id = top_id;
+            second_score = top_score;
+            top_id = accumulator.id;
+            top_score = score;
+        } else if score > second_score {
+            second_id = accumulator.id;
+            second_score = score;
+        }
+    }
+    PackedAxisPeak::evaluate(top_id, top_score, second_id, second_score)
+}
+
+fn active_axis_score(accumulator: PackedActiveAccumulator, query_energy: i64) -> f64 {
+    let denom = (query_energy.max(1) as f64) * (accumulator.considered.max(1) as f64);
+    (accumulator.net_dot.max(0) as f64) / denom.max(1.0)
+}
+
+fn offer_active_top_record(
+    top_records: &mut [PackedActiveRecordCandidate],
+    candidate: PackedActiveRecordCandidate,
+) {
+    if candidate.dot <= 0 || top_records.is_empty() {
+        return;
+    }
+    let mut replace_idx = 0usize;
+    let mut replace = top_records[0];
+    for (idx, item) in top_records.iter().copied().enumerate().skip(1) {
+        if active_record_order(&replace, &item) == core::cmp::Ordering::Greater {
+            replace_idx = idx;
+            replace = item;
+        }
+    }
+    if replace.dot == 0 || active_record_order(&candidate, &replace) == core::cmp::Ordering::Greater
+    {
+        top_records[replace_idx] = candidate;
+    }
+}
+
+fn active_record_order(
+    left: &PackedActiveRecordCandidate,
+    right: &PackedActiveRecordCandidate,
+) -> core::cmp::Ordering {
+    left.dot
+        .cmp(&right.dot)
+        .then_with(|| right.record_index.cmp(&left.record_index))
+}
+
+fn accumulate_support_field_with_dot(
+    field: &mut PackedSupportField,
+    dot: i64,
+    index: usize,
+    considered: &mut u16,
+    support_count: &mut u16,
+    anti_count: &mut u16,
+) {
+    *considered = considered.saturating_add(1);
+    if dot > 0 {
+        field.positive_dot = field.positive_dot.saturating_add(dot);
+        *support_count = support_count.saturating_add(1);
+        set_support_mask(&mut field.support_mask_a, &mut field.support_mask_b, index);
+    } else if dot < 0 {
+        field.negative_dot = field.negative_dot.saturating_add(dot);
+        *anti_count = anti_count.saturating_add(1);
+        set_support_mask(&mut field.anti_mask_a, &mut field.anti_mask_b, index);
+    }
+}
+
 pub fn compile_suppress_anti_lanes(
     fields: &[PackedSupportField],
     lanes_out: &mut [PackedLane64],
@@ -1749,6 +2321,53 @@ mod tests {
         assert_eq!(first.cycle.score_count, memory.len() as u16);
         assert_eq!(second.cycle.score_count, memory.len() as u16);
         assert_eq!(first.cycle.checksum, second.cycle.checksum);
+    }
+
+    #[test]
+    fn active65k_streaming_cycle_scans_full_field_without_score_arrays() {
+        let memory: Vec<PackedTriad32> = (0..ACTIVE_FIELD_RECORDS)
+            .map(|idx| {
+                let idx = idx as u32;
+                PackedTriad32::new(PackedTriadInput {
+                    subject_id: 1_000 + idx,
+                    object_id: 10_000 + idx.wrapping_mul(3),
+                    evidence_ref: 100_000 + idx.wrapping_mul(7),
+                    wave_seed: 0x6500_0000u32.wrapping_add(idx.wrapping_mul(97)),
+                    relation_id: (10 + (idx % 31)) as u16,
+                    route_id: (1 + (idx % 7)) as u16,
+                    group_id: (1 + (idx % 11)) as u16,
+                    role_pack: (((idx % 16) as u16) << 8) | ((idx % 13) as u16),
+                    flags: (idx % 5) as u16,
+                    lane_hint: (idx % 17) as u16,
+                    check: 0x55aa ^ (idx as u16).wrapping_mul(13),
+                    confidence: 160 + (idx % 80) as u8,
+                    polarity: (idx % 2) as u8,
+                })
+            })
+            .collect();
+        let query = project_triads(&memory[..8]);
+        let mut arena = PackedActive65kArena::new();
+        let layout = arena.layout();
+        assert_eq!(layout.active_records, ACTIVE_FIELD_RECORDS);
+        assert_eq!(layout.allocated_bytes, packed_active65k_workspace_bytes());
+        assert!(layout.allocated_bytes <= WORKSPACE_BYTES);
+        assert!(layout.all_cacheline_aligned);
+
+        let run = run_packed_active65k_cycle(&memory, &query, &mut arena, 18, 0);
+
+        assert!(run.ran);
+        assert_eq!(run.usage.state, PackedActive65kState::Ready);
+        assert_eq!(run.discovery.records_scanned as usize, ACTIVE_FIELD_RECORDS);
+        assert_eq!(run.proof.records_scanned as usize, ACTIVE_FIELD_RECORDS);
+        assert_eq!(run.proof.fields_built as usize, ACTIVE65K_PROOF_FIELDS);
+        assert_eq!(run.proof.lanes_compiled as usize, ACTIVE65K_PROOF_FIELDS);
+        assert!(run.usage.full_active_scan);
+        assert!(run.usage.streaming_discovery);
+        assert!(run.usage.proof_rescan);
+        assert!(run.discovery.route_peak.top_id > 0);
+        assert!(run.discovery.group_peak.top_id > 0);
+        assert!(run.discovery.checksum > 0);
+        assert!(run.proof.checksum > 0);
     }
 
     #[test]
