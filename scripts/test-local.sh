@@ -310,6 +310,21 @@ test -s "$(jq -r '.outputs.pack_log_path' <<<"$big_linux_atlas_json")"
 big_linux_atlas_delta_json="$("$llmwave_big" linux-atlas-build --out-dir "$tmp_linux_atlas" --pack-kind delta --max-facts 128 --format json)"
 jq -e '.pack_kind == "delta" and .artifact.fact_count > 0 and .artifact.previous_fact_count > 0 and .artifact.delta_new_facts == .artifact.fact_count and .artifact.append_only == true and .claim_boundary.append_only_memory_ready == true' <<<"$big_linux_atlas_delta_json" >/dev/null
 test -s "$(jq -r '.outputs.facts_path' <<<"$big_linux_atlas_delta_json")"
+tmp_linux_active="$(mktemp -d)"
+mkdir -p "$tmp_linux_active/facts"
+tmp_linux_active_facts="$tmp_linux_active/facts/base.jsonl"
+cat >"$tmp_linux_active_facts" <<JSONL
+{"fact_id":"linux.test.bash","layer":"linux-knowledge","domain":"apt-command-index","route":"linux.apt.command.provider","subject":"bash","relation":"provided by package","object":"bash","polarity":"positive","confidence":90,"evidence":{"source_kind":"fixture","path":"fixture","line":1,"extractor":"fixture"}}
+{"fact_id":"linux.test.systemd","layer":"linux-knowledge","domain":"systemd","route":"linux.systemd.exec","subject":"ssh.service","relation":"execstart","object":"/usr/sbin/sshd","polarity":"positive","confidence":88,"evidence":{"source_kind":"fixture","path":"fixture","line":2,"extractor":"fixture"}}
+{"fact_id":"linux.test.boundary.package","layer":"negative-boundary","domain":"linux-boundary","route":"linux.boundary.package","subject":"package installed","relation":"does not prove","object":"binary is running","polarity":"negative","confidence":95,"evidence":{"source_kind":"fixture","path":"fixture","line":3,"extractor":"fixture"}}
+{"fact_id":"linux.test.boundary.socket","layer":"negative-boundary","domain":"linux-boundary","route":"linux.boundary.socket","subject":"port listening","relation":"does not prove","object":"firewall allows external packets","polarity":"negative","confidence":95,"evidence":{"source_kind":"fixture","path":"fixture","line":4,"extractor":"fixture"}}
+JSONL
+printf '{"facts_path":"%s","fact_count":4}\n' "$tmp_linux_active_facts" >"$tmp_linux_active/packs.jsonl"
+big_linux_active_json="$("$llmwave_big" linux-active-field --atlas-dir "$tmp_linux_active" --max-active-facts 4 --query "which package provides command bash" --format json)"
+jq -e '.mode == "llmwave-big-linux-active-field" and .verdict == "LINUX_ACTIVE_FIELD_READY_NOT_LLM" and .active_pack.selected_facts == 4 and .active_pack.selected_route_count == 4 and .memory_budget.fits_6m_hot_projection == true' <<<"$big_linux_active_json" >/dev/null
+jq -e '.claim_boundary.active_field_ready == true and .claim_boundary.query_probe_ready == true and .claim_boundary.binary_hot_packet_ready == false and .claim_boundary.exposure_layer_ready == false and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_linux_active_json" >/dev/null
+jq -e '.probe_results[] | select(.query == "which package provides command bash" and .state == "FOCUSED" and .top_facts[0].object == "bash")' <<<"$big_linux_active_json" >/dev/null
+jq -e '.probe_results[] | select(.query == "package installed does not prove binary is running" and .state == "BOUNDARY_FOCUSED")' <<<"$big_linux_active_json" >/dev/null
 big_small_domain_claim_json="$("$llmwave_big" claim-gate --claim small-domain-llmwave --format json)"
 jq -e '.claim == "small-domain-llmwave" and .verdict == "CLAIM_ALLOWED_LOCAL_ONLY" and .allowed == true and (.missing_evidence | index("broad unscripted chat eval"))' <<<"$big_small_domain_claim_json" >/dev/null
 set +e

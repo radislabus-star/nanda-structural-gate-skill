@@ -127,6 +127,7 @@ nanda-llmwave-big rust-compile-evidence-build --focus-packet .nanda/llmwave-big-
 nanda-llmwave-big rust-heldout-eval --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --out .nanda/llmwave-big-training/rust-heldout-eval.json --format json
 nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind base --max-facts 1000000 --format json
 nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind delta --max-facts 1000000 --format json
+nanda-llmwave-big linux-active-field --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --query "which package provides command bash" --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -223,6 +224,14 @@ previously known fact IDs and write only new facts discovered after the base
 pack. Treat `LINUX_ATLAS_BASE_READY` as a knowledge-atlas result only; active
 65k packing, exposure analysis, LLM readiness, and nonlinear-memory proof remain
 closed.
+`linux-active-field` is the first active projection over that atlas. It reads
+the append-only fact packs, builds a route-balanced active window capped by
+`--max-active-facts` (default 65,536), estimates the 64-byte packed projection
+budget, and runs review-grade Linux probes such as command provider lookup,
+systemd exec hints, and negative boundary checks. Treat
+`LINUX_ACTIVE_FIELD_READY_NOT_LLM` as active-field readiness only: binary hot
+packet execution, exposure analysis, broad eval, LLM readiness, and nonlinear
+memory proof remain blocked.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,

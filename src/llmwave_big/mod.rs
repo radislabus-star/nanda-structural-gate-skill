@@ -41,6 +41,7 @@ pub mod l3_schema_bind;
 pub mod l3_schema_field;
 pub mod lens_scan;
 pub mod lexical_birth;
+pub mod linux_active_field;
 pub mod linux_atlas;
 pub mod loader;
 pub mod mature_anti_wave;
@@ -379,6 +380,9 @@ enum LlmwaveBigCommand {
     /// Build an append-only local Linux knowledge atlas from system metadata.
     #[command(name = "linux-atlas-build", alias = "linux-atlas")]
     LinuxAtlasBuild(LlmwaveBigLinuxAtlasBuildArgs),
+    /// Build a route-balanced Linux Active Field over the append-only Linux Atlas.
+    #[command(name = "linux-active-field", alias = "linux-field")]
+    LinuxActiveField(LlmwaveBigLinuxActiveFieldArgs),
 }
 
 #[derive(Parser)]
@@ -1116,6 +1120,20 @@ struct LlmwaveBigLinuxAtlasBuildArgs {
     pack_kind: String,
     #[arg(long = "max-facts", default_value_t = 1_000_000)]
     max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxActiveFieldArgs {
+    #[arg(long = "atlas-dir", default_value = ".nanda/linux-atlas")]
+    atlas_dir: PathBuf,
+    #[arg(long = "max-active-facts", default_value_t = 65_536)]
+    max_active_facts: usize,
+    #[arg(long = "query")]
+    query: Vec<String>,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -2201,6 +2219,68 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- nonlinear memory proven: `{}`",
                         report.claim_boundary.nonlinear_memory_proven
                     );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxActiveField(args) => {
+            let report = linux_active_field::build_linux_active_field_report(
+                linux_active_field::LinuxActiveFieldConfig {
+                    atlas_dir: args.atlas_dir,
+                    max_active_facts: args.max_active_facts,
+                    queries: args.query,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("atlas_facts: {}", report.atlas_input.fact_count);
+                    println!("selected_facts: {}", report.active_pack.selected_facts);
+                    println!(
+                        "selected_routes: {}",
+                        report.active_pack.selected_route_count
+                    );
+                    println!(
+                        "fits_6m_hot_projection: {}",
+                        report.memory_budget.fits_6m_hot_projection
+                    );
+                    println!(
+                        "active_65k_projection_ready: {}",
+                        report.claim_boundary.active_65k_projection_ready
+                    );
+                    if let Some(first) = report.probe_results.first() {
+                        println!("first_probe: {} => {}", first.query, first.state);
+                    }
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Active Field");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- atlas facts: `{}`", report.atlas_input.fact_count);
+                    println!("- selected facts: `{}`", report.active_pack.selected_facts);
+                    println!(
+                        "- selected routes: `{}`",
+                        report.active_pack.selected_route_count
+                    );
+                    println!(
+                        "- fits 6 MiB projection: `{}`",
+                        report.memory_budget.fits_6m_hot_projection
+                    );
+                    println!("- llm ready: `{}`", report.claim_boundary.llm_ready);
+                    println!(
+                        "- nonlinear memory proven: `{}`",
+                        report.claim_boundary.nonlinear_memory_proven
+                    );
+                    println!();
+                    println!("## Probes");
+                    for probe in &report.probe_results {
+                        println!(
+                            "- `{}`: `{}` score `{}`",
+                            probe.query, probe.state, probe.top_score
+                        );
+                    }
                 }
             }
             Ok(EXIT_PASS)

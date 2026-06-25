@@ -345,6 +345,12 @@ nanda-llmwave-big linux-atlas-build \
   --max-facts 1000000 \
   --format json
 
+nanda-llmwave-big linux-active-field \
+  --atlas-dir .nanda/linux-atlas \
+  --max-active-facts 65536 \
+  --query "which package provides command bash" \
+  --format json
+
 nanda-llmwave-big strict-density-claim-gate \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
@@ -555,6 +561,17 @@ memory. It writes JSONL facts plus `manifest.json`,
 and `packs.jsonl` under `.nanda/linux-atlas/`. Treat this as knowledge-atlas
 memory only: active 65k packing, exposure analysis, LLM readiness, and
 nonlinear-memory proof remain closed until later gates.
+
+`linux-active-field` is the next Linux SysField layer. It does not rebuild the
+atlas. It reads `packs.jsonl` plus `facts/*.jsonl`, selects a route-balanced
+active working set capped by `--max-active-facts` (65,536 by default), estimates
+the 64-byte packed projection budget, and runs review-grade probes over that
+active window. The default probes cover command-provider lookup, systemd exec
+hints, and negative boundary facts such as "package installed does not prove
+binary is running" and "port listening does not prove firewall exposure".
+Treat `LINUX_ACTIVE_FIELD_READY_NOT_LLM` as active projection readiness only:
+binary hot execution, exposure analysis, broad eval, LLM readiness, and
+nonlinear-memory proof remain closed until separate gates prove them.
 
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
 The implemented external-medium path is:

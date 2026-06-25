@@ -250,6 +250,7 @@ scripts/nanda-llmwave-big rust-compile-evidence-build --focus-packet .nanda/llmw
 scripts/nanda-llmwave-big rust-heldout-eval --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-suite .nanda/llmwave-big-training/rust-heldout-suite.json --out .nanda/llmwave-big-training/rust-heldout-eval.json --format json
 scripts/nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind base --max-facts 1000000 --format json
 scripts/nanda-llmwave-big linux-atlas-build --out-dir .nanda/linux-atlas --pack-kind delta --max-facts 1000000 --format json
+scripts/nanda-llmwave-big linux-active-field --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --query "which package provides command bash" --format json
 scripts/nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -925,6 +926,14 @@ facts later instead of rebuilding the active memory from zero. The atlas writes
 `facts/*.jsonl`, `indexes/fact-ids.txt`, `indexes/route-counts.json`, and
 `packs.jsonl`. Treat `LINUX_ATLAS_BASE_READY` as append-only Linux knowledge
 memory only: active 65k packing, exposure analysis, general LLM readiness, and
+nonlinear-memory proof remain blocked.
+Use `nanda-llmwave-big linux-active-field --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --format json`
+to build the first route-balanced Linux Active Field over the append-only atlas.
+It reads existing packs, selects a bounded active window, estimates the 64-byte
+packed projection budget, and runs review-grade probes for command providers,
+systemd exec hints, and negative boundary facts. Treat
+`LINUX_ACTIVE_FIELD_READY_NOT_LLM` as active projection readiness only: binary
+hot packet execution, exposure analysis, broad eval, LLM readiness, and
 nonlinear-memory proof remain blocked.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`
 to compare Rust profile packed memory against a linear fact baseline. It checks
