@@ -133,6 +133,8 @@ nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-active-65k.
 nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --top-k 5 --format json
 nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
+nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
+nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -261,6 +263,17 @@ benchmarks repeated full scans of fixed 64-byte records. Treat
 the hot loop: no JSON, labels, file I/O, heap allocation, or per-record score
 arrays in the measured loop. It is not broad chat readiness, nonlinear-memory
 proof, exposure analysis, or hardware PMU cache-miss proof.
+`linux-pack-residual` materializes the same Linux Active Field as a `.lrf`
+binary schema/residual memory: repeated `route+relation+polarity` modes become
+`SchemaRecord32`, subject/object variation becomes `ResidualRecord32`, and
+one-off facts stay as `FallbackRecord64`. Treat
+`LINUX_SCHEMA_RESIDUAL_PACKET_READY_NOT_PROOF` as written binary memory only.
+`linux-residual-proof` scans the `.lrf` schema/residual/fallback sections,
+runs the Linux domain eval and lexical duel, and compares the actual binary hot
+section bytes against a direct fixed64 baseline. Treat
+`LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory proof:
+real binary schema/residual storage beats fixed64 bytes and preserves the
+Linux-domain eval. It is not broad chat readiness or exposure reasoning.
 `strict-density-claim-gate` consumes the Rust corpus, focus packet, held-out
 eval, and compile evidence. It compares packed profile bytes against the
 linear fact baseline and checks schema reuse, residual saving, route balance,

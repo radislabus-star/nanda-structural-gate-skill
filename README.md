@@ -382,6 +382,21 @@ nanda-llmwave-big linux-cache-proof \
   --samples 5 \
   --format json
 
+nanda-llmwave-big linux-pack-residual \
+  --atlas-dir .nanda/linux-atlas \
+  --max-active-facts 65536 \
+  --out .nanda/linux-active/linux-active-65k.lrf \
+  --format json
+
+nanda-llmwave-big linux-residual-proof \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --query "which package provides command bash" \
+  --top-k 5 \
+  --iterations 64 \
+  --warmup-iterations 8 \
+  --samples 5 \
+  --format json
+
 nanda-llmwave-big strict-density-claim-gate \
   --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json \
   --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json \
@@ -643,6 +658,22 @@ allocation, and no per-record score arrays. Treat
 fixed-record hot loop under the 6 MiB budget. It is still not PMU cache-miss
 counter evidence, not broad chat readiness, not exposure analysis, and not
 nonlinear-memory proof.
+
+`linux-pack-residual` is the next Linux SysField memory layer. It writes a
+`.lrf` binary packet with real schema/residual sections instead of only
+reporting density economics. Repeated `route+relation+polarity` facts are
+promoted into `SchemaRecord32`, subject/object/evidence variation is stored as
+`ResidualRecord32`, and one-off facts stay as `FallbackRecord64` so weak schemas
+do not swallow unique facts.
+
+`linux-residual-proof` loads that `.lrf` packet, scans the schema/residual and
+fallback sections as binary records, runs the Linux eval and lexical duel, and
+checks the actual hot-section bytes against the direct fixed64 baseline. Treat
+`LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear-memory proof:
+the active Linux field is genuinely written and retrieved through binary
+schema/residual memory, fits the 6 MiB hot budget, saves bytes versus fixed64,
+and keeps the Linux-domain eval green. It is still not broad chat readiness and
+not exposure reasoning.
 
 `LLMWAVE_BROAD_EVAL_ROADMAP.md` tracks the next broad cognition eval layer.
 The implemented external-medium path is:

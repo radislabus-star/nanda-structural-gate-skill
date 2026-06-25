@@ -256,6 +256,8 @@ scripts/nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-act
 scripts/nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --top-k 5 --format json
 scripts/nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 scripts/nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
+scripts/nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
+scripts/nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
 scripts/nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile contracts --corpus examples/llmwave-big-contract-density-corpus.json --out .nanda/llmwave-big-training/contracts-density.json --format json
@@ -972,6 +974,19 @@ for the fixed-record loop under the 6 MiB budget: measured loop has no JSON,
 no labels, no file I/O, no heap allocation, and no per-record score arrays.
 It is not hardware PMU cache-miss proof, not broad chat readiness, not exposure
 analysis, and not nonlinear-memory proof.
+Use `nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json`
+to materialize the Linux Active Field as actual binary schema/residual memory.
+The `.lrf` packet stores repeated `route+relation+polarity` modes once as
+`SchemaRecord32`, per-fact subject/object variation as `ResidualRecord32`, and
+one-off facts as `FallbackRecord64`. Treat
+`LINUX_SCHEMA_RESIDUAL_PACKET_READY_NOT_PROOF` as written binary memory only.
+Use `nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --format json`
+to scan the `.lrf` binary sections, run the Linux-domain eval plus lexical
+duel, and compare actual hot-section bytes against direct fixed64 storage.
+Treat `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory
+proof only: schema/residual binary storage is real, retrieval works on the
+Linux eval, and bytes beat fixed64. It is not broad chat readiness and not
+exposure reasoning.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`
 to compare Rust profile packed memory against a linear fact baseline. It checks
 schema reuse, residual saving, packed bytes versus linear bytes, route balance,

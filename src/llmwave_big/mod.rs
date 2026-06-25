@@ -44,6 +44,7 @@ pub mod lexical_birth;
 pub mod linux_active_field;
 pub mod linux_atlas;
 pub mod linux_hot_packet;
+pub mod linux_residual_memory;
 pub mod loader;
 pub mod mature_anti_wave;
 pub mod memory_final_proof;
@@ -399,6 +400,12 @@ enum LlmwaveBigCommand {
     /// Prove the Linux hot loop scans only fixed records inside the 6 MiB cache budget.
     #[command(name = "linux-cache-proof", alias = "linux-cache-bench")]
     LinuxCacheProof(LlmwaveBigLinuxCacheProofArgs),
+    /// Pack the Linux Active Field into binary schema/residual memory.
+    #[command(name = "linux-pack-residual", alias = "linux-residual-pack")]
+    LinuxPackResidual(LlmwaveBigLinuxPackResidualArgs),
+    /// Prove Linux schema/residual binary memory over the residual packet.
+    #[command(name = "linux-residual-proof", alias = "linux-nonlinear-proof")]
+    LinuxResidualProof(LlmwaveBigLinuxResidualProofArgs),
 }
 
 #[derive(Parser)]
@@ -1218,6 +1225,41 @@ struct LlmwaveBigLinuxCacheProofArgs {
     hot_pack: PathBuf,
     #[arg(long = "query")]
     query: String,
+    #[arg(long = "iterations", default_value_t = 64)]
+    iterations: usize,
+    #[arg(long = "warmup-iterations", default_value_t = 8)]
+    warmup_iterations: usize,
+    #[arg(long = "samples", default_value_t = 5)]
+    samples: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxPackResidualArgs {
+    #[arg(long = "atlas-dir", default_value = ".nanda/linux-atlas")]
+    atlas_dir: PathBuf,
+    #[arg(long = "max-active-facts", default_value_t = 65_536)]
+    max_active_facts: usize,
+    #[arg(long = "promotion-threshold", default_value_t = 2)]
+    promotion_threshold: usize,
+    #[arg(long, default_value = ".nanda/linux-active/linux-active-65k.lrf")]
+    out: PathBuf,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxResidualProofArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "query")]
+    query: String,
+    #[arg(long = "top-k", default_value_t = 5)]
+    top_k: usize,
     #[arg(long = "iterations", default_value_t = 64)]
     iterations: usize,
     #[arg(long = "warmup-iterations", default_value_t = 8)]
@@ -2581,6 +2623,142 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- hardware cache counters used: `{}`",
                         report.runtime_contract.hardware_perf_counters_used
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxPackResidual(args) => {
+            let report = linux_residual_memory::build_linux_residual_pack_report(
+                linux_residual_memory::LinuxResidualPackConfig {
+                    atlas_dir: args.atlas_dir,
+                    max_active_facts: args.max_active_facts,
+                    promotion_threshold: args.promotion_threshold,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("selected_facts: {}", report.source.selected_facts);
+                    println!("schemas: {}", report.packet.schema_record_count);
+                    println!("residuals: {}", report.packet.residual_record_count);
+                    println!("fallbacks: {}", report.packet.fallback_record_count);
+                    println!(
+                        "binary_hot_sections_bytes: {}",
+                        report.packet.binary_hot_sections_bytes
+                    );
+                    println!(
+                        "residual_saving_bytes: {}",
+                        report.economics.residual_saving_bytes
+                    );
+                    println!("out: {}", report.out);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Schema/Residual Packet");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- selected facts: `{}`", report.source.selected_facts);
+                    println!("- schemas: `{}`", report.packet.schema_record_count);
+                    println!("- residuals: `{}`", report.packet.residual_record_count);
+                    println!("- fallbacks: `{}`", report.packet.fallback_record_count);
+                    println!(
+                        "- binary hot sections bytes: `{}`",
+                        report.packet.binary_hot_sections_bytes
+                    );
+                    println!(
+                        "- direct fixed64 baseline bytes: `{}`",
+                        report.packet.direct_fixed_baseline_bytes
+                    );
+                    println!(
+                        "- residual saving bytes: `{}`",
+                        report.economics.residual_saving_bytes
+                    );
+                    println!(
+                        "- nonlinear memory proven: `{}`",
+                        report.claim_boundary.nonlinear_memory_proven
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxResidualProof(args) => {
+            let report = linux_residual_memory::build_linux_residual_proof_report(
+                linux_residual_memory::LinuxResidualProofConfig {
+                    residual_pack: args.residual_pack,
+                    query: args.query,
+                    top_k: args.top_k,
+                    iterations: args.iterations,
+                    warmup_iterations: args.warmup_iterations,
+                    samples: args.samples,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "nonlinear_memory_proven: {}",
+                        report.claim_boundary.nonlinear_memory_proven
+                    );
+                    println!("schemas: {}", report.residual_pack.schema_record_count);
+                    println!("residuals: {}", report.residual_pack.residual_record_count);
+                    println!("fallbacks: {}", report.residual_pack.fallback_record_count);
+                    println!(
+                        "binary_hot_sections_bytes: {}",
+                        report.residual_pack.binary_hot_sections_bytes
+                    );
+                    println!(
+                        "direct_fixed_baseline_bytes: {}",
+                        report.residual_pack.direct_fixed_baseline_bytes
+                    );
+                    println!(
+                        "eval_passed: {}/{}",
+                        report.eval.metrics.passed, report.eval.metrics.total
+                    );
+                    println!("ns_per_scan_p50: {}", report.benchmark.ns_per_scan_p50);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Schema/Residual Proof");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- nonlinear memory proven: `{}`",
+                        report.claim_boundary.nonlinear_memory_proven
+                    );
+                    println!(
+                        "- Linux-profile nonlinear memory proven: `{}`",
+                        report.claim_boundary.linux_profile_nonlinear_memory_proven
+                    );
+                    println!("- schemas: `{}`", report.residual_pack.schema_record_count);
+                    println!(
+                        "- residuals: `{}`",
+                        report.residual_pack.residual_record_count
+                    );
+                    println!(
+                        "- fallbacks: `{}`",
+                        report.residual_pack.fallback_record_count
+                    );
+                    println!(
+                        "- binary hot sections bytes: `{}`",
+                        report.residual_pack.binary_hot_sections_bytes
+                    );
+                    println!(
+                        "- direct fixed64 baseline bytes: `{}`",
+                        report.residual_pack.direct_fixed_baseline_bytes
+                    );
+                    println!(
+                        "- eval passed: `{}/{}`",
+                        report.eval.metrics.passed, report.eval.metrics.total
+                    );
+                    println!(
+                        "- broad chat ready: `{}`",
+                        report.claim_boundary.broad_chat_llm_ready
+                    );
+                    println!(
+                        "- exposure ready: `{}`",
+                        report.claim_boundary.exposure_layer_ready
                     );
                 }
             }
