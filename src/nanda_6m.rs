@@ -12,6 +12,11 @@ mod wave;
 pub use replay::*;
 pub use wave::*;
 
+use std::alloc::{alloc_zeroed, dealloc, handle_alloc_error, Layout};
+use std::marker::PhantomData;
+use std::ptr::NonNull;
+use std::slice;
+
 pub const VERSION: &str = "nanda-6m-v40-llmwave-pattern-runtime";
 pub const FIELD_RECORD_VIEW_VERSION: &str = "packed-field-record-view-v1";
 pub const WAVE_DIM: usize = 1024;
@@ -45,6 +50,7 @@ pub const RUNTIME_FOCUS_FIELD_REQUESTS: usize = 64;
 pub const RUNTIME_SCORE_ARRAYS: usize = 3;
 pub const RUNTIME_OFFSET_ARRAYS: usize = 2;
 pub const RUNTIME_CURSOR_ARRAYS: usize = 1;
+pub const HOT_WORKSPACE_ALIGNMENT: usize = 64;
 
 pub const RESERVED_CORE_BYTES: usize = HEADER_BYTES
     + TRIAD_ARENA_BYTES
@@ -449,6 +455,197 @@ pub struct PackedHotWorkspace<'a> {
     pub buckets: PackedBucketWorkspace<'a>,
     pub fields_out: &'a mut [PackedSupportField],
     pub lanes_out: &'a mut [PackedLane64],
+}
+
+pub struct PackedHotWorkspaceArena {
+    query_wave: AlignedHotBuffer<i16>,
+    requests: AlignedHotBuffer<PackedFieldRequest>,
+    scores: AlignedHotBuffer<PackedTriadSupportScore>,
+    route_sorted: AlignedHotBuffer<PackedTriadSupportScore>,
+    group_sorted: AlignedHotBuffer<PackedTriadSupportScore>,
+    route_offsets: AlignedHotBuffer<u16>,
+    group_offsets: AlignedHotBuffer<u16>,
+    cursors: AlignedHotBuffer<u16>,
+    fields: AlignedHotBuffer<PackedSupportField>,
+    lanes: AlignedHotBuffer<PackedLane64>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedHotWorkspaceArenaLayout {
+    pub memory_records: usize,
+    pub field_requests: usize,
+    pub alignment_bytes: usize,
+    pub allocated_bytes: usize,
+    pub all_cacheline_aligned: bool,
+}
+
+impl PackedHotWorkspaceArena {
+    pub fn new(memory_records: usize, field_requests: usize) -> Self {
+        Self {
+            query_wave: AlignedHotBuffer::zeroed(WAVE_DIM),
+            requests: AlignedHotBuffer::zeroed(field_requests),
+            scores: AlignedHotBuffer::zeroed(memory_records),
+            route_sorted: AlignedHotBuffer::zeroed(memory_records),
+            group_sorted: AlignedHotBuffer::zeroed(memory_records),
+            route_offsets: AlignedHotBuffer::zeroed(SCORE_BUCKET_CAPACITY + 1),
+            group_offsets: AlignedHotBuffer::zeroed(SCORE_BUCKET_CAPACITY + 1),
+            cursors: AlignedHotBuffer::zeroed(SCORE_BUCKET_CAPACITY),
+            fields: AlignedHotBuffer::zeroed(field_requests),
+            lanes: AlignedHotBuffer::zeroed(field_requests),
+        }
+    }
+
+    pub fn query_wave_mut(&mut self) -> &mut [i16] {
+        self.query_wave.as_mut_slice()
+    }
+
+    pub fn requests_mut(&mut self) -> &mut [PackedFieldRequest] {
+        self.requests.as_mut_slice()
+    }
+
+    pub fn workspace_with_requests(
+        &mut self,
+    ) -> (&mut [PackedFieldRequest], PackedHotWorkspace<'_>) {
+        let requests = self.requests.as_mut_slice();
+        let workspace = PackedHotWorkspace {
+            buckets: PackedBucketWorkspace {
+                scores_out: self.scores.as_mut_slice(),
+                route_sorted_out: self.route_sorted.as_mut_slice(),
+                route_offsets_out: self.route_offsets.as_mut_slice(),
+                group_sorted_out: self.group_sorted.as_mut_slice(),
+                group_offsets_out: self.group_offsets.as_mut_slice(),
+                cursors_out: self.cursors.as_mut_slice(),
+            },
+            fields_out: self.fields.as_mut_slice(),
+            lanes_out: self.lanes.as_mut_slice(),
+        };
+        (requests, workspace)
+    }
+
+    pub fn workspace(&mut self) -> PackedHotWorkspace<'_> {
+        PackedHotWorkspace {
+            buckets: PackedBucketWorkspace {
+                scores_out: self.scores.as_mut_slice(),
+                route_sorted_out: self.route_sorted.as_mut_slice(),
+                route_offsets_out: self.route_offsets.as_mut_slice(),
+                group_sorted_out: self.group_sorted.as_mut_slice(),
+                group_offsets_out: self.group_offsets.as_mut_slice(),
+                cursors_out: self.cursors.as_mut_slice(),
+            },
+            fields_out: self.fields.as_mut_slice(),
+            lanes_out: self.lanes.as_mut_slice(),
+        }
+    }
+
+    pub fn layout(&self) -> PackedHotWorkspaceArenaLayout {
+        PackedHotWorkspaceArenaLayout {
+            memory_records: self.scores.len(),
+            field_requests: self.fields.len(),
+            alignment_bytes: HOT_WORKSPACE_ALIGNMENT,
+            allocated_bytes: self.allocated_bytes(),
+            all_cacheline_aligned: self.all_cacheline_aligned(),
+        }
+    }
+
+    pub fn allocated_bytes(&self) -> usize {
+        self.query_wave.bytes()
+            + self.requests.bytes()
+            + self.scores.bytes()
+            + self.route_sorted.bytes()
+            + self.group_sorted.bytes()
+            + self.route_offsets.bytes()
+            + self.group_offsets.bytes()
+            + self.cursors.bytes()
+            + self.fields.bytes()
+            + self.lanes.bytes()
+    }
+
+    pub fn all_cacheline_aligned(&self) -> bool {
+        self.query_wave.is_aligned()
+            && self.requests.is_aligned()
+            && self.scores.is_aligned()
+            && self.route_sorted.is_aligned()
+            && self.group_sorted.is_aligned()
+            && self.route_offsets.is_aligned()
+            && self.group_offsets.is_aligned()
+            && self.cursors.is_aligned()
+            && self.fields.is_aligned()
+            && self.lanes.is_aligned()
+    }
+}
+
+struct AlignedHotBuffer<T: Copy> {
+    ptr: NonNull<T>,
+    len: usize,
+    align: usize,
+    _marker: PhantomData<T>,
+}
+
+impl<T: Copy> AlignedHotBuffer<T> {
+    fn zeroed(len: usize) -> Self {
+        let align = HOT_WORKSPACE_ALIGNMENT.max(core::mem::align_of::<T>());
+        if len == 0 {
+            return Self {
+                ptr: NonNull::dangling(),
+                len,
+                align,
+                _marker: PhantomData,
+            };
+        }
+        let layout = aligned_layout::<T>(len, align);
+        // SAFETY: layout has non-zero size and a power-of-two alignment. The
+        // buffer is used only for Copy POD-like hot-core records.
+        let raw = unsafe { alloc_zeroed(layout) };
+        if raw.is_null() {
+            handle_alloc_error(layout);
+        }
+        let ptr = NonNull::new(raw.cast::<T>()).expect("allocator returned non-null pointer");
+        debug_assert_eq!((ptr.as_ptr() as usize) % align, 0);
+        Self {
+            ptr,
+            len,
+            align,
+            _marker: PhantomData,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn bytes(&self) -> usize {
+        self.len.saturating_mul(core::mem::size_of::<T>())
+    }
+
+    fn is_aligned(&self) -> bool {
+        self.len == 0 || (self.ptr.as_ptr() as usize).is_multiple_of(self.align)
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        // SAFETY: ptr was allocated for exactly len contiguous T values and the
+        // arena gives out one mutable workspace borrow at a time.
+        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+    }
+}
+
+impl<T: Copy> Drop for AlignedHotBuffer<T> {
+    fn drop(&mut self) {
+        if self.len == 0 {
+            return;
+        }
+        let layout = aligned_layout::<T>(self.len, self.align);
+        // SAFETY: ptr/layout pair matches the allocation created in zeroed.
+        unsafe {
+            dealloc(self.ptr.as_ptr().cast::<u8>(), layout);
+        }
+    }
+}
+
+fn aligned_layout<T>(len: usize, align: usize) -> Layout {
+    let size = core::mem::size_of::<T>()
+        .checked_mul(len)
+        .expect("hot workspace allocation size overflow");
+    Layout::from_size_align(size, align).expect("valid hot workspace layout")
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1484,6 +1681,74 @@ mod tests {
             Err(err) => err,
         };
         assert_eq!(err.state, PackedRuntimeState::WorkspaceTooSmall);
+    }
+
+    #[test]
+    fn packed_hot_workspace_arena_is_aligned_and_reusable() {
+        let memory = [
+            PackedTriad32::new(PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 3,
+                wave_seed: 4,
+                relation_id: 5,
+                route_id: 7,
+                group_id: 9,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 0,
+            }),
+            PackedTriad32::new(PackedTriadInput {
+                subject_id: 2,
+                object_id: 3,
+                evidence_ref: 4,
+                wave_seed: 5,
+                relation_id: 6,
+                route_id: 7,
+                group_id: 11,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 9,
+                confidence: 220,
+                polarity: 0,
+            }),
+        ];
+        let query = project_triads(&memory);
+        let requests = [
+            PackedFieldRequest::route(7, 101),
+            PackedFieldRequest::group(9, 102),
+        ];
+        let mut arena = PackedHotWorkspaceArena::new(memory.len(), requests.len());
+        let layout = arena.layout();
+        assert_eq!(layout.memory_records, memory.len());
+        assert_eq!(layout.field_requests, requests.len());
+        assert_eq!(layout.alignment_bytes, HOT_WORKSPACE_ALIGNMENT);
+        assert!(layout.all_cacheline_aligned);
+        assert_eq!(
+            layout.allocated_bytes,
+            packed_runtime_workspace_bytes(memory.len(), requests.len())
+        );
+
+        let (request_workspace, workspace) = arena.workspace_with_requests();
+        request_workspace.copy_from_slice(&requests);
+        assert!(validate_packed_hot_workspace(
+            &workspace,
+            memory.len(),
+            requests.len()
+        ));
+        let mut core = PackedHotCore::attach(&memory, 4, 0, requests.len(), workspace)
+            .expect("aligned arena should satisfy hot workspace contract");
+        let first = core.run_query(&query, request_workspace);
+        let second = core.run_query(&query, request_workspace);
+        assert!(first.ran);
+        assert!(second.ran);
+        assert_eq!(first.cycle.score_count, memory.len() as u16);
+        assert_eq!(second.cycle.score_count, memory.len() as u16);
+        assert_eq!(first.cycle.checksum, second.cycle.checksum);
     }
 
     #[test]

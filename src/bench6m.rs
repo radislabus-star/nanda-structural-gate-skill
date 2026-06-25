@@ -829,46 +829,32 @@ fn bench6m_hot_cycle(iterations: u64, triad_count: usize, field_count: usize) ->
     let memory = bench6m_triads(triad_count);
     let query_len = memory.len().clamp(1, 8);
     let query = nanda_6m::project_triads(&memory[..query_len]);
-    let requests = bench6m_field_requests(field_count);
-    let mut scores = vec![nanda_6m::PackedTriadSupportScore::default(); memory.len()];
-    let mut route_sorted = vec![nanda_6m::PackedTriadSupportScore::default(); memory.len()];
-    let mut group_sorted = vec![nanda_6m::PackedTriadSupportScore::default(); memory.len()];
-    let mut route_offsets = vec![0u16; nanda_6m::SCORE_BUCKET_CAPACITY + 1];
-    let mut group_offsets = vec![0u16; nanda_6m::SCORE_BUCKET_CAPACITY + 1];
-    let mut cursors = vec![0u16; nanda_6m::SCORE_BUCKET_CAPACITY];
-    let mut fields = vec![nanda_6m::PackedSupportField::default(); field_count];
-    let mut lanes = vec![nanda_6m::PackedLane64::default(); field_count];
-    let workspace = nanda_6m::PackedHotWorkspace {
-        buckets: nanda_6m::PackedBucketWorkspace {
-            scores_out: scores.as_mut_slice(),
-            route_sorted_out: route_sorted.as_mut_slice(),
-            route_offsets_out: route_offsets.as_mut_slice(),
-            group_sorted_out: group_sorted.as_mut_slice(),
-            group_offsets_out: group_offsets.as_mut_slice(),
-            cursors_out: cursors.as_mut_slice(),
-        },
-        fields_out: fields.as_mut_slice(),
-        lanes_out: lanes.as_mut_slice(),
-    };
+    let source_requests = bench6m_field_requests(field_count);
+    let mut arena = nanda_6m::PackedHotWorkspaceArena::new(memory.len(), field_count);
+    let arena_layout = arena.layout();
+    let (request_workspace, workspace) = arena.workspace_with_requests();
+    let request_count = source_requests.len().min(request_workspace.len());
+    request_workspace[..request_count].copy_from_slice(&source_requests[..request_count]);
+    let requests = &request_workspace[..request_count];
     let runtime_centroids = 18;
     let runtime_usage = nanda_6m::validate_packed_runtime(nanda_6m::PackedRuntimeShape {
         memory_records: memory.len(),
         centroids: runtime_centroids,
         resident_lanes: 0,
-        field_requests: requests.len(),
+        field_requests: request_count,
     });
     let mut core = nanda_6m::PackedHotCore::attach(
         memory.as_slice(),
         runtime_centroids,
         0,
-        requests.len(),
+        request_count,
         workspace,
     )
     .unwrap_or_else(|usage| panic!("bench hot-cycle runtime contract refused: {usage:?}"));
     let mut checksum: u64 = 0;
     let start = Instant::now();
     for _ in 0..iterations {
-        let run = core.run_query(black_box(&query), black_box(requests.as_slice()));
+        let run = core.run_query(black_box(&query), black_box(requests));
         let cycle = run.cycle;
         checksum = checksum
             .wrapping_add(cycle.checksum)
@@ -891,6 +877,10 @@ fn bench6m_hot_cycle(iterations: u64, triad_count: usize, field_count: usize) ->
     out["query_triads"] = json!(query_len);
     out["ns_per_field"] = json!(out["ns_per_op"].as_f64().unwrap_or(0.0) / field_count as f64);
     out["runtime_contract"] = runtime_usage_json(runtime_usage);
+    out["workspace_allocation"] = json!("preallocated-cacheline-aligned-arena");
+    out["workspace_alignment_bytes"] = json!(arena_layout.alignment_bytes);
+    out["workspace_allocated_bytes"] = json!(arena_layout.allocated_bytes);
+    out["workspace_all_cacheline_aligned"] = json!(arena_layout.all_cacheline_aligned);
     out
 }
 
