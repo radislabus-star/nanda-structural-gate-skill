@@ -74,6 +74,7 @@ pub mod rust_heldout;
 pub mod rust_heldout_eval;
 pub mod schema_memory_growth;
 pub mod schemas;
+pub mod security_fixture;
 pub mod strict_density_claim_gate;
 pub mod surface_bank_build;
 pub mod surface_bank_fixture;
@@ -420,6 +421,9 @@ enum LlmwaveBigCommand {
     /// Run a safe Daybreak-style defensive benchmark over the Linux-profile core.
     #[command(name = "daybreak-duel")]
     DaybreakDuel(LlmwaveBigDaybreakDuelArgs),
+    /// Run a safe local find -> patch -> verify security fixture.
+    #[command(name = "security-fixture-run")]
+    SecurityFixtureRun(LlmwaveBigSecurityFixtureRunArgs),
     /// Run constrained Linux-profile chat/readout over schema/residual memory.
     #[command(name = "linux-chat-run", alias = "linux-chat")]
     LinuxChatRun(LlmwaveBigLinuxChatRunArgs),
@@ -1349,6 +1353,14 @@ struct LlmwaveBigLinuxSnapshotImportArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigDaybreakDuelArgs {
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigSecurityFixtureRunArgs {
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -3176,6 +3188,53 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- patch generation ready: `{}`",
                         report.claim_boundary.patch_generation_ready
                     );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::SecurityFixtureRun(args) => {
+            let report = security_fixture::build_security_fixture_run_report(
+                security_fixture::SecurityFixtureRunConfig { out: args.out },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("finding: {}", report.finding.class);
+                    println!("route: {}", report.finding.vulnerable_route);
+                    println!(
+                        "before_escape_reaches_secret: {}",
+                        report.result.before_exploit_reaches_forbidden_path
+                    );
+                    println!(
+                        "after_escape_blocked: {}",
+                        report.result.after_forbidden_path_blocked
+                    );
+                    println!(
+                        "normal_file_still_reads: {}",
+                        report.result.regression_normal_file_still_reads
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Security Fixture Run");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- finding: `{}`", report.finding.class);
+                    println!("- route: `{}`", report.finding.vulnerable_route);
+                    println!(
+                        "- before escape reaches secret: `{}`",
+                        report.result.before_exploit_reaches_forbidden_path
+                    );
+                    println!(
+                        "- after escape blocked: `{}`",
+                        report.result.after_forbidden_path_blocked
+                    );
+                    println!(
+                        "- normal file still reads: `{}`",
+                        report.result.regression_normal_file_still_reads
+                    );
+                    println!("- patch id: `{}`", report.patch_candidate.patch_id);
                     println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }
             }

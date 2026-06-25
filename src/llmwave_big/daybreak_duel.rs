@@ -21,6 +21,7 @@ use super::linux_residual_memory::{build_linux_residual_pack_report, LinuxResidu
 use super::linux_runtime_snapshot::{
     build_linux_runtime_snapshot_import_report, LinuxRuntimeSnapshotImportConfig,
 };
+use super::security_fixture::{build_security_fixture_run_report, SecurityFixtureRunConfig};
 
 pub(crate) const DAYBREAK_DUEL_VERSION: &str = "llmwave-big-v-next-daybreak-duel";
 
@@ -139,6 +140,8 @@ fn run_duel_in(root: &Path) -> Result<DaybreakDuelReport> {
         max_facts: 4,
         runtime_snapshot: None,
     })?;
+    let security_fixture =
+        build_security_fixture_run_report(SecurityFixtureRunConfig { out: None })?;
 
     let challenges = vec![
         challenge(
@@ -188,15 +191,23 @@ fn run_duel_in(root: &Path) -> Result<DaybreakDuelReport> {
             "vulnerable package fact must not imply runtime exploitability",
             vuln_boundary.decision.state,
         ),
-        blocked(
-            "patch_candidate_generation",
+        challenge(
+            "local_patch_fixture_loop",
             "linux.patch.candidate",
-            "patch generation is not implemented in the core yet",
+            security_fixture.result.local_patch_loop_proven,
+            "safe local fixture should produce finding, patch candidate, and before/after verification",
+            format!(
+                "{} finding={} patch={} verified={}",
+                security_fixture.verdict,
+                security_fixture.result.finding_found,
+                security_fixture.result.patch_candidate_generated,
+                security_fixture.verification.all_passed
+            ),
         ),
         blocked(
-            "remediation_verification",
+            "real_project_remediation_verification",
             "linux.patch.verify",
-            "post-patch compile/test/runtime evidence bridge is not implemented yet",
+            "real-project post-patch compile/test/runtime evidence bridge is not implemented yet",
         ),
     ];
     let scoreboard = scoreboard(&challenges);
@@ -222,8 +233,8 @@ fn run_duel_in(root: &Path) -> Result<DaybreakDuelReport> {
         blocked_capabilities: vec![
             "source-level vulnerability discovery",
             "reachability proof over code paths",
-            "patch candidate generation",
-            "post-patch verification evidence bridge",
+            "real-project patch candidate generation",
+            "real-project post-patch verification evidence bridge",
             "comparison against live GPT-5.5-Cyber access",
         ],
         next_routes: vec![
@@ -478,11 +489,15 @@ mod tests {
             "DAYBREAK_DUEL_BASELINE_READY_NOT_COMPETITIVE"
         );
         assert_eq!(report.scoreboard.total, 6);
-        assert_eq!(report.scoreboard.passed, 4);
-        assert_eq!(report.scoreboard.blocked, 2);
+        assert_eq!(report.scoreboard.passed, 5);
+        assert_eq!(report.scoreboard.blocked, 1);
         assert!(report.challenges.iter().any(|challenge| challenge.id
             == "runtime_snapshot_firewall_overlay"
             && challenge.passed));
+        assert!(report
+            .challenges
+            .iter()
+            .any(|challenge| challenge.id == "local_patch_fixture_loop" && challenge.passed));
         assert!(!report.claim_boundary.patch_generation_ready);
         assert!(!report.claim_boundary.daybreak_competitive);
         let _ = fs::remove_dir_all(root);

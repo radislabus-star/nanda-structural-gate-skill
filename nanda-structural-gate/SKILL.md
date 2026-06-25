@@ -261,6 +261,7 @@ scripts/nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-acti
 scripts/nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-candidates 16 --format json
 scripts/nanda-llmwave-big linux-snapshot-import --snapshot .nanda/linux-active/runtime-snapshot.json --format json
 scripts/nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --max-candidates 16 --format json
+scripts/nanda-llmwave-big security-fixture-run --format json
 scripts/nanda-llmwave-big daybreak-duel --format json
 scripts/nanda-llmwave-big strict-density-claim-gate --artifact .nanda/llmwave-big-training/rust-corpus-artifact.json --focus-packet .nanda/llmwave-big-training/rust-focus-packet.json --heldout-eval .nanda/llmwave-big-training/rust-heldout-eval.json --compile-evidence .nanda/llmwave-big-training/rust-compile-evidence.json --out .nanda/llmwave-big-training/strict-density.json --format json
 scripts/nanda-llmwave-big profile-density-build --profile business --corpus examples/llmwave-big-nonlinear-memory-corpus.json --out .nanda/llmwave-big-training/business-density.json --format json
@@ -1054,11 +1055,18 @@ routes, but it does not run them and is not a network scanner. With
 Use `nanda-llmwave-big linux-relation-profile --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
 to inspect Linux relation-family coverage and missing relation routes. Use it
 to grow the corpus by causal relation type rather than raw fact count.
+Use `nanda-llmwave-big security-fixture-run --format json` when the user asks
+for a concrete result rather than another readiness check. It runs a safe local
+path-traversal fixture end to end: finding, patch candidate, before/after
+verification, and regression check. Treat
+`DEFENSIVE_PATCH_PROVEN_LOCAL_FIXTURE` as local fixture proof only, not a
+real-project scanner, exploit generator, or autonomous patcher.
 Use `nanda-llmwave-big daybreak-duel --format json` when the user asks to
 compare the Linux-profile core with a Daybreak-style cyber remediation loop.
 It runs safe local defensive fixtures only: shortcut rejection, runtime
-snapshot evidence, grounded decision-search stopping, and explicit blockers for
-patch generation plus post-patch verification. Treat
+snapshot evidence, grounded decision-search stopping, and the local patch
+fixture loop, with explicit blockers for real-project remediation verification.
+Treat
 `DAYBREAK_DUEL_BASELINE_READY_NOT_COMPETITIVE` as an honest scoreboard, not a
 claim that NANDA matches GPT-5.5-Cyber/Daybreak.
 Use `nanda-llmwave-big strict-density-claim-gate --artifact ... --focus-packet ... --heldout-eval ... --compile-evidence ... --out ... --format json`

@@ -824,15 +824,26 @@ nanda-llmwave-big linux-relation-profile \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
   --format json
 
+nanda-llmwave-big security-fixture-run \
+  --format json
+
 nanda-llmwave-big daybreak-duel \
   --format json
 ```
 
+`security-fixture-run` is the first concrete safe find -> patch -> verify
+result. It creates a temporary toy path-traversal fixture, proves the vulnerable
+version can read `../secret.txt`, emits a canonicalize-and-prefix patch
+candidate, verifies the patched version blocks escape, and verifies the normal
+file still reads. Treat `DEFENSIVE_PATCH_PROVEN_LOCAL_FIXTURE` as local fixture
+proof only, not a real-project scanner or exploit generator.
+
 `daybreak-duel` is the safe competition harness for the Linux-profile core. It
 runs local defensive fixtures inspired by a Daybreak-style remediation loop:
 reject listener/exposure shortcuts, accept side-effect-free runtime snapshot
-evidence, stop decision-search when evidence is already grounded, and keep
-patch generation plus post-patch verification explicitly blocked. Treat
+evidence, stop decision-search when evidence is already grounded, and run the
+local patch fixture loop while keeping real-project remediation verification
+explicitly blocked. Treat
 `DAYBREAK_DUEL_BASELINE_READY_NOT_COMPETITIVE` as an honest scoreboard, not a
 claim that NANDA matches GPT-5.5-Cyber/Daybreak.
 
