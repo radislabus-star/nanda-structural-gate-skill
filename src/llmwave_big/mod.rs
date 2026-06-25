@@ -22,6 +22,7 @@ pub mod core_v1_nonlinear_proof;
 pub mod core_v1_query_wave;
 pub mod core_v1_schema_reasoning;
 pub mod core_v1_surface_generation;
+pub mod core_v2;
 pub mod coupled_decode_loop;
 pub mod demo_domain;
 pub mod density_ablation;
@@ -129,6 +130,30 @@ enum LlmwaveBigCommand {
     /// Print the Phase 12 LLMWave Core V1 broad eval harness gate.
     #[command(name = "core-v1-broad-eval", alias = "core-broad-eval")]
     CoreV1BroadEvalHarness(LlmwaveBigCoreV1BroadEvalHarnessArgs),
+    /// Print the LLMWave Core V2 staged pipeline contract.
+    #[command(name = "core-v2-contract")]
+    CoreV2Contract(LlmwaveBigCoreV2ContractArgs),
+    /// Print the LLMWave Core V2 public-safe corpus artifact gate.
+    #[command(name = "core-v2-corpus")]
+    CoreV2Corpus(LlmwaveBigCoreV2CorpusArgs),
+    /// Print the LLMWave Core V2 held-out suite gate.
+    #[command(name = "core-v2-heldout")]
+    CoreV2Heldout(LlmwaveBigCoreV2HeldoutArgs),
+    /// Print the LLMWave Core V2 route-balanced focus gate.
+    #[command(name = "core-v2-focus")]
+    CoreV2Focus(LlmwaveBigCoreV2FocusArgs),
+    /// Print the LLMWave Core V2 density proof gate.
+    #[command(name = "core-v2-density")]
+    CoreV2Density(LlmwaveBigCoreV2DensityArgs),
+    /// Run the LLMWave Core V2 local route field.
+    #[command(name = "core-v2-run")]
+    CoreV2Run(LlmwaveBigCoreV2RunArgs),
+    /// Print the LLMWave Core V2 hot packet storage gate.
+    #[command(name = "core-v2-pack-hot")]
+    CoreV2PackHot(LlmwaveBigCoreV2PackHotArgs),
+    /// Print the LLMWave Core V2 hard claim gate.
+    #[command(name = "core-v2-claim-gate")]
+    CoreV2ClaimGate(LlmwaveBigCoreV2ClaimGateArgs),
     /// Print the v158-v160 Big Model Contract and claim boundary.
     Contract(LlmwaveBigContractArgs),
     /// Print the v161-v170 Wave Atlas file/index/loader contract.
@@ -429,6 +454,56 @@ struct LlmwaveBigCoreV1ConsolidationSleepArgs {
 struct LlmwaveBigCoreV1BroadEvalHarnessArgs {
     #[arg(long, default_value = "Has customs cleared the goods?")]
     text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV2ContractArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV2CorpusArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV2HeldoutArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV2FocusArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV2DensityArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV2RunArgs {
+    #[arg(long, default_value = "Has customs cleared the goods?")]
+    text: String,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV2PackHotArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigCoreV2ClaimGateArgs {
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -1301,6 +1376,86 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 core_v1_broad_eval_harness::build_core_v1_broad_eval_harness_report(args.text);
             report::print_core_v1_broad_eval_harness_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV2Contract(args) => {
+            let report = core_v2::build_core_v2_contract_report();
+            report::print_core_v2_report(
+                &report,
+                &args.format,
+                "LLMWave Core V2 Contract",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV2Corpus(args) => {
+            let report = core_v2::build_core_v2_corpus_report();
+            report::print_core_v2_report(
+                &report,
+                &args.format,
+                "LLMWave Core V2 Corpus",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV2Heldout(args) => {
+            let report = core_v2::build_core_v2_heldout_report();
+            report::print_core_v2_report(
+                &report,
+                &args.format,
+                "LLMWave Core V2 Heldout",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV2Focus(args) => {
+            let report = core_v2::build_core_v2_focus_report();
+            report::print_core_v2_report(
+                &report,
+                &args.format,
+                "LLMWave Core V2 Focus",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV2Density(args) => {
+            let report = core_v2::build_core_v2_density_report();
+            report::print_core_v2_report(
+                &report,
+                &args.format,
+                "LLMWave Core V2 Density",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV2Run(args) => {
+            let report = core_v2::build_core_v2_run_report(args.text);
+            report::print_core_v2_report(
+                &report,
+                &args.format,
+                "LLMWave Core V2 Run",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV2PackHot(args) => {
+            let report = core_v2::build_core_v2_pack_hot_report();
+            report::print_core_v2_report(
+                &report,
+                &args.format,
+                "LLMWave Core V2 Hot Packet",
+                report.verdict,
+            )?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::CoreV2ClaimGate(args) => {
+            let report = core_v2::build_core_v2_claim_gate_report();
+            report::print_core_v2_report(
+                &report,
+                &args.format,
+                "LLMWave Core V2 Claim Gate",
+                report.verdict,
+            )?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::Contract(args) => {

@@ -249,6 +249,14 @@ nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?
 nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-consolidation-sleep --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-broad-eval --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v2-contract --format json
+nanda-llmwave-big core-v2-corpus --format json
+nanda-llmwave-big core-v2-heldout --format json
+nanda-llmwave-big core-v2-focus --format json
+nanda-llmwave-big core-v2-density --format json
+nanda-llmwave-big core-v2-run --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v2-pack-hot --format json
+nanda-llmwave-big core-v2-claim-gate --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -1153,6 +1161,14 @@ feedback, consolidation, shortcut, role-swap, and hard-claim blockers. It can
 mark the local Core V1 pipeline ready, but still blocks broad generalization,
 LLM readiness, and nonlinear-memory proof until a real broad corpus and density
 proof are supplied.
+`nanda-llmwave-big core-v2-*` starts the Core V2 staged pipeline:
+contract, public-safe corpus fixture, held-out suite, route-balanced focus,
+density gate, local run, hot packet storage, and a hard claim gate. The intended
+local passing state is `CORE_V2_LOCAL_PIPELINE_READY_NOT_LLM`: it means the
+fixture pipeline is wired and guarded, while `llm_ready=false`,
+`nonlinear_memory_proven=false`, `real_broad_corpus_loaded=false`, and
+`cache_only_execution_proven=false` remain explicit. See
+[`LLMWAVE_CORE_V2_REPORT.md`](LLMWAVE_CORE_V2_REPORT.md).
 `nanda-llmwave-big contract` starts the v158-v160 LLMWave-Big track. It defines
 the Big Model Contract, bigness metrics, L2/L3 boundaries, and claim firewall.
 It deliberately reports `BIG_MODEL_NOT_PROVEN`: this is the contract and

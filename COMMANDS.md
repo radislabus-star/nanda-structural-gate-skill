@@ -342,6 +342,14 @@ nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared the goods?
 nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-consolidation-sleep --text "Has customs cleared the goods?" --format json
 nanda-llmwave-big core-v1-broad-eval --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v2-contract --format json
+nanda-llmwave-big core-v2-corpus --format json
+nanda-llmwave-big core-v2-heldout --format json
+nanda-llmwave-big core-v2-focus --format json
+nanda-llmwave-big core-v2-density --format json
+nanda-llmwave-big core-v2-run --text "Has customs cleared the goods?" --format json
+nanda-llmwave-big core-v2-pack-hot --format json
+nanda-llmwave-big core-v2-claim-gate --format json
 nanda-llmwave-big contract --format json
 nanda-llmwave-big atlas --format json
 nanda-llmwave-big active-core --format json
@@ -420,6 +428,15 @@ negative shortcut memory, and keeps broad eval/training and hard claims closed.
 `LLMWAVE_CORE_V1_PHASE12_REPORT.md`. It runs embedded broad controls for the
 Core V1 local pipeline and explicitly keeps real broad-corpus generalization,
 LLM readiness, and nonlinear-memory proof blocked.
+`core-v2-contract`, `core-v2-corpus`, `core-v2-heldout`, `core-v2-focus`,
+`core-v2-density`, `core-v2-run`, `core-v2-pack-hot`, and
+`core-v2-claim-gate` are the Core V2 staged pipeline. They move from a local
+public-safe relation fixture to held-out removal, route-balanced focus, density
+candidate checks, a local evidence-bound route run, and a compact hot-packet
+storage report. The passing claim gate is
+`CORE_V2_LOCAL_PIPELINE_READY_NOT_LLM`; it deliberately keeps general LLM,
+nonlinear-memory proof, real broad corpus, and cache-only execution claims
+closed.
 
 ## Word And Surface Memory
 

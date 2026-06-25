@@ -189,6 +189,14 @@ scripts/nanda-llmwave-big core-v1-answer-verifier --text "Has customs cleared th
 scripts/nanda-llmwave-big core-v1-feedback-learning --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-consolidation-sleep --text "Has customs cleared the goods?" --format json
 scripts/nanda-llmwave-big core-v1-broad-eval --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big core-v2-contract --format json
+scripts/nanda-llmwave-big core-v2-corpus --format json
+scripts/nanda-llmwave-big core-v2-heldout --format json
+scripts/nanda-llmwave-big core-v2-focus --format json
+scripts/nanda-llmwave-big core-v2-density --format json
+scripts/nanda-llmwave-big core-v2-run --text "Has customs cleared the goods?" --format json
+scripts/nanda-llmwave-big core-v2-pack-hot --format json
+scripts/nanda-llmwave-big core-v2-claim-gate --format json
 scripts/nanda-llmwave-big contract --format json
 scripts/nanda-llmwave-big atlas --format json
 scripts/nanda-llmwave-big active-core --format json
@@ -654,6 +662,14 @@ local broad-control harness across the Core V1 pipeline and hard-claim
 blockers. Treat `CORE_V1_BROAD_EVAL_HARNESS_READY_NOT_LLM` as local pipeline
 eval readiness only; real broad-corpus generalization, LLM readiness, and
 nonlinear-memory proof remain closed.
+`nanda-llmwave-big core-v2-contract`, `core-v2-corpus`, `core-v2-heldout`,
+`core-v2-focus`, `core-v2-density`, `core-v2-run`, `core-v2-pack-hot`, and
+`core-v2-claim-gate` are the Core V2 staged pipeline. They verify a local
+public-safe corpus fixture, exact held-out removal, route-balanced focus,
+density candidate controls, an evidence-bound local run, and compact hot-packet
+storage. Treat `CORE_V2_LOCAL_PIPELINE_READY_NOT_LLM` as a local pipeline gate
+only: `llm_ready`, `nonlinear_memory_proven`, real broad-corpus generalization,
+and cache-only execution proof must stay false.
 v158-v160 start LLMWave-Big through `nanda-llmwave-big contract`: Big Model
 Contract, required bigness metrics, explicit L2 Word Field vs L3 Schema Field
 separation, and a claim firewall. Treat `BIG_MODEL_NOT_PROVEN` as the honest
