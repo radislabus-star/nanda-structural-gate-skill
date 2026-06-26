@@ -319,6 +319,12 @@ sole-engine field audit, 1024 Pattern16 skill-admission, claim boundaries,
 packaging, and documentation all pass. It is a skill readiness gate, not an
 LLM/nonlinear-memory/hardware-cache proof.
 
+Do not confuse the raw capacity profile with the readiness admission profile.
+`nanda-llmwave-big structural-capacity --format json` reports the default
+capacity profile. `nanda-skill-readiness` separately runs the stronger
+Pattern16 skill-admission profile; a default-profile JSON is not a blocker just
+because its `noise_profile` is not `skill-admission`.
+
 For the latest LLMWave-Big eval path, use:
 
 ```bash

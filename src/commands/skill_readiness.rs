@@ -165,6 +165,12 @@ fn structural_capacity_summary() -> Value {
         },
     );
     json!({
+        "capacity_profile_checked": "skill-admission",
+        "default_capacity_profile": "default",
+        "default_profile_mismatch_is_not_blocker": true,
+        "readiness_uses_skill_admission_profile": true,
+        "admission_command": "nanda-llmwave-big structural-capacity --noise-profile skill-admission --format json",
+        "default_command": "nanda-llmwave-big structural-capacity --format json",
         "verdict": report.verdict,
         "fixed_1024_only": report.gates.fixed_1024_only,
         "pattern16_macro_cell": report.gates.pattern16_macro_cell,

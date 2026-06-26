@@ -767,6 +767,12 @@ only for the structural-gate/firewall claim. Treat `PUBLIC_V1_REVIEW` as
 unresolved and inspect `blockers`. This readiness gate aggregates doctor,
 sole-engine field audit, Pattern16 skill-admission, claim boundaries,
 packaging, and documentation presence.
+Do not treat the raw default `nanda-llmwave-big structural-capacity --format
+json` profile as the public skill admission gate. `nanda-skill-readiness`
+checks the stronger `--noise-profile skill-admission` path internally. A default
+capacity report whose profile is not `skill-admission` is not a readiness
+blocker; inspect
+`checks[].evidence.default_profile_mismatch_is_not_blocker=true`.
 Use `nanda-llmwave-big readiness-ladder --format json` to inspect the readiness
 level, and `nanda-llmwave-big claim-gate --claim llm-ready --format json` or
 `--claim nonlinear-memory` before making public claims. Treat blocked claim

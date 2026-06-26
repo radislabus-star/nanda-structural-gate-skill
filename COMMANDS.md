@@ -113,6 +113,12 @@ presence. `PUBLIC_V1_READY` means the structural-gate skill is ready as a
 public structural firewall; it still keeps LLM, nonlinear-memory, and hardware
 cache claims closed.
 
+Important profile boundary: plain `nanda-llmwave-big structural-capacity
+--format json` shows the default capacity profile. `nanda-skill-readiness`
+checks the stronger Pattern16 skill-admission profile internally. A raw default
+capacity profile that is not `skill-admission` is not a readiness blocker;
+inspect `checks[].evidence.default_profile_mismatch_is_not_blocker`.
+
 ## LLMWave Readiness And Claims
 
 ```bash
