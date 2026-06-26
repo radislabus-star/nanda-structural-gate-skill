@@ -715,6 +715,14 @@ one small multi-turn context recall loop. Treat
 it is not open-domain chat, not a general GPT-style model, not a network
 scanner, and not a vulnerability proof.
 
+`linux-chat-v1` is the bounded chat-loop layer: it keeps short dialogue state,
+resolves constrained follow-ups and corrections, delegates evidence-chain
+decisions to the Linux-profile reasoning owner, and applies anti-wave shortcut
+refusal before surfacing an answer. `linux-chat-v1-eval` runs the built-in
+provider/correction/follow-up/refusal script. Treat
+`LINUX_CHAT_V1_READY_NOT_GENERAL_LLM` as bounded Linux-profile chat readiness
+only, not broad chat readiness.
+
 `linux-query-wave`, `linux-reason-run`, `linux-broad-suite-build`,
 `linux-broad-eval-run`, and `linux-profile-claim-gate` turn that readout into a
 profile proof surface. The query wave fixes intent, anchors, route priors,
@@ -742,6 +750,18 @@ vulnerability proof.
 ```bash
 nanda-llmwave-big linux-chat-run \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-chat-v1-eval \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-chat-v1 \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --prompt "Which package provides command bash?" \
+  --prompt "I meant systemctl." \
   --max-facts 4 \
   --format json
 

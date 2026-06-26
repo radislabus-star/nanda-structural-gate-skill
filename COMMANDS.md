@@ -139,6 +139,9 @@ nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-a
 nanda-llmwave-big linux-snapshot-import --snapshot .nanda/linux-active/runtime-snapshot.json --format json
 nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --max-candidates 16 --format json
 nanda-llmwave-big linux-chat-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-facts 4 --format json
+nanda-llmwave-big linux-chat-v1-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-facts 4 --format json
+nanda-llmwave-big linux-chat-v1 --residual-pack .nanda/linux-active/linux-active-65k.lrf --prompt "Which package provides command bash?" --prompt "I meant systemctl." --max-facts 4 --format json
+nanda-llmwave-big linux-chat-v1 --residual-pack .nanda/linux-active/linux-active-65k.lrf --script .nanda/linux-active/linux-chat.script --max-facts 4 --format json
 nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json
 nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is ssh externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --text "Is ssh externally exposed?" --max-facts 4 --format json
@@ -312,6 +315,14 @@ listener/exposure boundary answers, context recall, and false-shortcut refusal.
 Treat `LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM` as Linux-profile chat
 readiness only. It is not open-domain chat, not a general GPT-style model, not a
 network scanner, and not a vulnerability proof.
+`linux-chat-v1` is the bounded chat-loop surface on top of the same reasoning
+owner. It keeps short dialogue state, resolves constrained follow-ups and
+corrections, delegates evidence-chain decisions to `linux-reason-run` logic, and
+keeps anti-wave shortcut refusal active. `linux-chat-v1-eval` runs the built-in
+script for provider answer, correction, listener follow-up, exposure refusal,
+vulnerability shortcut refusal, and unsupported-prompt refusal. Treat
+`LINUX_CHAT_V1_READY_NOT_GENERAL_LLM` as bounded Linux-profile chat readiness
+only.
 `linux-query-wave` compiles one Linux-profile prompt into intent, anchors,
 route priors, negative boundaries, forbidden shortcuts, and answer policy. It is
 input shaping only, not retrieval.

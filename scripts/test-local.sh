@@ -387,6 +387,19 @@ tmp_linux_chat_residual="$tmp_linux_chat/linux-chat.lrf"
 big_linux_chat_json="$("$llmwave_big" linux-chat-run --residual-pack "$tmp_linux_chat_residual" --max-facts 4 --format json)"
 jq -e '.mode == "llmwave-big-linux-chat-run" and .verdict == "LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM" and .eval.metrics.total == 5 and .eval.metrics.passed == 5 and .claim_boundary.broad_chat_llm_ready == true and .claim_boundary.linux_profile_broad_chat_ready == true and .claim_boundary.general_llm_ready == false and .claim_boundary.vulnerability_scan_ready == false' <<<"$big_linux_chat_json" >/dev/null
 jq -e '.turns[] | select(.intent == "external_exposure" and (.answer | ascii_downcase | contains("not confirmed")))' <<<"$big_linux_chat_json" >/dev/null
+big_linux_chat_v1_eval_json="$("$llmwave_big" linux-chat-v1-eval --residual-pack "$tmp_linux_chat_residual" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-chat-v1" and .verdict == "LINUX_CHAT_V1_READY_NOT_GENERAL_LLM" and .eval.total == 6 and .eval.passed == 6 and .claim_boundary.linux_chat_v1_ready == true and .claim_boundary.general_llm_ready == false and .claim_boundary.broad_chat_llm_ready == false' <<<"$big_linux_chat_v1_eval_json" >/dev/null
+jq -e '.turns[] | select(.context_resolution.correction_applied == true and .intent == "command_provider" and (.answer | ascii_downcase | contains("systemctl")))' <<<"$big_linux_chat_v1_eval_json" >/dev/null
+jq -e '.turns[] | select(.context_resolution.used_previous_topic == true and .intent == "external_exposure" and (.answer | ascii_downcase | contains("not confirmed")) and (.rejected_shortcuts | index("listener_implies_external_exposure")))' <<<"$big_linux_chat_v1_eval_json" >/dev/null
+tmp_linux_chat_v1_script="$tmp_linux_chat/linux-chat-v1.script"
+cat >"$tmp_linux_chat_v1_script" <<SCRIPT
+Which package provides command bash?
+I meant systemctl.
+What listeners are present?
+Does that mean external exposure?
+SCRIPT
+big_linux_chat_v1_script_json="$("$llmwave_big" linux-chat-v1 --residual-pack "$tmp_linux_chat_residual" --script "$tmp_linux_chat_v1_script" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-chat-v1" and .turn_count == 4 and .feedback_memory.context_rewrites == 2 and .feedback_memory.corrections_applied == 1 and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_v1_script_json" >/dev/null
 big_linux_query_wave_json="$("$llmwave_big" linux-query-wave --text "Is ssh externally exposed?" --format json)"
 jq -e '.mode == "llmwave-big-linux-query-wave" and .verdict == "LINUX_QUERY_WAVE_READY_NOT_ANSWER" and .query_wave.intent == "external_exposure" and (.query_wave.forbidden_shortcuts | index("listener_implies_external_exposure")) and .claim_boundary.general_llm_ready == false' <<<"$big_linux_query_wave_json" >/dev/null
 big_linux_reason_json="$("$llmwave_big" linux-reason-run --residual-pack "$tmp_linux_chat_residual" --text "Is this machine externally exposed?" --max-facts 4 --format json)"

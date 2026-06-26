@@ -45,6 +45,7 @@ pub mod lexical_birth;
 pub mod linux_active_field;
 pub mod linux_atlas;
 pub mod linux_chat;
+pub mod linux_chat_v1;
 pub mod linux_exposure;
 pub mod linux_hot_packet;
 pub mod linux_profile;
@@ -427,6 +428,12 @@ enum LlmwaveBigCommand {
     /// Run constrained Linux-profile chat/readout over schema/residual memory.
     #[command(name = "linux-chat-run", alias = "linux-chat")]
     LinuxChatRun(LlmwaveBigLinuxChatRunArgs),
+    /// Run Linux Chat V1: bounded multi-turn chat over Linux-profile memory.
+    #[command(name = "linux-chat-v1", alias = "linux-chat-loop")]
+    LinuxChatV1(LlmwaveBigLinuxChatV1Args),
+    /// Run the built-in Linux Chat V1 eval script.
+    #[command(name = "linux-chat-v1-eval")]
+    LinuxChatV1Eval(LlmwaveBigLinuxChatV1EvalArgs),
     /// Compile a Linux question into a typed Linux-profile query wave.
     #[command(name = "linux-query-wave")]
     LinuxQueryWave(LlmwaveBigLinuxQueryWaveArgs),
@@ -1376,6 +1383,40 @@ struct LlmwaveBigLinuxChatRunArgs {
     residual_pack: PathBuf,
     #[arg(long = "prompt")]
     prompt: Vec<String>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxChatV1Args {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "prompt")]
+    prompt: Vec<String>,
+    #[arg(long = "script")]
+    script: Option<PathBuf>,
+    #[arg(long = "runtime-snapshot")]
+    runtime_snapshot: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxChatV1EvalArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "runtime-snapshot")]
+    runtime_snapshot: Option<PathBuf>,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
     #[arg(long, value_enum, default_value = "json")]
@@ -3291,6 +3332,120 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- false positive rate: `{}`",
                         report.eval.metrics.false_positive_rate
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxChatV1(args) => {
+            let report =
+                linux_chat_v1::build_linux_chat_v1_report(linux_chat_v1::LinuxChatV1Config {
+                    residual_pack: args.residual_pack,
+                    prompt: args.prompt,
+                    script: args.script,
+                    max_facts: args.max_facts,
+                    runtime_snapshot: args.runtime_snapshot,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "linux_chat_v1_ready: {}",
+                        report.claim_boundary.linux_chat_v1_ready
+                    );
+                    println!(
+                        "general_llm_ready: {}",
+                        report.claim_boundary.general_llm_ready
+                    );
+                    println!("eval_passed: {}/{}", report.eval.passed, report.eval.total);
+                    println!(
+                        "shortcut_rejection_rate: {}",
+                        report.eval.shortcut_rejection_rate
+                    );
+                    println!("turns: {}", report.turn_count);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Chat V1");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- Linux Chat V1 ready: `{}`",
+                        report.claim_boundary.linux_chat_v1_ready
+                    );
+                    println!(
+                        "- general LLM ready: `{}`",
+                        report.claim_boundary.general_llm_ready
+                    );
+                    println!(
+                        "- eval passed: `{}/{}`",
+                        report.eval.passed, report.eval.total
+                    );
+                    println!(
+                        "- shortcut rejection rate: `{}`",
+                        report.eval.shortcut_rejection_rate
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxChatV1Eval(args) => {
+            let report =
+                linux_chat_v1::build_linux_chat_v1_report(linux_chat_v1::LinuxChatV1Config {
+                    residual_pack: args.residual_pack,
+                    prompt: Vec::new(),
+                    script: None,
+                    max_facts: args.max_facts,
+                    runtime_snapshot: args.runtime_snapshot,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "linux_chat_v1_ready: {}",
+                        report.claim_boundary.linux_chat_v1_ready
+                    );
+                    println!(
+                        "general_llm_ready: {}",
+                        report.claim_boundary.general_llm_ready
+                    );
+                    println!("eval_passed: {}/{}", report.eval.passed, report.eval.total);
+                    println!(
+                        "context_retention_rate: {}",
+                        report.eval.context_retention_rate
+                    );
+                    println!("correction_pass_rate: {}", report.eval.correction_pass_rate);
+                    println!(
+                        "shortcut_rejection_rate: {}",
+                        report.eval.shortcut_rejection_rate
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Chat V1 Eval");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- Linux Chat V1 ready: `{}`",
+                        report.claim_boundary.linux_chat_v1_ready
+                    );
+                    println!(
+                        "- eval passed: `{}/{}`",
+                        report.eval.passed, report.eval.total
+                    );
+                    println!(
+                        "- context retention rate: `{}`",
+                        report.eval.context_retention_rate
+                    );
+                    println!(
+                        "- correction pass rate: `{}`",
+                        report.eval.correction_pass_rate
+                    );
+                    println!(
+                        "- shortcut rejection rate: `{}`",
+                        report.eval.shortcut_rejection_rate
                     );
                     println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }
