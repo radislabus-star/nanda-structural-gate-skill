@@ -109,22 +109,23 @@ nonlinear-memory          CLAIM_BLOCKED
 llm-ready                 CLAIM_BLOCKED
 ```
 
-## Structural Capacity 1024
+## Structural Capacity 1024 Pattern16
 
 ```bash
 nanda-llmwave-big structural-capacity --format json
 ```
 
 This is the fixed LLMWave-Big capacity bridge from the old accepted
-128-pattern checkpoint to a 1024-pattern structural gate. It has no
-`--patterns` argument, no 256/512 mode, and no ladder. The gate must run all
-1024 patterns through clean retrieval, noisy retrieval, cold rejection,
-role-swap rejection, route-splice rejection, and conflict rejection.
+128-pattern checkpoint to a 1024 Pattern16 structural gate. It has no
+`--patterns` argument, no 256/512 mode, no smaller cell shape, and no ladder.
+The gate must run all 1024 macro-cells, 16 directed edges each, through clean
+retrieval, noisy retrieval, cold rejection, role-swap rejection,
+route-splice rejection, conflict rejection, and missing-edge rejection.
 
 Passing this command allows only the local claim
-`STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN`. It does not prove broad chat LLM
-readiness, global nonlinear memory, real-corpus capacity, or hardware cache
-residency.
+`STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN`. It does not prove broad
+chat LLM readiness, global nonlinear memory, real-corpus capacity, or hardware
+cache residency.
 
 ## Nonlinear Memory Eval
 

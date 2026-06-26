@@ -2609,10 +2609,11 @@ hardware cache residency if PMU evidence is absent
 
 v18 implemented as `src/llmwave_big/linux_atlas_projection.rs`.
 
-## Structural Capacity 1024 Gate
+## Structural Capacity 1024 Pattern16 Gate
 
-The structural-capacity bridge is no longer a 256/512/1024 ladder. It is a
-single fixed 1024-pattern core gate:
+The structural-capacity bridge is no longer a 256/512/1024 ladder, and it is
+not the old 4-edge cell. It is a single fixed 1024 Pattern16 macro-cell core
+gate:
 
 ```bash
 nanda-llmwave-big structural-capacity --format json
@@ -2622,14 +2623,21 @@ Required shape:
 
 ```text
 patterns = 1024
+pattern_shape = Pattern16 macro-cell
+edges_per_pattern = 16
+active_facts = 16384
 fixed_pattern_count = true
+fixed_pattern_shape = true
 smaller_pattern_modes_available = false
+smaller_pattern_shapes_available = false
 no --patterns CLI argument
+no cell-shape or edge-count CLI argument
 no 256/512 runnable modes
+no Pattern4 fallback
 ```
 
 The gate compares against the old accepted 128 robust-pattern checkpoint only
-as history. It must prove the full 1024 workload in one pass:
+as history. It must prove the full 1024 x 16 workload in one pass:
 
 ```text
 clean retrieval
@@ -2638,6 +2646,7 @@ cold rejection
 role-swap rejection
 route-splice rejection
 conflict rejection
+missing-edge rejection
 false_accept_rate = 0
 false_negative_rate = 0
 hot budget fits
@@ -2647,7 +2656,7 @@ schema/residual reuse beats direct fixed64 bytes
 Allowed claim:
 
 ```text
-STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN
+STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN
 ```
 
 Still not claimed:

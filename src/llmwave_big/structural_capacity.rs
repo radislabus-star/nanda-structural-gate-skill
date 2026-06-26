@@ -1,17 +1,19 @@
-//! Fixed 1024-pattern structural-capacity gate for LLMWave Big.
+//! Fixed 1024 Pattern16 structural-capacity gate for LLMWave Big.
 //!
 //! This is the bridge from the old robust 128-pattern checkpoint to the current
 //! active/schema-residual core. It deliberately exposes no smaller pattern
-//! count: the gate is 1024 or it is not the gate.
+//! count and no smaller cell shape: the gate is 1024 Pattern16 or it is not the
+//! gate.
 
 use serde::Serialize;
 
-pub(crate) const STRUCTURAL_CAPACITY_VERSION: &str = "llmwave-big-v-next-structural-capacity-1024";
+pub(crate) const STRUCTURAL_CAPACITY_VERSION: &str =
+    "llmwave-big-v-next-structural-capacity-1024-pattern16";
 
 pub(crate) const STRUCTURAL_PATTERN_CAPACITY: usize = 1024;
 
 const DEFAULT_HOT_BUDGET_BYTES: usize = 6 * 1024 * 1024;
-const EDGES_PER_PATTERN: usize = 4;
+const EDGES_PER_PATTERN: usize = 16;
 const DIRECT_FIXED64_BYTES: usize = 64;
 const SCHEMA_RECORD_BYTES: usize = 32;
 const RESIDUAL_RECORD_BYTES: usize = 24;
@@ -54,9 +56,12 @@ pub(crate) struct StructuralCapacityOldBaseline {
 
 #[derive(Serialize, Clone)]
 pub(crate) struct StructuralCapacityWorkload {
+    pub pattern_shape: &'static str,
     pub patterns: usize,
     pub fixed_pattern_count: bool,
+    pub fixed_pattern_shape: bool,
     pub smaller_pattern_modes_available: bool,
+    pub smaller_pattern_shapes_available: bool,
     pub seeds: usize,
     pub seed_start: u64,
     pub edges_per_pattern: usize,
@@ -67,6 +72,7 @@ pub(crate) struct StructuralCapacityWorkload {
     pub role_swap_cases: usize,
     pub route_splice_cases: usize,
     pub conflict_cases: usize,
+    pub missing_edge_cases: usize,
     pub noise_edges_per_noisy_case: usize,
 }
 
@@ -102,6 +108,7 @@ pub(crate) struct StructuralCapacityMetrics {
     pub role_swap_rejection_pass_rate: f32,
     pub route_splice_rejection_pass_rate: f32,
     pub conflict_rejection_pass_rate: f32,
+    pub missing_edge_rejection_pass_rate: f32,
     pub false_accept_rate: f32,
     pub false_negative_rate: f32,
     pub min_clean_margin: i64,
@@ -119,12 +126,14 @@ pub(crate) struct StructuralCapacityGates {
     pub role_swap_rejection: bool,
     pub route_splice_rejection: bool,
     pub conflict_rejection: bool,
+    pub missing_edge_rejection: bool,
     pub false_accept_rate_zero: bool,
     pub false_negative_rate_zero: bool,
     pub schema_residual_reuse: bool,
     pub hot_budget: bool,
     pub seed_robust: bool,
     pub old_baseline_beaten: bool,
+    pub pattern16_macro_cell: bool,
     pub final_gate_passed: bool,
 }
 
@@ -133,7 +142,9 @@ pub(crate) struct StructuralCapacityClaimBoundary {
     pub structural_capacity_1024_ready: bool,
     pub old_baseline_beaten: bool,
     pub synthetic_structural_patterns_only: bool,
+    pub pattern16_macro_cells: bool,
     pub smaller_pattern_modes_available: bool,
+    pub smaller_pattern_shapes_available: bool,
     pub broad_chat_llm_ready: bool,
     pub global_nonlinear_memory_proven: bool,
     pub hardware_cache_residency_counter_proven: bool,
@@ -151,6 +162,7 @@ pub(crate) struct StructuralCapacitySeedReport {
     pub role_swap_rejected: usize,
     pub route_splice_rejected: usize,
     pub conflict_rejected: usize,
+    pub missing_edge_rejected: usize,
     pub false_accepts: usize,
     pub false_negatives: usize,
     pub min_clean_margin: i64,
@@ -161,6 +173,7 @@ pub(crate) struct StructuralCapacitySeedReport {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct CapacityEdge {
+    slot: u8,
     subject: u64,
     relation: u64,
     object: u64,
@@ -201,6 +214,7 @@ struct SeedAccumulator {
     role_swap_rejected: usize,
     route_splice_rejected: usize,
     conflict_rejected: usize,
+    missing_edge_rejected: usize,
     false_accepts: usize,
     false_negatives: usize,
     min_clean_margin: Option<i64>,
@@ -231,13 +245,13 @@ pub(crate) fn build_structural_capacity_report(
     let metrics = aggregate_metrics(&seed_results, &workload);
     let gates = gates(&metrics, &memory);
     let verdict = if gates.final_gate_passed {
-        "STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN"
+        "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN"
     } else {
-        "STRUCTURAL_CAPACITY_1024_REVIEW"
+        "STRUCTURAL_CAPACITY_1024_PATTERN16_REVIEW"
     };
 
     StructuralCapacityReport {
-        mode: "llmwave-big-structural-capacity-1024",
+        mode: "llmwave-big-structural-capacity-1024-pattern16",
         version: STRUCTURAL_CAPACITY_VERSION,
         verdict,
         old_baseline: old_baseline(),
@@ -301,6 +315,11 @@ fn evaluate_seed(patterns: usize, seed: u64, noise_edges: usize) -> StructuralCa
         add_negative_result(&mut acc, decide(&field, &conflict_edges), |acc| {
             acc.conflict_rejected += 1;
         });
+
+        let missing_edges = missing_edge_query_edges(&field, index);
+        add_negative_result(&mut acc, decide(&field, &missing_edges), |acc| {
+            acc.missing_edge_rejected += 1;
+        });
     }
     let passed = acc.clean_passed == patterns
         && acc.noisy_passed == patterns
@@ -308,6 +327,7 @@ fn evaluate_seed(patterns: usize, seed: u64, noise_edges: usize) -> StructuralCa
         && acc.role_swap_rejected == patterns
         && acc.route_splice_rejected == patterns
         && acc.conflict_rejected == patterns
+        && acc.missing_edge_rejected == patterns
         && acc.false_accepts == 0
         && acc.false_negatives == 0;
 
@@ -320,6 +340,7 @@ fn evaluate_seed(patterns: usize, seed: u64, noise_edges: usize) -> StructuralCa
         role_swap_rejected: acc.role_swap_rejected,
         route_splice_rejected: acc.route_splice_rejected,
         conflict_rejected: acc.conflict_rejected,
+        missing_edge_rejected: acc.missing_edge_rejected,
         false_accepts: acc.false_accepts,
         false_negatives: acc.false_negatives,
         min_clean_margin: acc.min_clean_margin.unwrap_or(0),
@@ -387,21 +408,24 @@ fn score_pattern(
     let mut correct_edges = 0usize;
     let mut reverse_edges = 0usize;
     let mut conflicts = 0usize;
-    for edge in pattern.edges {
-        for query in query_edges {
-            if *query == edge {
-                correct_edges += 1;
-            } else if query.subject == edge.object
-                && query.relation == edge.relation
-                && query.object == edge.subject
-            {
-                reverse_edges += 1;
-            } else if query.relation == edge.relation
-                && ((query.subject == edge.subject && query.object != edge.object)
-                    || (query.object == edge.object && query.subject != edge.subject))
-            {
-                conflicts += 1;
-            }
+    for query in query_edges {
+        let slot = usize::from(query.slot);
+        if slot >= EDGES_PER_PATTERN {
+            continue;
+        }
+        let edge = pattern.edges[slot];
+        if *query == edge {
+            correct_edges += 1;
+        } else if query.subject == edge.object
+            && query.relation == edge.relation
+            && query.object == edge.subject
+        {
+            reverse_edges += 1;
+        } else if query.relation == edge.relation
+            && ((query.subject == edge.subject && query.object != edge.object)
+                || (query.object == edge.object && query.subject != edge.subject))
+        {
+            conflicts += 1;
         }
     }
     PatternScore {
@@ -427,6 +451,7 @@ fn role_swap_query_edges(pattern: &CapacityPattern) -> Vec<CapacityEdge> {
         .edges
         .iter()
         .map(|edge| CapacityEdge {
+            slot: edge.slot,
             subject: edge.object,
             relation: edge.relation,
             object: edge.subject,
@@ -436,22 +461,25 @@ fn role_swap_query_edges(pattern: &CapacityPattern) -> Vec<CapacityEdge> {
 
 fn route_splice_query_edges(field: &CapacityField, index: usize) -> Vec<CapacityEdge> {
     let foreign = (index + 1) % field.patterns.len();
-    vec![
-        field.patterns[index].edges[0],
-        field.patterns[index].edges[1],
-        field.patterns[foreign].edges[2],
-        field.patterns[foreign].edges[3],
-    ]
+    let mut edges = Vec::with_capacity(EDGES_PER_PATTERN);
+    edges.extend_from_slice(&field.patterns[index].edges[..EDGES_PER_PATTERN / 2]);
+    edges.extend_from_slice(&field.patterns[foreign].edges[EDGES_PER_PATTERN / 2..]);
+    edges
 }
 
 fn conflict_query_edges(field: &CapacityField, seed: u64, index: usize) -> Vec<CapacityEdge> {
     let mut edges = field.patterns[index].edges.to_vec();
     edges.push(CapacityEdge {
+        slot: 0,
         subject: entity_hash(seed, "supplier_conflict", index + 11),
         relation: relation_hash("issues_invoice"),
         object: field.patterns[index].edges[0].object,
     });
     edges
+}
+
+fn missing_edge_query_edges(field: &CapacityField, index: usize) -> Vec<CapacityEdge> {
+    field.patterns[index].edges[..EDGES_PER_PATTERN - 1].to_vec()
 }
 
 fn pattern(seed: u64, index: usize) -> CapacityPattern {
@@ -461,37 +489,53 @@ fn pattern(seed: u64, index: usize) -> CapacityPattern {
     let buyer = entity_hash(seed, "buyer", index);
     let certificate = entity_hash(seed, "certificate", index);
     let manufacturer = entity_hash(seed, "manufacturer", index);
+    let site = entity_hash(seed, "site", index);
+    let shipment = entity_hash(seed, "shipment", index);
+    let carrier = entity_hash(seed, "carrier", index);
+    let warehouse = entity_hash(seed, "warehouse", index);
+    let payment = entity_hash(seed, "payment", index);
+    let contract = entity_hash(seed, "contract", index);
+    let obligation = entity_hash(seed, "obligation", index);
+    let evidence = entity_hash(seed, "evidence", index);
     CapacityPattern {
         edges: [
-            CapacityEdge {
-                subject: supplier,
-                relation: relation_hash("issues_invoice"),
-                object: invoice,
-            },
-            CapacityEdge {
-                subject: invoice,
-                relation: relation_hash("covers_product"),
-                object: product,
-            },
-            CapacityEdge {
-                subject: product,
-                relation: relation_hash("ships_to_buyer"),
-                object: buyer,
-            },
-            CapacityEdge {
-                subject: certificate,
-                relation: relation_hash("belongs_to_manufacturer"),
-                object: manufacturer,
-            },
+            edge(0, supplier, "issues_invoice", invoice),
+            edge(1, invoice, "covers_product", product),
+            edge(2, product, "ships_to_buyer", buyer),
+            edge(3, certificate, "belongs_to_manufacturer", manufacturer),
+            edge(4, manufacturer, "operates_site", site),
+            edge(5, site, "authorized_for_product", product),
+            edge(6, carrier, "moves_shipment", shipment),
+            edge(7, shipment, "contains_product", product),
+            edge(8, shipment, "arrives_at_warehouse", warehouse),
+            edge(9, warehouse, "releases_to_buyer", buyer),
+            edge(10, buyer, "pays_invoice_with", payment),
+            edge(11, payment, "settles_invoice", invoice),
+            edge(12, contract, "governs_invoice", invoice),
+            edge(13, contract, "defines_obligation", obligation),
+            edge(14, obligation, "assigns_responsibility_to", supplier),
+            edge(15, evidence, "supports_certificate", certificate),
         ],
+    }
+}
+
+fn edge(slot: u8, subject: u64, relation: &str, object: u64) -> CapacityEdge {
+    CapacityEdge {
+        slot,
+        subject,
+        relation: relation_hash(relation),
+        object,
     }
 }
 
 fn workload(seeds: usize, seed_start: u64, noise_edges: usize) -> StructuralCapacityWorkload {
     StructuralCapacityWorkload {
+        pattern_shape: "Pattern16 macro-cell",
         patterns: STRUCTURAL_PATTERN_CAPACITY,
         fixed_pattern_count: true,
+        fixed_pattern_shape: true,
         smaller_pattern_modes_available: false,
+        smaller_pattern_shapes_available: false,
         seeds,
         seed_start,
         edges_per_pattern: EDGES_PER_PATTERN,
@@ -502,6 +546,7 @@ fn workload(seeds: usize, seed_start: u64, noise_edges: usize) -> StructuralCapa
         role_swap_cases: STRUCTURAL_PATTERN_CAPACITY * seeds,
         route_splice_cases: STRUCTURAL_PATTERN_CAPACITY * seeds,
         conflict_cases: STRUCTURAL_PATTERN_CAPACITY * seeds,
+        missing_edge_cases: STRUCTURAL_PATTERN_CAPACITY * seeds,
         noise_edges_per_noisy_case: noise_edges,
     }
 }
@@ -568,6 +613,10 @@ fn aggregate_metrics(
         .iter()
         .map(|seed| seed.conflict_rejected)
         .sum::<usize>();
+    let missing_edge_rejected = seed_results
+        .iter()
+        .map(|seed| seed.missing_edge_rejected)
+        .sum::<usize>();
     let false_accepts = seed_results
         .iter()
         .map(|seed| seed.false_accepts)
@@ -579,7 +628,8 @@ fn aggregate_metrics(
     let negative_cases = workload.cold_cases
         + workload.role_swap_cases
         + workload.route_splice_cases
-        + workload.conflict_cases;
+        + workload.conflict_cases
+        + workload.missing_edge_cases;
     let positive_cases = workload.clean_cases + workload.noisy_cases;
     let seed_passed = seed_results.iter().filter(|seed| seed.passed).count();
     StructuralCapacityMetrics {
@@ -592,6 +642,7 @@ fn aggregate_metrics(
         role_swap_rejection_pass_rate: ratio(role_swap_rejected, workload.role_swap_cases),
         route_splice_rejection_pass_rate: ratio(route_splice_rejected, workload.route_splice_cases),
         conflict_rejection_pass_rate: ratio(conflict_rejected, workload.conflict_cases),
+        missing_edge_rejection_pass_rate: ratio(missing_edge_rejected, workload.missing_edge_cases),
         false_accept_rate: ratio(false_accepts, negative_cases),
         false_negative_rate: ratio(false_negatives, positive_cases),
         min_clean_margin: seed_results
@@ -623,24 +674,28 @@ fn gates(
     let role_swap_rejection = metrics.role_swap_rejection_pass_rate == 1.0;
     let route_splice_rejection = metrics.route_splice_rejection_pass_rate == 1.0;
     let conflict_rejection = metrics.conflict_rejection_pass_rate == 1.0;
+    let missing_edge_rejection = metrics.missing_edge_rejection_pass_rate == 1.0;
     let false_accept_rate_zero = metrics.false_accept_rate == 0.0;
     let false_negative_rate_zero = metrics.false_negative_rate == 0.0;
     let schema_residual_reuse =
         memory.residual_saving_bytes > 0 && memory.schema_reuse_ratio == 1.0;
     let seed_robust = metrics.seed_robustness_pass_rate == 1.0;
     let old_baseline_beaten = STRUCTURAL_PATTERN_CAPACITY > OLD_ROBUST_BASELINE_PATTERNS;
+    let pattern16_macro_cell = EDGES_PER_PATTERN == 16;
     let final_gate_passed = clean_retrieval
         && noisy_retrieval
         && cold_rejection
         && role_swap_rejection
         && route_splice_rejection
         && conflict_rejection
+        && missing_edge_rejection
         && false_accept_rate_zero
         && false_negative_rate_zero
         && schema_residual_reuse
         && memory.fits_hot_budget
         && seed_robust
-        && old_baseline_beaten;
+        && old_baseline_beaten
+        && pattern16_macro_cell;
     StructuralCapacityGates {
         fixed_1024_only: true,
         clean_retrieval,
@@ -649,26 +704,31 @@ fn gates(
         role_swap_rejection,
         route_splice_rejection,
         conflict_rejection,
+        missing_edge_rejection,
         false_accept_rate_zero,
         false_negative_rate_zero,
         schema_residual_reuse,
         hot_budget: memory.fits_hot_budget,
         seed_robust,
         old_baseline_beaten,
+        pattern16_macro_cell,
         final_gate_passed,
     }
 }
 
 fn claim_boundary(verdict: &'static str) -> StructuralCapacityClaimBoundary {
     StructuralCapacityClaimBoundary {
-        structural_capacity_1024_ready: verdict == "STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN",
-        old_baseline_beaten: verdict == "STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN",
+        structural_capacity_1024_ready: verdict
+            == "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN",
+        old_baseline_beaten: verdict == "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN",
         synthetic_structural_patterns_only: true,
+        pattern16_macro_cells: true,
         smaller_pattern_modes_available: false,
+        smaller_pattern_shapes_available: false,
         broad_chat_llm_ready: false,
         global_nonlinear_memory_proven: false,
         hardware_cache_residency_counter_proven: false,
-        safe_claim: "LLMWave Big now has a fixed 1024-pattern structural-capacity gate: clean/noisy retrieval must pass and cold, role-swap, route-splice, and conflict traps must reject with zero false accepts. This is synthetic structural-capacity evidence, not broad chat or global nonlinear-memory proof.",
+        safe_claim: "LLMWave Big now has a fixed 1024 Pattern16 structural-capacity gate: each macro-cell has 16 directed edges, clean/noisy retrieval must pass, and cold, role-swap, route-splice, conflict, and missing-edge traps must reject with zero false accepts. This is synthetic structural-capacity evidence, not broad chat or global nonlinear-memory proof.",
         blocked_claims: vec![
             "broad_chat_llm_ready",
             "global_nonlinear_memory_proven",
@@ -687,7 +747,7 @@ fn old_baseline() -> StructuralCapacityOldBaseline {
         required_lift_factor: round4(
             STRUCTURAL_PATTERN_CAPACITY as f32 / OLD_ROBUST_BASELINE_PATTERNS as f32,
         ),
-        read_as: "The old accepted checkpoint was 128 robust wave patterns. This gate has no smaller runnable mode; it must prove 1024 structural patterns.",
+        read_as: "The old accepted checkpoint was 128 robust wave patterns. This gate has no smaller runnable mode or smaller cell shape; it must prove 1024 Pattern16 structural macro-cells.",
     }
 }
 
@@ -737,13 +797,24 @@ mod tests {
             hot_budget_bytes: DEFAULT_HOT_BUDGET_BYTES,
         });
         assert_eq!(report.workload.patterns, STRUCTURAL_PATTERN_CAPACITY);
+        assert_eq!(report.workload.pattern_shape, "Pattern16 macro-cell");
+        assert_eq!(report.workload.edges_per_pattern, 16);
+        assert_eq!(report.workload.active_facts, 16_384);
         assert!(report.workload.fixed_pattern_count);
+        assert!(report.workload.fixed_pattern_shape);
         assert!(!report.workload.smaller_pattern_modes_available);
-        assert_eq!(report.verdict, "STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN");
+        assert!(!report.workload.smaller_pattern_shapes_available);
+        assert_eq!(
+            report.verdict,
+            "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN"
+        );
         assert!(report.gates.final_gate_passed);
         assert!(report.gates.old_baseline_beaten);
+        assert!(report.gates.pattern16_macro_cell);
+        assert!(report.gates.missing_edge_rejection);
         assert_eq!(report.metrics.false_accept_rate, 0.0);
         assert_eq!(report.metrics.false_negative_rate, 0.0);
         assert!(report.memory.residual_saving_bytes > 0);
+        assert!(report.memory.fits_hot_budget);
     }
 }

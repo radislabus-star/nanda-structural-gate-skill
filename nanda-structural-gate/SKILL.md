@@ -763,12 +763,16 @@ only the local runtime claim; it still keeps broad chat readiness, global
 nonlinear-memory proof, and hardware cache-residency proof closed.
 Use `nanda-llmwave-big structural-capacity --format json` when the next claim
 is whether LLMWave-Big beats the old robust 128-pattern checkpoint. This gate
-is fixed to 1024 structural patterns only. It exposes no `--patterns` argument,
-no 256/512 modes, and no ladder. Inspect
+is fixed to 1024 Pattern16 macro-cells only: 1024 patterns, 16 directed edges
+per pattern. It exposes no `--patterns` argument, no 256/512 modes, no smaller
+cell shape, and no ladder. Inspect `workload.pattern_shape`,
+`workload.edges_per_pattern=16`,
 `workload.smaller_pattern_modes_available=false`,
-`gates.fixed_1024_only=true`, clean/noisy retrieval, cold rejection,
-role-swap rejection, route-splice rejection, conflict rejection, and zero false
-accept/negative rates. Treat `STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN` as a
+`workload.smaller_pattern_shapes_available=false`,
+`gates.fixed_1024_only=true`, `gates.pattern16_macro_cell=true`, clean/noisy
+retrieval, cold rejection, role-swap rejection, route-splice rejection,
+conflict rejection, missing-edge rejection, and zero false accept/negative
+rates. Treat `STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN` as a
 synthetic structural-capacity bridge only; it does not prove broad chat LLM,
 real-corpus capacity, global nonlinear memory, or hardware PMU residency.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership

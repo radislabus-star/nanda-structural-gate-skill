@@ -259,7 +259,7 @@ enum LlmwaveBigCommand {
     /// Run the v1841-v1900 core readiness gate.
     #[command(name = "core-eval")]
     CoreEval(LlmwaveBigCoreEvalArgs),
-    /// Run the fixed 1024-pattern structural-capacity core gate.
+    /// Run the fixed 1024 Pattern16 structural-capacity core gate.
     #[command(name = "structural-capacity", alias = "capacity-1024")]
     StructuralCapacity(LlmwaveBigStructuralCapacityArgs),
     /// Show the LLMWave readiness ladder without claiming broad LLM readiness.
@@ -4466,14 +4466,25 @@ fn print_structural_capacity_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => {
             println!("{}", report.verdict);
+            println!("pattern_shape: {}", report.workload.pattern_shape);
             println!("patterns: {}", report.workload.patterns);
+            println!("edges_per_pattern: {}", report.workload.edges_per_pattern);
+            println!("active_facts: {}", report.workload.active_facts);
             println!(
                 "fixed_pattern_count: {}",
                 report.workload.fixed_pattern_count
             );
             println!(
+                "fixed_pattern_shape: {}",
+                report.workload.fixed_pattern_shape
+            );
+            println!(
                 "smaller_pattern_modes_available: {}",
                 report.workload.smaller_pattern_modes_available
+            );
+            println!(
+                "smaller_pattern_shapes_available: {}",
+                report.workload.smaller_pattern_shapes_available
             );
             println!("total_cases: {}", report.metrics.total_cases);
             println!(
@@ -4488,6 +4499,10 @@ fn print_structural_capacity_report(
             println!(
                 "false_negative_rate: {}",
                 report.metrics.false_negative_rate
+            );
+            println!(
+                "missing_edge_rejection_pass_rate: {}",
+                report.metrics.missing_edge_rejection_pass_rate
             );
             println!("hot_bytes: {}", report.memory.hot_bytes);
             println!(
@@ -4511,14 +4526,28 @@ fn print_structural_capacity_report(
             println!("# LLMWave Big Structural Capacity");
             println!();
             println!("- verdict: `{}`", report.verdict);
+            println!("- pattern shape: `{}`", report.workload.pattern_shape);
             println!("- patterns: `{}`", report.workload.patterns);
+            println!(
+                "- edges per pattern: `{}`",
+                report.workload.edges_per_pattern
+            );
+            println!("- active facts: `{}`", report.workload.active_facts);
             println!(
                 "- fixed pattern count: `{}`",
                 report.workload.fixed_pattern_count
             );
             println!(
+                "- fixed pattern shape: `{}`",
+                report.workload.fixed_pattern_shape
+            );
+            println!(
                 "- smaller pattern modes available: `{}`",
                 report.workload.smaller_pattern_modes_available
+            );
+            println!(
+                "- smaller pattern shapes available: `{}`",
+                report.workload.smaller_pattern_shapes_available
             );
             println!("- total cases: `{}`", report.metrics.total_cases);
             println!(
@@ -4536,6 +4565,10 @@ fn print_structural_capacity_report(
             println!(
                 "- false negative rate: `{}`",
                 report.metrics.false_negative_rate
+            );
+            println!(
+                "- missing edge rejection pass rate: `{}`",
+                report.metrics.missing_edge_rejection_pass_rate
             );
             println!("- hot bytes: `{}`", report.memory.hot_bytes);
             println!(

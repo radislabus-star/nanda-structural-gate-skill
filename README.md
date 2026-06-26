@@ -279,12 +279,12 @@ nonlinear_memory          = CLAIM_BLOCKED
 llm_ready                 = CLAIM_BLOCKED
 ```
 
-`structural-capacity` is fixed to 1024 structural patterns. It intentionally
-does not expose `--patterns`, 256/512 modes, or a ladder. The gate checks clean
-and noisy retrieval plus cold, role-swap, route-splice, and conflict rejection
-for the full 1024 workload. A pass means
-`STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN`; it is not a broad chat, real-corpus,
-global nonlinear-memory, or hardware cache-residency proof.
+`structural-capacity` is fixed to 1024 Pattern16 macro-cells. It intentionally
+does not expose `--patterns`, 256/512 modes, a smaller cell shape, or a ladder.
+The gate checks clean and noisy retrieval plus cold, role-swap, route-splice,
+conflict, and missing-edge rejection for the full 1024 x 16 workload. A pass
+means `STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN`; it is not a broad
+chat, real-corpus, global nonlinear-memory, or hardware cache-residency proof.
 
 For the latest LLMWave-Big eval path, use:
 
