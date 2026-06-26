@@ -313,6 +313,12 @@ nonlinear-memory claims remain closed.
 reports may keep their domain explanation fields, but their field admission path
 must return a `FieldPassReport` from the shared engine.
 
+`nanda-skill-readiness --format json` is the one-command public readiness gate
+for the skill package. It returns `PUBLIC_V1_READY` only when doctor,
+sole-engine field audit, 1024 Pattern16 skill-admission, claim boundaries,
+packaging, and documentation all pass. It is a skill readiness gate, not an
+LLM/nonlinear-memory/hardware-cache proof.
+
 For the latest LLMWave-Big eval path, use:
 
 ```bash

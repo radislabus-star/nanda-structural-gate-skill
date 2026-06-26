@@ -79,6 +79,7 @@ nanda-field-equivalence \
   --cognitive-from llmwave-big-result.json \
   --format json
 nanda-field-cutover --suite structural-standard --format json
+nanda-skill-readiness --format json
 ```
 
 Current intended claim boundary:
@@ -104,6 +105,13 @@ LLMWave cognitive reports, Pattern16 structural capacity, lens scan, mature
 anti-wave, feedback memory, and the repository guard workflow. This proves one
 shared field-physics owner only; it does not open LLM, nonlinear-memory, or
 hardware-cache claims.
+
+Use `nanda-skill-readiness --format json` as the public skill readiness gate
+before release or handoff. It aggregates doctor, sole-engine field audit,
+Pattern16 skill-admission, claim boundaries, packaging, and documentation
+presence. `PUBLIC_V1_READY` means the structural-gate skill is ready as a
+public structural firewall; it still keeps LLM, nonlinear-memory, and hardware
+cache claims closed.
 
 ## LLMWave Readiness And Claims
 

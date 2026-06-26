@@ -111,6 +111,7 @@ scripts/nanda-field-cutover --suite structural-standard --format json
 scripts/nanda-field-cutover --structural-case focused-search.json --structural-case contested-search.json --format json
 scripts/nanda-profile-guards . --iterations 50 --format json
 scripts/nanda-release-gate .nanda/route-atlas.json
+scripts/nanda-skill-readiness --format json
 scripts/nanda-dogfood . --refactor-plan --boundary-economics --format json
 scripts/nanda-comb task.json --input-format json --depth 2
 scripts/nanda-extract notes.raw.txt --out .nanda/notes.json
@@ -760,6 +761,12 @@ be a cognitive-only field-core sole engine when
 `acceptance.cognitive_field_core_as_sole_engine=true`. When all three are true,
 `acceptance.field_core_as_sole_engine=true`. This still does not imply
 `llm_ready` or `nonlinear_memory_proven`.
+Use `nanda-skill-readiness --format json` before public handoff, release, or
+when the user asks whether the skill is ready. Treat `PUBLIC_V1_READY` as ready
+only for the structural-gate/firewall claim. Treat `PUBLIC_V1_REVIEW` as
+unresolved and inspect `blockers`. This readiness gate aggregates doctor,
+sole-engine field audit, Pattern16 skill-admission, claim boundaries,
+packaging, and documentation presence.
 Use `nanda-llmwave-big readiness-ladder --format json` to inspect the readiness
 level, and `nanda-llmwave-big claim-gate --claim llm-ready --format json` or
 `--claim nonlinear-memory` before making public claims. Treat blocked claim

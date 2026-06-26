@@ -51,6 +51,7 @@ guard_action="$root/nanda-structural-gate/scripts/nanda-guard-action"
 guard_diff="$root/nanda-structural-gate/scripts/nanda-guard-diff"
 profile_guards="$root/nanda-structural-gate/scripts/nanda-profile-guards"
 release_gate="$root/nanda-structural-gate/scripts/nanda-release-gate"
+skill_readiness="$root/nanda-structural-gate/scripts/nanda-skill-readiness"
 field_report="$root/nanda-structural-gate/scripts/nanda-field-report"
 field_audit="$root/nanda-structural-gate/scripts/nanda-field-audit"
 field_equivalence="$root/nanda-structural-gate/scripts/nanda-field-equivalence"
@@ -63,6 +64,10 @@ version_text="$("$root/target/debug/nanda" --version)"
 grep -q '^nanda ' <<<"$version_text"
 grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
 grep -q 'nanda_6m:' <<<"$version_text"
+skill_readiness_json="$("$skill_readiness" --format json)"
+jq -e '.mode == "nanda-skill-readiness" and .verdict == "PUBLIC_V1_READY" and .public_v1_ready == true and (.blockers | length) == 0' <<<"$skill_readiness_json" >/dev/null
+jq -e '(.checks[] | select(.check == "field_core_sole_engine" and .status == "PASS")) and (.checks[] | select(.check == "pattern16_skill_admission" and .status == "PASS")) and (.checks[] | select(.check == "claim_boundaries" and .status == "PASS"))' <<<"$skill_readiness_json" >/dev/null
+jq -e '.claim_boundary.structural_gate_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.hardware_cache_residency_counter_proven == false' <<<"$skill_readiness_json" >/dev/null
 big_core_v1_contract_json="$("$llmwave_big" core-v1-contract --format json)"
 jq -e '.mode == "llmwave-core-v1-contract" and .verdict == "CORE_V1_CONTRACT_RECORDED_NOT_IMPLEMENTED" and .claim_boundary.core_contract_recorded == true and .claim_boundary.claim_boundary_table_present == true and .claim_boundary.llm_ready == false and .claim_boundary.nonlinear_memory_proven == false and (.components | length) == 11 and (.required_boundaries | length) == 5' <<<"$big_core_v1_contract_json" >/dev/null
 big_core_v1_field_cutover_json="$("$llmwave_big" core-v1-field-cutover --format json)"

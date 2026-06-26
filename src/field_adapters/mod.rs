@@ -458,7 +458,7 @@ pub(crate) fn field_cutover_cmd(args: FieldCutoverArgs) -> Result<u8> {
     })
 }
 
-fn field_cutover_report(cases: Vec<Value>, suite_label: &str) -> Value {
+pub(crate) fn field_cutover_report(cases: Vec<Value>, suite_label: &str) -> Value {
     let cases_checked = cases.len();
     let all_peak_match = nonempty_all(&cases, "peak_matches");
     let all_state_family_match = nonempty_all(&cases, "state_family_matches");
@@ -542,7 +542,7 @@ fn field_cutover_suite_cases(suite: &FieldCutoverSuite) -> Result<Vec<Value>> {
     }
 }
 
-fn structural_standard_cutover_cases() -> Result<Vec<Value>> {
+pub(crate) fn structural_standard_cutover_cases() -> Result<Vec<Value>> {
     let specs = [
         (
             "focused-route-trap",
