@@ -1408,7 +1408,11 @@ the field candidate may be stricter than the typed boundary core, but it must
 not be more permissive. `boundary_field_engine.selected_verdict` is the
 agent-facing cutover verdict used for exit codes and dogfood decisions, while
 `boundary_decision.verdict` remains the stable typed-core explanation for
-compatibility. Use repo-wide mode to find possible split pressure only; if
+compatibility. The boundary kernel is split under `src/field_core/boundary/`
+into facts, typed decision, field pass, records, owner/energy, and utility
+modules; `nanda-skill-readiness` checks this as `boundary_field_kernel` so the
+policy does not drift back into command wrappers. Use repo-wide mode to find
+possible split pressure only; if
 repo-wide mode sees foreign route pressure but the score is not strong enough
 for an autonomous split, it returns `WATCH` and asks for a route-scoped pass.
 Use route-scoped mode with `--atlas`, `--route`, and `--owner` before a

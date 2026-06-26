@@ -68,7 +68,10 @@ shared `field_core` records for downstream field checks. It also includes
 `boundary_energy`. The selected agent verdict is
 `boundary_field_engine.selected_verdict`: the field candidate can be stricter
 than typed Boundary Economics, but `field_equivalence.field_not_more_permissive`
-must stay true before it is used.
+must stay true before it is used. The implementation owner is the split
+`src/field_core/boundary/` kernel; `nanda-skill-readiness` checks
+`boundary_field_kernel` so CLI commands remain wrappers instead of policy
+owners.
 
 ```bash
 nanda-boundary-economics . --format json

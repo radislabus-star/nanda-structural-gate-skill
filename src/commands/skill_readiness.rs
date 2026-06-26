@@ -35,6 +35,7 @@ pub(crate) fn cmd(args: SkillReadinessArgs) -> Result<u8> {
 fn build_report(repo: &Path) -> Value {
     let doctor = doctor_value();
     let field_audit = field_audit_summary();
+    let boundary_kernel = boundary_kernel_summary(repo);
     let structural_capacity = structural_capacity_summary();
     let claim_gates = claim_gate_summary();
     let packaging = packaging_summary(repo);
@@ -57,6 +58,25 @@ fn build_report(repo: &Path) -> Value {
                 .unwrap_or(false)
                 && field_audit["local_physics_copies_allowed"].as_bool() == Some(false),
             field_audit,
+        ),
+        check(
+            "boundary_field_kernel",
+            boundary_kernel["kernel_split_files_present"]
+                .as_bool()
+                .unwrap_or(false)
+                && boundary_kernel["commands_are_wrappers"]
+                    .as_bool()
+                    .unwrap_or(false)
+                && boundary_kernel["field_records_owner_is_field_core"]
+                    .as_bool()
+                    .unwrap_or(false)
+                && boundary_kernel["field_not_more_permissive"]
+                    .as_bool()
+                    .unwrap_or(false)
+                && boundary_kernel["selected_verdict_present"]
+                    .as_bool()
+                    .unwrap_or(false),
+            boundary_kernel,
         ),
         check(
             "pattern16_skill_admission",
@@ -207,6 +227,65 @@ fn claim_gate_summary() -> Value {
     })
 }
 
+fn boundary_kernel_summary(repo: &Path) -> Value {
+    let expected_files = [
+        "src/field_core/boundary/mod.rs",
+        "src/field_core/boundary/facts.rs",
+        "src/field_core/boundary/decision.rs",
+        "src/field_core/boundary/field_pass.rs",
+        "src/field_core/boundary/records.rs",
+        "src/field_core/boundary/energy.rs",
+        "src/field_core/boundary/util.rs",
+    ];
+    let missing_files = expected_files
+        .iter()
+        .filter(|file| !repo.join(file).is_file())
+        .copied()
+        .collect::<Vec<_>>();
+    let input = repo.join("src/field_core/boundary/mod.rs");
+    let report = if input.is_file() {
+        crate::field_core::boundary_report(
+            &input,
+            None,
+            None,
+            Some("source-flow"),
+            Some("field_core::boundary"),
+            readiness_boundary_route_for_path,
+            readiness_boundary_owner_for_path,
+        )
+        .unwrap_or_else(|err| json!({"error": err.to_string()}))
+    } else {
+        json!({"error": "boundary mod.rs missing"})
+    };
+    json!({
+        "owner": "field_core::boundary",
+        "kernel_split_files_present": missing_files.is_empty(),
+        "missing_files": missing_files,
+        "commands_are_wrappers": report["boundary_core"]["commands_are_wrappers"].as_bool().unwrap_or(false),
+        "field_records_owner_is_field_core": report["boundary_field_records"]["owner"].as_str() == Some("field_core::boundary"),
+        "field_not_more_permissive": report["field_equivalence"]["field_not_more_permissive"].as_bool().unwrap_or(false),
+        "selected_verdict_present": report["boundary_field_engine"]["selected_verdict"].as_str().is_some(),
+        "selected_verdict": report["boundary_field_engine"]["selected_verdict"].clone(),
+        "typed_verdict": report["boundary_decision"]["verdict"].clone()
+    })
+}
+
+fn readiness_boundary_route_for_path(path: &str) -> String {
+    if path.contains("field_core/boundary") {
+        "source-flow".to_string()
+    } else {
+        "unknown-flow".to_string()
+    }
+}
+
+fn readiness_boundary_owner_for_path(path: &str) -> String {
+    if path.contains("field_core/boundary") {
+        "field_core::boundary".to_string()
+    } else {
+        "unknown-owner".to_string()
+    }
+}
+
 fn packaging_summary(repo: &Path) -> Value {
     json!({
         "has_skill_md": repo.join("nanda-structural-gate/SKILL.md").is_file(),
@@ -273,6 +352,19 @@ mod tests {
         assert_eq!(report["mode"], "nanda-skill-readiness");
         assert_eq!(report["claim_boundary"]["broad_chat_llm_ready"], false);
         assert_eq!(report["claim_boundary"]["nonlinear_memory_proven"], false);
-        assert_eq!(report["checks"][2]["evidence"]["fixed_1024_only"], true);
+        let pattern16 = report["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|check| check["check"] == "pattern16_skill_admission")
+            .expect("pattern16 readiness check");
+        assert_eq!(pattern16["evidence"]["fixed_1024_only"], true);
+        let boundary_kernel = report["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|check| check["check"] == "boundary_field_kernel")
+            .expect("boundary kernel readiness check");
+        assert_eq!(boundary_kernel["status"], "PASS");
     }
 }
