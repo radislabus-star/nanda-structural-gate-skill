@@ -142,6 +142,8 @@ nanda-llmwave-big linux-chat-run --residual-pack .nanda/linux-active/linux-activ
 nanda-llmwave-big linux-chat-v1-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-facts 4 --format json
 nanda-llmwave-big linux-chat-v1 --residual-pack .nanda/linux-active/linux-active-65k.lrf --prompt "Which package provides command bash?" --prompt "I meant systemctl." --max-facts 4 --format json
 nanda-llmwave-big linux-chat-v1 --residual-pack .nanda/linux-active/linux-active-65k.lrf --script .nanda/linux-active/linux-chat.script --max-facts 4 --format json
+nanda-llmwave-big linux-chat-v2-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-chat-v2-eval.lwm --max-facts 4 --format json
+nanda-llmwave-big linux-chat-v2 --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-chat-v2.lwm --prompt "Which package provides command foocmd?" --prompt "learn accept: foocmd | linux.apt.command.provider | foopkg" --prompt "Which package provides command foocmd?" --max-facts 4 --format json
 nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json
 nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is ssh externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --text "Is ssh externally exposed?" --max-facts 4 --format json
@@ -323,6 +325,15 @@ script for provider answer, correction, listener follow-up, exposure refusal,
 vulnerability shortcut refusal, and unsupported-prompt refusal. Treat
 `LINUX_CHAT_V1_READY_NOT_GENERAL_LLM` as bounded Linux-profile chat readiness
 only.
+`linux-chat-v2` adds persistent wave-memory learning from dialogue feedback. It
+writes explicit accept/reject/learn feedback as fixed 32-byte `.lwm` wave-delta
+records, reloads that memory before the next question, and proves that a later
+field pass can change because of memory rather than transcript replay.
+`linux-chat-v2-eval` checks positive memory lift, learned anti-wave replay, and
+unrelated-route preservation. Treat
+`LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM` as local
+Linux-profile dialogue learning only, not general LLM readiness and not a final
+nonlinear-memory proof.
 `linux-query-wave` compiles one Linux-profile prompt into intent, anchors,
 route priors, negative boundaries, forbidden shortcuts, and answer policy. It is
 input shaping only, not retrieval.

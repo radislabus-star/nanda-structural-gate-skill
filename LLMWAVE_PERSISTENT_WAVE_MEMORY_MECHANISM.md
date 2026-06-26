@@ -366,3 +366,55 @@ linux-chat-v1 turn
 
 Only after that should the chat surface claim a durable memory effect.
 
+## Implemented Checkpoint
+
+Implemented in this repository as:
+
+```text
+src/llmwave_big/persistent_wave_memory.rs
+src/llmwave_big/linux_chat_v2.rs
+```
+
+Public commands:
+
+```bash
+nanda-llmwave-big linux-chat-v2-eval \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --memory .nanda/linux-active/linux-chat-v2-eval.lwm \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-chat-v2 \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --memory .nanda/linux-active/linux-chat-v2.lwm \
+  --prompt "Which package provides command foocmd?" \
+  --prompt "learn accept: foocmd | linux.apt.command.provider | foopkg" \
+  --prompt "Which package provides command foocmd?" \
+  --max-facts 4 \
+  --format json
+```
+
+Current acceptance marker:
+
+```text
+LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM
+```
+
+What the built-in eval proves:
+
+```text
+unknown command blocked before learning
+explicit positive wave delta written
+next question reloads .lwm and answers from wave memory
+unrelated residual route remains grounded
+explicit negative wave delta written
+next question reloads .lwm and activates learned anti-wave
+```
+
+Claim boundary remains:
+
+```text
+general_llm_ready = false
+nonlinear_memory_proven = false
+session_log_used_as_memory = false
+```

@@ -400,6 +400,13 @@ Does that mean external exposure?
 SCRIPT
 big_linux_chat_v1_script_json="$("$llmwave_big" linux-chat-v1 --residual-pack "$tmp_linux_chat_residual" --script "$tmp_linux_chat_v1_script" --max-facts 4 --format json)"
 jq -e '.mode == "llmwave-big-linux-chat-v1" and .turn_count == 4 and .feedback_memory.context_rewrites == 2 and .feedback_memory.corrections_applied == 1 and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_v1_script_json" >/dev/null
+tmp_linux_chat_v2_memory="$tmp_linux_chat/linux-chat-v2.lwm"
+big_linux_chat_v2_eval_json="$("$llmwave_big" linux-chat-v2-eval --residual-pack "$tmp_linux_chat_residual" --memory "$tmp_linux_chat_v2_memory" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-chat-v2" and .verdict == "LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM" and .eval.total == 6 and .eval.passed == 6 and .eval.deltas_written == 2 and .eval.memory_lift_observed == true and .eval.answer_changed_due_to_wave_memory == true and .eval.negative_lane_replay_observed == true and .eval.unrelated_route_preserved == true and .claim_boundary.dialogue_learning_ready == true and .claim_boundary.persistent_wave_memory_ready == true and .claim_boundary.session_log_used_as_memory == false and .claim_boundary.general_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_linux_chat_v2_eval_json" >/dev/null
+jq -e '.turns[] | select(.verifier_state == "GROUNDED_BY_WAVE_MEMORY" and .answer_changed_due_to_wave_memory == true and (.answer | ascii_downcase | contains("foopkg")))' <<<"$big_linux_chat_v2_eval_json" >/dev/null
+jq -e '.turns[] | select(.verifier_state == "BOUNDARY_WITH_LEARNED_ANTI_WAVE" and .memory_effect.learned_negative_lanes_active == true)' <<<"$big_linux_chat_v2_eval_json" >/dev/null
+test -s "$tmp_linux_chat_v2_memory"
+jq -e '.record_bytes == 32 and .record_count == 2 and (.records[] | select(.delta_state == "POSITIVE_DELTA")) and (.records[] | select(.delta_state == "NEGATIVE_DELTA"))' "$tmp_linux_chat_v2_memory" >/dev/null
 big_linux_query_wave_json="$("$llmwave_big" linux-query-wave --text "Is ssh externally exposed?" --format json)"
 jq -e '.mode == "llmwave-big-linux-query-wave" and .verdict == "LINUX_QUERY_WAVE_READY_NOT_ANSWER" and .query_wave.intent == "external_exposure" and (.query_wave.forbidden_shortcuts | index("listener_implies_external_exposure")) and .claim_boundary.general_llm_ready == false' <<<"$big_linux_query_wave_json" >/dev/null
 big_linux_reason_json="$("$llmwave_big" linux-reason-run --residual-pack "$tmp_linux_chat_residual" --text "Is this machine externally exposed?" --max-facts 4 --format json)"

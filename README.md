@@ -723,6 +723,17 @@ provider/correction/follow-up/refusal script. Treat
 `LINUX_CHAT_V1_READY_NOT_GENERAL_LLM` as bounded Linux-profile chat readiness
 only, not broad chat readiness.
 
+`linux-chat-v2` adds dialogue-time persistent wave learning. It does not store
+the transcript as memory. It compiles explicit user feedback into fixed
+32-byte wave-delta records, writes them to a `.lwm` memory packet, reloads that
+packet before the next question, and lets the next Linux-profile field pass
+change because of the learned delta. `linux-chat-v2-eval` proves the local loop:
+unknown command -> explicit positive delta -> next answer from wave memory,
+plus negative anti-wave replay and preservation of an unrelated residual route.
+Treat `LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM` as local
+Linux-profile dialogue learning only; it is not general LLM readiness and not a
+global nonlinear-memory proof.
+
 `linux-query-wave`, `linux-reason-run`, `linux-broad-suite-build`,
 `linux-broad-eval-run`, and `linux-profile-claim-gate` turn that readout into a
 profile proof surface. The query wave fixes intent, anchors, route priors,
@@ -762,6 +773,21 @@ nanda-llmwave-big linux-chat-v1 \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
   --prompt "Which package provides command bash?" \
   --prompt "I meant systemctl." \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-chat-v2-eval \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --memory .nanda/linux-active/linux-chat-v2-eval.lwm \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-chat-v2 \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --memory .nanda/linux-active/linux-chat-v2.lwm \
+  --prompt "Which package provides command foocmd?" \
+  --prompt "learn accept: foocmd | linux.apt.command.provider | foopkg" \
+  --prompt "Which package provides command foocmd?" \
   --max-facts 4 \
   --format json
 

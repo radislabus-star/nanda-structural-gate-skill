@@ -1017,6 +1017,18 @@ evidence, exposure-boundary refusal, and a small context recall loop. Treat
 `LINUX_PROFILE_BROAD_CHAT_READY_NOT_GENERAL_LLM` as Linux-profile readiness only:
 it is not open-domain chat, not a general GPT-style model, not a network scanner,
 and not a vulnerability proof.
+Use `nanda-llmwave-big linux-chat-v2-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-chat-v2-eval.lwm --max-facts 4 --format json`
+to prove the local dialogue-learning loop: an unknown command stays blocked,
+explicit feedback writes a fixed 32-byte wave delta, the next question reloads
+`.lwm` memory and answers from that delta, learned anti-wave replay suppresses a
+shortcut, and an unrelated residual route remains grounded. Treat
+`LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM` as local
+Linux-profile dialogue learning only, not general LLM readiness and not a final
+nonlinear-memory proof.
+Use `nanda-llmwave-big linux-chat-v2 --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-chat-v2.lwm --prompt "Which package provides command foocmd?" --prompt "learn accept: foocmd | linux.apt.command.provider | foopkg" --prompt "Which package provides command foocmd?" --max-facts 4 --format json`
+when the user wants to teach the bounded Linux-profile model through explicit
+dialogue feedback. Do not treat the transcript itself as memory; inspect the
+`.lwm` wave-delta records and the next turn's `memory_effect`.
 Use `nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json`
 to compile one Linux-profile prompt into intent, anchors, route priors, negative
 boundaries, forbidden shortcuts, and answer policy. This is input shaping only,

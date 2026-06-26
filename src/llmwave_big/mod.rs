@@ -46,6 +46,7 @@ pub mod linux_active_field;
 pub mod linux_atlas;
 pub mod linux_chat;
 pub mod linux_chat_v1;
+pub mod linux_chat_v2;
 pub mod linux_exposure;
 pub mod linux_hot_packet;
 pub mod linux_profile;
@@ -63,6 +64,7 @@ pub mod multi_schema_competition;
 pub mod nonlinear_memory_eval;
 pub mod open_surface_generation;
 pub mod operators;
+pub mod persistent_wave_memory;
 pub mod profile_density_build;
 pub mod query_wave;
 pub mod readiness;
@@ -434,6 +436,12 @@ enum LlmwaveBigCommand {
     /// Run the built-in Linux Chat V1 eval script.
     #[command(name = "linux-chat-v1-eval")]
     LinuxChatV1Eval(LlmwaveBigLinuxChatV1EvalArgs),
+    /// Run Linux Chat V2: persistent wave-memory learning from dialogue feedback.
+    #[command(name = "linux-chat-v2")]
+    LinuxChatV2(LlmwaveBigLinuxChatV2Args),
+    /// Run the built-in Linux Chat V2 persistent learning eval script.
+    #[command(name = "linux-chat-v2-eval")]
+    LinuxChatV2Eval(LlmwaveBigLinuxChatV2EvalArgs),
     /// Compile a Linux question into a typed Linux-profile query wave.
     #[command(name = "linux-query-wave")]
     LinuxQueryWave(LlmwaveBigLinuxQueryWaveArgs),
@@ -1415,6 +1423,52 @@ struct LlmwaveBigLinuxChatV1EvalArgs {
         default_value = ".nanda/linux-active/linux-active-65k.lrf"
     )]
     residual_pack: PathBuf,
+    #[arg(long = "runtime-snapshot")]
+    runtime_snapshot: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxChatV2Args {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(
+        long = "memory",
+        default_value = ".nanda/linux-active/linux-chat-v2.lwm"
+    )]
+    memory: PathBuf,
+    #[arg(long = "prompt")]
+    prompt: Vec<String>,
+    #[arg(long = "script")]
+    script: Option<PathBuf>,
+    #[arg(long = "runtime-snapshot")]
+    runtime_snapshot: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long = "reset-memory", default_value_t = false)]
+    reset_memory: bool,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxChatV2EvalArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(
+        long = "memory",
+        default_value = ".nanda/linux-active/linux-chat-v2-eval.lwm"
+    )]
+    memory: PathBuf,
     #[arg(long = "runtime-snapshot")]
     runtime_snapshot: Option<PathBuf>,
     #[arg(long = "max-facts", default_value_t = 4)]
@@ -3446,6 +3500,109 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- shortcut rejection rate: `{}`",
                         report.eval.shortcut_rejection_rate
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxChatV2(args) => {
+            let report =
+                linux_chat_v2::build_linux_chat_v2_report(linux_chat_v2::LinuxChatV2Config {
+                    residual_pack: args.residual_pack,
+                    memory: args.memory,
+                    prompt: args.prompt,
+                    script: args.script,
+                    max_facts: args.max_facts,
+                    runtime_snapshot: args.runtime_snapshot,
+                    reset_memory: args.reset_memory,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "dialogue_learning_ready: {}",
+                        report.claim_boundary.dialogue_learning_ready
+                    );
+                    println!(
+                        "persistent_wave_memory_ready: {}",
+                        report.claim_boundary.persistent_wave_memory_ready
+                    );
+                    println!(
+                        "general_llm_ready: {}",
+                        report.claim_boundary.general_llm_ready
+                    );
+                    println!("eval_passed: {}/{}", report.eval.passed, report.eval.total);
+                    println!("deltas_written: {}", report.eval.deltas_written);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Chat V2");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- dialogue learning ready: `{}`",
+                        report.claim_boundary.dialogue_learning_ready
+                    );
+                    println!(
+                        "- persistent wave memory ready: `{}`",
+                        report.claim_boundary.persistent_wave_memory_ready
+                    );
+                    println!(
+                        "- eval passed: `{}/{}`",
+                        report.eval.passed, report.eval.total
+                    );
+                    println!("- deltas written: `{}`", report.eval.deltas_written);
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxChatV2Eval(args) => {
+            let report =
+                linux_chat_v2::build_linux_chat_v2_report(linux_chat_v2::LinuxChatV2Config {
+                    residual_pack: args.residual_pack,
+                    memory: args.memory,
+                    prompt: Vec::new(),
+                    script: None,
+                    max_facts: args.max_facts,
+                    runtime_snapshot: args.runtime_snapshot,
+                    reset_memory: true,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "dialogue_learning_ready: {}",
+                        report.claim_boundary.dialogue_learning_ready
+                    );
+                    println!("memory_lift_observed: {}", report.eval.memory_lift_observed);
+                    println!(
+                        "negative_lane_replay_observed: {}",
+                        report.eval.negative_lane_replay_observed
+                    );
+                    println!("eval_passed: {}/{}", report.eval.passed, report.eval.total);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Chat V2 Eval");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- dialogue learning ready: `{}`",
+                        report.claim_boundary.dialogue_learning_ready
+                    );
+                    println!(
+                        "- memory lift observed: `{}`",
+                        report.eval.memory_lift_observed
+                    );
+                    println!(
+                        "- negative lane replay observed: `{}`",
+                        report.eval.negative_lane_replay_observed
+                    );
+                    println!(
+                        "- eval passed: `{}/{}`",
+                        report.eval.passed, report.eval.total
                     );
                     println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }
