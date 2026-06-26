@@ -93,6 +93,7 @@ nonlinear_memory_proven = false
 
 ```bash
 nanda-llmwave-big readiness-ladder --format json
+nanda-llmwave-big structural-capacity --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
 nanda-llmwave-big claim-gate --claim nonlinear-memory --format json
@@ -107,6 +108,23 @@ small-domain-llmwave      CLAIM_ALLOWED_LOCAL_ONLY
 nonlinear-memory          CLAIM_BLOCKED
 llm-ready                 CLAIM_BLOCKED
 ```
+
+## Structural Capacity 1024
+
+```bash
+nanda-llmwave-big structural-capacity --format json
+```
+
+This is the fixed LLMWave-Big capacity bridge from the old accepted
+128-pattern checkpoint to a 1024-pattern structural gate. It has no
+`--patterns` argument, no 256/512 mode, and no ladder. The gate must run all
+1024 patterns through clean retrieval, noisy retrieval, cold rejection,
+role-swap rejection, route-splice rejection, and conflict rejection.
+
+Passing this command allows only the local claim
+`STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN`. It does not prove broad chat LLM
+readiness, global nonlinear memory, real-corpus capacity, or hardware cache
+residency.
 
 ## Nonlinear Memory Eval
 

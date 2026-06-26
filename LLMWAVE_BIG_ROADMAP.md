@@ -2609,6 +2609,56 @@ hardware cache residency if PMU evidence is absent
 
 v18 implemented as `src/llmwave_big/linux_atlas_projection.rs`.
 
+## Structural Capacity 1024 Gate
+
+The structural-capacity bridge is no longer a 256/512/1024 ladder. It is a
+single fixed 1024-pattern core gate:
+
+```bash
+nanda-llmwave-big structural-capacity --format json
+```
+
+Required shape:
+
+```text
+patterns = 1024
+fixed_pattern_count = true
+smaller_pattern_modes_available = false
+no --patterns CLI argument
+no 256/512 runnable modes
+```
+
+The gate compares against the old accepted 128 robust-pattern checkpoint only
+as history. It must prove the full 1024 workload in one pass:
+
+```text
+clean retrieval
+noisy retrieval
+cold rejection
+role-swap rejection
+route-splice rejection
+conflict rejection
+false_accept_rate = 0
+false_negative_rate = 0
+hot budget fits
+schema/residual reuse beats direct fixed64 bytes
+```
+
+Allowed claim:
+
+```text
+STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN
+```
+
+Still not claimed:
+
+```text
+broad chat LLM readiness
+real-corpus structural capacity
+global nonlinear memory proof
+hardware PMU cache residency
+```
+
 ## Summary
 
 ```text

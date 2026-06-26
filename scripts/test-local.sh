@@ -291,6 +291,10 @@ jq -e '.claim_boundary.full_pipeline_implemented == true and .claim_boundary.fre
 big_core_eval_json="$("$llmwave_big" core-eval --format json)"
 jq -e '.roadmap_block == "v1841-v1900" and .verdict == "CORE_RUNTIME_READY_FIXTURE"' <<<"$big_core_eval_json" >/dev/null
 jq -e '.criteria.feedback_applied_to_next_run == true and .criteria.memory_persists_across_process_restart == true and .claim_boundary.core_runtime_ready == true and .claim_boundary.full_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_core_eval_json" >/dev/null
+big_structural_capacity_json="$("$llmwave_big" structural-capacity --format json)"
+jq -e '.mode == "llmwave-big-structural-capacity-1024" and .verdict == "STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN" and .workload.patterns == 1024 and .workload.fixed_pattern_count == true and .workload.smaller_pattern_modes_available == false' <<<"$big_structural_capacity_json" >/dev/null
+jq -e '.gates.fixed_1024_only == true and .gates.final_gate_passed == true and .metrics.false_accept_rate == 0 and .metrics.false_negative_rate == 0 and .claim_boundary.structural_capacity_1024_ready == true' <<<"$big_structural_capacity_json" >/dev/null
+jq -e '.claim_boundary.broad_chat_llm_ready == false and .claim_boundary.global_nonlinear_memory_proven == false and .claim_boundary.hardware_cache_residency_counter_proven == false' <<<"$big_structural_capacity_json" >/dev/null
 big_readiness_json="$("$llmwave_big" readiness-ladder --format json)"
 jq -e '.mode == "llmwave-big-readiness-ladder" and .current_level == 3 and .current_state == "CONSTRAINED_FIELD_ENGINE_READY_NOT_GENERAL_LLM"' <<<"$big_readiness_json" >/dev/null
 jq -e '.claim_boundary.field_core_as_sole_engine == true and .claim_boundary.fixture_reasoning_ready == true and .claim_boundary.artifact_grounded_qa_ready == true and .claim_boundary.scripted_hot_multi_turn_ready == true and .claim_boundary.small_domain_llmwave_ready == true and .claim_boundary.scale_amortized_nonlinear_memory_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_readiness_json" >/dev/null

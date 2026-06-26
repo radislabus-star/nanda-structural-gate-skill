@@ -231,6 +231,7 @@ scripts/nanda-llmwave-big learning-eval --format json
 scripts/nanda-llmwave-big memory-consolidate --format json
 scripts/nanda-llmwave-big run --evidence-mode release-confirmed --decision accept --format json
 scripts/nanda-llmwave-big core-eval --format json
+scripts/nanda-llmwave-big structural-capacity --format json
 scripts/nanda-llmwave-big readiness-ladder --format json
 scripts/nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 scripts/nanda-llmwave-big claim-gate --claim active-65k-runtime --format json
@@ -760,6 +761,16 @@ record active field. Inspect `active_65k.runtime_contract.full_active_scan`,
 `no_per_record_score_arrays`. `claim-gate --claim active-65k-runtime` allows
 only the local runtime claim; it still keeps broad chat readiness, global
 nonlinear-memory proof, and hardware cache-residency proof closed.
+Use `nanda-llmwave-big structural-capacity --format json` when the next claim
+is whether LLMWave-Big beats the old robust 128-pattern checkpoint. This gate
+is fixed to 1024 structural patterns only. It exposes no `--patterns` argument,
+no 256/512 modes, and no ladder. Inspect
+`workload.smaller_pattern_modes_available=false`,
+`gates.fixed_1024_only=true`, clean/noisy retrieval, cold rejection,
+role-swap rejection, route-splice rejection, conflict rejection, and zero false
+accept/negative rates. Treat `STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN` as a
+synthetic structural-capacity bridge only; it does not prove broad chat LLM,
+real-corpus capacity, global nonlinear memory, or hardware PMU residency.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
 should point to `field_core::peak::FieldPeakResult`,
 `field_core::coherence::FieldCoherenceResult`, and

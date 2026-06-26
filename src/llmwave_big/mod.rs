@@ -82,6 +82,7 @@ pub mod schema_memory_growth;
 pub mod schemas;
 pub mod security_fixture;
 pub mod strict_density_claim_gate;
+pub mod structural_capacity;
 pub mod surface_bank_build;
 pub mod surface_bank_fixture;
 pub mod surface_bank_validate;
@@ -258,6 +259,9 @@ enum LlmwaveBigCommand {
     /// Run the v1841-v1900 core readiness gate.
     #[command(name = "core-eval")]
     CoreEval(LlmwaveBigCoreEvalArgs),
+    /// Run the fixed 1024-pattern structural-capacity core gate.
+    #[command(name = "structural-capacity", alias = "capacity-1024")]
+    StructuralCapacity(LlmwaveBigStructuralCapacityArgs),
     /// Show the LLMWave readiness ladder without claiming broad LLM readiness.
     #[command(name = "readiness-ladder", alias = "readiness")]
     ReadinessLadder(LlmwaveBigReadinessLadderArgs),
@@ -888,6 +892,20 @@ struct LlmwaveBigRunArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigCoreEvalArgs {
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigStructuralCapacityArgs {
+    #[arg(long, default_value_t = 13)]
+    seed: u64,
+    #[arg(long, default_value_t = 2)]
+    seeds: usize,
+    #[arg(long = "noise-edges", default_value_t = 4)]
+    noise_edges: usize,
+    #[arg(long = "hot-budget-bytes", default_value_t = 6 * 1024 * 1024)]
+    hot_budget_bytes: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -2396,6 +2414,18 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::CoreEval(args) => {
             let report = field_runtime::build_core_eval_report();
             report::print_core_eval_report(&report, &args.format)?;
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::StructuralCapacity(args) => {
+            let report = structural_capacity::build_structural_capacity_report(
+                structural_capacity::StructuralCapacityConfig {
+                    seed: args.seed,
+                    seeds: args.seeds,
+                    noise_edges: args.noise_edges,
+                    hot_budget_bytes: args.hot_budget_bytes,
+                },
+            );
+            print_structural_capacity_report(&report, &args.format)?;
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::ReadinessLadder(args) => {
@@ -4426,6 +4456,103 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(EXIT_PASS)
         }
     }
+}
+
+fn print_structural_capacity_report(
+    report: &structural_capacity::StructuralCapacityReport,
+    format: &OutputFormat,
+) -> Result<()> {
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
+        OutputFormat::Text => {
+            println!("{}", report.verdict);
+            println!("patterns: {}", report.workload.patterns);
+            println!(
+                "fixed_pattern_count: {}",
+                report.workload.fixed_pattern_count
+            );
+            println!(
+                "smaller_pattern_modes_available: {}",
+                report.workload.smaller_pattern_modes_available
+            );
+            println!("total_cases: {}", report.metrics.total_cases);
+            println!(
+                "clean_retrieval_pass_rate: {}",
+                report.metrics.clean_retrieval_pass_rate
+            );
+            println!(
+                "noisy_retrieval_pass_rate: {}",
+                report.metrics.noisy_retrieval_pass_rate
+            );
+            println!("false_accept_rate: {}", report.metrics.false_accept_rate);
+            println!(
+                "false_negative_rate: {}",
+                report.metrics.false_negative_rate
+            );
+            println!("hot_bytes: {}", report.memory.hot_bytes);
+            println!(
+                "bytes_per_useful_pattern: {}",
+                report.memory.bytes_per_useful_pattern
+            );
+            println!(
+                "structural_capacity_1024_ready: {}",
+                report.claim_boundary.structural_capacity_1024_ready
+            );
+            println!(
+                "global_nonlinear_memory_proven: {}",
+                report.claim_boundary.global_nonlinear_memory_proven
+            );
+            println!(
+                "broad_chat_llm_ready: {}",
+                report.claim_boundary.broad_chat_llm_ready
+            );
+        }
+        OutputFormat::Md => {
+            println!("# LLMWave Big Structural Capacity");
+            println!();
+            println!("- verdict: `{}`", report.verdict);
+            println!("- patterns: `{}`", report.workload.patterns);
+            println!(
+                "- fixed pattern count: `{}`",
+                report.workload.fixed_pattern_count
+            );
+            println!(
+                "- smaller pattern modes available: `{}`",
+                report.workload.smaller_pattern_modes_available
+            );
+            println!("- total cases: `{}`", report.metrics.total_cases);
+            println!(
+                "- clean retrieval pass rate: `{}`",
+                report.metrics.clean_retrieval_pass_rate
+            );
+            println!(
+                "- noisy retrieval pass rate: `{}`",
+                report.metrics.noisy_retrieval_pass_rate
+            );
+            println!(
+                "- false accept rate: `{}`",
+                report.metrics.false_accept_rate
+            );
+            println!(
+                "- false negative rate: `{}`",
+                report.metrics.false_negative_rate
+            );
+            println!("- hot bytes: `{}`", report.memory.hot_bytes);
+            println!(
+                "- bytes per useful pattern: `{}`",
+                report.memory.bytes_per_useful_pattern
+            );
+            println!(
+                "- nonlinear memory proven: `{}`",
+                report.claim_boundary.global_nonlinear_memory_proven
+            );
+            println!(
+                "- broad chat LLM ready: `{}`",
+                report.claim_boundary.broad_chat_llm_ready
+            );
+        }
+    }
+    Ok(())
 }
 
 fn build_contract_report() -> LlmwaveBigReport {

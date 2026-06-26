@@ -261,6 +261,7 @@ nanda-llmwave-big core-v3-plan --format json
 nanda-llmwave-big core-v3-solution-search --goal "confirm customs clearance" --format json
 nanda-llmwave-big core-v3-pack-1m --format json
 nanda-llmwave-big core-v3-claim-gate --goal "confirm customs clearance" --format json
+nanda-llmwave-big structural-capacity --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -277,6 +278,13 @@ small_domain_llmwave      = CLAIM_ALLOWED_LOCAL_ONLY
 nonlinear_memory          = CLAIM_BLOCKED
 llm_ready                 = CLAIM_BLOCKED
 ```
+
+`structural-capacity` is fixed to 1024 structural patterns. It intentionally
+does not expose `--patterns`, 256/512 modes, or a ladder. The gate checks clean
+and noisy retrieval plus cold, role-swap, route-splice, and conflict rejection
+for the full 1024 workload. A pass means
+`STRUCTURAL_CAPACITY_1024_BASELINE_BEATEN`; it is not a broad chat, real-corpus,
+global nonlinear-memory, or hardware cache-residency proof.
 
 For the latest LLMWave-Big eval path, use:
 
