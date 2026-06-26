@@ -280,6 +280,19 @@ nonlinear_memory          = CLAIM_BLOCKED
 llm_ready                 = CLAIM_BLOCKED
 ```
 
+`nanda-field-audit` now exposes `sole_engine_contract`, the machine contract for
+the single field-physics engine. Inspect:
+
+- `sole_engine_contract.version == "unified-field-sole-engine-v1"`
+- `sole_engine_contract.big_pipelines`
+- `sole_engine_contract.field_core_backed_pipelines`
+- `sole_engine_contract.local_physics_copies_allowed == false`
+- `sole_engine_contract.field_core_as_sole_engine == true`
+
+This is the only supported claim that the registered large pipelines share one
+field physics owner. It does not imply broad chat readiness, nonlinear memory
+proof, or hardware cache residency.
+
 `structural-capacity` is fixed to 1024 Pattern16 macro-cells. It intentionally
 does not expose `--patterns`, 256/512 modes, a smaller cell shape, or a ladder.
 The gate checks clean and noisy retrieval plus cold, role-swap, route-splice,
@@ -295,6 +308,10 @@ The same report includes `lens_admission`, which reuses the existing
 define a second lens system: it calls through the shared lens -> anti-wave ->
 peak pass and keeps `field_pass_safe_to_answer=false` while the broad LLM and
 nonlinear-memory claims remain closed.
+
+`lens-scan` and `mature-anti-wave` also expose `field_core_admission`. Those
+reports may keep their domain explanation fields, but their field admission path
+must return a `FieldPassReport` from the shared engine.
 
 For the latest LLMWave-Big eval path, use:
 

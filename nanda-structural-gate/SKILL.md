@@ -735,6 +735,15 @@ reports preserve their domain-specific top-level verdicts; the field-core
 selection is exposed in `cognitive_field_engine` and `cognitive_field_cutover`.
 Use `nanda-field-audit --format json` when the question is whether the unified
 field is coherent across structural, packed, and cognitive paths. Inspect
+`sole_engine_contract` first: it is the registry that says which large
+pipelines are allowed to consume field physics, which `field_core` entrypoint
+they use, and whether any local physics copy is still allowed. Treat
+`sole_engine_contract.field_core_as_sole_engine=true` as the only supported
+global sole-engine claim, and only when
+`sole_engine_contract.local_physics_copies_allowed=false` and
+`sole_engine_contract.big_pipelines ==
+sole_engine_contract.field_core_backed_pipelines`.
+Also inspect
 `field_engine_contract`: structural cutover may be default when the structural
 suite passes, packed cutover is allowed only as an explicit packed-only path
 through the typed hot decision core, and cognitive cutover is cognitive-only

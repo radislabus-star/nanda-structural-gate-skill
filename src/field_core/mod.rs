@@ -13,6 +13,7 @@ pub(crate) mod peak;
 pub(crate) mod readout;
 pub(crate) mod record;
 pub(crate) mod runtime;
+pub(crate) mod sole_engine;
 pub(crate) mod vector;
 
 pub(crate) use anti_wave::*;
@@ -26,6 +27,7 @@ pub(crate) use peak::*;
 pub(crate) use readout::*;
 pub(crate) use record::*;
 pub(crate) use runtime::*;
+pub(crate) use sole_engine::*;
 pub(crate) use vector::*;
 
 pub(crate) const FIELD_CORE_VERSION: &str = "unified-field-v1-readonly";

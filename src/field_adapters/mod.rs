@@ -60,6 +60,8 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         ["structural_cutover_suite_pass"]
         .as_bool()
         .unwrap_or(false);
+    let sole_engine = field_core::build_sole_engine_audit(structural_cutover_suite_pass);
+    let sole_engine_value = serde_json::to_value(&sole_engine)?;
     let field_operation_contract = json!({
         "version": "unified-field-operation-contract-v1",
         "peak_owner": "field_core::peak::FieldPeakResult",
@@ -114,10 +116,34 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         "nonlinear_memory_proven": false,
         "llm_ready": false
     });
+    let mut acceptance = acceptance;
+    if let Some(object) = acceptance.as_object_mut() {
+        object.insert("sole_engine_registry".to_string(), json!(true));
+        object.insert(
+            "big_pipelines_registered".to_string(),
+            json!(sole_engine.big_pipelines),
+        );
+        object.insert(
+            "field_core_backed_pipelines".to_string(),
+            json!(sole_engine.field_core_backed_pipelines),
+        );
+        object.insert(
+            "local_physics_copies_allowed".to_string(),
+            json!(sole_engine.local_physics_copies_allowed),
+        );
+        object.insert(
+            "sole_engine_blockers".to_string(),
+            json!(sole_engine.blockers.clone()),
+        );
+        object.insert(
+            "field_core_as_sole_engine".to_string(),
+            json!(sole_engine.field_core_as_sole_engine),
+        );
+    }
     let out = json!({
         "mode": "unified-field-audit",
         "version": field_core::FIELD_PASS_VERSION,
-        "overall_state": if structural_cutover_suite_pass {
+        "overall_state": if sole_engine.field_core_as_sole_engine {
             "FIELD_CORE_SOLE_ENGINE_ACTIVE_LLM_NOT_READY"
         } else {
             "STRUCTURAL_FIELD_CORE_SOLE_ENGINE_ACTIVE_GLOBAL_NOT_READY"
@@ -130,6 +156,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "feedback_delta": "FieldMemoryDelta",
             "memory_delta": "FieldMemoryDeltaSummary"
         },
+        "sole_engine_contract": sole_engine_value,
         "families": [
             {
                 "family": "structural",
@@ -180,9 +207,9 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         ],
         "field_engine_contract": {
             "version": "unified-field-engine-contract-v1",
-            "policy_owner": "field_core::engine::FieldEngineDecision",
+            "policy_owner": sole_engine.policy_owner,
             "families_checked": 3,
-            "global_sole_engine": structural_cutover_suite_pass,
+            "global_sole_engine": sole_engine.field_core_as_sole_engine,
             "llm_ready": false,
             "nonlinear_memory_proven": false,
             "structural": {
@@ -220,7 +247,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "report_module_extraction": "KEEP",
             "reason": "route-scoped extraction is not required until boundary evidence shows reduced confusion"
         },
-        "next_required_steps": []
+        "next_required_steps": sole_engine.blockers.clone()
     });
     match args.format {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&out)?),

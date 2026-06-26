@@ -1,7 +1,8 @@
 # Unified Field Refactor Plan
 
 Status: implemented as unified field projection, shared compute primitives,
-first shared `FieldPass`, and local feedback-to-memory-delta replay.
+first shared `FieldPass`, local feedback-to-memory-delta replay, and a
+`sole_engine_contract` registry for large pipeline consumers.
 
 This document prepares the migration from several field-like implementations to
 one shared field contract. It is not permission to rewrite the runtime in one
@@ -63,6 +64,7 @@ src/field_core/
   coherence.rs      # energy, coherence, pull, field state
   feedback.rs       # accept/reject/watch replay contract
   adapters.rs       # explicit adapter traits, no domain logic
+  sole_engine.rs    # registered large-pipeline consumers and claim gate
 
 src/field_adapters/
   structural.rs     # triads/routes/owners -> field_core
@@ -1099,6 +1101,40 @@ Files not to refactor first:
 - `src/model.rs`: large but low current risk; do not move common triad model
   code until adapter boundaries are stable.
 - `src/map_gate.rs`: central structural map; wrap first, move later.
+
+### Phase 26: Sole Engine Registry
+
+Status: done in `src/field_core/sole_engine.rs`.
+
+`nanda-field-audit --format json` now emits `sole_engine_contract`. This is the
+canonical machine-readable proof that the registered big pipelines use the same
+field physics owner.
+
+Registered consumers:
+
+- structural search;
+- packed hot runtime;
+- LLMWave cognitive reports;
+- Pattern16 structural capacity;
+- lens scan;
+- mature anti-wave;
+- memory feedback;
+- repository guard workflow.
+
+Acceptance:
+
+```text
+sole_engine_contract.big_pipelines ==
+sole_engine_contract.field_core_backed_pipelines
+sole_engine_contract.local_physics_copies_allowed == false
+sole_engine_contract.field_core_as_sole_engine == true
+```
+
+Claim boundary:
+
+- `llm_ready=false`;
+- `nonlinear_memory_proven=false`;
+- `cache_only_execution_proven=false`.
 
 ## Success Criteria
 

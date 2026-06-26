@@ -3,6 +3,7 @@
 use serde::Serialize;
 
 use super::lens_scan;
+use crate::field_core;
 
 pub(crate) const MATURE_ANTI_WAVE_VERSION: &str = "llmwave-big-v1210-mature-anti-wave";
 
@@ -34,6 +35,7 @@ pub(crate) struct MatureAntiWaveReport {
     pub top_route: &'static str,
     pub anti_lanes: Vec<AntiLane>,
     pub field_after_anti: FieldAfterAnti,
+    pub field_core_admission: field_core::FieldPassReport,
     pub metrics: MatureAntiWaveMetrics,
     pub claim_boundary: MatureAntiWaveClaimBoundary,
 }
@@ -100,6 +102,7 @@ pub(crate) fn build_mature_anti_wave_report(input_text: String) -> MatureAntiWav
         .min()
         .unwrap_or(0);
     let has_answer_lane = anti_lanes.iter().any(|lane| lane.lens == "answer");
+    let field_core_admission = field_core_admission(lens_report.top_route, &anti_lanes);
     let verdict = if has_answer_lane && locality_floor >= 70 {
         "MATURE_ANTI_WAVE_READY_NOT_ANSWER"
     } else {
@@ -126,6 +129,7 @@ pub(crate) fn build_mature_anti_wave_report(input_text: String) -> MatureAntiWav
             support_preserved_total,
             locality_floor,
         },
+        field_core_admission,
         metrics: MatureAntiWaveMetrics {
             lane_count: anti_lanes.len(),
             suppress_total,
@@ -152,6 +156,64 @@ pub(crate) fn build_mature_anti_wave_report(input_text: String) -> MatureAntiWav
                 "Blocking lenses can compile local anti-wave lanes that suppress an unsupported answer without deleting the route peak",
         },
     }
+}
+
+fn field_core_admission(
+    top_route: &'static str,
+    anti_lanes: &[AntiLane],
+) -> field_core::FieldPassReport {
+    let query = field_core::FieldRecord::synthetic(
+        "mature-anti-wave-query",
+        field_core::FieldRecordKind::AntiWaveLane,
+        "mature_anti_wave",
+        "suppresses_false_answer_on",
+        top_route,
+        Some(top_route.to_string()),
+        Some("mature-anti-wave".to_string()),
+    );
+    let records = vec![field_core::FieldRecord::synthetic(
+        "mature-anti-wave-route",
+        field_core::FieldRecordKind::L3Schema,
+        "route_peak",
+        "preserved_under_anti_wave",
+        top_route,
+        Some(top_route.to_string()),
+        Some("mature-anti-wave".to_string()),
+    )];
+    let anti_waves = anti_lanes
+        .iter()
+        .map(|lane| field_core::FieldAntiWaveLane {
+            id: format!("anti-lane-{}", lane.lens),
+            target: lane.lens.to_string(),
+            subject: "mature_anti_wave".to_string(),
+            relation: lane.action.to_string(),
+            object: lane.reason.to_string(),
+            route: Some(top_route.to_string()),
+            group: Some(lane.lens.to_string()),
+            strength: (lane.record.suppress_score / 12).max(1) as i32,
+        })
+        .collect::<Vec<_>>();
+
+    field_core::run_field_pass(&field_core::FieldPassInput {
+        family: field_core::FieldFamily::Cognitive,
+        query,
+        records,
+        lenses: vec![
+            field_core::FieldLensOperation {
+                kind: field_core::FieldLensKind::Route,
+                label: top_route.to_string(),
+                strength: 1,
+            },
+            field_core::FieldLensOperation {
+                kind: field_core::FieldLensKind::Evidence,
+                label: "anti-wave-locality".to_string(),
+                strength: 1,
+            },
+        ],
+        anti_waves,
+        state_hint: Some("FIELD_THIN".to_string()),
+        claim_boundary: field_core::FieldClaimBoundary::default(),
+    })
 }
 
 fn compile_anti_lanes(report: &lens_scan::LensScanReport) -> Vec<AntiLane> {

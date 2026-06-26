@@ -1,5 +1,7 @@
 use serde::Serialize;
 
+use crate::field_core;
+
 #[derive(Serialize, Clone)]
 pub(crate) struct ReadinessLadderReport {
     pub mode: &'static str,
@@ -163,20 +165,30 @@ pub(crate) fn build_readiness_ladder_report() -> ReadinessLadderReport {
 pub(crate) fn build_claim_gate_report(claim: ClaimGateKind) -> ClaimGateReport {
     let claims = readiness_claims();
     match claim {
-        ClaimGateKind::FieldCoreSoleEngine => ClaimGateReport {
-            mode: "llmwave-big-claim-gate",
-            version: "llmwave-big-v-next-claim-gate",
-            claim: "field-core-sole-engine",
-            verdict: "CLAIM_ALLOWED",
-            allowed: true,
-            evidence: vec![
-                "structural family sole engine",
-                "packed family sole engine",
-                "cognitive family sole engine",
-            ],
-            missing_evidence: vec![],
-            claim_boundary: claims,
-        },
+        ClaimGateKind::FieldCoreSoleEngine => {
+            let audit = field_core::build_sole_engine_audit(true);
+            ClaimGateReport {
+                mode: "llmwave-big-claim-gate",
+                version: "llmwave-big-v-next-claim-gate",
+                claim: "field-core-sole-engine",
+                verdict: if audit.field_core_as_sole_engine {
+                    "CLAIM_ALLOWED"
+                } else {
+                    "CLAIM_BLOCKED"
+                },
+                allowed: audit.field_core_as_sole_engine,
+                evidence: vec![
+                    "nanda-field-audit sole_engine_contract",
+                    "structural family field pass through field_core",
+                    "packed family field pass through field_core",
+                    "cognitive family field pass through field_core",
+                    "Pattern16 admission field pass through field_core",
+                    "lens scan and mature anti-wave expose FieldPassReport admission",
+                ],
+                missing_evidence: audit.blockers,
+                claim_boundary: claims,
+            }
+        }
         ClaimGateKind::Active65kRuntime => ClaimGateReport {
             mode: "llmwave-big-claim-gate",
             version: "llmwave-big-v-next-claim-gate",
@@ -290,8 +302,9 @@ pub(crate) fn build_claim_gate_report(claim: ClaimGateKind) -> ClaimGateReport {
 }
 
 fn readiness_claims() -> ReadinessClaims {
+    let sole_engine = field_core::build_sole_engine_audit(true);
     ReadinessClaims {
-        field_core_as_sole_engine: true,
+        field_core_as_sole_engine: sole_engine.field_core_as_sole_engine,
         active_65k_runtime_ready: true,
         fixture_reasoning_ready: true,
         artifact_grounded_qa_ready: true,

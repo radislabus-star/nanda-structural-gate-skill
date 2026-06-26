@@ -15,6 +15,10 @@ physics for admission readout.
   - `field_core::pass::run_field_pass`
 - The readout confirms the Pattern16 peak while preserving the claim boundary:
   `field_pass_safe_to_answer=false`.
+- `lens-scan` and `mature-anti-wave` now expose `field_core_admission`, so the
+  downstream lens/anti-wave pipeline also reports through `FieldPassReport`.
+- `nanda-field-audit` exposes `sole_engine_contract`, which registers Pattern16,
+  lens scan, and mature anti-wave as consumers of the same field physics.
 
 ## Integration Rules
 
@@ -56,7 +60,9 @@ It should carry:
 
 ### Phase 2: Lens Scan Bridge
 
-Bridge `llmwave_big::lens_scan` to Pattern16 admission without duplicating
+Status: implemented as `LensScanReport.field_core_admission`.
+
+Bridge `llmwave_big::lens_scan` to the shared field pass without duplicating
 fixtures.
 
 Target:
@@ -72,7 +78,9 @@ scan, not whether a natural-language answer is allowed.
 
 ### Phase 3: Mature Anti-Wave Bridge
 
-Bridge `llmwave_big::mature_anti_wave` to Pattern16 admission.
+Status: implemented as `MatureAntiWaveReport.field_core_admission`.
+
+Bridge `llmwave_big::mature_anti_wave` to the shared field pass.
 
 Target:
 
@@ -146,5 +154,7 @@ Done in the Pattern16 admission integration pass:
 
 Remaining:
 
-1. Consider extracting the local admission struct into `field_core` once one
-   more caller needs it.
+1. Consider extracting the local Pattern16 admission struct into `field_core`
+   once a second caller needs the same exact readout shape.
+2. Use `sole_engine_contract` as the acceptance registry before adding any new
+   large field pipeline.

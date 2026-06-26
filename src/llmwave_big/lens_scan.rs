@@ -3,6 +3,7 @@
 use serde::Serialize;
 
 use super::multi_peak_field;
+use crate::field_core;
 
 pub(crate) const LENS_SCAN_VERSION: &str = "llmwave-big-v1140-lens-scan";
 
@@ -34,6 +35,7 @@ pub(crate) struct LensScanReport {
     pub top_route: &'static str,
     pub answer_decision: &'static str,
     pub lenses: Vec<LensResult>,
+    pub field_core_admission: field_core::FieldPassReport,
     pub metrics: LensMetrics,
     pub claim_boundary: LensClaimBoundary,
 }
@@ -75,6 +77,7 @@ pub(crate) struct LensClaimBoundary {
 pub(crate) fn build_lens_scan_report(input_text: String) -> LensScanReport {
     let field = multi_peak_field::build_multi_peak_field_report(input_text.clone());
     let lenses = build_lenses(field.top_peak.record.route_id);
+    let field_core_admission = field_core_admission(field.top_peak.route, &lenses);
     let pass_count = lenses.iter().filter(|lens| lens.state == "PASS").count();
     let watch_count = lenses.iter().filter(|lens| lens.state == "WATCH").count();
     let block_count = lenses.iter().filter(|lens| lens.state == "BLOCK").count();
@@ -112,6 +115,7 @@ pub(crate) fn build_lens_scan_report(input_text: String) -> LensScanReport {
             state: verdict,
         },
         lenses,
+        field_core_admission,
         claim_boundary: LensClaimBoundary {
             lens_scan_implemented: true,
             fixed_lens_records: core::mem::size_of::<LensRecord32>() == 32,
@@ -125,6 +129,75 @@ pub(crate) fn build_lens_scan_report(input_text: String) -> LensScanReport {
                 "Lens scan can block a stable raw peak when evidence/causal/answer lenses do not allow an answer",
         },
     }
+}
+
+fn field_core_admission(
+    top_route: &'static str,
+    lenses: &[LensResult],
+) -> field_core::FieldPassReport {
+    let query = field_core::FieldRecord::synthetic(
+        "lens-scan-query",
+        field_core::FieldRecordKind::L3Schema,
+        "lens_scan",
+        "checks_route",
+        top_route,
+        Some(top_route.to_string()),
+        Some("lens-scan".to_string()),
+    );
+    let records = lenses
+        .iter()
+        .map(|lens| {
+            field_core::FieldRecord::synthetic(
+                format!("lens-{}", lens.lens),
+                field_core::FieldRecordKind::L3Schema,
+                "lens",
+                lens.state,
+                lens.lens,
+                Some(top_route.to_string()),
+                Some(lens.state.to_string()),
+            )
+        })
+        .collect::<Vec<_>>();
+    let anti_waves = lenses
+        .iter()
+        .filter(|lens| matches!(lens.state, "WATCH" | "BLOCK"))
+        .map(|lens| field_core::FieldAntiWaveLane {
+            id: format!("lens-anti-{}", lens.lens),
+            target: lens.lens.to_string(),
+            subject: "lens_scan".to_string(),
+            relation: "blocks".to_string(),
+            object: lens.reason.to_string(),
+            route: Some(top_route.to_string()),
+            group: Some(lens.lens.to_string()),
+            strength: (lens.record.anti_score / 10).max(1) as i32,
+        })
+        .collect::<Vec<_>>();
+
+    field_core::run_field_pass(&field_core::FieldPassInput {
+        family: field_core::FieldFamily::Cognitive,
+        query,
+        records,
+        lenses: vec![
+            field_core::FieldLensOperation {
+                kind: field_core::FieldLensKind::Route,
+                label: top_route.to_string(),
+                strength: 1,
+            },
+            field_core::FieldLensOperation {
+                kind: field_core::FieldLensKind::Role,
+                label: "answer-permission".to_string(),
+                strength: 1,
+            },
+            field_core::FieldLensOperation {
+                kind: field_core::FieldLensKind::Evidence,
+                label: "lens-scan".to_string(),
+                strength: 1,
+            },
+        ],
+        anti_waves,
+        state_hint: Some("FIELD_THIN".to_string()),
+        claim_boundary: field_core::FieldClaimBoundary::default(),
+    })
 }
 
 fn build_lenses(route_id: u32) -> Vec<LensResult> {

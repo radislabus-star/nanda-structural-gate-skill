@@ -89,6 +89,22 @@ llm_ready = false
 nonlinear_memory_proven = false
 ```
 
+Inspect `nanda-field-audit --format json` as the canonical sole-engine proof.
+The important machine field is `sole_engine_contract`:
+
+```text
+sole_engine_contract.version = unified-field-sole-engine-v1
+sole_engine_contract.big_pipelines = sole_engine_contract.field_core_backed_pipelines
+sole_engine_contract.local_physics_copies_allowed = false
+sole_engine_contract.field_core_as_sole_engine = true
+```
+
+The registered big pipelines include structural search, packed hot runtime,
+LLMWave cognitive reports, Pattern16 structural capacity, lens scan, mature
+anti-wave, feedback memory, and the repository guard workflow. This proves one
+shared field-physics owner only; it does not open LLM, nonlinear-memory, or
+hardware-cache claims.
+
 ## LLMWave Readiness And Claims
 
 ```bash
