@@ -232,6 +232,7 @@ scripts/nanda-llmwave-big memory-consolidate --format json
 scripts/nanda-llmwave-big run --evidence-mode release-confirmed --decision accept --format json
 scripts/nanda-llmwave-big core-eval --format json
 scripts/nanda-llmwave-big structural-capacity --format json
+scripts/nanda-llmwave-big structural-capacity --noise-profile skill-admission --format json
 scripts/nanda-llmwave-big readiness-ladder --format json
 scripts/nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 scripts/nanda-llmwave-big claim-gate --claim active-65k-runtime --format json
@@ -775,6 +776,17 @@ conflict rejection, missing-edge rejection, and zero false accept/negative
 rates. Treat `STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN` as a
 synthetic structural-capacity bridge only; it does not prove broad chat LLM,
 real-corpus capacity, global nonlinear memory, or hardware PMU residency.
+Before using Pattern16 as a skill admission core, run
+`nanda-llmwave-big structural-capacity --noise-profile skill-admission --format json`.
+This profile keeps the same 1024 Pattern16 shape but raises the stress to at
+least 8 seeds and 16 foreign-edge noisy additions per positive query. Require
+`gates.skill_admission_noise_pressure=true`,
+`gates.single_peak_under_noise=true`, and
+`gates.anti_wave_traps_reject_false_peaks=true`. Read "noise" here as
+foreign-edge interference pressure. Read "anti-wave" as the false-peak blockers:
+cold, role-swap, route-splice, conflict, and missing-edge traps must remain
+rejected. Do not treat a multi-peak or margin-eroded noisy field as admission
+evidence.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
 should point to `field_core::peak::FieldPeakResult`,
 `field_core::coherence::FieldCoherenceResult`, and

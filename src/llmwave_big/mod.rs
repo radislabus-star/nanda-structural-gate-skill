@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -904,10 +904,29 @@ struct LlmwaveBigStructuralCapacityArgs {
     seeds: usize,
     #[arg(long = "noise-edges", default_value_t = 4)]
     noise_edges: usize,
+    #[arg(long = "noise-profile", value_enum, default_value = "default")]
+    noise_profile: LlmwaveBigStructuralCapacityNoiseProfile,
     #[arg(long = "hot-budget-bytes", default_value_t = 6 * 1024 * 1024)]
     hot_budget_bytes: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum LlmwaveBigStructuralCapacityNoiseProfile {
+    Default,
+    SkillAdmission,
+}
+
+impl From<LlmwaveBigStructuralCapacityNoiseProfile>
+    for structural_capacity::StructuralCapacityNoiseProfile
+{
+    fn from(value: LlmwaveBigStructuralCapacityNoiseProfile) -> Self {
+        match value {
+            LlmwaveBigStructuralCapacityNoiseProfile::Default => Self::Default,
+            LlmwaveBigStructuralCapacityNoiseProfile::SkillAdmission => Self::SkillAdmission,
+        }
+    }
 }
 
 #[derive(Parser)]
@@ -2423,6 +2442,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     seeds: args.seeds,
                     noise_edges: args.noise_edges,
                     hot_budget_bytes: args.hot_budget_bytes,
+                    noise_profile: args.noise_profile.into(),
                 },
             );
             print_structural_capacity_report(&report, &args.format)?;
@@ -4466,6 +4486,12 @@ fn print_structural_capacity_report(
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(report)?),
         OutputFormat::Text => {
             println!("{}", report.verdict);
+            println!("noise_profile: {}", report.workload.noise_profile);
+            println!("seeds: {}", report.workload.seeds);
+            println!(
+                "noise_edges_per_noisy_case: {}",
+                report.workload.noise_edges_per_noisy_case
+            );
             println!("pattern_shape: {}", report.workload.pattern_shape);
             println!("patterns: {}", report.workload.patterns);
             println!("edges_per_pattern: {}", report.workload.edges_per_pattern);
@@ -4504,6 +4530,15 @@ fn print_structural_capacity_report(
                 "missing_edge_rejection_pass_rate: {}",
                 report.metrics.missing_edge_rejection_pass_rate
             );
+            println!("min_noisy_margin: {}", report.metrics.min_noisy_margin);
+            println!(
+                "single_peak_under_noise: {}",
+                report.gates.single_peak_under_noise
+            );
+            println!(
+                "anti_wave_traps_reject_false_peaks: {}",
+                report.gates.anti_wave_traps_reject_false_peaks
+            );
             println!("hot_bytes: {}", report.memory.hot_bytes);
             println!(
                 "bytes_per_useful_pattern: {}",
@@ -4526,6 +4561,12 @@ fn print_structural_capacity_report(
             println!("# LLMWave Big Structural Capacity");
             println!();
             println!("- verdict: `{}`", report.verdict);
+            println!("- noise profile: `{}`", report.workload.noise_profile);
+            println!("- seeds: `{}`", report.workload.seeds);
+            println!(
+                "- noise edges per noisy case: `{}`",
+                report.workload.noise_edges_per_noisy_case
+            );
             println!("- pattern shape: `{}`", report.workload.pattern_shape);
             println!("- patterns: `{}`", report.workload.patterns);
             println!(
@@ -4569,6 +4610,15 @@ fn print_structural_capacity_report(
             println!(
                 "- missing edge rejection pass rate: `{}`",
                 report.metrics.missing_edge_rejection_pass_rate
+            );
+            println!("- min noisy margin: `{}`", report.metrics.min_noisy_margin);
+            println!(
+                "- single peak under noise: `{}`",
+                report.gates.single_peak_under_noise
+            );
+            println!(
+                "- anti-wave traps reject false peaks: `{}`",
+                report.gates.anti_wave_traps_reject_false_peaks
             );
             println!("- hot bytes: `{}`", report.memory.hot_bytes);
             println!(

@@ -21,6 +21,9 @@ const PATTERN_INDEX_RECORD_BYTES: usize = 16;
 const ANTI_LANE_RECORD_BYTES: usize = 16;
 const OLD_ROBUST_BASELINE_PATTERNS: usize = 128;
 const OLD_TURBO_CELLS: usize = 256;
+const SKILL_ADMISSION_MIN_SEEDS: usize = 8;
+const SKILL_ADMISSION_NOISE_EDGES: usize = EDGES_PER_PATTERN;
+const SINGLE_PEAK_NOISE_MARGIN_MIN: i64 = 1_000;
 
 #[derive(Clone)]
 pub(crate) struct StructuralCapacityConfig {
@@ -28,6 +31,23 @@ pub(crate) struct StructuralCapacityConfig {
     pub seeds: usize,
     pub noise_edges: usize,
     pub hot_budget_bytes: usize,
+    pub noise_profile: StructuralCapacityNoiseProfile,
+}
+
+#[derive(Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum StructuralCapacityNoiseProfile {
+    Default,
+    SkillAdmission,
+}
+
+impl StructuralCapacityNoiseProfile {
+    fn as_str(self) -> &'static str {
+        match self {
+            StructuralCapacityNoiseProfile::Default => "default",
+            StructuralCapacityNoiseProfile::SkillAdmission => "skill-admission",
+        }
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -56,12 +76,17 @@ pub(crate) struct StructuralCapacityOldBaseline {
 
 #[derive(Serialize, Clone)]
 pub(crate) struct StructuralCapacityWorkload {
+    pub noise_profile: &'static str,
+    pub noise_pressure: &'static str,
+    pub anti_wave_trap_policy: &'static str,
     pub pattern_shape: &'static str,
     pub patterns: usize,
     pub fixed_pattern_count: bool,
     pub fixed_pattern_shape: bool,
     pub smaller_pattern_modes_available: bool,
     pub smaller_pattern_shapes_available: bool,
+    pub requested_seeds: usize,
+    pub requested_noise_edges_per_noisy_case: usize,
     pub seeds: usize,
     pub seed_start: u64,
     pub edges_per_pattern: usize,
@@ -120,6 +145,9 @@ pub(crate) struct StructuralCapacityMetrics {
 #[derive(Serialize, Clone)]
 pub(crate) struct StructuralCapacityGates {
     pub fixed_1024_only: bool,
+    pub skill_admission_noise_profile: bool,
+    pub skill_admission_noise_pressure: bool,
+    pub single_peak_under_noise: bool,
     pub clean_retrieval: bool,
     pub noisy_retrieval: bool,
     pub cold_rejection: bool,
@@ -127,6 +155,7 @@ pub(crate) struct StructuralCapacityGates {
     pub route_splice_rejection: bool,
     pub conflict_rejection: bool,
     pub missing_edge_rejection: bool,
+    pub anti_wave_traps_reject_false_peaks: bool,
     pub false_accept_rate_zero: bool,
     pub false_negative_rate_zero: bool,
     pub schema_residual_reuse: bool,
@@ -225,7 +254,20 @@ struct SeedAccumulator {
 pub(crate) fn build_structural_capacity_report(
     config: StructuralCapacityConfig,
 ) -> StructuralCapacityReport {
-    let seeds = config.seeds.max(1);
+    let requested_seeds = config.seeds.max(1);
+    let requested_noise_edges = config.noise_edges;
+    let seeds = match config.noise_profile {
+        StructuralCapacityNoiseProfile::Default => requested_seeds,
+        StructuralCapacityNoiseProfile::SkillAdmission => {
+            requested_seeds.max(SKILL_ADMISSION_MIN_SEEDS)
+        }
+    };
+    let noise_edges = match config.noise_profile {
+        StructuralCapacityNoiseProfile::Default => requested_noise_edges,
+        StructuralCapacityNoiseProfile::SkillAdmission => {
+            requested_noise_edges.max(SKILL_ADMISSION_NOISE_EDGES)
+        }
+    };
     let hot_budget_bytes = if config.hot_budget_bytes == 0 {
         DEFAULT_HOT_BUDGET_BYTES
     } else {
@@ -236,14 +278,21 @@ pub(crate) fn build_structural_capacity_report(
             evaluate_seed(
                 STRUCTURAL_PATTERN_CAPACITY,
                 config.seed.wrapping_add(offset as u64),
-                config.noise_edges,
+                noise_edges,
             )
         })
         .collect::<Vec<_>>();
-    let workload = workload(seeds, config.seed, config.noise_edges);
+    let workload = workload(
+        config.noise_profile,
+        requested_seeds,
+        requested_noise_edges,
+        seeds,
+        config.seed,
+        noise_edges,
+    );
     let memory = memory(hot_budget_bytes);
     let metrics = aggregate_metrics(&seed_results, &workload);
-    let gates = gates(&metrics, &memory);
+    let gates = gates(&workload, &metrics, &memory);
     let verdict = if gates.final_gate_passed {
         "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN"
     } else {
@@ -528,14 +577,26 @@ fn edge(slot: u8, subject: u64, relation: &str, object: u64) -> CapacityEdge {
     }
 }
 
-fn workload(seeds: usize, seed_start: u64, noise_edges: usize) -> StructuralCapacityWorkload {
+fn workload(
+    noise_profile: StructuralCapacityNoiseProfile,
+    requested_seeds: usize,
+    requested_noise_edges: usize,
+    seeds: usize,
+    seed_start: u64,
+    noise_edges: usize,
+) -> StructuralCapacityWorkload {
     StructuralCapacityWorkload {
+        noise_profile: noise_profile.as_str(),
+        noise_pressure: "positive noisy queries keep the full Pattern16 and add foreign edges as interference pressure",
+        anti_wave_trap_policy: "cold, role-swap, 8/8 route-splice, conflict, and missing-edge traps must stay rejected",
         pattern_shape: "Pattern16 macro-cell",
         patterns: STRUCTURAL_PATTERN_CAPACITY,
         fixed_pattern_count: true,
         fixed_pattern_shape: true,
         smaller_pattern_modes_available: false,
         smaller_pattern_shapes_available: false,
+        requested_seeds,
+        requested_noise_edges_per_noisy_case: requested_noise_edges,
         seeds,
         seed_start,
         edges_per_pattern: EDGES_PER_PATTERN,
@@ -665,9 +726,15 @@ fn aggregate_metrics(
 }
 
 fn gates(
+    workload: &StructuralCapacityWorkload,
     metrics: &StructuralCapacityMetrics,
     memory: &StructuralCapacityMemory,
 ) -> StructuralCapacityGates {
+    let skill_admission_noise_profile = workload.noise_profile == "skill-admission";
+    let skill_admission_noise_pressure = !skill_admission_noise_profile
+        || (workload.seeds >= SKILL_ADMISSION_MIN_SEEDS
+            && workload.noise_edges_per_noisy_case >= SKILL_ADMISSION_NOISE_EDGES);
+    let single_peak_under_noise = metrics.min_noisy_margin >= SINGLE_PEAK_NOISE_MARGIN_MIN;
     let clean_retrieval = metrics.clean_retrieval_pass_rate == 1.0;
     let noisy_retrieval = metrics.noisy_retrieval_pass_rate == 1.0;
     let cold_rejection = metrics.cold_rejection_pass_rate == 1.0;
@@ -676,6 +743,12 @@ fn gates(
     let conflict_rejection = metrics.conflict_rejection_pass_rate == 1.0;
     let missing_edge_rejection = metrics.missing_edge_rejection_pass_rate == 1.0;
     let false_accept_rate_zero = metrics.false_accept_rate == 0.0;
+    let anti_wave_traps_reject_false_peaks = cold_rejection
+        && role_swap_rejection
+        && route_splice_rejection
+        && conflict_rejection
+        && missing_edge_rejection
+        && false_accept_rate_zero;
     let false_negative_rate_zero = metrics.false_negative_rate == 0.0;
     let schema_residual_reuse =
         memory.residual_saving_bytes > 0 && memory.schema_reuse_ratio == 1.0;
@@ -684,11 +757,14 @@ fn gates(
     let pattern16_macro_cell = EDGES_PER_PATTERN == 16;
     let final_gate_passed = clean_retrieval
         && noisy_retrieval
+        && skill_admission_noise_pressure
+        && single_peak_under_noise
         && cold_rejection
         && role_swap_rejection
         && route_splice_rejection
         && conflict_rejection
         && missing_edge_rejection
+        && anti_wave_traps_reject_false_peaks
         && false_accept_rate_zero
         && false_negative_rate_zero
         && schema_residual_reuse
@@ -698,6 +774,9 @@ fn gates(
         && pattern16_macro_cell;
     StructuralCapacityGates {
         fixed_1024_only: true,
+        skill_admission_noise_profile,
+        skill_admission_noise_pressure,
+        single_peak_under_noise,
         clean_retrieval,
         noisy_retrieval,
         cold_rejection,
@@ -705,6 +784,7 @@ fn gates(
         route_splice_rejection,
         conflict_rejection,
         missing_edge_rejection,
+        anti_wave_traps_reject_false_peaks,
         false_accept_rate_zero,
         false_negative_rate_zero,
         schema_residual_reuse,
@@ -795,6 +875,7 @@ mod tests {
             seeds: 2,
             noise_edges: 4,
             hot_budget_bytes: DEFAULT_HOT_BUDGET_BYTES,
+            noise_profile: StructuralCapacityNoiseProfile::Default,
         });
         assert_eq!(report.workload.patterns, STRUCTURAL_PATTERN_CAPACITY);
         assert_eq!(report.workload.pattern_shape, "Pattern16 macro-cell");
@@ -816,5 +897,29 @@ mod tests {
         assert_eq!(report.metrics.false_negative_rate, 0.0);
         assert!(report.memory.residual_saving_bytes > 0);
         assert!(report.memory.fits_hot_budget);
+    }
+
+    #[test]
+    fn skill_admission_profile_forces_noise_pressure_and_single_peak() {
+        let report = build_structural_capacity_report(StructuralCapacityConfig {
+            seed: 13,
+            seeds: 2,
+            noise_edges: 4,
+            hot_budget_bytes: DEFAULT_HOT_BUDGET_BYTES,
+            noise_profile: StructuralCapacityNoiseProfile::SkillAdmission,
+        });
+        assert_eq!(report.workload.noise_profile, "skill-admission");
+        assert_eq!(report.workload.requested_seeds, 2);
+        assert_eq!(report.workload.requested_noise_edges_per_noisy_case, 4);
+        assert_eq!(report.workload.seeds, 8);
+        assert_eq!(report.workload.noise_edges_per_noisy_case, 16);
+        assert!(report.gates.skill_admission_noise_profile);
+        assert!(report.gates.skill_admission_noise_pressure);
+        assert!(report.gates.single_peak_under_noise);
+        assert!(report.gates.anti_wave_traps_reject_false_peaks);
+        assert_eq!(
+            report.verdict,
+            "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN"
+        );
     }
 }

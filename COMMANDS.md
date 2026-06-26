@@ -113,6 +113,7 @@ llm-ready                 CLAIM_BLOCKED
 
 ```bash
 nanda-llmwave-big structural-capacity --format json
+nanda-llmwave-big structural-capacity --noise-profile skill-admission --format json
 ```
 
 This is the fixed LLMWave-Big capacity bridge from the old accepted
@@ -121,6 +122,13 @@ This is the fixed LLMWave-Big capacity bridge from the old accepted
 The gate must run all 1024 macro-cells, 16 directed edges each, through clean
 retrieval, noisy retrieval, cold rejection, role-swap rejection,
 route-splice rejection, conflict rejection, and missing-edge rejection.
+
+Use `--noise-profile skill-admission` before treating Pattern16 as a skill
+admission core. It does not change the fixed shape. It raises the check to at
+least 8 seeds and 16 foreign noisy edges per positive query, then requires a
+single dominant noisy peak and anti-wave trap rejection. In this context
+"noise" means foreign-edge interference pressure; anti-wave means cold,
+role-swap, route-splice, conflict, and missing-edge false peaks stay blocked.
 
 Passing this command allows only the local claim
 `STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN`. It does not prove broad

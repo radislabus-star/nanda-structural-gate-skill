@@ -262,6 +262,7 @@ nanda-llmwave-big core-v3-solution-search --goal "confirm customs clearance" --f
 nanda-llmwave-big core-v3-pack-1m --format json
 nanda-llmwave-big core-v3-claim-gate --goal "confirm customs clearance" --format json
 nanda-llmwave-big structural-capacity --format json
+nanda-llmwave-big structural-capacity --noise-profile skill-admission --format json
 nanda-llmwave-big readiness-ladder --format json
 nanda-llmwave-big claim-gate --claim field-core-sole-engine --format json
 nanda-llmwave-big claim-gate --claim small-domain-llmwave --format json
@@ -285,6 +286,10 @@ The gate checks clean and noisy retrieval plus cold, role-swap, route-splice,
 conflict, and missing-edge rejection for the full 1024 x 16 workload. A pass
 means `STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN`; it is not a broad
 chat, real-corpus, global nonlinear-memory, or hardware cache-residency proof.
+Use `--noise-profile skill-admission` when the skill needs the stronger
+admission profile: the shape stays 1024 Pattern16, but the run escalates to 8
+seeds, 16 foreign-edge noisy pressure, a required single noisy peak, and the
+anti-wave false-peak traps.
 
 For the latest LLMWave-Big eval path, use:
 

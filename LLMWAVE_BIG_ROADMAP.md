@@ -2653,6 +2653,28 @@ hot budget fits
 schema/residual reuse beats direct fixed64 bytes
 ```
 
+Skill admission profile:
+
+```bash
+nanda-llmwave-big structural-capacity --noise-profile skill-admission --format json
+```
+
+This is the required stress profile before treating Pattern16 as a skill-core
+admission result. It keeps the same fixed 1024 Pattern16 shape, but raises the
+run to at least 8 seeds and 16 foreign-edge noisy additions per positive query.
+It must preserve a single dominant noisy peak and keep anti-wave false-peak
+traps rejected:
+
+```text
+gates.skill_admission_noise_pressure = true
+gates.single_peak_under_noise = true
+gates.anti_wave_traps_reject_false_peaks = true
+```
+
+Noise is foreign-edge interference pressure. Anti-wave is not random noise; it
+is the rejection layer for cold, role-swap, route-splice, conflict, and
+missing-edge false peaks.
+
 Allowed claim:
 
 ```text
