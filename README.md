@@ -734,6 +734,16 @@ Treat `LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM` as local
 Linux-profile dialogue learning only; it is not general LLM readiness and not a
 global nonlinear-memory proof.
 
+`linux-vpn-train` writes a safe local VPN training profile into persistent
+wave memory. It teaches bounded routes for WireGuard setup, local status
+checks, DNS/routes, NetworkManager import, TrustTunnel safety, and secret
+boundaries. It does not mutate the machine, read secret files, or print private
+keys. `linux-vpn-train-eval` trains that `.lwm` memory and asks through
+`linux-chat-v2`; expected answers come from wave memory, while private-key
+requests activate learned anti-wave refusal. Treat
+`LINUX_VPN_LOCAL_TRAINING_READY_NOT_AUTOCONFIG` as local planning/training
+readiness only, not automatic VPN configuration.
+
 `linux-query-wave`, `linux-reason-run`, `linux-broad-suite-build`,
 `linux-broad-eval-run`, and `linux-profile-claim-gate` turn that readout into a
 profile proof surface. The query wave fixes intent, anchors, route priors,
@@ -788,6 +798,17 @@ nanda-llmwave-big linux-chat-v2 \
   --prompt "Which package provides command foocmd?" \
   --prompt "learn accept: foocmd | linux.apt.command.provider | foopkg" \
   --prompt "Which package provides command foocmd?" \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-vpn-train \
+  --memory .nanda/linux-active/linux-vpn.lwm \
+  --reset-memory \
+  --format json
+
+nanda-llmwave-big linux-vpn-train-eval \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --memory .nanda/linux-active/linux-vpn-eval.lwm \
   --max-facts 4 \
   --format json
 

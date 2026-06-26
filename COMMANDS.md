@@ -144,6 +144,8 @@ nanda-llmwave-big linux-chat-v1 --residual-pack .nanda/linux-active/linux-active
 nanda-llmwave-big linux-chat-v1 --residual-pack .nanda/linux-active/linux-active-65k.lrf --script .nanda/linux-active/linux-chat.script --max-facts 4 --format json
 nanda-llmwave-big linux-chat-v2-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-chat-v2-eval.lwm --max-facts 4 --format json
 nanda-llmwave-big linux-chat-v2 --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-chat-v2.lwm --prompt "Which package provides command foocmd?" --prompt "learn accept: foocmd | linux.apt.command.provider | foopkg" --prompt "Which package provides command foocmd?" --max-facts 4 --format json
+nanda-llmwave-big linux-vpn-train --memory .nanda/linux-active/linux-vpn.lwm --reset-memory --format json
+nanda-llmwave-big linux-vpn-train-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-vpn-eval.lwm --max-facts 4 --format json
 nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json
 nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is ssh externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-reason-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --runtime-snapshot .nanda/linux-active/runtime-snapshot.json --text "Is ssh externally exposed?" --max-facts 4 --format json
@@ -334,6 +336,12 @@ unrelated-route preservation. Treat
 `LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM` as local
 Linux-profile dialogue learning only, not general LLM readiness and not a final
 nonlinear-memory proof.
+`linux-vpn-train` writes a safe local VPN training profile into persistent
+wave memory: WireGuard setup, status checks, DNS/routes, NetworkManager import,
+TrustTunnel safety, and secret boundaries. It does not mutate the local system,
+read secret files, or print private keys. `linux-vpn-train-eval` trains that
+memory and proves through `linux-chat-v2` that VPN questions answer from wave
+memory while secret-material requests activate learned anti-wave refusal.
 `linux-query-wave` compiles one Linux-profile prompt into intent, anchors,
 route priors, negative boundaries, forbidden shortcuts, and answer policy. It is
 input shaping only, not retrieval.

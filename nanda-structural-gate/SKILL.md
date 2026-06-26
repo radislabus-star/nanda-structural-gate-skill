@@ -1029,6 +1029,16 @@ Use `nanda-llmwave-big linux-chat-v2 --residual-pack .nanda/linux-active/linux-a
 when the user wants to teach the bounded Linux-profile model through explicit
 dialogue feedback. Do not treat the transcript itself as memory; inspect the
 `.lwm` wave-delta records and the next turn's `memory_effect`.
+Use `nanda-llmwave-big linux-vpn-train --memory .nanda/linux-active/linux-vpn.lwm --reset-memory --format json`
+to write a safe local VPN training profile into persistent wave memory. It
+teaches bounded routes for WireGuard setup, status checks, DNS/routes,
+NetworkManager import, TrustTunnel safety, and secret boundaries. It must not
+mutate the local machine, read secret files, or print private keys.
+Use `nanda-llmwave-big linux-vpn-train-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-vpn-eval.lwm --max-facts 4 --format json`
+to verify that VPN questions answer through `linux-chat-v2` from wave memory
+and that private-key/QR/token requests activate learned anti-wave refusal.
+Treat `LINUX_VPN_LOCAL_TRAINING_READY_NOT_AUTOCONFIG` as local VPN planning and
+training readiness only, not automatic system configuration.
 Use `nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json`
 to compile one Linux-profile prompt into intent, anchors, route priors, negative
 boundaries, forbidden shortcuts, and answer policy. This is input shaping only,

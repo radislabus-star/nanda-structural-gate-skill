@@ -544,6 +544,46 @@ fn build_linux_query_wave(text: &str) -> LinuxQueryWave {
 }
 
 fn classify_intent(text: &str) -> &'static str {
+    if text.contains("vpn")
+        && (text.contains("secret")
+            || text.contains("private key")
+            || text.contains("private keys")
+            || text.contains("qr")
+            || text.contains("token")
+            || text.contains("password")
+            || text.contains("print key")
+            || text.contains("show key"))
+    {
+        return "vpn_secret_boundary";
+    }
+    if text.contains("trusttunnel") || (text.contains("vpn") && text.contains("relay")) {
+        return "vpn_trusttunnel_local";
+    }
+    if text.contains("wireguard")
+        || text.contains("wg-quick")
+        || (text.contains("vpn") && (text.contains("configure") || text.contains("setup")))
+    {
+        return "vpn_wireguard_setup";
+    }
+    if text.contains("vpn")
+        && (text.contains("dns")
+            || text.contains("route")
+            || text.contains("routing")
+            || text.contains("split tunnel")
+            || text.contains("killswitch")
+            || text.contains("kill switch"))
+    {
+        return "vpn_dns_route";
+    }
+    if text.contains("vpn")
+        && (text.contains("status")
+            || text.contains("check")
+            || text.contains("debug")
+            || text.contains("verify")
+            || text.contains("test"))
+    {
+        return "vpn_status_check";
+    }
     if text.contains("which package provides command")
         || text.contains("what package provides command")
         || text.contains("provides command")
@@ -669,6 +709,44 @@ fn route_contract(
             vec!["linux.boundary.cve"],
             vec!["vulnerable_package_implies_exploitable_system"],
             "refuse_vulnerability_to_exposure_shortcut",
+        ),
+        "vpn_wireguard_setup" => (
+            vec!["linux.vpn.wireguard.local_setup"],
+            vec!["linux.vpn.wireguard.local_setup"],
+            vec!["linux.vpn.secret.boundary"],
+            vec![
+                "vpn_plan_implies_system_changed",
+                "vpn_config_requires_printing_private_key",
+            ],
+            "answer_from_persistent_vpn_memory_only",
+        ),
+        "vpn_status_check" => (
+            vec!["linux.vpn.status.local_check"],
+            vec!["linux.vpn.status.local_check"],
+            vec![],
+            vec!["vpn_status_check_implies_config_change"],
+            "answer_from_persistent_vpn_memory_only",
+        ),
+        "vpn_dns_route" => (
+            vec!["linux.vpn.dns_route.local_setup"],
+            vec!["linux.vpn.dns_route.local_setup"],
+            vec!["linux.vpn.secret.boundary"],
+            vec!["vpn_dns_plan_implies_system_changed"],
+            "answer_from_persistent_vpn_memory_only",
+        ),
+        "vpn_trusttunnel_local" => (
+            vec!["linux.vpn.trusttunnel.local_safety"],
+            vec!["linux.vpn.trusttunnel.local_safety"],
+            vec!["linux.vpn.secret.boundary"],
+            vec!["vpn_relay_plan_implies_production_cutover"],
+            "answer_from_persistent_vpn_memory_only",
+        ),
+        "vpn_secret_boundary" => (
+            vec!["linux.vpn.secret.boundary"],
+            vec!["linux.vpn.secret.boundary"],
+            vec!["linux.vpn.secret.boundary"],
+            vec!["print_vpn_private_material"],
+            "refuse_secret_material_output",
         ),
         _ => (
             vec![],
@@ -811,6 +889,46 @@ fn build_evidence_chain(
             "vulnerability-boundary",
             &["linux.boundary.cve"],
             &[],
+            max_facts,
+        ),
+        "vpn_wireguard_setup" => push_matching(
+            &mut steps,
+            facts,
+            "vpn-wireguard-setup",
+            &["linux.vpn.wireguard.local_setup"],
+            &query.anchors,
+            max_facts,
+        ),
+        "vpn_status_check" => push_matching(
+            &mut steps,
+            facts,
+            "vpn-status-check",
+            &["linux.vpn.status.local_check"],
+            &query.anchors,
+            max_facts,
+        ),
+        "vpn_dns_route" => push_matching(
+            &mut steps,
+            facts,
+            "vpn-dns-route",
+            &["linux.vpn.dns_route.local_setup"],
+            &query.anchors,
+            max_facts,
+        ),
+        "vpn_trusttunnel_local" => push_matching(
+            &mut steps,
+            facts,
+            "vpn-trusttunnel-local",
+            &["linux.vpn.trusttunnel.local_safety"],
+            &query.anchors,
+            max_facts,
+        ),
+        "vpn_secret_boundary" => push_matching(
+            &mut steps,
+            facts,
+            "vpn-secret-boundary",
+            &["linux.vpn.secret.boundary"],
+            &query.anchors,
             max_facts,
         ),
         _ => {}
@@ -1085,6 +1203,23 @@ fn decide_linux_answer(
             true,
             "No. A vulnerable package fact does not prove runtime exposure or exploitability.".to_string(),
         ),
+        "vpn_secret_boundary" => answer(
+            "SECRET_OUTPUT_REFUSED",
+            true,
+            "No. VPN private keys, tokens, QR payloads, and tt URLs must not be printed into chat or training memory.".to_string(),
+        ),
+        "vpn_wireguard_setup"
+        | "vpn_status_check"
+        | "vpn_dns_route"
+        | "vpn_trusttunnel_local" => first_route(evidence, &query.required_routes[0])
+            .map(|fact| {
+                answer(
+                    "ANSWER_GROUNDED",
+                    true,
+                    format!("{}: {}", fact.subject, fact.object),
+                )
+            })
+            .unwrap_or_else(|| missing("NO_VPN_MEMORY_FACT", &query.required_routes[0])),
         _ => LinuxReasonDecision {
             state: "UNSUPPORTED_PROMPT".to_string(),
             answer_allowed: false,

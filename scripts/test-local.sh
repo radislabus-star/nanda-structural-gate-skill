@@ -407,6 +407,12 @@ jq -e '.turns[] | select(.verifier_state == "GROUNDED_BY_WAVE_MEMORY" and .answe
 jq -e '.turns[] | select(.verifier_state == "BOUNDARY_WITH_LEARNED_ANTI_WAVE" and .memory_effect.learned_negative_lanes_active == true)' <<<"$big_linux_chat_v2_eval_json" >/dev/null
 test -s "$tmp_linux_chat_v2_memory"
 jq -e '.record_bytes == 32 and .record_count == 2 and (.records[] | select(.delta_state == "POSITIVE_DELTA")) and (.records[] | select(.delta_state == "NEGATIVE_DELTA"))' "$tmp_linux_chat_v2_memory" >/dev/null
+tmp_linux_vpn_memory="$tmp_linux_chat/linux-vpn.lwm"
+big_linux_vpn_train_eval_json="$("$llmwave_big" linux-vpn-train-eval --residual-pack "$tmp_linux_chat_residual" --memory "$tmp_linux_vpn_memory" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-vpn-train-eval" and .verdict == "LINUX_VPN_LOCAL_TRAINING_READY_NOT_AUTOCONFIG" and .training.verdict == "LINUX_VPN_WAVE_MEMORY_TRAINED_NOT_SYSTEM_MUTATION" and .training.inserted_delta_count == 6 and .training.memory.record_count == 6 and .eval.total == 5 and .eval.passed == 5 and .claim_boundary.local_vpn_training_ready == true and .claim_boundary.local_system_mutation_done == false and .claim_boundary.secrets_read == false and .claim_boundary.secrets_printed == false and .claim_boundary.general_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false' <<<"$big_linux_vpn_train_eval_json" >/dev/null
+jq -e '.chat.turns[] | select(.intent == "vpn_wireguard_setup" and .verifier_state == "GROUNDED_BY_WAVE_MEMORY" and (.answer | ascii_downcase | contains("wg-quick up")))' <<<"$big_linux_vpn_train_eval_json" >/dev/null
+jq -e '.chat.turns[] | select(.intent == "vpn_secret_boundary" and .verifier_state == "BOUNDARY_WITH_LEARNED_ANTI_WAVE" and (.answer | ascii_downcase | contains("do not print private keys")))' <<<"$big_linux_vpn_train_eval_json" >/dev/null
+test -s "$tmp_linux_vpn_memory"
 big_linux_query_wave_json="$("$llmwave_big" linux-query-wave --text "Is ssh externally exposed?" --format json)"
 jq -e '.mode == "llmwave-big-linux-query-wave" and .verdict == "LINUX_QUERY_WAVE_READY_NOT_ANSWER" and .query_wave.intent == "external_exposure" and (.query_wave.forbidden_shortcuts | index("listener_implies_external_exposure")) and .claim_boundary.general_llm_ready == false' <<<"$big_linux_query_wave_json" >/dev/null
 big_linux_reason_json="$("$llmwave_big" linux-reason-run --residual-pack "$tmp_linux_chat_residual" --text "Is this machine externally exposed?" --max-facts 4 --format json)"

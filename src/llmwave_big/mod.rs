@@ -52,6 +52,7 @@ pub mod linux_hot_packet;
 pub mod linux_profile;
 pub mod linux_residual_memory;
 pub mod linux_runtime_snapshot;
+pub mod linux_vpn_training;
 pub mod loader;
 pub mod mature_anti_wave;
 pub mod memory_final_proof;
@@ -442,6 +443,12 @@ enum LlmwaveBigCommand {
     /// Run the built-in Linux Chat V2 persistent learning eval script.
     #[command(name = "linux-chat-v2-eval")]
     LinuxChatV2Eval(LlmwaveBigLinuxChatV2EvalArgs),
+    /// Train safe local VPN routes into persistent Linux-profile wave memory.
+    #[command(name = "linux-vpn-train")]
+    LinuxVpnTrain(LlmwaveBigLinuxVpnTrainArgs),
+    /// Train and evaluate local VPN routes through Linux Chat V2.
+    #[command(name = "linux-vpn-train-eval")]
+    LinuxVpnTrainEval(LlmwaveBigLinuxVpnTrainEvalArgs),
     /// Compile a Linux question into a typed Linux-profile query wave.
     #[command(name = "linux-query-wave")]
     LinuxQueryWave(LlmwaveBigLinuxQueryWaveArgs),
@@ -1471,6 +1478,34 @@ struct LlmwaveBigLinuxChatV2EvalArgs {
     memory: PathBuf,
     #[arg(long = "runtime-snapshot")]
     runtime_snapshot: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxVpnTrainArgs {
+    #[arg(long = "memory", default_value = ".nanda/linux-active/linux-vpn.lwm")]
+    memory: PathBuf,
+    #[arg(long = "reset-memory", default_value_t = false)]
+    reset_memory: bool,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxVpnTrainEvalArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(
+        long = "memory",
+        default_value = ".nanda/linux-active/linux-vpn-eval.lwm"
+    )]
+    memory: PathBuf,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
     #[arg(long, value_enum, default_value = "json")]
@@ -3603,6 +3638,88 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- eval passed: `{}/{}`",
                         report.eval.passed, report.eval.total
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxVpnTrain(args) => {
+            let report = linux_vpn_training::build_linux_vpn_train_report(
+                linux_vpn_training::LinuxVpnTrainConfig {
+                    memory: args.memory,
+                    reset_memory: args.reset_memory,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "local_vpn_training_ready: {}",
+                        report.claim_boundary.local_vpn_training_ready
+                    );
+                    println!("inserted_delta_count: {}", report.inserted_delta_count);
+                    println!(
+                        "local_system_mutation_done: {}",
+                        report.claim_boundary.local_system_mutation_done
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux VPN Train");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- local VPN training ready: `{}`",
+                        report.claim_boundary.local_vpn_training_ready
+                    );
+                    println!("- inserted deltas: `{}`", report.inserted_delta_count);
+                    println!(
+                        "- local system mutation done: `{}`",
+                        report.claim_boundary.local_system_mutation_done
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxVpnTrainEval(args) => {
+            let report = linux_vpn_training::build_linux_vpn_train_eval_report(
+                linux_vpn_training::LinuxVpnTrainEvalConfig {
+                    residual_pack: args.residual_pack,
+                    memory: args.memory,
+                    max_facts: args.max_facts,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "local_vpn_training_ready: {}",
+                        report.claim_boundary.local_vpn_training_ready
+                    );
+                    println!("eval_passed: {}/{}", report.eval.passed, report.eval.total);
+                    println!(
+                        "local_system_mutation_done: {}",
+                        report.claim_boundary.local_system_mutation_done
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux VPN Train Eval");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- local VPN training ready: `{}`",
+                        report.claim_boundary.local_vpn_training_ready
+                    );
+                    println!(
+                        "- eval passed: `{}/{}`",
+                        report.eval.passed, report.eval.total
+                    );
+                    println!(
+                        "- local system mutation done: `{}`",
+                        report.claim_boundary.local_system_mutation_done
                     );
                     println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }

@@ -686,6 +686,27 @@ fn surface_answer(
     rejected_shortcuts: &[String],
     memory_effect: &PersistentWaveMemoryEffect,
 ) -> String {
+    if reason.query_wave.intent.starts_with("vpn_") {
+        if memory_effect.learned_negative_lanes_active
+            || reason.query_wave.intent == "vpn_secret_boundary"
+        {
+            return "VPN safety boundary: do not print private keys, tokens, QR payloads, passwords, or tt URLs. Keep secret material in local files and pass only paths or variable names.".to_string();
+        }
+        if let Some(learned) = &memory_effect.learned_answer {
+            return format!(
+                "Learned VPN wave-memory answer: {} {} {}.",
+                learned.subject, learned.relation, learned.object
+            );
+        }
+        if let Some(fact) = evidence.iter().find(|fact| fact.polarity == "positive") {
+            return format!(
+                "Grounded VPN answer: {} {} {}.",
+                fact.subject, fact.relation, fact.object
+            );
+        }
+        return "I cannot answer: no VPN training memory matched this local route.".to_string();
+    }
+
     match reason.query_wave.intent.as_str() {
         "command_provider" => {
             if let Some(learned) = &memory_effect.learned_answer {
@@ -1040,6 +1061,16 @@ fn intent_for_route(route: &str) -> &'static str {
         "command_provider"
     } else if route.contains("boundary.socket") || route.contains("exposure") {
         "external_exposure"
+    } else if route.contains("vpn.wireguard") {
+        "vpn_wireguard_setup"
+    } else if route.contains("vpn.status") {
+        "vpn_status_check"
+    } else if route.contains("vpn.dns_route") {
+        "vpn_dns_route"
+    } else if route.contains("vpn.trusttunnel") {
+        "vpn_trusttunnel_local"
+    } else if route.contains("vpn.secret") {
+        "vpn_secret_boundary"
     } else {
         "unknown"
     }
@@ -1050,6 +1081,8 @@ fn relation_for_route(route: &str, delta_state: &str) -> &'static str {
         "does not prove"
     } else if route.contains("command") || route.contains("package.binary") {
         "provided by package"
+    } else if route.contains("vpn") {
+        "local plan"
     } else {
         "supports route"
     }
