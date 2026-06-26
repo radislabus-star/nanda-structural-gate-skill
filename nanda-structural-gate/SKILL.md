@@ -1039,6 +1039,13 @@ to verify that VPN questions answer through `linux-chat-v2` from wave memory
 and that private-key/QR/token requests activate learned anti-wave refusal.
 Treat `LINUX_VPN_LOCAL_TRAINING_READY_NOT_AUTOCONFIG` as local VPN planning and
 training readiness only, not automatic system configuration.
+Use `nanda-llmwave-big linux-vpn-action-plan --text "turn off wireguard vpn wg0" --format json`
+to compile a natural-language VPN request into a local command plan without
+executing it. Use `nanda-llmwave-big linux-vpn-control --action down --backend wireguard --target wg0 --format json`
+for an explicit dry-run. Actual local `up`/`down` execution requires both
+`--execute` and `--i-understand-network-may-drop`; do not run it unless the user
+explicitly asks for live VPN mutation. These commands must not read secret files
+or print private keys, tokens, QR payloads, or tt URLs.
 Use `nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json`
 to compile one Linux-profile prompt into intent, anchors, route priors, negative
 boundaries, forbidden shortcuts, and answer policy. This is input shaping only,

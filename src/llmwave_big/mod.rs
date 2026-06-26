@@ -52,6 +52,7 @@ pub mod linux_hot_packet;
 pub mod linux_profile;
 pub mod linux_residual_memory;
 pub mod linux_runtime_snapshot;
+pub mod linux_vpn_control;
 pub mod linux_vpn_training;
 pub mod loader;
 pub mod mature_anti_wave;
@@ -449,6 +450,12 @@ enum LlmwaveBigCommand {
     /// Train and evaluate local VPN routes through Linux Chat V2.
     #[command(name = "linux-vpn-train-eval")]
     LinuxVpnTrainEval(LlmwaveBigLinuxVpnTrainEvalArgs),
+    /// Compile a guarded local VPN enable/disable/status command plan.
+    #[command(name = "linux-vpn-action-plan")]
+    LinuxVpnActionPlan(LlmwaveBigLinuxVpnActionPlanArgs),
+    /// Dry-run or explicitly execute a guarded local VPN control command.
+    #[command(name = "linux-vpn-control")]
+    LinuxVpnControl(LlmwaveBigLinuxVpnControlArgs),
     /// Compile a Linux question into a typed Linux-profile query wave.
     #[command(name = "linux-query-wave")]
     LinuxQueryWave(LlmwaveBigLinuxQueryWaveArgs),
@@ -1508,6 +1515,36 @@ struct LlmwaveBigLinuxVpnTrainEvalArgs {
     memory: PathBuf,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxVpnActionPlanArgs {
+    #[arg(long = "text")]
+    text: Option<String>,
+    #[arg(long = "action")]
+    action: Option<String>,
+    #[arg(long = "backend")]
+    backend: Option<String>,
+    #[arg(long = "target")]
+    target: Option<String>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxVpnControlArgs {
+    #[arg(long = "action")]
+    action: String,
+    #[arg(long = "backend")]
+    backend: String,
+    #[arg(long = "target")]
+    target: Option<String>,
+    #[arg(long = "execute", default_value_t = false)]
+    execute: bool,
+    #[arg(long = "i-understand-network-may-drop", default_value_t = false)]
+    i_understand_network_may_drop: bool,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -3717,6 +3754,87 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- eval passed: `{}/{}`",
                         report.eval.passed, report.eval.total
                     );
+                    println!(
+                        "- local system mutation done: `{}`",
+                        report.claim_boundary.local_system_mutation_done
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxVpnActionPlan(args) => {
+            let report = linux_vpn_control::build_linux_vpn_action_plan_report(
+                linux_vpn_control::LinuxVpnActionPlanConfig {
+                    text: args.text,
+                    action: args.action,
+                    backend: args.backend,
+                    target: args.target,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("action: {}", report.action);
+                    println!("backend: {}", report.backend);
+                    println!("target: {}", report.target);
+                    println!("command: {}", report.plan.command_preview);
+                    println!(
+                        "local_system_mutation_done: {}",
+                        report.claim_boundary.local_system_mutation_done
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux VPN Action Plan");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- action: `{}`", report.action);
+                    println!("- backend: `{}`", report.backend);
+                    println!("- target: `{}`", report.target);
+                    println!("- command: `{}`", report.plan.command_preview);
+                    println!(
+                        "- local system mutation done: `{}`",
+                        report.claim_boundary.local_system_mutation_done
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxVpnControl(args) => {
+            let report = linux_vpn_control::build_linux_vpn_control_report(
+                linux_vpn_control::LinuxVpnControlConfig {
+                    action: args.action,
+                    backend: args.backend,
+                    target: args.target,
+                    execute: args.execute,
+                    i_understand_network_may_drop: args.i_understand_network_may_drop,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("action: {}", report.action);
+                    println!("backend: {}", report.backend);
+                    println!("target: {}", report.target);
+                    println!("command: {}", report.plan.command_preview);
+                    println!("executed: {}", report.execution.executed);
+                    println!(
+                        "local_system_mutation_done: {}",
+                        report.claim_boundary.local_system_mutation_done
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux VPN Control");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- action: `{}`", report.action);
+                    println!("- backend: `{}`", report.backend);
+                    println!("- target: `{}`", report.target);
+                    println!("- command: `{}`", report.plan.command_preview);
+                    println!("- executed: `{}`", report.execution.executed);
                     println!(
                         "- local system mutation done: `{}`",
                         report.claim_boundary.local_system_mutation_done

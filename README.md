@@ -744,6 +744,14 @@ requests activate learned anti-wave refusal. Treat
 `LINUX_VPN_LOCAL_TRAINING_READY_NOT_AUTOCONFIG` as local planning/training
 readiness only, not automatic VPN configuration.
 
+`linux-vpn-action-plan` and `linux-vpn-control` are the guarded control surface.
+The action planner converts text such as "turn off wireguard vpn wg0" into a
+command plan and never executes it. The control command accepts explicit
+`--action`, `--backend`, and optional `--target`; it dry-runs by default and only
+executes local `up`/`down` actions when both `--execute` and
+`--i-understand-network-may-drop` are present. These commands do not read secret
+files or print private keys, tokens, QR payloads, or tt URLs.
+
 `linux-query-wave`, `linux-reason-run`, `linux-broad-suite-build`,
 `linux-broad-eval-run`, and `linux-profile-claim-gate` turn that readout into a
 profile proof surface. The query wave fixes intent, anchors, route priors,
@@ -810,6 +818,24 @@ nanda-llmwave-big linux-vpn-train-eval \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
   --memory .nanda/linux-active/linux-vpn-eval.lwm \
   --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-vpn-action-plan \
+  --text "turn off wireguard vpn wg0" \
+  --format json
+
+nanda-llmwave-big linux-vpn-control \
+  --action down \
+  --backend wireguard \
+  --target wg0 \
+  --format json
+
+nanda-llmwave-big linux-vpn-control \
+  --action down \
+  --backend wireguard \
+  --target wg0 \
+  --execute \
+  --i-understand-network-may-drop \
   --format json
 
 nanda-llmwave-big linux-query-wave \

@@ -342,6 +342,12 @@ TrustTunnel safety, and secret boundaries. It does not mutate the local system,
 read secret files, or print private keys. `linux-vpn-train-eval` trains that
 memory and proves through `linux-chat-v2` that VPN questions answer from wave
 memory while secret-material requests activate learned anti-wave refusal.
+`linux-vpn-action-plan` compiles a user request such as "turn off wireguard vpn
+wg0" into a concrete local command plan without executing it. `linux-vpn-control`
+dry-runs explicit `up` / `down` / `status` actions by default. Real `up` or
+`down` execution requires both `--execute` and
+`--i-understand-network-may-drop`; even then it must not read or print VPN
+private material.
 `linux-query-wave` compiles one Linux-profile prompt into intent, anchors,
 route priors, negative boundaries, forbidden shortcuts, and answer policy. It is
 input shaping only, not retrieval.
