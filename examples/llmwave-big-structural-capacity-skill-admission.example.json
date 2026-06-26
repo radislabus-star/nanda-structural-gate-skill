@@ -1,0 +1,39 @@
+{
+  "command": "nanda-llmwave-big structural-capacity --noise-profile skill-admission --format json",
+  "expected_compact_fields": {
+    "verdict": "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN",
+    "workload": {
+      "noise_profile": "skill-admission",
+      "patterns": 1024,
+      "pattern_shape": "Pattern16 macro-cell",
+      "edges_per_pattern": 16,
+      "active_facts": 16384,
+      "seeds": 8,
+      "noise_edges_per_noisy_case": 16,
+      "smaller_pattern_modes_available": false,
+      "smaller_pattern_shapes_available": false
+    },
+    "gates": {
+      "single_peak_under_noise": true,
+      "field_core_lens_admission": true,
+      "anti_wave_traps_reject_false_peaks": true,
+      "final_gate_passed": true
+    },
+    "lens_admission": {
+      "field_core_version": "unified-field-v1-readonly",
+      "field_pass_version": "unified-field-pass-v1",
+      "uses_existing_field_core_lens": true,
+      "uses_existing_field_core_anti_wave": true,
+      "field_pass_peak_target": "pattern16-structural-capacity",
+      "field_pass_verdict": "WATCH",
+      "field_pass_safe_to_answer": false,
+      "claim_boundary_preserved": true,
+      "accepted_for_skill_admission": true
+    },
+    "claim_boundary": {
+      "broad_chat_llm_ready": false,
+      "global_nonlinear_memory_proven": false,
+      "hardware_cache_residency_counter_proven": false
+    }
+  }
+}

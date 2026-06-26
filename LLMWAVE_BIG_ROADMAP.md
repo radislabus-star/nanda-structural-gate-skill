@@ -2668,12 +2668,36 @@ traps rejected:
 ```text
 gates.skill_admission_noise_pressure = true
 gates.single_peak_under_noise = true
+gates.field_core_lens_admission = true
 gates.anti_wave_traps_reject_false_peaks = true
 ```
 
 Noise is foreign-edge interference pressure. Anti-wave is not random noise; it
 is the rejection layer for cold, role-swap, route-splice, conflict, and
 missing-edge false peaks.
+
+Pattern16 admission must also expose `lens_admission`. This is a bridge to the
+already-existing shared field physics:
+
+```text
+field_core::lens::apply_lens_chain
+field_core::anti_wave::apply_anti_wave
+field_core::pass::run_field_pass
+```
+
+The admission readout must preserve:
+
+```text
+lens_admission.uses_existing_field_core_lens = true
+lens_admission.uses_existing_field_core_anti_wave = true
+lens_admission.field_pass_peak_target = "pattern16-structural-capacity"
+lens_admission.accepted_for_skill_admission = true
+lens_admission.claim_boundary_preserved = true
+lens_admission.field_pass_safe_to_answer = false
+```
+
+`field_pass_verdict=WATCH` is allowed for this readout because the broad
+LLM/nonlinear claim boundary must stay closed.
 
 Allowed claim:
 

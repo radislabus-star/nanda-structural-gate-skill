@@ -4536,6 +4536,18 @@ fn print_structural_capacity_report(
                 report.gates.single_peak_under_noise
             );
             println!(
+                "field_core_lens_admission: {}",
+                report.gates.field_core_lens_admission
+            );
+            println!(
+                "lens_admission_peak: {}",
+                report.lens_admission.field_pass_peak_target
+            );
+            println!(
+                "lens_admission_verdict: {}",
+                report.lens_admission.field_pass_verdict
+            );
+            println!(
                 "anti_wave_traps_reject_false_peaks: {}",
                 report.gates.anti_wave_traps_reject_false_peaks
             );
@@ -4615,6 +4627,18 @@ fn print_structural_capacity_report(
             println!(
                 "- single peak under noise: `{}`",
                 report.gates.single_peak_under_noise
+            );
+            println!(
+                "- field-core lens admission: `{}`",
+                report.gates.field_core_lens_admission
+            );
+            println!(
+                "- lens admission peak: `{}`",
+                report.lens_admission.field_pass_peak_target
+            );
+            println!(
+                "- lens admission verdict: `{}`",
+                report.lens_admission.field_pass_verdict
             );
             println!(
                 "- anti-wave traps reject false peaks: `{}`",

@@ -290,6 +290,11 @@ Use `--noise-profile skill-admission` when the skill needs the stronger
 admission profile: the shape stays 1024 Pattern16, but the run escalates to 8
 seeds, 16 foreign-edge noisy pressure, a required single noisy peak, and the
 anti-wave false-peak traps.
+The same report includes `lens_admission`, which reuses the existing
+`field_core` lens and anti-wave pipeline. In other words, Pattern16 does not
+define a second lens system: it calls through the shared lens -> anti-wave ->
+peak pass and keeps `field_pass_safe_to_answer=false` while the broad LLM and
+nonlinear-memory claims remain closed.
 
 For the latest LLMWave-Big eval path, use:
 

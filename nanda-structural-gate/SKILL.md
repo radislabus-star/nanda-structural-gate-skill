@@ -787,6 +787,16 @@ foreign-edge interference pressure. Read "anti-wave" as the false-peak blockers:
 cold, role-swap, route-splice, conflict, and missing-edge traps must remain
 rejected. Do not treat a multi-peak or margin-eroded noisy field as admission
 evidence.
+Also inspect `lens_admission`. Pattern16 admission must reuse the existing
+`field_core` lens -> anti-wave -> peak pass, not a second local lens model.
+Require `lens_admission.uses_existing_field_core_lens=true`,
+`lens_admission.uses_existing_field_core_anti_wave=true`,
+`lens_admission.field_pass_peak_target="pattern16-structural-capacity"`,
+`lens_admission.accepted_for_skill_admission=true`, and
+`lens_admission.claim_boundary_preserved=true`. A `field_pass_verdict` of
+`WATCH` is acceptable here when `field_pass_safe_to_answer=false`: it means the
+readout confirmed the Pattern16 peak while keeping the broad LLM/nonlinear
+claim boundary closed.
 Also inspect `field_operation_contract`: peak/coherence/anti-wave ownership
 should point to `field_core::peak::FieldPeakResult`,
 `field_core::coherence::FieldCoherenceResult`, and

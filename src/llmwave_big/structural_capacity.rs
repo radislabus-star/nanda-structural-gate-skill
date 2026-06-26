@@ -7,6 +7,12 @@
 
 use serde::Serialize;
 
+use crate::field_core::{
+    run_field_pass, FieldAntiWaveLane, FieldClaimBoundary, FieldFamily, FieldLensKind,
+    FieldLensOperation, FieldPassInput, FieldPassReport, FieldRecord, FieldRecordKind,
+    FIELD_CORE_VERSION, FIELD_PASS_VERSION,
+};
+
 pub(crate) const STRUCTURAL_CAPACITY_VERSION: &str =
     "llmwave-big-v-next-structural-capacity-1024-pattern16";
 
@@ -60,6 +66,7 @@ pub(crate) struct StructuralCapacityReport {
     pub memory: StructuralCapacityMemory,
     pub metrics: StructuralCapacityMetrics,
     pub gates: StructuralCapacityGates,
+    pub lens_admission: StructuralCapacityLensAdmission,
     pub claim_boundary: StructuralCapacityClaimBoundary,
     pub seed_results: Vec<StructuralCapacitySeedReport>,
 }
@@ -148,6 +155,7 @@ pub(crate) struct StructuralCapacityGates {
     pub skill_admission_noise_profile: bool,
     pub skill_admission_noise_pressure: bool,
     pub single_peak_under_noise: bool,
+    pub field_core_lens_admission: bool,
     pub clean_retrieval: bool,
     pub noisy_retrieval: bool,
     pub cold_rejection: bool,
@@ -164,6 +172,27 @@ pub(crate) struct StructuralCapacityGates {
     pub old_baseline_beaten: bool,
     pub pattern16_macro_cell: bool,
     pub final_gate_passed: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct StructuralCapacityLensAdmission {
+    pub version: &'static str,
+    pub field_core_version: &'static str,
+    pub field_pass_version: &'static str,
+    pub uses_existing_field_core_lens: bool,
+    pub uses_existing_field_core_anti_wave: bool,
+    pub lens_chain: Vec<&'static str>,
+    pub anti_wave_lanes: Vec<&'static str>,
+    pub field_pass_verdict: String,
+    pub field_pass_peak_target: String,
+    pub field_pass_peak_state: String,
+    pub field_pass_coherence_state: String,
+    pub field_pass_safe_to_answer: bool,
+    pub claim_boundary_preserved: bool,
+    pub single_peak_confirmed: bool,
+    pub anti_wave_local_false_peak_blockers: bool,
+    pub accepted_for_skill_admission: bool,
+    pub read_as: &'static str,
 }
 
 #[derive(Serialize, Clone)]
@@ -292,7 +321,8 @@ pub(crate) fn build_structural_capacity_report(
     );
     let memory = memory(hot_budget_bytes);
     let metrics = aggregate_metrics(&seed_results, &workload);
-    let gates = gates(&workload, &metrics, &memory);
+    let lens_admission = lens_admission(&metrics);
+    let gates = gates(&workload, &metrics, &memory, &lens_admission);
     let verdict = if gates.final_gate_passed {
         "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN"
     } else {
@@ -308,6 +338,7 @@ pub(crate) fn build_structural_capacity_report(
         memory,
         metrics,
         gates: gates.clone(),
+        lens_admission,
         claim_boundary: claim_boundary(verdict),
         seed_results,
     }
@@ -729,6 +760,7 @@ fn gates(
     workload: &StructuralCapacityWorkload,
     metrics: &StructuralCapacityMetrics,
     memory: &StructuralCapacityMemory,
+    lens_admission: &StructuralCapacityLensAdmission,
 ) -> StructuralCapacityGates {
     let skill_admission_noise_profile = workload.noise_profile == "skill-admission";
     let skill_admission_noise_pressure = !skill_admission_noise_profile
@@ -755,10 +787,12 @@ fn gates(
     let seed_robust = metrics.seed_robustness_pass_rate == 1.0;
     let old_baseline_beaten = STRUCTURAL_PATTERN_CAPACITY > OLD_ROBUST_BASELINE_PATTERNS;
     let pattern16_macro_cell = EDGES_PER_PATTERN == 16;
+    let field_core_lens_admission = lens_admission.accepted_for_skill_admission;
     let final_gate_passed = clean_retrieval
         && noisy_retrieval
         && skill_admission_noise_pressure
         && single_peak_under_noise
+        && field_core_lens_admission
         && cold_rejection
         && role_swap_rejection
         && route_splice_rejection
@@ -777,6 +811,7 @@ fn gates(
         skill_admission_noise_profile,
         skill_admission_noise_pressure,
         single_peak_under_noise,
+        field_core_lens_admission,
         clean_retrieval,
         noisy_retrieval,
         cold_rejection,
@@ -794,6 +829,139 @@ fn gates(
         pattern16_macro_cell,
         final_gate_passed,
     }
+}
+
+fn lens_admission(metrics: &StructuralCapacityMetrics) -> StructuralCapacityLensAdmission {
+    let lens_chain = vec!["route", "role", "evidence"];
+    let anti_wave_lanes = vec![
+        "role-swap-false-peak",
+        "route-splice-false-peak",
+        "conflict-false-peak",
+        "missing-edge-false-peak",
+        "cold-false-peak",
+    ];
+    let pass = run_pattern16_field_pass(&lens_chain, &anti_wave_lanes);
+    let claim_boundary_preserved = !pass.safe_to_answer
+        && pass.claim_boundary.read_only_projection
+        && pass.claim_boundary.no_behavior_change
+        && pass.claim_boundary.not_llm_ready
+        && pass.claim_boundary.not_nonlinear_memory_proof;
+    let single_peak_confirmed =
+        pass.peak.target == "pattern16-structural-capacity" && pass.peak.margin >= 0.04;
+    let anti_wave_local_false_peak_blockers =
+        pass.anti_wave_count == anti_wave_lanes.len() && pass.verdict != "VETO";
+    let accepted_for_skill_admission = single_peak_confirmed
+        && anti_wave_local_false_peak_blockers
+        && claim_boundary_preserved
+        && metrics.min_noisy_margin >= SINGLE_PEAK_NOISE_MARGIN_MIN;
+
+    StructuralCapacityLensAdmission {
+        version: "pattern16-field-core-lens-admission-v1",
+        field_core_version: FIELD_CORE_VERSION,
+        field_pass_version: FIELD_PASS_VERSION,
+        uses_existing_field_core_lens: true,
+        uses_existing_field_core_anti_wave: true,
+        lens_chain,
+        anti_wave_lanes,
+        field_pass_verdict: pass.verdict,
+        field_pass_peak_target: pass.peak.target,
+        field_pass_peak_state: pass.peak.state,
+        field_pass_coherence_state: pass.coherence_state,
+        field_pass_safe_to_answer: pass.safe_to_answer,
+        claim_boundary_preserved,
+        single_peak_confirmed,
+        anti_wave_local_false_peak_blockers,
+        accepted_for_skill_admission,
+        read_as: "Pattern16 admission reuses field_core lens -> anti-wave -> peak pass. It is an admission readout only and preserves the non-LLM/nonlinear claim boundary.",
+    }
+}
+
+fn run_pattern16_field_pass(
+    lens_chain: &[&'static str],
+    anti_wave_lanes: &[&'static str],
+) -> FieldPassReport {
+    let lenses = lens_chain
+        .iter()
+        .map(|name| FieldLensOperation {
+            kind: match *name {
+                "route" => FieldLensKind::Route,
+                "role" => FieldLensKind::Role,
+                "evidence" => FieldLensKind::Evidence,
+                _ => FieldLensKind::Group,
+            },
+            label: format!("pattern16-{name}"),
+            strength: 1,
+        })
+        .collect::<Vec<_>>();
+    let anti_waves = anti_wave_lanes
+        .iter()
+        .map(|lane| FieldAntiWaveLane {
+            id: (*lane).to_string(),
+            target: (*lane).to_string(),
+            subject: "pattern16".to_string(),
+            relation: "suppresses_false_peak".to_string(),
+            object: (*lane).to_string(),
+            route: Some((*lane).to_string()),
+            group: Some("pattern16-admission".to_string()),
+            strength: 2,
+        })
+        .collect::<Vec<_>>();
+    let query = FieldRecord::synthetic(
+        "pattern16-query",
+        FieldRecordKind::StructuralTriad,
+        "pattern16",
+        "admits",
+        "skill-core",
+        Some("pattern16-structural-capacity".to_string()),
+        Some("pattern16-admission".to_string()),
+    );
+    let records = vec![
+        FieldRecord::synthetic(
+            "pattern16-true-peak",
+            FieldRecordKind::StructuralTriad,
+            "pattern16",
+            "admits",
+            "skill-core",
+            Some("pattern16-structural-capacity".to_string()),
+            Some("pattern16-admission".to_string()),
+        ),
+        FieldRecord::synthetic(
+            "role-swap-false-peak",
+            FieldRecordKind::StructuralTriad,
+            "skill-core",
+            "admits",
+            "pattern16",
+            Some("role-swap-false-peak".to_string()),
+            Some("pattern16-admission".to_string()),
+        ),
+        FieldRecord::synthetic(
+            "route-splice-false-peak",
+            FieldRecordKind::StructuralTriad,
+            "pattern16",
+            "splices",
+            "foreign-route",
+            Some("route-splice-false-peak".to_string()),
+            Some("pattern16-admission".to_string()),
+        ),
+        FieldRecord::synthetic(
+            "missing-edge-false-peak",
+            FieldRecordKind::StructuralTriad,
+            "pattern16",
+            "missing_edge",
+            "partial-cell",
+            Some("missing-edge-false-peak".to_string()),
+            Some("pattern16-admission".to_string()),
+        ),
+    ];
+    run_field_pass(&FieldPassInput {
+        family: FieldFamily::Structural,
+        query,
+        records,
+        lenses,
+        anti_waves,
+        state_hint: Some("FIELD_THIN".to_string()),
+        claim_boundary: FieldClaimBoundary::default(),
+    })
 }
 
 fn claim_boundary(verdict: &'static str) -> StructuralCapacityClaimBoundary {
@@ -893,6 +1061,16 @@ mod tests {
         assert!(report.gates.old_baseline_beaten);
         assert!(report.gates.pattern16_macro_cell);
         assert!(report.gates.missing_edge_rejection);
+        assert!(report.gates.field_core_lens_admission);
+        assert!(report.lens_admission.uses_existing_field_core_lens);
+        assert!(report.lens_admission.uses_existing_field_core_anti_wave);
+        assert_eq!(
+            report.lens_admission.field_pass_peak_target,
+            "pattern16-structural-capacity"
+        );
+        assert_eq!(report.lens_admission.field_pass_verdict, "WATCH");
+        assert!(!report.lens_admission.field_pass_safe_to_answer);
+        assert!(report.lens_admission.claim_boundary_preserved);
         assert_eq!(report.metrics.false_accept_rate, 0.0);
         assert_eq!(report.metrics.false_negative_rate, 0.0);
         assert!(report.memory.residual_saving_bytes > 0);
@@ -917,6 +1095,10 @@ mod tests {
         assert!(report.gates.skill_admission_noise_pressure);
         assert!(report.gates.single_peak_under_noise);
         assert!(report.gates.anti_wave_traps_reject_false_peaks);
+        assert!(report.gates.field_core_lens_admission);
+        assert!(report.lens_admission.accepted_for_skill_admission);
+        assert!(report.lens_admission.single_peak_confirmed);
+        assert!(report.lens_admission.anti_wave_local_false_peak_blockers);
         assert_eq!(
             report.verdict,
             "STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN"

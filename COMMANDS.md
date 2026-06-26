@@ -129,6 +129,16 @@ least 8 seeds and 16 foreign noisy edges per positive query, then requires a
 single dominant noisy peak and anti-wave trap rejection. In this context
 "noise" means foreign-edge interference pressure; anti-wave means cold,
 role-swap, route-splice, conflict, and missing-edge false peaks stay blocked.
+The report also exposes `lens_admission`: Pattern16 admission reuses the
+existing `field_core` lens chain and anti-wave pass (`run_field_pass`) rather
+than inventing a second lens system. Require
+`lens_admission.uses_existing_field_core_lens=true`,
+`lens_admission.uses_existing_field_core_anti_wave=true`,
+`lens_admission.field_pass_peak_target="pattern16-structural-capacity"`, and
+`lens_admission.claim_boundary_preserved=true`. The field pass may remain
+`WATCH` because the LLM/nonlinear claim boundary is intentionally closed.
+See `examples/llmwave-big-structural-capacity-skill-admission.example.json`
+for the compact machine contract.
 
 Passing this command allows only the local claim
 `STRUCTURAL_CAPACITY_1024_PATTERN16_BASELINE_BEATEN`. It does not prove broad
