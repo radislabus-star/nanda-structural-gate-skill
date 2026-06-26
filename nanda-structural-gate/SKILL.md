@@ -256,6 +256,7 @@ scripts/nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-act
 scripts/nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --top-k 5 --format json
 scripts/nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 scripts/nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
+scripts/nanda-llmwave-big linux-pmu-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --max-cache-miss-rate 0.02 --format json
 scripts/nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
 scripts/nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
 scripts/nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-candidates 16 --format json
@@ -983,6 +984,13 @@ for the fixed-record loop under the 6 MiB budget: measured loop has no JSON,
 no labels, no file I/O, no heap allocation, and no per-record score arrays.
 It is not hardware PMU cache-miss proof, not broad chat readiness, not exposure
 analysis, and not nonlinear-memory proof.
+Use `nanda-llmwave-big linux-pmu-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --format json`
+when the next claim needs hardware counter evidence rather than a software
+budget proof. It measures the same fixed-record hot loop with Linux
+`perf_event_open` counters for `cache-references` and `cache-misses`.
+Treat `LINUX_PMU_CACHE_RESIDENCY_PROVEN` as host-local PMU evidence only. Treat
+`LINUX_PMU_CACHE_RESIDENCY_BLOCKED` as an honest kernel/permission blocker; do
+not turn it into a PASS.
 Use `nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json`
 to materialize the Linux Active Field as actual binary schema/residual memory.
 The `.lrf` packet stores repeated `route+relation+polarity` modes once as

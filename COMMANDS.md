@@ -134,6 +134,7 @@ nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k
 nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 nanda-llmwave-big linux-atlas-projection --atlas-dir .nanda/linux-atlas --hot-pack .nanda/linux-active/linux-active-65k.laf --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
+nanda-llmwave-big linux-pmu-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --max-cache-miss-rate 0.02 --format json
 nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
 nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --max-candidates 16 --format json
@@ -290,6 +291,12 @@ benchmarks repeated full scans of fixed 64-byte records. Treat
 the hot loop: no JSON, labels, file I/O, heap allocation, or per-record score
 arrays in the measured loop. It is not broad chat readiness, nonlinear-memory
 proof, exposure analysis, or hardware PMU cache-miss proof.
+`linux-pmu-cache-proof` runs the same fixed-record hot loop under Linux
+`perf_event_open` hardware counters. It reports `cache-references`,
+`cache-misses`, miss rate, and whether the rate is below
+`--max-cache-miss-rate`. Treat `LINUX_PMU_CACHE_RESIDENCY_PROVEN` as host-local
+PMU evidence only. If kernel permissions block perf counters, the command
+returns `LINUX_PMU_CACHE_RESIDENCY_BLOCKED` and keeps the hardware claim false.
 `linux-atlas-projection` is the Phase 18 Atlas-to-6MB gate. It audits the cold
 Linux Atlas by metadata/manifest, runs `.laf` cache proof and `.lrf`
 schema/residual proof, and only reports

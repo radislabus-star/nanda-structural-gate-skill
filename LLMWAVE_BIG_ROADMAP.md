@@ -2361,25 +2361,34 @@ daemon speed is not a model-quality proof
 serve mode must not bypass safety/verifier gates
 ```
 
-### 18.4 Add Hardware PMU Cache Evidence
+### 18.4 Add Hardware PMU Cache Evidence, implemented
 
-Planned work:
+Implemented command:
+
+```text
+nanda-llmwave-big linux-pmu-cache-proof
+alias: nanda-llmwave-big linux-hardware-cache-proof
+```
+
+Implemented work:
 
 ```text
 measure cycles
 measure instructions
 measure cache-references
 measure cache-misses
-measure LLC/L3 misses where available
-attach counters to linux-cache-proof report
+measure cache miss rate around the fixed-record hot loop
+block honestly when perf_event_open is unavailable
+keep software cache-budget proof separate from PMU evidence
 ```
 
 Acceptance:
 
 ```text
-hardware_perf_counters_used=true
-hardware_cache_miss_rate_reported=true
-PMU sample command recorded
+hardware_perf_counters_used=true when host allows PMU access
+hardware_cache_miss_rate_reported=true when counters are available
+LINUX_PMU_CACHE_RESIDENCY_PROVEN only when miss rate is below threshold
+LINUX_PMU_CACHE_RESIDENCY_BLOCKED when kernel permissions deny counters
 cache-only claim separates:
   software budget proof
   hardware residency evidence

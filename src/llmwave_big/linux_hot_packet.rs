@@ -66,6 +66,16 @@ pub(crate) struct LinuxCacheProofConfig {
     pub samples: usize,
 }
 
+#[derive(Clone)]
+pub(crate) struct LinuxPmuCacheProofConfig {
+    pub hot_pack: PathBuf,
+    pub query: String,
+    pub iterations: usize,
+    pub warmup_iterations: usize,
+    pub samples: usize,
+    pub max_cache_miss_rate: f64,
+}
+
 #[derive(Serialize, Clone)]
 pub(crate) struct LinuxHotPackReport {
     pub mode: &'static str,
@@ -155,6 +165,19 @@ pub(crate) struct LinuxCacheProofReport {
 }
 
 #[derive(Serialize, Clone)]
+pub(crate) struct LinuxPmuCacheProofReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub hot_pack: LinuxCacheProofPackSummary,
+    pub compiled_query: LinuxCacheProofQuerySummary,
+    pub software_runtime_contract: LinuxCacheRuntimeContract,
+    pub software_benchmark: LinuxCacheBenchmarkSummary,
+    pub pmu: LinuxPmuCounterSummary,
+    pub claim_boundary: LinuxPmuCacheProofClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
 pub(crate) struct LinuxCacheProofPackSummary {
     pub path: String,
     pub file_bytes: usize,
@@ -235,6 +258,40 @@ pub(crate) struct LinuxCacheProofClaimBoundary {
     pub cache_only_execution_proven: bool,
     pub hardware_cache_residency_counter_proven: bool,
     pub exposure_layer_ready: bool,
+    pub broad_chat_llm_ready: bool,
+    pub nonlinear_memory_proven: bool,
+    pub safe_claim: &'static str,
+    pub blocked_claims: Vec<&'static str>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxPmuCounterSummary {
+    pub counter_status: &'static str,
+    pub measured_scope: &'static str,
+    pub attempted_events: Vec<&'static str>,
+    pub available_events: Vec<&'static str>,
+    pub blocked_reason: Option<String>,
+    pub perf_event_open_errno: Option<i32>,
+    pub cache_references: Option<u64>,
+    pub cache_misses: Option<u64>,
+    pub cache_miss_rate: Option<f64>,
+    pub max_cache_miss_rate: f64,
+    pub cache_miss_rate_under_threshold: Option<bool>,
+    pub elapsed_ns: Option<u128>,
+    pub measured_scans: usize,
+    pub measured_record_visits: u128,
+    pub checksum: Option<u64>,
+    pub read_as: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxPmuCacheProofClaimBoundary {
+    pub binary_hot_packet_loaded: bool,
+    pub fixed_records_fit_6m: bool,
+    pub fixed_records_fit_detected_l3: Option<bool>,
+    pub software_cache_only_execution_proven: bool,
+    pub hardware_perf_counters_used: bool,
+    pub hardware_cache_residency_counter_proven: bool,
     pub broad_chat_llm_ready: bool,
     pub nonlinear_memory_proven: bool,
     pub safe_claim: &'static str,
@@ -818,6 +875,124 @@ pub(crate) fn build_linux_cache_proof_report(
     })
 }
 
+pub(crate) fn build_linux_pmu_cache_proof_report(
+    config: LinuxPmuCacheProofConfig,
+) -> Result<LinuxPmuCacheProofReport> {
+    let fixed = parse_laf_fixed_records_only(&config.hot_pack)?;
+    let query = compile_linux_hot_numeric_query(&config.query);
+    let iterations = config.iterations.max(1);
+    let samples = config.samples.max(1);
+    let warmup_iterations = config.warmup_iterations;
+    let software_benchmark = benchmark_linux_fixed_records(
+        &fixed.records,
+        &query,
+        iterations,
+        warmup_iterations,
+        samples,
+    );
+    let hot_loop_record_bytes = fixed.records.len() * LAF_RECORD_BYTES;
+    let fixed_records_fit_6m = hot_loop_record_bytes <= SIX_MIB_BYTES;
+    let fixed_records_fit_detected_l3 = fixed
+        .detected_l3_bytes
+        .map(|l3_bytes| hot_loop_record_bytes <= l3_bytes);
+    let whole_file_fits_6m = fixed.actual_file_bytes <= SIX_MIB_BYTES;
+    let full_active_scan = software_benchmark.records_per_scan == fixed.records.len();
+    let software_cache_only_execution_proven = !fixed.records.is_empty()
+        && fixed_records_fit_6m
+        && software_benchmark.measured_scans > 0
+        && software_benchmark.measured_record_visits > 0
+        && full_active_scan
+        && software_benchmark.top_score > 0;
+    let pmu = measure_linux_hot_loop_pmu(
+        &fixed.records,
+        &query,
+        iterations,
+        warmup_iterations,
+        samples,
+        config.max_cache_miss_rate.max(0.0),
+    );
+    let hardware_perf_counters_used = pmu.counter_status == "MEASURED";
+    let hardware_cache_residency_counter_proven = software_cache_only_execution_proven
+        && fixed_records_fit_detected_l3.unwrap_or(fixed_records_fit_6m)
+        && pmu.cache_miss_rate_under_threshold == Some(true);
+    let verdict = if hardware_cache_residency_counter_proven {
+        "LINUX_PMU_CACHE_RESIDENCY_PROVEN"
+    } else if pmu.counter_status == "MEASURED" {
+        "LINUX_PMU_CACHE_RESIDENCY_REVIEW"
+    } else {
+        "LINUX_PMU_CACHE_RESIDENCY_BLOCKED"
+    };
+
+    let mut blocked_claims = vec!["broad_chat_llm_ready", "nonlinear_memory_proven"];
+    if !hardware_cache_residency_counter_proven {
+        blocked_claims.push("hardware_cache_residency_counter_proven");
+    }
+    if !software_cache_only_execution_proven {
+        blocked_claims.push("software_cache_only_execution_proven");
+    }
+
+    Ok(LinuxPmuCacheProofReport {
+        mode: "llmwave-big-linux-pmu-cache-proof",
+        version: LINUX_HOT_PACKET_VERSION,
+        verdict,
+        hot_pack: LinuxCacheProofPackSummary {
+            path: config.hot_pack.display().to_string(),
+            file_bytes: fixed.actual_file_bytes,
+            wave_dim: fixed.header.wave_dim,
+            fixed_record_count: fixed.records.len(),
+            route_count: fixed.header.route_count,
+            corpus_hash64: fixed.header.corpus_hash,
+            fixed_record_bytes: fixed.header.record_bytes,
+            hot_loop_record_bytes,
+            cold_label_count: fixed.header.label_count,
+            cold_label_table_bytes: fixed.cold_label_table_bytes,
+            hot_budget_bytes: SIX_MIB_BYTES,
+            detected_l3_bytes: fixed.detected_l3_bytes,
+            fixed_records_fit_6m,
+            fixed_records_fit_detected_l3,
+            whole_file_fits_6m,
+        },
+        compiled_query: LinuxCacheProofQuerySummary {
+            raw_query: query.raw_query.clone(),
+            token_count: query.token_hashes.len(),
+            token_hash_count: query.token_hashes.len(),
+            route_hint_hash_count: query.route_hint_hashes.len(),
+            relation_hint_hash_count: query.relation_hint_hashes.len(),
+            boundary_intent: query.boundary_intent,
+            positive_intent: query.positive_intent,
+        },
+        software_runtime_contract: LinuxCacheRuntimeContract {
+            records_loaded_from: "laf-header-plus-fixed-record-section-only",
+            full_active_scan,
+            fixed_record_only_inner_loop: true,
+            json_used_in_hot_loop: false,
+            labels_read_from_packet: false,
+            label_decode_in_hot_loop: false,
+            file_io_in_hot_loop: false,
+            heap_allocation_in_inner_loop: false,
+            per_record_score_arrays: false,
+            cold_label_table_excluded: true,
+            measured_loop_uses_numeric_hashes: true,
+            hardware_perf_counters_used,
+            hardware_cache_miss_rate_proven: hardware_cache_residency_counter_proven,
+        },
+        software_benchmark,
+        pmu,
+        claim_boundary: LinuxPmuCacheProofClaimBoundary {
+            binary_hot_packet_loaded: true,
+            fixed_records_fit_6m,
+            fixed_records_fit_detected_l3,
+            software_cache_only_execution_proven,
+            hardware_perf_counters_used,
+            hardware_cache_residency_counter_proven,
+            broad_chat_llm_ready: false,
+            nonlinear_memory_proven: false,
+            safe_claim: "The Linux .laf fixed-record loop is measured with hardware PMU cache-reference/cache-miss counters when the host kernel allows perf_event_open. A PASS means the hot fixed-record section fits the cache budget and PMU cache miss rate stayed under the configured threshold. This is not broad chat or nonlinear-memory proof.",
+            blocked_claims,
+        },
+    })
+}
+
 fn benchmark_linux_fixed_records(
     records: &[PackedLinuxFact64],
     query: &LinuxHotNumericQuery,
@@ -885,6 +1060,105 @@ fn benchmark_linux_fixed_records(
         top_fact_hash: last_scan.top_fact_hash,
         checksum: last_scan.checksum,
         sample_ns_per_scan: sample_ns_per_scan.into_iter().map(round2).collect(),
+    }
+}
+
+fn measure_linux_hot_loop_pmu(
+    records: &[PackedLinuxFact64],
+    query: &LinuxHotNumericQuery,
+    iterations: usize,
+    warmup_iterations: usize,
+    samples: usize,
+    max_cache_miss_rate: f64,
+) -> LinuxPmuCounterSummary {
+    let attempted_events = vec!["cache-references", "cache-misses"];
+    if records.is_empty() {
+        return LinuxPmuCounterSummary {
+            counter_status: "BLOCKED",
+            measured_scope: "linux-laf-fixed-record-hot-loop",
+            attempted_events,
+            available_events: Vec::new(),
+            blocked_reason: Some("empty_fixed_record_section".to_string()),
+            perf_event_open_errno: None,
+            cache_references: None,
+            cache_misses: None,
+            cache_miss_rate: None,
+            max_cache_miss_rate: round4_f64(max_cache_miss_rate),
+            cache_miss_rate_under_threshold: None,
+            elapsed_ns: None,
+            measured_scans: 0,
+            measured_record_visits: 0,
+            checksum: None,
+            read_as: "No PMU proof was attempted because the hot loop has no records.",
+        };
+    }
+
+    for _ in 0..warmup_iterations {
+        black_box(scan_linux_fixed_records_numeric(records, query));
+    }
+
+    let measured_scans = samples.saturating_mul(iterations.max(1));
+    let measured_record_visits = measured_scans as u128 * records.len() as u128;
+    match platform_pmu::measure_cache_counters(|| {
+        let mut checksum = 0u64;
+        for scan_index in 0..measured_scans {
+            checksum = checksum.rotate_left(9)
+                ^ black_box(scan_linux_fixed_records_numeric(records, query)).checksum
+                ^ (scan_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        }
+        checksum
+    }) {
+        PmuMeasureOutcome::Measured(measured) => {
+            let cache_miss_rate = if measured.cache_references == 0 {
+                None
+            } else {
+                Some(round6(
+                    measured.cache_misses as f64 / measured.cache_references as f64,
+                ))
+            };
+            let cache_miss_rate_under_threshold =
+                cache_miss_rate.map(|rate| rate <= max_cache_miss_rate);
+            LinuxPmuCounterSummary {
+                counter_status: if cache_miss_rate.is_some() {
+                    "MEASURED"
+                } else {
+                    "NO_REFERENCES"
+                },
+                measured_scope: "linux-laf-fixed-record-hot-loop",
+                attempted_events,
+                available_events: vec!["cache-references", "cache-misses"],
+                blocked_reason: None,
+                perf_event_open_errno: None,
+                cache_references: Some(measured.cache_references),
+                cache_misses: Some(measured.cache_misses),
+                cache_miss_rate,
+                max_cache_miss_rate: round4_f64(max_cache_miss_rate),
+                cache_miss_rate_under_threshold,
+                elapsed_ns: Some(measured.elapsed_ns),
+                measured_scans,
+                measured_record_visits,
+                checksum: Some(measured.checksum),
+                read_as: "Hardware PMU counters were read around the fixed-record hot loop only, after warmup. The result is a host/runtime measurement, not a portable model theorem.",
+            }
+        }
+        PmuMeasureOutcome::Blocked(blocked) => LinuxPmuCounterSummary {
+            counter_status: "BLOCKED",
+            measured_scope: "linux-laf-fixed-record-hot-loop",
+            attempted_events,
+            available_events: Vec::new(),
+            blocked_reason: Some(blocked.reason),
+            perf_event_open_errno: blocked.errno,
+            cache_references: None,
+            cache_misses: None,
+            cache_miss_rate: None,
+            max_cache_miss_rate: round4_f64(max_cache_miss_rate),
+            cache_miss_rate_under_threshold: None,
+            elapsed_ns: None,
+            measured_scans,
+            measured_record_visits,
+            checksum: None,
+            read_as: "PMU proof is blocked by host/kernel support or permissions. This keeps hardware_cache_residency_counter_proven=false instead of inventing a result.",
+        },
     }
 }
 
@@ -1780,6 +2054,10 @@ fn round4_f64(value: f64) -> f64 {
     (value * 10_000.0).round() / 10_000.0
 }
 
+fn round6(value: f64) -> f64 {
+    (value * 1_000_000.0).round() / 1_000_000.0
+}
+
 fn percentile(sorted: &[f64], percentile: f64) -> f64 {
     if sorted.is_empty() {
         return 0.0;
@@ -1863,6 +2141,255 @@ fn read_u64(cursor: &mut Cursor<&[u8]>) -> Result<u64> {
     let mut bytes = [0u8; 8];
     cursor.read_exact(&mut bytes)?;
     Ok(u64::from_le_bytes(bytes))
+}
+
+struct PmuMeasuredCounters {
+    cache_references: u64,
+    cache_misses: u64,
+    elapsed_ns: u128,
+    checksum: u64,
+}
+
+struct PmuBlocked {
+    reason: String,
+    errno: Option<i32>,
+}
+
+enum PmuMeasureOutcome {
+    Measured(PmuMeasuredCounters),
+    Blocked(PmuBlocked),
+}
+
+#[cfg(target_os = "linux")]
+mod platform_pmu {
+    use super::{PmuBlocked, PmuMeasureOutcome, PmuMeasuredCounters};
+    use std::ffi::c_void;
+    use std::io;
+    use std::mem;
+    use std::os::raw::{c_int, c_long, c_ulong};
+    use std::time::Instant;
+
+    const PERF_TYPE_HARDWARE: u32 = 0;
+    const PERF_COUNT_HW_CACHE_REFERENCES: u64 = 2;
+    const PERF_COUNT_HW_CACHE_MISSES: u64 = 3;
+    const PERF_EVENT_IOC_ENABLE: c_ulong = 0x2400;
+    const PERF_EVENT_IOC_DISABLE: c_ulong = 0x2401;
+    const PERF_EVENT_IOC_RESET: c_ulong = 0x2403;
+    const PERF_ATTR_DISABLED: u64 = 1 << 0;
+    const PERF_ATTR_EXCLUDE_KERNEL: u64 = 1 << 5;
+    const PERF_ATTR_EXCLUDE_HV: u64 = 1 << 6;
+
+    #[cfg(target_arch = "x86_64")]
+    const SYS_PERF_EVENT_OPEN: c_long = 298;
+    #[cfg(target_arch = "aarch64")]
+    const SYS_PERF_EVENT_OPEN: c_long = 241;
+    #[cfg(target_arch = "arm")]
+    const SYS_PERF_EVENT_OPEN: c_long = 364;
+    #[cfg(target_arch = "riscv64")]
+    const SYS_PERF_EVENT_OPEN: c_long = 241;
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct PerfEventAttr {
+        type_: u32,
+        size: u32,
+        config: u64,
+        sample_period_or_freq: u64,
+        sample_type: u64,
+        read_format: u64,
+        flags: u64,
+        wakeup_events_or_watermark: u32,
+        bp_type: u32,
+        bp_addr_or_config1: u64,
+        bp_len_or_config2: u64,
+        branch_sample_type: u64,
+        sample_regs_user: u64,
+        sample_stack_user: u32,
+        clockid: i32,
+        sample_regs_intr: u64,
+        aux_watermark: u32,
+        sample_max_stack: u16,
+        reserved_2: u16,
+        aux_sample_size: u32,
+        reserved_3: u32,
+        sig_data: u64,
+        config3: u64,
+    }
+
+    unsafe extern "C" {
+        fn syscall(num: c_long, ...) -> c_long;
+        fn close(fd: c_int) -> c_int;
+        fn read(fd: c_int, buf: *mut c_void, count: usize) -> isize;
+        fn ioctl(fd: c_int, request: c_ulong, ...) -> c_int;
+    }
+
+    pub(super) fn measure_cache_counters(run: impl FnOnce() -> u64) -> PmuMeasureOutcome {
+        #[cfg(not(any(
+            target_arch = "x86_64",
+            target_arch = "aarch64",
+            target_arch = "arm",
+            target_arch = "riscv64"
+        )))]
+        {
+            let checksum = run();
+            return PmuMeasureOutcome::Blocked(PmuBlocked {
+                reason: format!(
+                    "perf_event_open_syscall_not_defined_for_arch; checksum={checksum}"
+                ),
+                errno: None,
+            });
+        }
+
+        let refs_fd = match open_hardware_counter(PERF_COUNT_HW_CACHE_REFERENCES) {
+            Ok(fd) => fd,
+            Err(blocked) => {
+                let checksum = run();
+                return PmuMeasureOutcome::Blocked(PmuBlocked {
+                    reason: format!(
+                        "open_cache_references_failed:{}; checksum={checksum}",
+                        blocked.reason
+                    ),
+                    errno: blocked.errno,
+                });
+            }
+        };
+        let misses_fd = match open_hardware_counter(PERF_COUNT_HW_CACHE_MISSES) {
+            Ok(fd) => fd,
+            Err(blocked) => {
+                unsafe {
+                    close(refs_fd);
+                }
+                let checksum = run();
+                return PmuMeasureOutcome::Blocked(PmuBlocked {
+                    reason: format!(
+                        "open_cache_misses_failed:{}; checksum={checksum}",
+                        blocked.reason
+                    ),
+                    errno: blocked.errno,
+                });
+            }
+        };
+
+        let reset_ok = counter_ioctl(refs_fd, PERF_EVENT_IOC_RESET)
+            && counter_ioctl(misses_fd, PERF_EVENT_IOC_RESET);
+        let enable_ok = counter_ioctl(refs_fd, PERF_EVENT_IOC_ENABLE)
+            && counter_ioctl(misses_fd, PERF_EVENT_IOC_ENABLE);
+        if !reset_ok || !enable_ok {
+            unsafe {
+                close(refs_fd);
+                close(misses_fd);
+            }
+            let checksum = run();
+            return PmuMeasureOutcome::Blocked(PmuBlocked {
+                reason: format!("perf_counter_ioctl_failed; checksum={checksum}"),
+                errno: io::Error::last_os_error().raw_os_error(),
+            });
+        }
+
+        let start = Instant::now();
+        let checksum = run();
+        let elapsed_ns = start.elapsed().as_nanos();
+        let disable_ok = counter_ioctl(refs_fd, PERF_EVENT_IOC_DISABLE)
+            && counter_ioctl(misses_fd, PERF_EVENT_IOC_DISABLE);
+        let refs = read_counter(refs_fd);
+        let misses = read_counter(misses_fd);
+        unsafe {
+            close(refs_fd);
+            close(misses_fd);
+        }
+        if !disable_ok {
+            return PmuMeasureOutcome::Blocked(PmuBlocked {
+                reason: format!("perf_counter_disable_failed; checksum={checksum}"),
+                errno: io::Error::last_os_error().raw_os_error(),
+            });
+        }
+        match (refs, misses) {
+            (Ok(cache_references), Ok(cache_misses)) => {
+                PmuMeasureOutcome::Measured(PmuMeasuredCounters {
+                    cache_references,
+                    cache_misses,
+                    elapsed_ns,
+                    checksum,
+                })
+            }
+            (Err(blocked), _) | (_, Err(blocked)) => PmuMeasureOutcome::Blocked(blocked),
+        }
+    }
+
+    fn open_hardware_counter(config: u64) -> Result<c_int, PmuBlocked> {
+        let attr = PerfEventAttr {
+            type_: PERF_TYPE_HARDWARE,
+            size: mem::size_of::<PerfEventAttr>() as u32,
+            config,
+            sample_period_or_freq: 0,
+            sample_type: 0,
+            read_format: 0,
+            flags: PERF_ATTR_DISABLED | PERF_ATTR_EXCLUDE_KERNEL | PERF_ATTR_EXCLUDE_HV,
+            wakeup_events_or_watermark: 0,
+            bp_type: 0,
+            bp_addr_or_config1: 0,
+            bp_len_or_config2: 0,
+            branch_sample_type: 0,
+            sample_regs_user: 0,
+            sample_stack_user: 0,
+            clockid: 0,
+            sample_regs_intr: 0,
+            aux_watermark: 0,
+            sample_max_stack: 0,
+            reserved_2: 0,
+            aux_sample_size: 0,
+            reserved_3: 0,
+            sig_data: 0,
+            config3: 0,
+        };
+        let fd = unsafe { syscall(SYS_PERF_EVENT_OPEN, &attr, 0, -1, -1, 0) };
+        if fd < 0 {
+            let err = io::Error::last_os_error();
+            Err(PmuBlocked {
+                reason: err.to_string(),
+                errno: err.raw_os_error(),
+            })
+        } else {
+            Ok(fd as c_int)
+        }
+    }
+
+    fn counter_ioctl(fd: c_int, request: c_ulong) -> bool {
+        unsafe { ioctl(fd, request, 0) == 0 }
+    }
+
+    fn read_counter(fd: c_int) -> Result<u64, PmuBlocked> {
+        let mut value = 0u64;
+        let result = unsafe {
+            read(
+                fd,
+                (&mut value as *mut u64).cast::<c_void>(),
+                mem::size_of::<u64>(),
+            )
+        };
+        if result == mem::size_of::<u64>() as isize {
+            Ok(value)
+        } else {
+            let err = io::Error::last_os_error();
+            Err(PmuBlocked {
+                reason: err.to_string(),
+                errno: err.raw_os_error(),
+            })
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+mod platform_pmu {
+    use super::{PmuBlocked, PmuMeasureOutcome};
+
+    pub(super) fn measure_cache_counters(run: impl FnOnce() -> u64) -> PmuMeasureOutcome {
+        let checksum = run();
+        PmuMeasureOutcome::Blocked(PmuBlocked {
+            reason: format!("perf_event_open_available_only_on_linux; checksum={checksum}"),
+            errno: None,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -2015,6 +2542,65 @@ mod tests {
         assert!(!proof.runtime_contract.json_used_in_hot_loop);
         assert_eq!(proof.benchmark.records_per_scan, 2);
         assert!(proof.benchmark.top_score > 0);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn linux_pmu_cache_proof_reports_measured_or_blocked() {
+        let root = unique_tmp_dir("linux-pmu-cache-proof");
+        let facts_dir = root.join("facts");
+        fs::create_dir_all(&facts_dir).unwrap();
+        let facts_path = facts_dir.join("fixture.jsonl");
+        let facts = vec![
+            test_fact(
+                "linux.apt.command.provider",
+                "bash",
+                "provided by package",
+                "bash",
+                "positive",
+            ),
+            test_fact(
+                "linux.boundary.package",
+                "package installed",
+                "does not prove",
+                "binary is running",
+                "negative",
+            ),
+        ];
+        let mut file = fs::File::create(&facts_path).unwrap();
+        for fact in facts {
+            serde_json::to_writer(&mut file, &fact).unwrap();
+            file.write_all(b"\n").unwrap();
+        }
+        let hot_path = root.join("linux.laf");
+        build_linux_hot_pack_report(LinuxHotPackConfig {
+            atlas_dir: root.clone(),
+            max_active_facts: 2,
+            out: hot_path.clone(),
+        })
+        .unwrap();
+
+        let proof = build_linux_pmu_cache_proof_report(LinuxPmuCacheProofConfig {
+            hot_pack: hot_path,
+            query: "which package provides command bash".to_string(),
+            iterations: 2,
+            warmup_iterations: 1,
+            samples: 2,
+            max_cache_miss_rate: 1.0,
+        })
+        .unwrap();
+        assert_eq!(proof.mode, "llmwave-big-linux-pmu-cache-proof");
+        assert!(proof.claim_boundary.software_cache_only_execution_proven);
+        assert!(matches!(
+            proof.pmu.counter_status,
+            "MEASURED" | "NO_REFERENCES" | "BLOCKED"
+        ));
+        if proof.pmu.counter_status == "MEASURED" {
+            assert!(proof.pmu.cache_references.unwrap_or(0) > 0);
+            assert!(proof.pmu.cache_misses.is_some());
+        } else {
+            assert!(proof.pmu.blocked_reason.is_some() || proof.pmu.cache_references == Some(0));
+        }
         let _ = fs::remove_dir_all(root);
     }
 

@@ -415,6 +415,9 @@ enum LlmwaveBigCommand {
     /// Prove the Linux hot loop scans only fixed records inside the 6 MiB cache budget.
     #[command(name = "linux-cache-proof", alias = "linux-cache-bench")]
     LinuxCacheProof(LlmwaveBigLinuxCacheProofArgs),
+    /// Measure Linux hot-loop cache residency with hardware PMU counters.
+    #[command(name = "linux-pmu-cache-proof", alias = "linux-hardware-cache-proof")]
+    LinuxPmuCacheProof(LlmwaveBigLinuxPmuCacheProofArgs),
     /// Pack the Linux Active Field into binary schema/residual memory.
     #[command(name = "linux-pack-residual", alias = "linux-residual-pack")]
     LinuxPackResidual(LlmwaveBigLinuxPackResidualArgs),
@@ -1346,6 +1349,27 @@ struct LlmwaveBigLinuxCacheProofArgs {
     warmup_iterations: usize,
     #[arg(long = "samples", default_value_t = 5)]
     samples: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxPmuCacheProofArgs {
+    #[arg(
+        long = "hot-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.laf"
+    )]
+    hot_pack: PathBuf,
+    #[arg(long = "query", default_value = "which package provides command bash")]
+    query: String,
+    #[arg(long = "iterations", default_value_t = 64)]
+    iterations: usize,
+    #[arg(long = "warmup-iterations", default_value_t = 8)]
+    warmup_iterations: usize,
+    #[arg(long = "samples", default_value_t = 5)]
+    samples: usize,
+    #[arg(long = "max-cache-miss-rate", default_value_t = 0.02)]
+    max_cache_miss_rate: f64,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -3180,6 +3204,66 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- hardware cache counters used: `{}`",
                         report.runtime_contract.hardware_perf_counters_used
                     );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxPmuCacheProof(args) => {
+            let report = linux_hot_packet::build_linux_pmu_cache_proof_report(
+                linux_hot_packet::LinuxPmuCacheProofConfig {
+                    hot_pack: args.hot_pack,
+                    query: args.query,
+                    iterations: args.iterations,
+                    warmup_iterations: args.warmup_iterations,
+                    samples: args.samples,
+                    max_cache_miss_rate: args.max_cache_miss_rate,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("pmu_status: {}", report.pmu.counter_status);
+                    println!(
+                        "hardware_perf_counters_used: {}",
+                        report.claim_boundary.hardware_perf_counters_used
+                    );
+                    println!(
+                        "hardware_cache_residency_counter_proven: {}",
+                        report
+                            .claim_boundary
+                            .hardware_cache_residency_counter_proven
+                    );
+                    println!(
+                        "software_cache_only_execution_proven: {}",
+                        report.claim_boundary.software_cache_only_execution_proven
+                    );
+                    println!("cache_miss_rate: {:?}", report.pmu.cache_miss_rate);
+                    if let Some(reason) = &report.pmu.blocked_reason {
+                        println!("blocked_reason: {reason}");
+                    }
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux PMU Cache Proof");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- PMU status: `{}`", report.pmu.counter_status);
+                    println!(
+                        "- hardware counters used: `{}`",
+                        report.claim_boundary.hardware_perf_counters_used
+                    );
+                    println!(
+                        "- hardware cache residency proven: `{}`",
+                        report
+                            .claim_boundary
+                            .hardware_cache_residency_counter_proven
+                    );
+                    println!(
+                        "- software cache-only proven: `{}`",
+                        report.claim_boundary.software_cache_only_execution_proven
+                    );
+                    println!("- cache miss rate: `{:?}`", report.pmu.cache_miss_rate);
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }
             }
             Ok(EXIT_PASS)

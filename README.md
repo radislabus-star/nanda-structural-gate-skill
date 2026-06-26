@@ -392,6 +392,15 @@ nanda-llmwave-big linux-cache-proof \
   --samples 5 \
   --format json
 
+nanda-llmwave-big linux-pmu-cache-proof \
+  --hot-pack .nanda/linux-active/linux-active-65k.laf \
+  --query "which package provides command bash" \
+  --iterations 64 \
+  --warmup-iterations 8 \
+  --samples 5 \
+  --max-cache-miss-rate 0.02 \
+  --format json
+
 nanda-llmwave-big linux-pack-residual \
   --atlas-dir .nanda/linux-atlas \
   --max-active-facts 65536 \
@@ -683,6 +692,15 @@ allocation, and no per-record score arrays. Treat
 fixed-record hot loop under the 6 MiB budget. It is still not PMU cache-miss
 counter evidence, not broad chat readiness, not exposure analysis, and not
 nonlinear-memory proof.
+
+`linux-pmu-cache-proof` is the hardware evidence layer for the same `.laf`
+fixed-record hot loop. It opens PMU counters with `perf_event_open`, warms the
+loop, measures `cache-references` and `cache-misses` around the numeric scan,
+and compares the miss rate with `--max-cache-miss-rate`. Treat
+`LINUX_PMU_CACHE_RESIDENCY_PROVEN` as host-local hardware counter evidence for
+the hot loop. If the kernel blocks perf counters, the command returns
+`LINUX_PMU_CACHE_RESIDENCY_BLOCKED` and keeps
+`hardware_cache_residency_counter_proven=false`.
 
 `linux-atlas-projection` is the Phase 18 Atlas-to-6MB cognitive projection
 gate. It does not claim that the whole append-only Linux Atlas is losslessly
