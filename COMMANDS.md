@@ -59,7 +59,8 @@ nanda-release-gate .nanda/route-atlas.json
 Use this before refactoring. `WATCH` means do not cut yet. Repo-wide mode is
 only a pressure scan; rerun with `--atlas`, `--route`, and `--owner` before a
 concrete split/merge. With `nanda-dogfood --boundary-economics`, unresolved
-boundary verdicts are raised into `agent_decision`.
+boundary verdicts are raised into `agent_decision`. The policy owner is
+`field_core::boundary`; this command is a wrapper.
 
 ```bash
 nanda-boundary-economics . --format json

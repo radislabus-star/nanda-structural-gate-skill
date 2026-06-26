@@ -51,7 +51,15 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
                 .map(Path::to_path_buf)
                 .unwrap_or_else(|| PathBuf::from("."))
         };
-        Some(commands::boundary::report(&repo_root, None, None)?)
+        Some(crate::field_core::boundary_report(
+            &repo_root,
+            None,
+            None,
+            None,
+            None,
+            auto_route_for_path,
+            auto_owner_for_path,
+        )?)
     } else {
         None
     };

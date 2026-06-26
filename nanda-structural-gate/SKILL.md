@@ -409,6 +409,9 @@ top-level `boundary_decision` for compatibility. `WATCH` means do not cut;
 `SPLIT_STRONG` means refactor only inside `allowed_files` and after required
 tests; `MERGE_CANDIDATE` means prepare a separate merge plan; `KEEP` means do
 not touch the boundary.
+Boundary Economics policy is owned by `field_core::boundary`; the public
+command is only a wrapper. Treat drift back into `commands/boundary.rs` as a
+core ownership regression.
 When `nanda-dogfood . --refactor-plan --boundary-economics` is used, inspect
 `agent_decision.boundary_economics_verdict`: a boundary `WATCH` downgrades an
 otherwise safe edit to `REVIEW_REQUIRED`, and a boundary `VETO` downgrades it

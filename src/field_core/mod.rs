@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 pub(crate) mod adapters;
 pub(crate) mod anti_wave;
 pub(crate) mod basis;
+pub(crate) mod boundary;
 pub(crate) mod coherence;
 pub(crate) mod engine;
 pub(crate) mod feedback;
@@ -18,6 +19,7 @@ pub(crate) mod vector;
 
 pub(crate) use anti_wave::*;
 pub(crate) use basis::*;
+pub(crate) use boundary::*;
 pub(crate) use coherence::*;
 pub(crate) use engine::*;
 pub(crate) use feedback::*;

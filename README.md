@@ -1413,6 +1413,8 @@ keeping top-level `boundary_decision` for compatibility. Verdicts are
 boundary; `SPLIT_STRONG` allows refactor only inside the returned contract;
 `SPLIT_WEAK` is a small preparatory step plus human review; `MERGE_CANDIDATE`
 needs a separate merge plan or review.
+The boundary policy owner is `field_core::boundary`; the CLI command is only a
+wrapper around that core report.
 When `nanda-dogfood . --refactor-plan --boundary-economics` is used, unresolved
 boundary economics is propagated into `agent_decision`: a boundary `WATCH`
 downgrades an otherwise safe edit to `REVIEW_REQUIRED`, and a boundary `VETO`
