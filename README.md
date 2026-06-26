@@ -1398,7 +1398,9 @@ not treat `src/main.rs` as the whole repository.
 split/merge from file size. It applies `NO EVIDENCE => NO CUT` and returns a
 JSON `boundary_decision` with verdict, score components, evidence, allowed
 files, forbidden routes, required tests, and repair contract. Use repo-wide
-mode to find possible split pressure; use route-scoped mode with `--atlas`,
+mode to find possible split pressure only; if repo-wide mode sees foreign route
+pressure but the score is not strong enough for an autonomous split, it returns
+`WATCH` and asks for a route-scoped pass. Use route-scoped mode with `--atlas`,
 `--route`, and `--owner` before a concrete refactor. Route-scoped mode starts
 from `atlas.routes[route].allowed_files` and then narrows by owner/path so the
 contract does not drag unrelated routes into the evidence. If an explicit
@@ -1411,6 +1413,10 @@ keeping top-level `boundary_decision` for compatibility. Verdicts are
 boundary; `SPLIT_STRONG` allows refactor only inside the returned contract;
 `SPLIT_WEAK` is a small preparatory step plus human review; `MERGE_CANDIDATE`
 needs a separate merge plan or review.
+When `nanda-dogfood . --refactor-plan --boundary-economics` is used, unresolved
+boundary economics is propagated into `agent_decision`: a boundary `WATCH`
+downgrades an otherwise safe edit to `REVIEW_REQUIRED`, and a boundary `VETO`
+downgrades it to `REPAIR_REQUIRED`.
 `nanda-build-atlas` writes reusable route memory to `.nanda/route-atlas.json`.
 `nanda-guard-action` is the fast pre-edit check: symptom plus `action_id` must
 resolve to an atlas route. `nanda-guard-diff` is the post-edit check: changed

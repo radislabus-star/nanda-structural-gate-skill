@@ -450,11 +450,14 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
     let score = positive - negative;
 
     let owner_filter_failed = facts.owner_filter_requested && !facts.owner_filter_matched;
+    let repo_wide_route_pressure = route.is_none() && !facts.foreign_route_files.is_empty();
 
     let verdict = if owner_filter_failed || !has_owner || !has_route || evidence_count == 0 {
         "WATCH"
     } else if !facts.foreign_route_files.is_empty() && route.is_some() {
         "VETO"
+    } else if repo_wide_route_pressure && score <= 0 {
+        "WATCH"
     } else if multi_route && score >= 3 {
         "SPLIT_STRONG"
     } else if multi_route && score > 0 {
@@ -468,6 +471,9 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
     let reason = match verdict {
         "WATCH" if owner_filter_failed => {
             "owner evidence not found in route atlas; explicit owner cannot fall back to whole route"
+        }
+        "WATCH" if repo_wide_route_pressure => {
+            "repo-wide route pressure found, but evidence is not strong enough for autonomous split; rerun route-scoped with atlas, route, and owner"
         }
         "WATCH" => "insufficient route, owner, or evidence; NO EVIDENCE => NO CUT",
         "VETO" => "target route would cross foreign route files; split/merge is unsafe",
@@ -526,7 +532,7 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
         "forbidden_routes": if let Some(route) = route { json!(facts.routes.iter().filter(|item| item.as_str() != route).cloned().collect::<Vec<_>>()) } else { json!([]) },
         "must_not_change": must_not_change(verdict),
         "required_tests": required_tests(facts),
-        "repair": repair_tasks(verdict, owner_filter_failed)
+        "repair": repair_tasks(verdict, owner_filter_failed, repo_wide_route_pressure)
     })
 }
 
@@ -668,12 +674,19 @@ fn required_tests(facts: &BoundaryFacts) -> Value {
     }
 }
 
-fn repair_tasks(verdict: &str, owner_filter_failed: bool) -> Value {
+fn repair_tasks(verdict: &str, owner_filter_failed: bool, repo_wide_route_pressure: bool) -> Value {
     if owner_filter_failed {
         return json!([
             "use an owner that matches the selected route atlas",
             "rebuild atlas if the owner map is stale",
             "do not expand to the whole route after owner mismatch"
+        ]);
+    }
+    if repo_wide_route_pressure && verdict == "WATCH" {
+        return json!([
+            "build or refresh the route atlas",
+            "select the route with boundary pressure",
+            "rerun boundary economics with --atlas, --route, and --owner before cutting"
         ]);
     }
     match verdict {

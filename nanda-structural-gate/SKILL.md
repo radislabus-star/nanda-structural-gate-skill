@@ -393,8 +393,11 @@ count is small.
 Use `nanda-boundary-economics` before split/merge refactors. It enforces
 `NO EVIDENCE => NO CUT`: do not split or merge just because a file is large or
 small. Inspect `boundary_decision.verdict`, score components, evidence, and the
-refactor contract. Use repo-wide mode only to find possible split pressure. Use
-route-scoped mode with `--atlas`, `--route`, and `--owner` before a concrete
+refactor contract. Use repo-wide mode only to find possible split pressure. If
+repo-wide mode sees foreign route pressure but the boundary score is not strong
+enough for an autonomous split, treat the `WATCH` verdict as a stop and rerun a
+route-scoped pass. Use route-scoped mode with `--atlas`, `--route`, and
+`--owner` before a concrete
 refactor; it starts from `atlas.routes[route].allowed_files` and narrows by
 owner/path so unrelated routes do not pollute the contract. If explicit
 `--owner` does not match the selected route atlas, treat the `WATCH` verdict
@@ -406,6 +409,10 @@ top-level `boundary_decision` for compatibility. `WATCH` means do not cut;
 `SPLIT_STRONG` means refactor only inside `allowed_files` and after required
 tests; `MERGE_CANDIDATE` means prepare a separate merge plan; `KEEP` means do
 not touch the boundary.
+When `nanda-dogfood . --refactor-plan --boundary-economics` is used, inspect
+`agent_decision.boundary_economics_verdict`: a boundary `WATCH` downgrades an
+otherwise safe edit to `REVIEW_REQUIRED`, and a boundary `VETO` downgrades it
+to `REPAIR_REQUIRED`.
 Use `nanda-build-atlas` to write reusable route memory once. Use
 `nanda-guard-action` before editing and `nanda-guard-diff` after editing. Use
 `nanda-release-gate` only before publishing or merging. Do not run the full

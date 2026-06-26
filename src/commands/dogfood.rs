@@ -68,7 +68,10 @@ pub(crate) fn dogfood_cmd(args: DogfoodArgs) -> Result<u8> {
     )?;
     let summary = comb_summary(&comb_tree);
     let failure_field = codex_failure_field(&packet, &triads, &candidates);
-    let decision = dogfood_decision(&comb_tree, &summary, &failure_field);
+    let mut decision = dogfood_decision(&comb_tree, &summary, &failure_field);
+    if let Some(boundary_economics) = boundary_economics.as_ref() {
+        apply_boundary_economics_to_decision(&mut decision, boundary_economics);
+    }
     let out = json!({
         "core_version": CORE_VERSION,
         "wave_dim": WAVE_DIM,
@@ -484,6 +487,36 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value, failure_field: &Va
         "codex_failure_reasons": failure_field["reason_codes"],
         "next": next
     })
+}
+
+fn apply_boundary_economics_to_decision(decision: &mut Value, boundary_economics: &Value) {
+    let verdict = boundary_economics["boundary_decision"]["verdict"]
+        .as_str()
+        .unwrap_or("WATCH");
+    let boundary_safe = boundary_economics["boundary_decision"]["safe_to_edit"]
+        .as_bool()
+        .unwrap_or(false);
+    let reason = boundary_economics["boundary_decision"]["reason"]
+        .as_str()
+        .unwrap_or("");
+    decision["boundary_economics_verdict"] = json!(verdict);
+    decision["boundary_economics_safe_to_edit"] = json!(boundary_safe);
+    decision["boundary_economics_reason"] = json!(reason);
+
+    if decision["safe_to_edit"].as_bool() == Some(true) && !boundary_safe {
+        let action = if verdict == "VETO" {
+            "REPAIR_REQUIRED"
+        } else {
+            "REVIEW_REQUIRED"
+        };
+        decision["action"] = json!(action);
+        decision["safe_to_edit"] = json!(false);
+        decision["next"] = json!(if verdict == "VETO" {
+            "Boundary Economics vetoed the refactor boundary; split by route before editing."
+        } else {
+            "Boundary Economics is unresolved; rerun a route-scoped boundary pass before refactoring."
+        });
+    }
 }
 
 pub(crate) fn print_dogfood_text(out: &Value) {

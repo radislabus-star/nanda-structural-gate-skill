@@ -2034,6 +2034,28 @@ cat >"$tmp_boundary_repo/tests/mixed_test.rs" <<'EOF_BOUNDARY'
 EOF_BOUNDARY
 boundary_split_json="$("$boundary_economics" "$tmp_boundary_repo" --format json)"
 jq -e '.boundary_decision.verdict == "SPLIT_STRONG" and .boundary_decision.evidence.foreign_pull != []' <<<"$boundary_split_json" >/dev/null
+tmp_boundary_pressure_repo="$(mktemp -d)"
+mkdir -p "$tmp_boundary_pressure_repo/src/shared_owner/core"
+cat >"$tmp_boundary_pressure_repo/src/shared_owner/core/nanda_support.rs" <<'EOF_BOUNDARY'
+pub fn nanda_support() {}
+EOF_BOUNDARY
+for i in 1 2 3 4 5; do
+  cat >"$tmp_boundary_pressure_repo/src/shared_owner/core/nanda_api_$i.rs" <<EOF_BOUNDARY
+pub fn nanda_api_$i() {}
+EOF_BOUNDARY
+done
+cat >"$tmp_boundary_pressure_repo/src/shared_owner/core/runtime_call.rs" <<'EOF_BOUNDARY'
+pub fn runtime_call() { nanda_support(); }
+EOF_BOUNDARY
+for i in 1 2 3; do
+  cat >"$tmp_boundary_pressure_repo/src/shared_owner/core/runtime_api_$i.rs" <<EOF_BOUNDARY
+pub fn runtime_api_$i() {}
+EOF_BOUNDARY
+done
+boundary_pressure_json="$("$boundary_economics" "$tmp_boundary_pressure_repo" --format json || true)"
+jq -e '.boundary_decision.verdict == "WATCH" and .boundary_decision.safe_to_edit == false and (.boundary_decision.reason | contains("repo-wide route pressure")) and (.boundary_decision.repair | index("rerun boundary economics with --atlas, --route, and --owner before cutting"))' <<<"$boundary_pressure_json" >/dev/null
+boundary_pressure_dogfood_json="$("$dogfood" "$tmp_boundary_pressure_repo" --refactor-plan --boundary-economics --format json || true)"
+jq -e '.agent_decision.action == "REVIEW_REQUIRED" and .agent_decision.safe_to_edit == false and .agent_decision.boundary_economics_verdict == "WATCH" and .boundary_economics.boundary_decision.verdict == "WATCH"' <<<"$boundary_pressure_dogfood_json" >/dev/null
 boundary_atlas_path="$tmp_boundary_repo/.nanda/route-atlas.json"
 "$build_atlas" "$tmp_boundary_repo" --out "$boundary_atlas_path" --format json >/dev/null
 boundary_scoped_json="$("$boundary_economics" "$tmp_boundary_repo" --atlas "$boundary_atlas_path" --route ime-display-flow --owner src::bin::lay_ibus_engine --format json || true)"
@@ -2048,7 +2070,7 @@ boundary_watch_json="$("$boundary_economics" "$tmp_watch_repo" --format json || 
 jq -e '.boundary_decision.verdict == "WATCH"' <<<"$boundary_watch_json" >/dev/null
 dogfood_boundary_json="$("$dogfood" "$tmp_boundary_repo" --refactor-plan --boundary-economics --format json || true)"
 jq -e '.boundary_economics.boundary_decision.verdict | IN("SPLIT_STRONG","SPLIT_WEAK","VETO","KEEP","MERGE_CANDIDATE","WATCH")' <<<"$dogfood_boundary_json" >/dev/null
-rm -rf "$tmp_boundary_repo" "$tmp_watch_repo"
+rm -rf "$tmp_boundary_repo" "$tmp_boundary_pressure_repo" "$tmp_watch_repo"
 
 "$init_md" --task-id skill-smoke --template skill --stdout >/dev/null
 "$init_md" --task-id project-smoke --template project --stdout >/dev/null
