@@ -1400,11 +1400,19 @@ typed core JSON `boundary_decision` with verdict, score components, evidence,
 allowed files, forbidden routes, required tests, and repair contract. It also
 returns `boundary_field_records`, a compact bridge from boundary facts into
 `field_core` `FieldRecord` entries, so the boundary layer can feed the same
-structural field physics as other NANDA passes. Use repo-wide mode to find
-possible split pressure only; if repo-wide mode sees foreign route pressure but
-the score is not strong enough for an autonomous split, it returns `WATCH` and
-asks for a route-scoped pass. Use route-scoped mode with `--atlas`, `--route`,
-and `--owner` before a concrete refactor. Route-scoped mode starts from
+structural field physics as other NANDA passes. Boundary facts also run through
+`boundary_field_pass`: a shared `FieldPassInput` with route/owner lenses and
+anti-wave lanes for foreign routes, owner mismatches, and untested runtime
+side effects. `field_equivalence.field_not_more_permissive=true` is required:
+the field candidate may be stricter than the typed boundary core, but it must
+not be more permissive. `boundary_field_engine.selected_verdict` is the
+agent-facing cutover verdict used for exit codes and dogfood decisions, while
+`boundary_decision.verdict` remains the stable typed-core explanation for
+compatibility. Use repo-wide mode to find possible split pressure only; if
+repo-wide mode sees foreign route pressure but the score is not strong enough
+for an autonomous split, it returns `WATCH` and asks for a route-scoped pass.
+Use route-scoped mode with `--atlas`, `--route`, and `--owner` before a
+concrete refactor. Route-scoped mode starts from
 `atlas.routes[route].allowed_files` and then narrows by owner/path so the
 contract does not drag unrelated routes into the evidence. If an explicit
 `--owner` does not match the selected route atlas, the verdict is `WATCH` and

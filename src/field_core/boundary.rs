@@ -5,7 +5,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::{FieldRecord, FieldRecordKind};
+use super::{
+    run_field_pass, FieldAntiWaveLane, FieldClaimBoundary, FieldFamily, FieldLensKind,
+    FieldLensOperation, FieldPassInput, FieldPassReport, FieldRecord, FieldRecordKind,
+    FIELD_PASS_VERSION,
+};
 use crate::CORE_VERSION;
 
 pub(crate) type BoundaryPathClassifier = fn(&str) -> String;
@@ -155,6 +159,86 @@ struct BoundaryFieldRecordBridge {
     sample: Vec<FieldRecord>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryFieldPassAdmission {
+    version: &'static str,
+    mode: &'static str,
+    query: FieldRecord,
+    lenses: Vec<FieldLensOperation>,
+    anti_waves: Vec<FieldAntiWaveLane>,
+    state_hint: Option<String>,
+    field_pass: FieldPassReport,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryFieldEquivalence {
+    version: &'static str,
+    old_verdict: String,
+    field_verdict: String,
+    old_safe_to_edit: bool,
+    field_safe_to_answer: bool,
+    old_rank: u8,
+    field_rank: u8,
+    field_not_more_permissive: bool,
+    cutover_ready: bool,
+    mismatch_reason: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryFieldEngine {
+    version: &'static str,
+    selected_engine: &'static str,
+    candidate_allowed: bool,
+    cutover_applied: bool,
+    top_level_boundary_decision_preserved: bool,
+    selected_verdict: String,
+    selected_safe_to_edit: bool,
+    policy: BoundaryFieldEnginePolicy,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryFieldEnginePolicy {
+    requires_not_more_permissive: bool,
+    requires_field_pass_version: &'static str,
+    can_be_stricter_than_typed_core: bool,
+    cannot_be_more_permissive_than_typed_core: bool,
+    public_json_compatibility: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryOwnerGravity {
+    version: &'static str,
+    requested_owner: Option<String>,
+    dominant_owner: Option<String>,
+    owner_file_counts: BTreeMap<String, usize>,
+    owner_count: usize,
+    dominant_owner_ratio: f64,
+    owner_conflict: bool,
+    owner_conflict_energy: i32,
+    adapter_leak_energy: i32,
+    cross_owner_call_edges: Vec<String>,
+    verdict_hint: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryEnergy {
+    version: &'static str,
+    owner_clarity_gain: i32,
+    foreign_pull_reduction: i32,
+    test_isolation_gain: i32,
+    state_locality_gain: i32,
+    api_surface_growth: i32,
+    adapter_leak: i32,
+    runtime_risk: i32,
+    migration_cost: i32,
+    wrapper_tax: i32,
+    owner_conflict_energy: i32,
+    boundary_tax: i32,
+    net: i32,
+    verdict_hint: &'static str,
+    read_as: &'static str,
+}
+
 pub(crate) fn boundary_report(
     input: &Path,
     atlas: Option<&Value>,
@@ -238,13 +322,24 @@ pub(crate) fn boundary_report(
     let decision = boundary_decision(&facts, target_route.as_deref(), target_owner.as_deref());
     let field_records = boundary_field_records(&facts);
     let field_record_bridge = BoundaryFieldRecordBridge::from_facts(&facts, &field_records);
+    let owner_gravity = boundary_owner_gravity(&facts);
+    let boundary_energy = boundary_energy(&facts, &decision, &owner_gravity);
+    let field_admission = boundary_field_pass_admission(
+        &facts,
+        &decision,
+        &field_records,
+        target_route.as_deref(),
+        target_owner.as_deref(),
+    );
+    let field_equivalence = boundary_field_equivalence(&decision, &field_admission.field_pass);
+    let field_engine = boundary_field_engine(&decision, &field_equivalence);
 
     Ok(json!({
         "mode": "boundary-economics",
         "core_version": CORE_VERSION,
         "boundary_core": {
             "owner": "field_core::boundary",
-            "version": "boundary-economics-core-v1",
+            "version": "boundary-economics-core-v2-field-pass",
             "commands_are_wrappers": true
         },
         "input": input.display().to_string(),
@@ -254,6 +349,11 @@ pub(crate) fn boundary_report(
         "target_owner": target_owner,
         "boundary_decision": decision,
         "boundary_field_records": field_record_bridge,
+        "boundary_field_pass": field_admission,
+        "field_equivalence": field_equivalence,
+        "boundary_field_engine": field_engine,
+        "owner_gravity": owner_gravity,
+        "boundary_energy": boundary_energy,
         "read_as": "NANDA Boundary Economics: NO EVIDENCE => NO CUT. Split/merge decisions require route, owner, state, API, runtime, and test evidence."
     }))
 }
@@ -707,6 +807,404 @@ impl BoundaryFieldRecordBridge {
             sample: records.iter().take(16).cloned().collect(),
         }
     }
+}
+
+fn boundary_owner_gravity(facts: &BoundaryFacts) -> BoundaryOwnerGravity {
+    let mut owner_file_counts = BTreeMap::<String, usize>::new();
+    for owner in facts.file_owners.values() {
+        *owner_file_counts.entry(owner.clone()).or_default() += 1;
+    }
+    let dominant_owner = owner_file_counts
+        .iter()
+        .max_by_key(|(_, count)| *count)
+        .map(|(owner, _)| owner.clone());
+    let dominant_count = dominant_owner
+        .as_ref()
+        .and_then(|owner| owner_file_counts.get(owner))
+        .copied()
+        .unwrap_or(0);
+    let dominant_owner_ratio = if facts.files.is_empty() {
+        0.0
+    } else {
+        round4(dominant_count as f64 / facts.files.len() as f64)
+    };
+    let cross_owner_call_edges = cross_owner_call_edges(facts);
+    let owner_conflict = facts.owner_filter_requested && !facts.owner_filter_matched
+        || owner_file_counts.len() > 1
+        || !cross_owner_call_edges.is_empty();
+    let owner_conflict_energy = (owner_file_counts.len().saturating_sub(1) as i32 * 2)
+        + cross_owner_call_edges.len() as i32;
+    let adapter_leak_energy = facts.thin_wrappers.len() as i32
+        + if !facts.public_api.is_empty() && facts.shared_state.is_empty() {
+            1
+        } else {
+            0
+        };
+    let verdict_hint = if owner_conflict {
+        "OWNER_CONFLICT"
+    } else if dominant_owner.is_some() {
+        "OWNER_STABLE"
+    } else {
+        "OWNER_UNRESOLVED"
+    };
+    BoundaryOwnerGravity {
+        version: "boundary-owner-gravity-v1",
+        requested_owner: facts.requested_owner.clone(),
+        dominant_owner,
+        owner_file_counts,
+        owner_count: facts.owners.len(),
+        dominant_owner_ratio,
+        owner_conflict,
+        owner_conflict_energy,
+        adapter_leak_energy,
+        cross_owner_call_edges: sample(&cross_owner_call_edges, 16),
+        verdict_hint,
+    }
+}
+
+fn boundary_energy(
+    facts: &BoundaryFacts,
+    decision: &BoundaryDecision,
+    owner_gravity: &BoundaryOwnerGravity,
+) -> BoundaryEnergy {
+    let owner_clarity_gain = decision.score_components.owner_clarity_gain.score;
+    let foreign_pull_reduction = decision.score_components.foreign_pull_reduction.score;
+    let test_isolation_gain = decision.score_components.test_isolation_gain.score;
+    let state_locality_gain = decision.score_components.state_locality_gain.score;
+    let api_surface_growth = -decision.score_components.api_surface_growth.score;
+    let adapter_leak = -decision.score_components.adapter_leak.score;
+    let runtime_risk = -decision.score_components.runtime_risk.score;
+    let migration_cost = -decision.score_components.migration_cost.score;
+    let wrapper_tax = facts.thin_wrappers.len() as i32;
+    let boundary_tax = api_surface_growth
+        + adapter_leak
+        + runtime_risk
+        + migration_cost
+        + wrapper_tax
+        + owner_gravity.owner_conflict_energy;
+    let net =
+        owner_clarity_gain + foreign_pull_reduction + test_isolation_gain + state_locality_gain
+            - boundary_tax;
+    let verdict_hint = if matches!(decision.verdict, "VETO") || owner_gravity.owner_conflict {
+        "NO_CUT_REPAIR_OWNER_OR_ROUTE"
+    } else if net >= 3 {
+        "CUT_CAN_REDUCE_CONFUSION"
+    } else if net < 0 {
+        "BOUNDARY_TAX_TOO_HIGH"
+    } else {
+        "NO_CUT_KEEP_BOUNDARY"
+    };
+    BoundaryEnergy {
+        version: "boundary-energy-v1",
+        owner_clarity_gain,
+        foreign_pull_reduction,
+        test_isolation_gain,
+        state_locality_gain,
+        api_surface_growth,
+        adapter_leak,
+        runtime_risk,
+        migration_cost,
+        wrapper_tax,
+        owner_conflict_energy: owner_gravity.owner_conflict_energy,
+        boundary_tax,
+        net,
+        verdict_hint,
+        read_as: "Positive energy must exceed boundary tax before a split/merge is justified.",
+    }
+}
+
+fn boundary_field_pass_admission(
+    facts: &BoundaryFacts,
+    decision: &BoundaryDecision,
+    field_records: &[FieldRecord],
+    route: Option<&str>,
+    owner: Option<&str>,
+) -> BoundaryFieldPassAdmission {
+    let query = FieldRecord::synthetic(
+        "boundary-query",
+        FieldRecordKind::StructuralTriad,
+        "boundary_decision",
+        "evaluates",
+        route.unwrap_or(decision.verdict).to_string(),
+        route.map(str::to_string).or_else(|| decision.route.clone()),
+        owner.map(str::to_string).or_else(|| decision.owner.clone()),
+    );
+    let mut records = field_records.to_vec();
+    let mut query_witness = query.clone();
+    query_witness.id = "boundary-query-witness".to_string();
+    records.push(query_witness);
+    records.push(FieldRecord::synthetic(
+        "boundary-typed-decision",
+        FieldRecordKind::StructuralTriad,
+        "typed_boundary_core",
+        "emits",
+        decision.verdict.to_string(),
+        decision.route.clone(),
+        decision.owner.clone(),
+    ));
+    if records.is_empty() {
+        records.push(FieldRecord::synthetic(
+            "boundary-no-evidence",
+            FieldRecordKind::StructuralTriad,
+            "boundary_evidence",
+            "is",
+            "empty",
+            route.map(str::to_string),
+            owner.map(str::to_string),
+        ));
+    }
+    let mut lenses = vec![FieldLensOperation {
+        kind: FieldLensKind::Evidence,
+        label: "boundary-economics".to_string(),
+        strength: 1,
+    }];
+    if let Some(route) = route {
+        lenses.push(FieldLensOperation {
+            kind: FieldLensKind::Route,
+            label: route.to_string(),
+            strength: 2,
+        });
+    }
+    if let Some(owner) = owner {
+        lenses.push(FieldLensOperation {
+            kind: FieldLensKind::Group,
+            label: owner.to_string(),
+            strength: 1,
+        });
+    }
+    let anti_waves = boundary_anti_waves(facts, decision, route, owner);
+    let state_hint = boundary_field_state_hint(decision, facts, anti_waves.len());
+    let field_pass = run_field_pass(&FieldPassInput {
+        family: FieldFamily::Structural,
+        query: query.clone(),
+        records,
+        lenses: lenses.clone(),
+        anti_waves: anti_waves.clone(),
+        state_hint: state_hint.clone(),
+        claim_boundary: FieldClaimBoundary {
+            not_llm_ready: false,
+            not_nonlinear_memory_proof: false,
+            ..FieldClaimBoundary::default()
+        },
+    });
+    BoundaryFieldPassAdmission {
+        version: "boundary-field-pass-admission-v1",
+        mode: "dual-run",
+        query,
+        lenses,
+        anti_waves,
+        state_hint,
+        field_pass,
+    }
+}
+
+fn boundary_anti_waves(
+    facts: &BoundaryFacts,
+    decision: &BoundaryDecision,
+    route: Option<&str>,
+    owner: Option<&str>,
+) -> Vec<FieldAntiWaveLane> {
+    let mut lanes = vec![];
+    for file in facts.foreign_route_files.iter().take(8) {
+        lanes.push(boundary_anti_wave_lane(
+            lanes.len(),
+            "foreign_route",
+            "suppresses",
+            file,
+            route,
+            owner,
+            3,
+        ));
+    }
+    if facts.owner_filter_requested && !facts.owner_filter_matched {
+        lanes.push(boundary_anti_wave_lane(
+            lanes.len(),
+            "owner_filter",
+            "rejects",
+            facts.requested_owner.as_deref().unwrap_or("unknown_owner"),
+            route,
+            owner,
+            3,
+        ));
+    }
+    if !facts.runtime_side_effects.is_empty() && facts.tests.is_empty() {
+        lanes.push(boundary_anti_wave_lane(
+            lanes.len(),
+            "runtime_risk",
+            "requires_test",
+            "runtime_side_effect_without_route_test",
+            route,
+            owner,
+            2,
+        ));
+    }
+    if matches!(decision.verdict, "VETO") && lanes.is_empty() {
+        lanes.push(boundary_anti_wave_lane(
+            lanes.len(),
+            "boundary_veto",
+            "blocks",
+            "unsafe_refactor",
+            route,
+            owner,
+            3,
+        ));
+    }
+    if !decision.safe_to_edit && !matches!(decision.verdict, "VETO") {
+        lanes.push(boundary_anti_wave_lane(
+            lanes.len(),
+            "boundary_not_safe_to_edit",
+            "keeps_review_state",
+            decision.verdict,
+            route,
+            owner,
+            1,
+        ));
+    }
+    lanes
+}
+
+fn boundary_anti_wave_lane(
+    index: usize,
+    subject: &str,
+    relation: &str,
+    object: &str,
+    route: Option<&str>,
+    owner: Option<&str>,
+    strength: i32,
+) -> FieldAntiWaveLane {
+    FieldAntiWaveLane {
+        id: format!("boundary-anti-wave-{index}"),
+        target: object.to_string(),
+        subject: subject.to_string(),
+        relation: relation.to_string(),
+        object: object.to_string(),
+        route: route.map(str::to_string),
+        group: owner.map(str::to_string),
+        strength,
+    }
+}
+
+fn boundary_field_state_hint(
+    decision: &BoundaryDecision,
+    facts: &BoundaryFacts,
+    anti_wave_count: usize,
+) -> Option<String> {
+    match decision.verdict {
+        "WATCH" | "SPLIT_WEAK" | "MERGE_CANDIDATE" => Some("FIELD_THIN".to_string()),
+        "VETO" => Some("FIELD_CONTESTED".to_string()),
+        _ if facts.files.is_empty() => Some("FIELD_THIN".to_string()),
+        _ if anti_wave_count > 0 && facts.foreign_route_files.is_empty() => {
+            Some("FIELD_THIN".to_string())
+        }
+        _ if anti_wave_count > 0 => None,
+        _ => None,
+    }
+}
+
+fn boundary_field_equivalence(
+    decision: &BoundaryDecision,
+    field_pass: &FieldPassReport,
+) -> BoundaryFieldEquivalence {
+    let old_rank = boundary_verdict_rank(decision.verdict);
+    let field_rank = field_pass_rank(&field_pass.verdict);
+    let field_not_more_permissive = field_rank <= old_rank;
+    let mut mismatch_reason = vec![];
+    if !field_not_more_permissive {
+        mismatch_reason.push("field_more_permissive_than_typed_boundary_core".to_string());
+    }
+    if field_pass.version != FIELD_PASS_VERSION {
+        mismatch_reason.push("field_pass_version_mismatch".to_string());
+    }
+    let cutover_ready = field_not_more_permissive && mismatch_reason.is_empty();
+    BoundaryFieldEquivalence {
+        version: "boundary-field-equivalence-v1",
+        old_verdict: decision.verdict.to_string(),
+        field_verdict: field_pass.verdict.clone(),
+        old_safe_to_edit: decision.safe_to_edit,
+        field_safe_to_answer: field_pass.safe_to_answer,
+        old_rank,
+        field_rank,
+        field_not_more_permissive,
+        cutover_ready,
+        mismatch_reason,
+    }
+}
+
+fn boundary_field_engine(
+    decision: &BoundaryDecision,
+    equivalence: &BoundaryFieldEquivalence,
+) -> BoundaryFieldEngine {
+    let candidate_allowed = equivalence.cutover_ready;
+    let selected_verdict = if !candidate_allowed {
+        decision.verdict.to_string()
+    } else if equivalence.field_verdict == "VETO" {
+        "VETO".to_string()
+    } else if equivalence.field_verdict == "WATCH" && decision.safe_to_edit {
+        "WATCH".to_string()
+    } else {
+        decision.verdict.to_string()
+    };
+    let selected_safe_to_edit = matches!(selected_verdict.as_str(), "SPLIT_STRONG" | "KEEP");
+    BoundaryFieldEngine {
+        version: "boundary-field-engine-v1",
+        selected_engine: if candidate_allowed {
+            "field-core-boundary-admission"
+        } else {
+            "typed-boundary-core"
+        },
+        candidate_allowed,
+        cutover_applied: false,
+        top_level_boundary_decision_preserved: true,
+        selected_verdict,
+        selected_safe_to_edit,
+        policy: BoundaryFieldEnginePolicy {
+            requires_not_more_permissive: true,
+            requires_field_pass_version: FIELD_PASS_VERSION,
+            can_be_stricter_than_typed_core: true,
+            cannot_be_more_permissive_than_typed_core: true,
+            public_json_compatibility: "boundary_decision remains the stable public contract; boundary_field_engine is the field cutover candidate",
+        },
+    }
+}
+
+fn boundary_verdict_rank(verdict: &str) -> u8 {
+    match verdict {
+        "VETO" => 0,
+        "WATCH" | "SPLIT_WEAK" | "MERGE_CANDIDATE" => 1,
+        "SPLIT_STRONG" | "KEEP" => 2,
+        _ => 1,
+    }
+}
+
+fn field_pass_rank(verdict: &str) -> u8 {
+    match verdict {
+        "VETO" => 0,
+        "PASS" => 2,
+        _ => 1,
+    }
+}
+
+fn cross_owner_call_edges(facts: &BoundaryFacts) -> Vec<String> {
+    facts
+        .call_edges
+        .iter()
+        .filter_map(|edge| {
+            let (caller, callee) = call_edge_files(edge)?;
+            let caller_owner = facts.file_owners.get(caller)?;
+            let callee_owner = facts.file_owners.get(callee)?;
+            (caller_owner != callee_owner).then(|| edge.clone())
+        })
+        .collect()
+}
+
+fn call_edge_files(edge: &str) -> Option<(&str, &str)> {
+    let (caller, rhs) = edge.split_once(" -> ")?;
+    let callee = rhs.split_once("::").map_or(rhs, |(file, _)| file);
+    Some((caller, callee))
+}
+
+fn round4(value: f64) -> f64 {
+    (value * 10_000.0).round() / 10_000.0
 }
 
 fn boundary_field_records(facts: &BoundaryFacts) -> Vec<FieldRecord> {

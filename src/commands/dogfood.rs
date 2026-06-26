@@ -498,18 +498,25 @@ pub(crate) fn dogfood_decision(tree: &Value, summary: &Value, failure_field: &Va
 }
 
 fn apply_boundary_economics_to_decision(decision: &mut Value, boundary_economics: &Value) {
-    let verdict = boundary_economics["boundary_decision"]["verdict"]
+    let typed_verdict = boundary_economics["boundary_decision"]["verdict"]
         .as_str()
         .unwrap_or("WATCH");
-    let boundary_safe = boundary_economics["boundary_decision"]["safe_to_edit"]
+    let verdict = boundary_economics["boundary_field_engine"]["selected_verdict"]
+        .as_str()
+        .unwrap_or(typed_verdict);
+    let boundary_safe = boundary_economics["boundary_field_engine"]["selected_safe_to_edit"]
         .as_bool()
+        .or_else(|| boundary_economics["boundary_decision"]["safe_to_edit"].as_bool())
         .unwrap_or(false);
     let reason = boundary_economics["boundary_decision"]["reason"]
         .as_str()
         .unwrap_or("");
     decision["boundary_economics_verdict"] = json!(verdict);
+    decision["boundary_economics_typed_verdict"] = json!(typed_verdict);
     decision["boundary_economics_safe_to_edit"] = json!(boundary_safe);
     decision["boundary_economics_reason"] = json!(reason);
+    decision["boundary_economics_field_not_more_permissive"] =
+        boundary_economics["field_equivalence"]["field_not_more_permissive"].clone();
 
     if decision["safe_to_edit"].as_bool() == Some(true) && !boundary_safe {
         let action = if verdict == "VETO" {

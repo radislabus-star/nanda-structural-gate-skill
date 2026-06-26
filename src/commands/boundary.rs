@@ -56,21 +56,25 @@ fn print_boundary_output(out: &Value, format: &OutputFormat) -> Result<()> {
         OutputFormat::Json => println!("{}", serde_json::to_string_pretty(out)?),
         OutputFormat::Text => {
             let decision = &out["boundary_decision"];
+            let selected = selected_boundary_verdict(out);
             println!("mode: boundary-economics");
             println!(
                 "verdict: {}",
                 decision["verdict"].as_str().unwrap_or("WATCH")
             );
+            println!("field_selected_verdict: {selected}");
             println!("score: {}", decision["score"].as_i64().unwrap_or(0));
             println!("reason: {}", decision["reason"].as_str().unwrap_or(""));
         }
         OutputFormat::Md => {
             let decision = &out["boundary_decision"];
+            let selected = selected_boundary_verdict(out);
             println!("# NANDA Boundary Economics\n");
             println!(
                 "- verdict: `{}`",
                 decision["verdict"].as_str().unwrap_or("WATCH")
             );
+            println!("- field selected verdict: `{selected}`");
             println!("- reason: {}", decision["reason"].as_str().unwrap_or(""));
         }
     }
@@ -78,12 +82,16 @@ fn print_boundary_output(out: &Value, format: &OutputFormat) -> Result<()> {
 }
 
 fn boundary_exit_code(out: &Value) -> u8 {
-    match out["boundary_decision"]["verdict"]
-        .as_str()
-        .unwrap_or("WATCH")
-    {
+    match selected_boundary_verdict(out) {
         "SPLIT_STRONG" | "KEEP" => EXIT_PASS,
         "VETO" => EXIT_VETO,
         _ => EXIT_WATCH,
     }
+}
+
+fn selected_boundary_verdict(out: &Value) -> &str {
+    out["boundary_field_engine"]["selected_verdict"]
+        .as_str()
+        .or_else(|| out["boundary_decision"]["verdict"].as_str())
+        .unwrap_or("WATCH")
 }

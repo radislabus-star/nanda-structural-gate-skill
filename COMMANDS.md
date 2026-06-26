@@ -63,7 +63,12 @@ boundary verdicts are raised into `agent_decision`. The policy owner is
 `field_core::boundary`; this command is a wrapper. The JSON includes
 `boundary_decision` plus `boundary_field_records`, which projects files,
 functions, API edges, call edges, runtime effects, tests, and foreign pulls into
-shared `field_core` records for downstream field checks.
+shared `field_core` records for downstream field checks. It also includes
+`boundary_field_pass`, `field_equivalence`, `owner_gravity`, and
+`boundary_energy`. The selected agent verdict is
+`boundary_field_engine.selected_verdict`: the field candidate can be stricter
+than typed Boundary Economics, but `field_equivalence.field_not_more_permissive`
+must stay true before it is used.
 
 ```bash
 nanda-boundary-economics . --format json

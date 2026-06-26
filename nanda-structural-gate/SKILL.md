@@ -395,11 +395,18 @@ Use `nanda-boundary-economics` before split/merge refactors. It enforces
 small. Inspect `boundary_decision.verdict`, score components, evidence, and the
 refactor contract. Inspect `boundary_field_records` when you need to see which
 files, functions, API edges, call edges, runtime effects, tests, or foreign
-pulls were projected into shared `field_core` records. Use repo-wide mode only
-to find possible split pressure. If repo-wide mode sees foreign route pressure
-but the boundary score is not strong enough for an autonomous split, treat the
-`WATCH` verdict as a stop and rerun a route-scoped pass. Use route-scoped mode
-with `--atlas`, `--route`, and `--owner` before a concrete
+pulls were projected into shared `field_core` records. Inspect
+`boundary_field_pass` and `field_equivalence` before trusting a boundary cut:
+`field_equivalence.field_not_more_permissive` must be true. The field candidate
+may be stricter than the typed core, never softer. Use
+`boundary_field_engine.selected_verdict` as the agent-facing verdict when it is
+present; `boundary_decision.verdict` is the typed explanation kept for
+compatibility. Inspect `owner_gravity` and `boundary_energy` to decide whether
+a proposed boundary reduces confusion or only adds wrapper/API tax. Use
+repo-wide mode only to find possible split pressure. If repo-wide mode sees
+foreign route pressure but the boundary score is not strong enough for an
+autonomous split, treat the `WATCH` verdict as a stop and rerun a route-scoped
+pass. Use route-scoped mode with `--atlas`, `--route`, and `--owner` before a concrete
 refactor; it starts from `atlas.routes[route].allowed_files` and narrows by
 owner/path so unrelated routes do not pollute the contract. If explicit
 `--owner` does not match the selected route atlas, treat the `WATCH` verdict
