@@ -8,6 +8,7 @@ use crate::field_core::{FieldAntiWaveLane, FieldLensOperation, FieldPassReport, 
 use crate::CORE_VERSION;
 
 mod decision;
+mod diff;
 mod energy;
 mod facts;
 mod field_pass;
@@ -408,6 +409,24 @@ pub(crate) fn boundary_from_guard_action(atlas: &Value, action_out: &Value) -> V
         "required_tests": route_node.map(|node| node["runtime_checks"].clone()).unwrap_or_else(|| json!([])),
         "repair": if verdict == "WATCH" { json!(["provide route, owner, evidence, and diff before split/merge"]) } else { json!([]) }
     })
+}
+
+pub(crate) fn boundary_guard_diff(
+    atlas: &Value,
+    action_id: &str,
+    diff_text: &str,
+    diff_source: Option<Value>,
+) -> Value {
+    diff::boundary_guard_diff(atlas, action_id, diff_text, diff_source)
+}
+
+pub(crate) fn boundary_guard_diff_unreadable(
+    atlas: &Value,
+    action_id: &str,
+    diff_source: Option<Value>,
+    diff_error: &str,
+) -> Value {
+    diff::boundary_guard_diff_unreadable(atlas, action_id, diff_source, diff_error)
 }
 
 pub(crate) fn boundary_from_guard_diff(atlas: &Value, diff_out: &Value) -> Value {

@@ -316,8 +316,8 @@ must return a `FieldPassReport` from the shared engine.
 `nanda-skill-readiness --format json` is the one-command public readiness gate
 for the skill package. It returns `PUBLIC_V1_READY` only when doctor,
 sole-engine field audit, 1024 Pattern16 skill-admission, claim boundaries,
-packaging, and documentation all pass. It is a skill readiness gate, not an
-LLM/nonlinear-memory/hardware-cache proof.
+Boundary Economics field/diff kernels, packaging, and documentation all pass.
+It is a skill readiness gate, not an LLM/nonlinear-memory/hardware-cache proof.
 
 Do not confuse the raw capacity profile with the readiness admission profile.
 `nanda-llmwave-big structural-capacity --format json` reports the default
@@ -1409,9 +1409,10 @@ not be more permissive. `boundary_field_engine.selected_verdict` is the
 agent-facing cutover verdict used for exit codes and dogfood decisions, while
 `boundary_decision.verdict` remains the stable typed-core explanation for
 compatibility. The boundary kernel is split under `src/field_core/boundary/`
-into facts, typed decision, field pass, records, owner/energy, and utility
-modules; `nanda-skill-readiness` checks this as `boundary_field_kernel` so the
-policy does not drift back into command wrappers. Use repo-wide mode to find
+into facts, typed decision, field pass, records, owner/energy, diff, and
+utility modules; `nanda-skill-readiness` checks this as
+`boundary_field_kernel` so the policy does not drift back into command
+wrappers. Use repo-wide mode to find
 possible split pressure only; if
 repo-wide mode sees foreign route pressure but the score is not strong enough
 for an autonomous split, it returns `WATCH` and asks for a route-scoped pass.
@@ -1437,14 +1438,19 @@ downgrades it to `REPAIR_REQUIRED`.
 `nanda-build-atlas` writes reusable route memory to `.nanda/route-atlas.json`.
 `nanda-guard-action` is the fast pre-edit check: symptom plus `action_id` must
 resolve to an atlas route. `nanda-guard-diff` is the post-edit check: changed
-files must stay inside the selected route capsule. Empty, unreadable, or
-unparseable diffs return `WATCH` with `safe_to_edit=false`, not PASS. Diff
-files from a different git repository return `WATCH` with
-`reason=diff_source_repo_mismatch`. Intentional cross-route edits must use an
-explicit shared contract action such as `shared.manual_toggle_contract`,
-`shared.text_edit_contract`, `shared.candidate_contract`, or
-`shared.layout_sync_contract`; otherwise route crossing is `VETO` and the
-report names changed routes, shared candidates, and suggested shared actions.
+files must stay inside the selected route capsule. Its decision path is owned
+by `field_core::boundary::diff`, and JSON includes `boundary_diff_kernel` with
+diff facts, `DIFF_KEEP` / `DIFF_WATCH` / `DIFF_VETO` /
+`DIFF_SHARED_CONTRACT_REQUIRED` / `DIFF_TESTS_REQUIRED`, field records, field
+pass, and not-more-permissive equivalence. Empty, unreadable, or unparseable
+diffs return `WATCH` with `safe_to_edit=false`, not PASS. Diff files from a
+different git repository return `WATCH` with `reason=diff_source_repo_mismatch`.
+Intentional cross-route edits must use an explicit shared contract action such
+as `shared.manual_toggle_contract`, `shared.text_edit_contract`,
+`shared.candidate_contract`, or `shared.layout_sync_contract`; otherwise route
+crossing is `VETO` and the report names changed routes, shared candidates, and
+suggested shared actions. Added public API is `WATCH` until reviewed, and
+runtime side effects without a changed route test are `DIFF_TESTS_REQUIRED`.
 Use `shared.version_bump_contract` only for release metadata diffs. It is scoped
 to `Cargo.toml`, `Cargo.lock`, `VERSIONING.md`, extension metadata/version JS,
 and explicitly versioned README/HOW_IT_WORKS edits. The guard checks Cargo,

@@ -422,9 +422,9 @@ Boundary Economics policy is owned by `field_core::boundary`; the public
 command is only a wrapper. Treat drift back into `commands/boundary.rs` as a
 core ownership regression. Treat loss of `boundary_field_records` as a field
 integration regression. Treat loss of the split boundary kernel modules
-(`facts`, `decision`, `field_pass`, `records`, `energy`, `util`) or loss of the
-`nanda-skill-readiness` `boundary_field_kernel` PASS check as a public-readiness
-regression.
+(`facts`, `decision`, `field_pass`, `records`, `energy`, `diff`, `util`) or
+loss of the `nanda-skill-readiness` `boundary_field_kernel` PASS check as a
+public-readiness regression.
 When `nanda-dogfood . --refactor-plan --boundary-economics` is used, inspect
 `agent_decision.boundary_economics_verdict`: a boundary `WATCH` downgrades an
 otherwise safe edit to `REVIEW_REQUIRED`, and a boundary `VETO` downgrades it
@@ -443,8 +443,13 @@ metadata diffs. It is scoped to `Cargo.toml`, `Cargo.lock`, `VERSIONING.md`,
 extension metadata/version JS, and explicitly versioned README/HOW_IT_WORKS
 edits. It must verify Cargo, lockfile, extension `version-name`, numeric
 metadata version, JS `APP_VERSION`, and stale version tokens before PASS.
-Inspect `route_crossing_report` for changed routes, shared candidates,
-contract scope, and suggested shared actions.
+Inspect `boundary_diff_kernel` first: it is owned by
+`field_core::boundary::diff`, reports `DIFF_KEEP`, `DIFF_WATCH`, `DIFF_VETO`,
+`DIFF_SHARED_CONTRACT_REQUIRED`, or `DIFF_TESTS_REQUIRED`, and must keep
+`field_equivalence.field_not_more_permissive=true`. Added public API remains
+`WATCH` until reviewed; runtime side effects without a changed route test are
+`DIFF_TESTS_REQUIRED`. Inspect `route_crossing_report` for changed routes,
+shared candidates, contract scope, and suggested shared actions.
 Use `nanda-profile-guards` before changing performance-sensitive guard
 workflow. Treat it as wall-clock CLI evidence for whether the fast guard path
 or the heavier full-field path is dominating the edit cycle. Inspect

@@ -69,9 +69,17 @@ shared `field_core` records for downstream field checks. It also includes
 `boundary_field_engine.selected_verdict`: the field candidate can be stricter
 than typed Boundary Economics, but `field_equivalence.field_not_more_permissive`
 must stay true before it is used. The implementation owner is the split
-`src/field_core/boundary/` kernel; `nanda-skill-readiness` checks
+`src/field_core/boundary/` kernel, including the post-edit diff kernel in
+`src/field_core/boundary/diff.rs`; `nanda-skill-readiness` checks
 `boundary_field_kernel` so CLI commands remain wrappers instead of policy
 owners.
+
+`nanda-guard-diff` JSON includes `boundary_diff_kernel`. Inspect its
+`diff_verdict` (`DIFF_KEEP`, `DIFF_WATCH`, `DIFF_VETO`,
+`DIFF_SHARED_CONTRACT_REQUIRED`, or `DIFF_TESTS_REQUIRED`) and
+`field_equivalence.field_not_more_permissive` before trusting a post-edit
+PASS. Added public API and runtime side effects without changed route tests
+stay review-only.
 
 ```bash
 nanda-boundary-economics . --format json

@@ -67,7 +67,7 @@ grep -q 'nanda_6m:' <<<"$version_text"
 skill_readiness_json="$("$skill_readiness" --format json)"
 jq -e '.mode == "nanda-skill-readiness" and .verdict == "PUBLIC_V1_READY" and .public_v1_ready == true and (.blockers | length) == 0' <<<"$skill_readiness_json" >/dev/null
 jq -e '(.checks[] | select(.check == "field_core_sole_engine" and .status == "PASS")) and (.checks[] | select(.check == "boundary_field_kernel" and .status == "PASS")) and (.checks[] | select(.check == "pattern16_skill_admission" and .status == "PASS")) and (.checks[] | select(.check == "claim_boundaries" and .status == "PASS"))' <<<"$skill_readiness_json" >/dev/null
-jq -e '(.checks[] | select(.check == "boundary_field_kernel" and .evidence.kernel_split_files_present == true and .evidence.commands_are_wrappers == true and .evidence.field_records_owner_is_field_core == true and .evidence.field_not_more_permissive == true and .evidence.selected_verdict_present == true))' <<<"$skill_readiness_json" >/dev/null
+jq -e '(.checks[] | select(.check == "boundary_field_kernel" and .evidence.kernel_split_files_present == true and .evidence.commands_are_wrappers == true and .evidence.field_records_owner_is_field_core == true and .evidence.field_not_more_permissive == true and .evidence.selected_verdict_present == true and .evidence.diff_kernel_present == true and .evidence.diff_kernel_owner_is_field_core == true and .evidence.diff_field_not_more_permissive == true))' <<<"$skill_readiness_json" >/dev/null
 jq -e '(.checks[] | select(.check == "pattern16_skill_admission" and .evidence.capacity_profile_checked == "skill-admission" and .evidence.default_capacity_profile == "default" and .evidence.default_profile_mismatch_is_not_blocker == true and .evidence.readiness_uses_skill_admission_profile == true))' <<<"$skill_readiness_json" >/dev/null
 jq -e '.claim_boundary.structural_gate_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.hardware_cache_residency_counter_proven == false' <<<"$skill_readiness_json" >/dev/null
 big_core_v1_contract_json="$("$llmwave_big" core-v1-contract --format json)"
@@ -1885,6 +1885,7 @@ diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
 EOF_DIFF
 guard_diff_pass="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_atlas_repo/ime.diff" --format json)"
 jq -e '.verdict == "PASS" and .safe_to_edit == true' <<<"$guard_diff_pass" >/dev/null
+jq -e '.boundary_diff_kernel.owner == "field_core::boundary::diff" and .boundary_diff_kernel.diff_verdict == "DIFF_KEEP" and .boundary_diff_kernel.field_equivalence.field_not_more_permissive == true' <<<"$guard_diff_pass" >/dev/null
 touch "$tmp_atlas_repo/empty.diff"
 set +e
 guard_diff_empty="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_atlas_repo/empty.diff" --format json)"
