@@ -393,11 +393,13 @@ count is small.
 Use `nanda-boundary-economics` before split/merge refactors. It enforces
 `NO EVIDENCE => NO CUT`: do not split or merge just because a file is large or
 small. Inspect `boundary_decision.verdict`, score components, evidence, and the
-refactor contract. Use repo-wide mode only to find possible split pressure. If
-repo-wide mode sees foreign route pressure but the boundary score is not strong
-enough for an autonomous split, treat the `WATCH` verdict as a stop and rerun a
-route-scoped pass. Use route-scoped mode with `--atlas`, `--route`, and
-`--owner` before a concrete
+refactor contract. Inspect `boundary_field_records` when you need to see which
+files, functions, API edges, call edges, runtime effects, tests, or foreign
+pulls were projected into shared `field_core` records. Use repo-wide mode only
+to find possible split pressure. If repo-wide mode sees foreign route pressure
+but the boundary score is not strong enough for an autonomous split, treat the
+`WATCH` verdict as a stop and rerun a route-scoped pass. Use route-scoped mode
+with `--atlas`, `--route`, and `--owner` before a concrete
 refactor; it starts from `atlas.routes[route].allowed_files` and narrows by
 owner/path so unrelated routes do not pollute the contract. If explicit
 `--owner` does not match the selected route atlas, treat the `WATCH` verdict
@@ -411,7 +413,8 @@ tests; `MERGE_CANDIDATE` means prepare a separate merge plan; `KEEP` means do
 not touch the boundary.
 Boundary Economics policy is owned by `field_core::boundary`; the public
 command is only a wrapper. Treat drift back into `commands/boundary.rs` as a
-core ownership regression.
+core ownership regression. Treat loss of `boundary_field_records` as a field
+integration regression.
 When `nanda-dogfood . --refactor-plan --boundary-economics` is used, inspect
 `agent_decision.boundary_economics_verdict`: a boundary `WATCH` downgrades an
 otherwise safe edit to `REVIEW_REQUIRED`, and a boundary `VETO` downgrades it

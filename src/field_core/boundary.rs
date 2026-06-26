@@ -1,9 +1,11 @@
 use anyhow::Result;
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::{FieldRecord, FieldRecordKind};
 use crate::CORE_VERSION;
 
 pub(crate) type BoundaryPathClassifier = fn(&str) -> String;
@@ -11,6 +13,8 @@ pub(crate) type BoundaryPathClassifier = fn(&str) -> String;
 #[derive(Default)]
 struct BoundaryFacts {
     files: Vec<String>,
+    file_routes: BTreeMap<String, String>,
+    file_owners: BTreeMap<String, String>,
     functions: Vec<String>,
     public_api: Vec<String>,
     call_edges: Vec<String>,
@@ -28,6 +32,127 @@ struct BoundaryFacts {
     owner_filter_matched: bool,
     requested_owner: Option<String>,
     route_files_considered: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoundaryVerdict {
+    SplitStrong,
+    SplitWeak,
+    Keep,
+    MergeCandidate,
+    Veto,
+    Watch,
+}
+
+impl BoundaryVerdict {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::SplitStrong => "SPLIT_STRONG",
+            Self::SplitWeak => "SPLIT_WEAK",
+            Self::Keep => "KEEP",
+            Self::MergeCandidate => "MERGE_CANDIDATE",
+            Self::Veto => "VETO",
+            Self::Watch => "WATCH",
+        }
+    }
+
+    fn safe_to_edit(self) -> bool {
+        matches!(self, Self::SplitStrong | Self::Keep)
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryDecision {
+    verdict: &'static str,
+    route: Option<String>,
+    owner: Option<String>,
+    reason: String,
+    principle: &'static str,
+    score: i32,
+    safe_to_edit: bool,
+    score_components: BoundaryScoreComponents,
+    evidence: BoundaryEvidence,
+    allowed_files: Vec<String>,
+    forbidden_routes: Vec<String>,
+    must_not_change: Vec<String>,
+    required_tests: Vec<String>,
+    repair: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryScoreComponents {
+    owner_clarity_gain: BoundaryScoreComponent,
+    foreign_pull_reduction: BoundaryScoreComponent,
+    test_isolation_gain: BoundaryScoreComponent,
+    state_locality_gain: BoundaryScoreComponent,
+    api_surface_growth: BoundaryScoreComponent,
+    adapter_leak: BoundaryScoreComponent,
+    runtime_risk: BoundaryScoreComponent,
+    migration_cost: BoundaryScoreComponent,
+}
+
+impl BoundaryScoreComponents {
+    fn empty() -> Self {
+        Self {
+            owner_clarity_gain: score_component(0, vec![]),
+            foreign_pull_reduction: score_component(0, vec![]),
+            test_isolation_gain: score_component(0, vec![]),
+            state_locality_gain: score_component(0, vec![]),
+            api_surface_growth: score_component(0, vec![]),
+            adapter_leak: score_component(0, vec![]),
+            runtime_risk: score_component(0, vec![]),
+            migration_cost: score_component(0, vec![]),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryScoreComponent {
+    score: i32,
+    counted: bool,
+    evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryEvidence {
+    files: Vec<String>,
+    functions: Vec<String>,
+    owner_edges: Vec<String>,
+    call_edges: Vec<String>,
+    public_api_edges: Vec<String>,
+    foreign_pull: Vec<String>,
+    foreign_pull_details: Vec<Value>,
+    shared_state: Vec<String>,
+    runtime_side_effects: Vec<String>,
+    tests: Vec<String>,
+    route_ids: Vec<String>,
+    owner_ids: Vec<String>,
+    owner_filter: BoundaryOwnerFilterEvidence,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryOwnerFilterEvidence {
+    requested: bool,
+    matched: bool,
+    requested_owner: Option<String>,
+    route_files_considered: usize,
+    matched_files: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct BoundaryFieldRecordBridge {
+    version: &'static str,
+    owner: &'static str,
+    record_count: usize,
+    file_records: usize,
+    function_records: usize,
+    public_api_records: usize,
+    call_edge_records: usize,
+    shared_state_records: usize,
+    runtime_side_effect_records: usize,
+    test_records: usize,
+    foreign_pull_records: usize,
+    sample: Vec<FieldRecord>,
 }
 
 pub(crate) fn boundary_report(
@@ -111,6 +236,8 @@ pub(crate) fn boundary_report(
     facts.requested_owner = owner.map(str::to_string);
     facts.route_files_considered = route_files_considered;
     let decision = boundary_decision(&facts, target_route.as_deref(), target_owner.as_deref());
+    let field_records = boundary_field_records(&facts);
+    let field_record_bridge = BoundaryFieldRecordBridge::from_facts(&facts, &field_records);
 
     Ok(json!({
         "mode": "boundary-economics",
@@ -126,6 +253,7 @@ pub(crate) fn boundary_report(
         "target_route": target_route,
         "target_owner": target_owner,
         "boundary_decision": decision,
+        "boundary_field_records": field_record_bridge,
         "read_as": "NANDA Boundary Economics: NO EVIDENCE => NO CUT. Split/merge decisions require route, owner, state, API, runtime, and test evidence."
     }))
 }
@@ -313,6 +441,8 @@ fn collect_facts(
         let owner = owner_for_path(rel);
         facts.routes.insert(route.clone());
         facts.owners.insert(owner.clone());
+        facts.file_routes.insert(rel.clone(), route.clone());
+        facts.file_owners.insert(rel.clone(), owner.clone());
         if target_route.is_some_and(|target| target != route) {
             facts.foreign_route_files.push(rel.clone());
             facts.foreign_route_details.push(json!({
@@ -398,7 +528,11 @@ fn collect_facts(
     facts
 }
 
-fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&str>) -> Value {
+fn boundary_decision(
+    facts: &BoundaryFacts,
+    route: Option<&str>,
+    owner: Option<&str>,
+) -> BoundaryDecision {
     let evidence_count = facts.functions.len()
         + facts.public_api.len()
         + facts.call_edges.len()
@@ -446,87 +580,269 @@ fn boundary_decision(facts: &BoundaryFacts, route: Option<&str>, owner: Option<&
     let repo_wide_route_pressure = route.is_none() && !facts.foreign_route_files.is_empty();
 
     let verdict = if owner_filter_failed || !has_owner || !has_route || evidence_count == 0 {
-        "WATCH"
+        BoundaryVerdict::Watch
     } else if !facts.foreign_route_files.is_empty() && route.is_some() {
-        "VETO"
+        BoundaryVerdict::Veto
     } else if repo_wide_route_pressure && score <= 0 {
-        "WATCH"
+        BoundaryVerdict::Watch
     } else if multi_route && score >= 3 {
-        "SPLIT_STRONG"
+        BoundaryVerdict::SplitStrong
     } else if multi_route && score > 0 {
-        "SPLIT_WEAK"
+        BoundaryVerdict::SplitWeak
     } else if thin_wrapper {
-        "MERGE_CANDIDATE"
+        BoundaryVerdict::MergeCandidate
     } else {
-        "KEEP"
+        BoundaryVerdict::Keep
     };
 
     let reason = match verdict {
-        "WATCH" if owner_filter_failed => {
+        BoundaryVerdict::Watch if owner_filter_failed => {
             "owner evidence not found in route atlas; explicit owner cannot fall back to whole route"
         }
-        "WATCH" if repo_wide_route_pressure => {
+        BoundaryVerdict::Watch if repo_wide_route_pressure => {
             "repo-wide route pressure found, but evidence is not strong enough for autonomous split; rerun route-scoped with atlas, route, and owner"
         }
-        "WATCH" => "insufficient route, owner, or evidence; NO EVIDENCE => NO CUT",
-        "VETO" => "target route would cross foreign route files; split/merge is unsafe",
-        "SPLIT_STRONG" => {
+        BoundaryVerdict::Watch => "insufficient route, owner, or evidence; NO EVIDENCE => NO CUT",
+        BoundaryVerdict::Veto => "target route would cross foreign route files; split/merge is unsafe",
+        BoundaryVerdict::SplitStrong => {
             "mixed routes/owners create enough evidence that a boundary should reduce confusion"
         }
-        "SPLIT_WEAK" => {
+        BoundaryVerdict::SplitWeak => {
             "boundary may help, but evidence is not strong enough for autonomous refactor"
         }
-        "MERGE_CANDIDATE" => {
+        BoundaryVerdict::MergeCandidate => {
             "thin wrapper has no state, tests, runtime side effects, or independent owner evidence"
         }
-        _ => "current boundary is acceptable; no cut is justified by available evidence",
+        BoundaryVerdict::Keep => {
+            "current boundary is acceptable; no cut is justified by available evidence"
+        }
     };
 
-    json!({
-        "verdict": verdict,
-        "route": route,
-        "owner": owner,
-        "reason": reason,
-        "principle": "NO_EVIDENCE_NO_CUT",
-        "score": score,
-        "safe_to_edit": matches!(verdict, "SPLIT_STRONG" | "KEEP"),
-        "score_components": {
-            "owner_clarity_gain": component(owner_clarity_gain, owner_evidence(facts)),
-            "foreign_pull_reduction": component(foreign_pull_reduction, facts.foreign_route_files.clone()),
-            "test_isolation_gain": component(test_isolation_gain, facts.tests.clone()),
-            "state_locality_gain": component(state_locality_gain, facts.shared_state.clone()),
-            "api_surface_growth": component(-api_surface_growth, facts.public_api.clone()),
-            "adapter_leak": component(-adapter_leak, facts.thin_wrappers.clone()),
-            "runtime_risk": component(-runtime_risk, facts.runtime_side_effects.clone()),
-            "migration_cost": component(-migration_cost, facts.files.clone())
+    let allowed_files = if facts.route_scoped
+        && matches!(
+            verdict,
+            BoundaryVerdict::SplitStrong | BoundaryVerdict::SplitWeak | BoundaryVerdict::Keep
+        ) {
+        facts.files.clone()
+    } else if matches!(verdict, BoundaryVerdict::Keep) {
+        sample(&facts.files, 12)
+    } else {
+        vec![]
+    };
+    let forbidden_routes = if let Some(route) = route {
+        facts
+            .routes
+            .iter()
+            .filter(|item| item.as_str() != route)
+            .cloned()
+            .collect()
+    } else {
+        vec![]
+    };
+
+    BoundaryDecision {
+        verdict: verdict.as_str(),
+        route: route.map(str::to_string),
+        owner: owner.map(str::to_string),
+        reason: reason.to_string(),
+        principle: "NO_EVIDENCE_NO_CUT",
+        score,
+        safe_to_edit: verdict.safe_to_edit(),
+        score_components: BoundaryScoreComponents {
+            owner_clarity_gain: score_component(owner_clarity_gain, owner_evidence(facts)),
+            foreign_pull_reduction: score_component(
+                foreign_pull_reduction,
+                facts.foreign_route_files.clone(),
+            ),
+            test_isolation_gain: score_component(test_isolation_gain, facts.tests.clone()),
+            state_locality_gain: score_component(state_locality_gain, facts.shared_state.clone()),
+            api_surface_growth: score_component(-api_surface_growth, facts.public_api.clone()),
+            adapter_leak: score_component(-adapter_leak, facts.thin_wrappers.clone()),
+            runtime_risk: score_component(-runtime_risk, facts.runtime_side_effects.clone()),
+            migration_cost: score_component(-migration_cost, facts.files.clone()),
         },
-        "evidence": {
-            "files": facts.files,
-            "functions": sample(&facts.functions, 24),
-            "owner_edges": owner_evidence(facts),
-            "call_edges": sample(&facts.call_edges, 24),
-            "public_api_edges": sample(&facts.public_api, 24),
-            "foreign_pull": facts.foreign_route_files,
-            "foreign_pull_details": sample_values(&facts.foreign_route_details, 16),
-            "shared_state": sample(&facts.shared_state, 24),
-            "runtime_side_effects": sample(&facts.runtime_side_effects, 24),
-            "tests": facts.tests,
-            "route_ids": facts.routes.iter().cloned().collect::<Vec<_>>(),
-            "owner_ids": facts.owners.iter().cloned().collect::<Vec<_>>(),
-            "owner_filter": {
-                "requested": facts.owner_filter_requested,
-                "matched": facts.owner_filter_matched,
-                "requested_owner": facts.requested_owner.clone(),
-                "route_files_considered": facts.route_files_considered,
-                "matched_files": facts.files.len()
-            }
+        evidence: BoundaryEvidence {
+            files: facts.files.clone(),
+            functions: sample(&facts.functions, 24),
+            owner_edges: owner_evidence(facts),
+            call_edges: sample(&facts.call_edges, 24),
+            public_api_edges: sample(&facts.public_api, 24),
+            foreign_pull: facts.foreign_route_files.clone(),
+            foreign_pull_details: sample_values(&facts.foreign_route_details, 16),
+            shared_state: sample(&facts.shared_state, 24),
+            runtime_side_effects: sample(&facts.runtime_side_effects, 24),
+            tests: facts.tests.clone(),
+            route_ids: facts.routes.iter().cloned().collect(),
+            owner_ids: facts.owners.iter().cloned().collect(),
+            owner_filter: BoundaryOwnerFilterEvidence {
+                requested: facts.owner_filter_requested,
+                matched: facts.owner_filter_matched,
+                requested_owner: facts.requested_owner.clone(),
+                route_files_considered: facts.route_files_considered,
+                matched_files: facts.files.len(),
+            },
         },
-        "allowed_files": if facts.route_scoped && matches!(verdict, "SPLIT_STRONG" | "SPLIT_WEAK" | "KEEP") { json!(facts.files) } else if matches!(verdict, "KEEP") { json!(sample(&facts.files, 12)) } else { json!([]) },
-        "forbidden_routes": if let Some(route) = route { json!(facts.routes.iter().filter(|item| item.as_str() != route).cloned().collect::<Vec<_>>()) } else { json!([]) },
-        "must_not_change": must_not_change(verdict),
-        "required_tests": required_tests(facts),
-        "repair": repair_tasks(verdict, owner_filter_failed, repo_wide_route_pressure)
-    })
+        allowed_files,
+        forbidden_routes,
+        must_not_change: must_not_change(verdict),
+        required_tests: required_tests(facts),
+        repair: repair_tasks(verdict, owner_filter_failed, repo_wide_route_pressure),
+    }
+}
+
+impl BoundaryFieldRecordBridge {
+    fn from_facts(facts: &BoundaryFacts, records: &[FieldRecord]) -> Self {
+        Self {
+            version: "boundary-field-records-v1",
+            owner: "field_core::boundary",
+            record_count: records.len(),
+            file_records: facts.files.len(),
+            function_records: facts.functions.len(),
+            public_api_records: facts.public_api.len(),
+            call_edge_records: facts.call_edges.len(),
+            shared_state_records: facts.shared_state.len(),
+            runtime_side_effect_records: facts.runtime_side_effects.len(),
+            test_records: facts.tests.len(),
+            foreign_pull_records: facts.foreign_route_files.len(),
+            sample: records.iter().take(16).cloned().collect(),
+        }
+    }
+}
+
+fn boundary_field_records(facts: &BoundaryFacts) -> Vec<FieldRecord> {
+    let mut records = vec![];
+    for file in &facts.files {
+        push_boundary_record(
+            &mut records,
+            "boundary_file",
+            "belongs_to_route",
+            file,
+            route_for_fact_file(facts, file),
+            owner_for_fact_file(facts, file),
+            Some(file.clone()),
+        );
+    }
+    for function in &facts.functions {
+        let file = file_from_function(function);
+        push_boundary_record(
+            &mut records,
+            "boundary_function",
+            "declared_in",
+            function,
+            route_for_fact_file(facts, file),
+            owner_for_fact_file(facts, file),
+            Some(file.to_string()),
+        );
+    }
+    for edge in &facts.public_api {
+        let file = file_from_line_ref(edge);
+        push_boundary_record(
+            &mut records,
+            "boundary_public_api",
+            "exposes",
+            edge,
+            route_for_fact_file(facts, file),
+            owner_for_fact_file(facts, file),
+            Some(file.to_string()),
+        );
+    }
+    for edge in &facts.call_edges {
+        let file = edge.split(" -> ").next().unwrap_or(edge);
+        push_boundary_record(
+            &mut records,
+            "boundary_call_edge",
+            "connects",
+            edge,
+            route_for_fact_file(facts, file),
+            owner_for_fact_file(facts, file),
+            Some(file.to_string()),
+        );
+    }
+    for item in &facts.shared_state {
+        let file = file_from_line_ref(item);
+        push_boundary_record(
+            &mut records,
+            "boundary_shared_state",
+            "holds_state",
+            item,
+            route_for_fact_file(facts, file),
+            owner_for_fact_file(facts, file),
+            Some(file.to_string()),
+        );
+    }
+    for item in &facts.runtime_side_effects {
+        let file = file_from_line_ref(item);
+        push_boundary_record(
+            &mut records,
+            "boundary_runtime_side_effect",
+            "mutates_runtime",
+            item,
+            route_for_fact_file(facts, file),
+            owner_for_fact_file(facts, file),
+            Some(file.to_string()),
+        );
+    }
+    for test in &facts.tests {
+        push_boundary_record(
+            &mut records,
+            "boundary_test",
+            "verifies_route",
+            test,
+            route_for_fact_file(facts, test),
+            owner_for_fact_file(facts, test),
+            Some(test.clone()),
+        );
+    }
+    for foreign_file in &facts.foreign_route_files {
+        push_boundary_record(
+            &mut records,
+            "boundary_foreign_pull",
+            "pulls_foreign_route",
+            foreign_file,
+            route_for_fact_file(facts, foreign_file),
+            owner_for_fact_file(facts, foreign_file),
+            Some(foreign_file.clone()),
+        );
+    }
+    records
+}
+
+fn push_boundary_record(
+    records: &mut Vec<FieldRecord>,
+    subject: &str,
+    relation: &str,
+    object: &str,
+    route: Option<String>,
+    group: Option<String>,
+    evidence_ref: Option<String>,
+) {
+    records.push(FieldRecord {
+        id: format!("boundary-record-{}", records.len()),
+        kind: FieldRecordKind::StructuralTriad,
+        subject: subject.to_string(),
+        relation: relation.to_string(),
+        object: object.to_string(),
+        route,
+        group,
+        confidence: 255,
+        evidence_ref,
+    });
+}
+
+fn route_for_fact_file(facts: &BoundaryFacts, file: &str) -> Option<String> {
+    facts.file_routes.get(file).cloned()
+}
+
+fn owner_for_fact_file(facts: &BoundaryFacts, file: &str) -> Option<String> {
+    facts.file_owners.get(file).cloned()
+}
+
+fn file_from_function(function: &str) -> &str {
+    function.split_once("::").map_or(function, |(file, _)| file)
+}
+
+fn file_from_line_ref(item: &str) -> &str {
+    item.split_once(':').map_or(item, |(file, _)| file)
 }
 
 fn extract_functions(source: &str) -> Vec<String> {
@@ -610,12 +926,12 @@ fn owner_evidence(facts: &BoundaryFacts) -> Vec<String> {
         .collect()
 }
 
-fn component(score: i32, evidence: Vec<String>) -> Value {
-    json!({
-        "score": score,
-        "counted": !evidence.is_empty(),
-        "evidence": sample(&evidence, 16)
-    })
+fn score_component(score: i32, evidence: Vec<String>) -> BoundaryScoreComponent {
+    BoundaryScoreComponent {
+        score,
+        counted: !evidence.is_empty(),
+        evidence: sample(&evidence, 16),
+    }
 }
 
 fn sample(items: &[String], cap: usize) -> Vec<String> {
@@ -627,67 +943,104 @@ fn sample_values(items: &[Value], cap: usize) -> Vec<Value> {
 }
 
 fn empty_components() -> Value {
-    json!({
-        "owner_clarity_gain": component(0, vec![]),
-        "foreign_pull_reduction": component(0, vec![]),
-        "test_isolation_gain": component(0, vec![]),
-        "state_locality_gain": component(0, vec![]),
-        "api_surface_growth": component(0, vec![]),
-        "adapter_leak": component(0, vec![]),
-        "runtime_risk": component(0, vec![]),
-        "migration_cost": component(0, vec![])
-    })
+    serde_json::to_value(BoundaryScoreComponents::empty()).unwrap_or_else(|_| json!({}))
 }
 
-fn must_not_change(verdict: &str) -> Value {
+fn must_not_change(verdict: BoundaryVerdict) -> Vec<String> {
     match verdict {
-        "SPLIT_STRONG" | "SPLIT_WEAK" => json!([
+        BoundaryVerdict::SplitStrong | BoundaryVerdict::SplitWeak => [
             "foreign routes",
             "public behavior outside contract",
-            "runtime side effects without tests"
-        ]),
-        "MERGE_CANDIDATE" => json!(["owner public API without human review", "runtime behavior"]),
-        "KEEP" => json!(["module boundary"]),
-        _ => json!(["code boundary"]),
+            "runtime side effects without tests",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
+        BoundaryVerdict::MergeCandidate => {
+            ["owner public API without human review", "runtime behavior"]
+                .into_iter()
+                .map(str::to_string)
+                .collect()
+        }
+        BoundaryVerdict::Keep => vec!["module boundary".to_string()],
+        _ => vec!["code boundary".to_string()],
     }
 }
 
-fn required_tests(facts: &BoundaryFacts) -> Value {
+fn required_tests(facts: &BoundaryFacts) -> Vec<String> {
     let mut tests = vec![];
     tests.extend(facts.runtime_checks.iter().take(5).cloned());
     tests.extend(facts.tests.iter().take(5).cloned());
     tests.sort();
     tests.dedup();
     if !tests.is_empty() {
-        json!(tests)
+        tests
     } else if !facts.runtime_side_effects.is_empty() {
-        json!(["add route-specific runtime smoke before refactor"])
+        vec!["add route-specific runtime smoke before refactor".to_string()]
     } else {
-        json!(["add or identify route-specific test before changing boundary"])
+        vec!["add or identify route-specific test before changing boundary".to_string()]
     }
 }
 
-fn repair_tasks(verdict: &str, owner_filter_failed: bool, repo_wide_route_pressure: bool) -> Value {
+fn repair_tasks(
+    verdict: BoundaryVerdict,
+    owner_filter_failed: bool,
+    repo_wide_route_pressure: bool,
+) -> Vec<String> {
     if owner_filter_failed {
-        return json!([
+        return [
             "use an owner that matches the selected route atlas",
             "rebuild atlas if the owner map is stale",
-            "do not expand to the whole route after owner mismatch"
-        ]);
+            "do not expand to the whole route after owner mismatch",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
     }
-    if repo_wide_route_pressure && verdict == "WATCH" {
-        return json!([
+    if repo_wide_route_pressure && verdict == BoundaryVerdict::Watch {
+        return [
             "build or refresh the route atlas",
             "select the route with boundary pressure",
-            "rerun boundary economics with --atlas, --route, and --owner before cutting"
-        ]);
+            "rerun boundary economics with --atlas, --route, and --owner before cutting",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
     }
     match verdict {
-        "WATCH" => json!(["collect owner, route, public API, state, runtime, and test evidence before split/merge"]),
-        "VETO" => json!(["do not cut across foreign route", "split the refactor by route owner"]),
-        "SPLIT_STRONG" => json!(["extract behind owner-owned API", "keep forbidden routes out of diff", "run required tests"]),
-        "SPLIT_WEAK" => json!(["prepare a small mechanical step only", "ask for human review before semantic changes"]),
-        "MERGE_CANDIDATE" => json!(["merge wrapper into owner module", "or make helper private behind owner public method"]),
-        _ => json!([]),
+        BoundaryVerdict::Watch => vec![
+            "collect owner, route, public API, state, runtime, and test evidence before split/merge"
+                .to_string(),
+        ],
+        BoundaryVerdict::Veto => [
+            "do not cut across foreign route",
+            "split the refactor by route owner",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
+        BoundaryVerdict::SplitStrong => [
+            "extract behind owner-owned API",
+            "keep forbidden routes out of diff",
+            "run required tests",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
+        BoundaryVerdict::SplitWeak => [
+            "prepare a small mechanical step only",
+            "ask for human review before semantic changes",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
+        BoundaryVerdict::MergeCandidate => [
+            "merge wrapper into owner module",
+            "or make helper private behind owner public method",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
+        BoundaryVerdict::Keep => vec![],
     }
 }

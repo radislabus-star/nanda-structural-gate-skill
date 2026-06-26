@@ -1396,13 +1396,16 @@ refactor plan scans multiple source files and reports `risk_files`; it should
 not treat `src/main.rs` as the whole repository.
 `nanda-boundary-economics` is the refactor boundary layer. It does not suggest
 split/merge from file size. It applies `NO EVIDENCE => NO CUT` and returns a
-JSON `boundary_decision` with verdict, score components, evidence, allowed
-files, forbidden routes, required tests, and repair contract. Use repo-wide
-mode to find possible split pressure only; if repo-wide mode sees foreign route
-pressure but the score is not strong enough for an autonomous split, it returns
-`WATCH` and asks for a route-scoped pass. Use route-scoped mode with `--atlas`,
-`--route`, and `--owner` before a concrete refactor. Route-scoped mode starts
-from `atlas.routes[route].allowed_files` and then narrows by owner/path so the
+typed core JSON `boundary_decision` with verdict, score components, evidence,
+allowed files, forbidden routes, required tests, and repair contract. It also
+returns `boundary_field_records`, a compact bridge from boundary facts into
+`field_core` `FieldRecord` entries, so the boundary layer can feed the same
+structural field physics as other NANDA passes. Use repo-wide mode to find
+possible split pressure only; if repo-wide mode sees foreign route pressure but
+the score is not strong enough for an autonomous split, it returns `WATCH` and
+asks for a route-scoped pass. Use route-scoped mode with `--atlas`, `--route`,
+and `--owner` before a concrete refactor. Route-scoped mode starts from
+`atlas.routes[route].allowed_files` and then narrows by owner/path so the
 contract does not drag unrelated routes into the evidence. If an explicit
 `--owner` does not match the selected route atlas, the verdict is `WATCH` and
 `safe_to_edit=false`; the command must not fall back to the whole route.

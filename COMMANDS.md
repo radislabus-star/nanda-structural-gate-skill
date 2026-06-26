@@ -60,7 +60,10 @@ Use this before refactoring. `WATCH` means do not cut yet. Repo-wide mode is
 only a pressure scan; rerun with `--atlas`, `--route`, and `--owner` before a
 concrete split/merge. With `nanda-dogfood --boundary-economics`, unresolved
 boundary verdicts are raised into `agent_decision`. The policy owner is
-`field_core::boundary`; this command is a wrapper.
+`field_core::boundary`; this command is a wrapper. The JSON includes
+`boundary_decision` plus `boundary_field_records`, which projects files,
+functions, API edges, call edges, runtime effects, tests, and foreign pulls into
+shared `field_core` records for downstream field checks.
 
 ```bash
 nanda-boundary-economics . --format json

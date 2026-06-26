@@ -2015,6 +2015,7 @@ fn route_private_two() {}
 EOF_BOUNDARY
 boundary_keep_json="$("$boundary_economics" "$tmp_boundary_repo/src/runtime_one.rs" --route runtime-flow --owner src::runtime_one.rs --format json)"
 jq -e '.boundary_decision.verdict == "KEEP"' <<<"$boundary_keep_json" >/dev/null
+jq -e '.boundary_field_records.version == "boundary-field-records-v1" and .boundary_field_records.owner == "field_core::boundary" and .boundary_field_records.record_count > 0 and .boundary_field_records.sample[0].kind == "structural_triad"' <<<"$boundary_keep_json" >/dev/null
 cat >"$tmp_boundary_repo/src/bin/lay_daemon/thin_wrapper.rs" <<'EOF_BOUNDARY'
 pub fn forward_candidate() { owner_candidate(); }
 fn owner_candidate() {}
@@ -2034,6 +2035,7 @@ cat >"$tmp_boundary_repo/tests/mixed_test.rs" <<'EOF_BOUNDARY'
 EOF_BOUNDARY
 boundary_split_json="$("$boundary_economics" "$tmp_boundary_repo" --format json)"
 jq -e '.boundary_decision.verdict == "SPLIT_STRONG" and .boundary_decision.evidence.foreign_pull != []' <<<"$boundary_split_json" >/dev/null
+jq -e '.boundary_field_records.record_count > 0 and .boundary_field_records.foreign_pull_records > 0 and .boundary_field_records.call_edge_records > 0' <<<"$boundary_split_json" >/dev/null
 tmp_boundary_pressure_repo="$(mktemp -d)"
 mkdir -p "$tmp_boundary_pressure_repo/src/shared_owner/core"
 cat >"$tmp_boundary_pressure_repo/src/shared_owner/core/nanda_support.rs" <<'EOF_BOUNDARY'
@@ -2060,6 +2062,7 @@ boundary_atlas_path="$tmp_boundary_repo/.nanda/route-atlas.json"
 "$build_atlas" "$tmp_boundary_repo" --out "$boundary_atlas_path" --format json >/dev/null
 boundary_scoped_json="$("$boundary_economics" "$tmp_boundary_repo" --atlas "$boundary_atlas_path" --route ime-display-flow --owner src::bin::lay_ibus_engine --format json || true)"
 jq -e '.scope == "route-scoped" and (.boundary_decision.verdict | IN("KEEP","MERGE_CANDIDATE")) and (.boundary_decision.evidence.files | all(contains("lay_ibus_engine"))) and .boundary_decision.evidence.foreign_pull == [] and (.boundary_decision.required_tests | length) <= 5' <<<"$boundary_scoped_json" >/dev/null
+jq -e '.boundary_field_records.version == "boundary-field-records-v1" and .boundary_field_records.file_records == (.boundary_decision.evidence.files | length)' <<<"$boundary_scoped_json" >/dev/null
 boundary_wrong_owner_json="$("$boundary_economics" "$tmp_boundary_repo" --atlas "$boundary_atlas_path" --route ime-display-flow --owner WrongOwner --format json || true)"
 jq -e '.scope == "route-scoped" and .boundary_decision.verdict == "WATCH" and .boundary_decision.safe_to_edit == false and .boundary_decision.evidence.owner_filter.requested == true and .boundary_decision.evidence.owner_filter.matched == false and .boundary_decision.allowed_files == []' <<<"$boundary_wrong_owner_json" >/dev/null
 boundary_veto_json="$("$boundary_economics" "$tmp_boundary_repo" --route ime-display-flow --owner src::bin::lay_ibus_engine --format json || true)"
