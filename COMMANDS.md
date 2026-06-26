@@ -132,6 +132,7 @@ nanda-llmwave-big linux-pack-hot --atlas-dir .nanda/linux-atlas --max-active-fac
 nanda-llmwave-big linux-ask-hot --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
 nanda-llmwave-big linux-hot-eval --hot-pack .nanda/linux-active/linux-active-65k.laf --top-k 5 --format json
 nanda-llmwave-big linux-domain-run --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --top-k 5 --format json
+nanda-llmwave-big linux-atlas-projection --atlas-dir .nanda/linux-atlas --hot-pack .nanda/linux-active/linux-active-65k.laf --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big linux-cache-proof --hot-pack .nanda/linux-active/linux-active-65k.laf --query "which package provides command bash" --iterations 64 --warmup-iterations 8 --samples 5 --format json
 nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json
 nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --top-k 5 --iterations 64 --warmup-iterations 8 --samples 5 --format json
@@ -289,6 +290,13 @@ benchmarks repeated full scans of fixed 64-byte records. Treat
 the hot loop: no JSON, labels, file I/O, heap allocation, or per-record score
 arrays in the measured loop. It is not broad chat readiness, nonlinear-memory
 proof, exposure analysis, or hardware PMU cache-miss proof.
+`linux-atlas-projection` is the Phase 18 Atlas-to-6MB gate. It audits the cold
+Linux Atlas by metadata/manifest, runs `.laf` cache proof and `.lrf`
+schema/residual proof, and only reports
+`LINUX_ATLAS_6MB_COGNITIVE_PROJECTION_READY` when useful Atlas cognition is
+represented by a 6 MiB active projection. It explicitly does not claim lossless
+Atlas storage, hardware PMU cache residency, global nonlinear memory, or general
+LLM readiness.
 `linux-pack-residual` materializes the same Linux Active Field as a `.lrf`
 binary schema/residual memory: repeated `route+relation+polarity` modes become
 `SchemaRecord32`, subject/object variation becomes `ResidualRecord32`, and

@@ -2235,6 +2235,371 @@ near-root rejection is safety evidence, not semantic understanding
 nonlinear_surface_memory_proven remains false
 ```
 
+## Phase 18: Atlas-to-6MB Cognitive Projection, implemented
+
+Goal:
+
+```text
+large Linux Atlas
+  -> audit cold bytes / snapshots / provenance
+  -> reuse useful facts as active cognitive projection
+  -> prove `.laf` cache-budget runtime
+  -> prove `.lrf` schema/residual nonlinear memory for Linux profile
+  -> keep lossless Atlas storage and general LLM claims closed
+```
+
+Implemented command:
+
+```text
+nanda-llmwave-big linux-atlas-projection
+alias: nanda-llmwave-big phase18-atlas-projection
+```
+
+Current baseline:
+
+```text
+.laf hot packet:
+  fixed_records: 65,536
+  fixed_record_bytes: 64
+  fixed_record_section: ~4 MiB
+  whole_file: ~5.8 MiB
+  cache budget: 6 MiB
+  measured hot scan: sub-ms full scan on current machine
+  strength: fast numeric fixed-record scan
+  limit: not the final schema/residual runtime
+
+.lrf schema/residual packet:
+  represented_facts: 65,536
+  schema_records: 43
+  residual_records: 65,525
+  binary_hot_sections: ~2 MiB
+  whole_file: ~3.8 MiB
+  strength: Linux-profile nonlinear schema/residual memory proof
+  limit: not yet the sole fast runtime field
+
+Cold Atlas / corpus:
+  large append-only source of facts and snapshots
+  strength: rebuildable long-term memory
+  limit: too large for every request; needs compaction and focus discipline
+```
+
+### 18.1 Make `.lrf` The Main Runtime Memory
+
+Planned work:
+
+```text
+linux-active-65k.lrf
+  -> runtime loader
+  -> schema/residual scan
+  -> query wave
+  -> anti-wave suppression
+  -> answer/verifier surface
+```
+
+Acceptance:
+
+```text
+LINUX_LRF_RUNTIME_READY
+full scan over schema/residual/fallback sections
+no JSON in hot loop
+no string labels in hot loop
+bytes beat direct fixed64 baseline
+answers match or beat current .laf route eval
+```
+
+Stop rules:
+
+```text
+.lrf proof alone is not broad LLM readiness
+Linux-profile nonlinear memory proof is not global nonlinear memory proof
+```
+
+### 18.2 Remove / Lazy-Decode Cold Labels From Hot Path
+
+Planned work:
+
+```text
+hot loop reads only numeric records
+cold label table moves behind lazy decode
+answer display may decode labels after peak selection
+cache proof must distinguish compute bytes from explanation bytes
+```
+
+Acceptance:
+
+```text
+hot_loop_label_decode=false
+labels_read_after_peak_only=true
+hot compute section <= 6 MiB
+report exposes compute_bytes vs display_bytes
+```
+
+### 18.3 Build A Preloaded Runtime / `nanda-serve` Path
+
+Planned work:
+
+```text
+start one resident process
+mmap or preload .laf/.lrf once
+accept JSONL or compact binary requests
+return peak/answer without CLI startup cost
+```
+
+Acceptance:
+
+```text
+resident_packet_loaded_once=true
+request_path_no_reload=true
+p50 request latency measured separately from startup
+safe shutdown / reload command exists
+```
+
+Stop rules:
+
+```text
+daemon speed is not a model-quality proof
+serve mode must not bypass safety/verifier gates
+```
+
+### 18.4 Add Hardware PMU Cache Evidence
+
+Planned work:
+
+```text
+measure cycles
+measure instructions
+measure cache-references
+measure cache-misses
+measure LLC/L3 misses where available
+attach counters to linux-cache-proof report
+```
+
+Acceptance:
+
+```text
+hardware_perf_counters_used=true
+hardware_cache_miss_rate_reported=true
+PMU sample command recorded
+cache-only claim separates:
+  software budget proof
+  hardware residency evidence
+```
+
+Stop rules:
+
+```text
+if PMU is unavailable -> keep hardware_cache_miss_rate_proven=false
+software cache budget proof must not be renamed hardware proof
+```
+
+### 18.5 Merge Fast `.laf` Scan With `.lrf` Schema/Residual Reasoning
+
+Planned work:
+
+```text
+.laf speed path
+  + .lrf schema/residual economy
+  -> one mature field runtime
+```
+
+Candidate architecture:
+
+```text
+query wave
+  -> schema route competition
+  -> residual/fallback scan
+  -> anti-wave shortcut suppression
+  -> verifier
+  -> lazy label decode
+  -> answer/action surface
+```
+
+Acceptance:
+
+```text
+field_core_as_packed_sole_engine=true for Linux profile
+same output schema for search/reason/chat/action
+route eval passes
+held-out eval passes
+false_positive_rate remains zero on boundary suite
+```
+
+Stop rules:
+
+```text
+do not delete .laf until .lrf runtime matches speed and quality gates
+do not claim general sole-engine readiness from Linux-only proof
+```
+
+### 18.6 Grow Linux Corpus By Schemas, Not Raw Fact Count
+
+Planned work:
+
+```text
+add causal relation families:
+  command -> package -> binary -> service
+  service -> unit -> process -> socket
+  socket -> firewall -> route -> exposure
+  vpn -> interface -> route -> dns -> public exit
+  error -> evidence -> safe action
+  config -> runtime state -> verification
+```
+
+Acceptance:
+
+```text
+relation_family_coverage increases
+schema_reuse_ratio increases
+residual_saving_ratio does not collapse
+held-out route inference improves
+near-collision false positives remain controlled
+```
+
+Stop rules:
+
+```text
+more facts alone is not progress
+new data must improve reasoning or compression metrics
+```
+
+### 18.7 Consolidate Feedback Into Durable Schema/Residual Memory
+
+Planned work:
+
+```text
+.lwm explicit feedback deltas
+  -> repeated accepted/rejected lanes
+  -> consolidation pass
+  -> schema update or anti-schema
+  -> new .lrf generation
+```
+
+Acceptance:
+
+```text
+feedback_delta_loaded=true
+before_after_answer_lift=true
+accepted feedback becomes positive lane or schema update
+rejected shortcut becomes anti-wave lane
+consolidated memory survives new process
+unrelated routes remain stable
+```
+
+Stop rules:
+
+```text
+feedback is not gradient training
+user transcript is not memory by itself
+unsafe feedback cannot bypass verifier
+```
+
+### 18.8 Generalize Guarded Action Layer
+
+Planned work:
+
+```text
+vpn action plan/control
+  -> generic Linux action contracts
+  -> dry-run first
+  -> explicit execute
+  -> route-specific confirmation
+  -> verifier checks after mutation
+```
+
+Candidate action families:
+
+```text
+vpn up/down/status
+service start/stop/status
+package install/remove/query
+firewall view/propose/apply
+dns/route inspect/propose/apply
+config edit with backup/check/revert
+```
+
+Acceptance:
+
+```text
+action_plan_ready=true
+dry_run_default=true
+execute_requires_explicit_confirmation=true
+secrets_read=false
+secrets_printed=false
+runtime mutation reported explicitly
+forbidden production routes blocked by default
+```
+
+Stop rules:
+
+```text
+action layer is not autonomy
+live mutation requires explicit user command
+secret material never enters chat, logs, or memory
+```
+
+### 18.9 Compact The Cold Atlas
+
+Planned work:
+
+```text
+append-only Linux Atlas snapshots
+  -> route-indexed compaction
+  -> duplicate/current conflict detection
+  -> canonical current facts
+  -> archive kept cold
+```
+
+Acceptance:
+
+```text
+atlas_compaction_report exists
+duplicate_current_count reported
+canonical_current_layer exported
+focus build uses canonical/current first
+archive facts excluded from direct peak unless requested
+```
+
+Stop rules:
+
+```text
+compaction must not erase provenance
+archive noise must not dominate active field
+```
+
+### 18.10 Final Hardware Runtime Gate
+
+Final target:
+
+```text
+LINUX_ATLAS_6MB_COGNITIVE_PROJECTION_READY
+```
+
+Required evidence:
+
+```text
+Atlas metadata audited without scanning cold JSONL bodies
+.laf hot loop fits the 6 MiB budget
+.laf cache-only software runtime proof passes
+.lrf schema/residual hot sections fit the 6 MiB budget
+.lrf schema/residual memory beats fixed64 baseline
+.lrf Linux-profile nonlinear memory proof passes
+active represented fact counts match between `.laf` and `.lrf`
+false_positive_rate stays zero on the residual proof eval
+PMU evidence is either recorded or explicitly kept blocked
+```
+
+Still not claimed:
+
+```text
+general LLM readiness
+open-domain chat readiness
+global nonlinear memory proof
+autonomous system administration
+hardware cache residency if PMU evidence is absent
+```
+
+v18 implemented as `src/llmwave_big/linux_atlas_projection.rs`.
+
 ## Summary
 
 ```text

@@ -374,6 +374,16 @@ nanda-llmwave-big linux-domain-run \
   --top-k 5 \
   --format json
 
+nanda-llmwave-big linux-atlas-projection \
+  --atlas-dir .nanda/linux-atlas \
+  --hot-pack .nanda/linux-active/linux-active-65k.laf \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --query "which package provides command bash" \
+  --iterations 64 \
+  --warmup-iterations 8 \
+  --samples 5 \
+  --format json
+
 nanda-llmwave-big linux-cache-proof \
   --hot-pack .nanda/linux-active/linux-active-65k.laf \
   --query "which package provides command bash" \
@@ -673,6 +683,15 @@ allocation, and no per-record score arrays. Treat
 fixed-record hot loop under the 6 MiB budget. It is still not PMU cache-miss
 counter evidence, not broad chat readiness, not exposure analysis, and not
 nonlinear-memory proof.
+
+`linux-atlas-projection` is the Phase 18 Atlas-to-6MB cognitive projection
+gate. It does not claim that the whole append-only Linux Atlas is losslessly
+stored in 6 MiB. Instead, it audits cold Atlas metadata, runs the `.laf`
+cache-budget proof, runs the `.lrf` schema/residual proof, and accepts only when
+the useful active Linux cognition is represented by the 6 MiB runtime projection.
+Treat `LINUX_ATLAS_6MB_COGNITIVE_PROJECTION_READY` as a Linux-profile projection
+claim only: global nonlinear memory, hardware PMU cache residency, and general
+LLM readiness remain closed.
 
 `linux-pack-residual` is the next Linux SysField memory layer. It writes a
 `.lrf` binary packet with real schema/residual sections instead of only

@@ -996,6 +996,12 @@ Treat `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory
 proof only: schema/residual binary storage is real, retrieval works on the
 Linux eval, and bytes beat fixed64. It is not broad chat readiness and not
 exposure reasoning.
+Use `nanda-llmwave-big linux-atlas-projection --atlas-dir .nanda/linux-atlas --hot-pack .nanda/linux-active/linux-active-65k.laf --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
+to run the Phase 18 Atlas-to-6MB cognitive projection gate. It audits the cold
+Atlas by metadata/manifest, runs `.laf` cache proof and `.lrf` schema/residual
+proof, and treats `LINUX_ATLAS_6MB_COGNITIVE_PROJECTION_READY` as a Linux-profile
+projection claim only. Do not read it as lossless Atlas storage, global
+nonlinear memory proof, hardware PMU cache residency, or general LLM readiness.
 Use `nanda-llmwave-big linux-exposure-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
 to run boundary-aware Linux exposure reasoning over that schema/residual packet.
 It separates package facts, runtime sockets, bind scope, firewall allow

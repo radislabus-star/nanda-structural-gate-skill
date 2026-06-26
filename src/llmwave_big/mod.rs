@@ -44,6 +44,7 @@ pub mod lens_scan;
 pub mod lexical_birth;
 pub mod linux_active_field;
 pub mod linux_atlas;
+pub mod linux_atlas_projection;
 pub mod linux_chat;
 pub mod linux_chat_v1;
 pub mod linux_chat_v2;
@@ -408,6 +409,9 @@ enum LlmwaveBigCommand {
     /// Run the constrained Linux Domain LLMWave path over a hot packet.
     #[command(name = "linux-domain-run")]
     LinuxDomainRun(LlmwaveBigLinuxDomainRunArgs),
+    /// Gate the Linux Atlas -> 6 MiB cognitive projection.
+    #[command(name = "linux-atlas-projection", alias = "phase18-atlas-projection")]
+    LinuxAtlasProjection(LlmwaveBigLinuxAtlasProjectionArgs),
     /// Prove the Linux hot loop scans only fixed records inside the 6 MiB cache budget.
     #[command(name = "linux-cache-proof", alias = "linux-cache-bench")]
     LinuxCacheProof(LlmwaveBigLinuxCacheProofArgs),
@@ -1295,6 +1299,34 @@ struct LlmwaveBigLinuxDomainRunArgs {
     query: String,
     #[arg(long = "top-k", default_value_t = 5)]
     top_k: usize,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxAtlasProjectionArgs {
+    #[arg(long = "atlas-dir", default_value = ".nanda/linux-atlas")]
+    atlas_dir: PathBuf,
+    #[arg(
+        long = "hot-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.laf"
+    )]
+    hot_pack: PathBuf,
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(long = "query", default_value = "which package provides command bash")]
+    query: String,
+    #[arg(long = "top-k", default_value_t = 5)]
+    top_k: usize,
+    #[arg(long = "iterations", default_value_t = 64)]
+    iterations: usize,
+    #[arg(long = "warmup-iterations", default_value_t = 8)]
+    warmup_iterations: usize,
+    #[arg(long = "samples", default_value_t = 5)]
+    samples: usize,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
 }
@@ -3027,6 +3059,77 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- nonlinear memory proven: `{}`",
                         report.claim_boundary.nonlinear_memory_proven
                     );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxAtlasProjection(args) => {
+            let report = linux_atlas_projection::build_linux_atlas_projection_report(
+                linux_atlas_projection::LinuxAtlasProjectionConfig {
+                    atlas_dir: args.atlas_dir,
+                    hot_pack: args.hot_pack,
+                    residual_pack: args.residual_pack,
+                    query: args.query,
+                    top_k: args.top_k,
+                    iterations: args.iterations,
+                    warmup_iterations: args.warmup_iterations,
+                    samples: args.samples,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("atlas_bytes: {}", report.atlas.total_bytes);
+                    println!("active_facts: {}", report.projection.active_fact_count);
+                    println!("laf_file_bytes: {}", report.runtime.laf_file_bytes);
+                    println!("lrf_file_bytes: {}", report.runtime.lrf_file_bytes);
+                    println!(
+                        "lrf_hot_sections_bytes: {}",
+                        report.runtime.lrf_hot_sections_bytes
+                    );
+                    println!(
+                        "cache_only_execution_proven: {}",
+                        report.claim_boundary.cache_only_execution_proven
+                    );
+                    println!(
+                        "linux_profile_nonlinear_memory_proven: {}",
+                        report.claim_boundary.linux_profile_nonlinear_memory_proven
+                    );
+                    println!(
+                        "lossless_atlas_storage_in_6m: {}",
+                        report.claim_boundary.atlas_lossless_storage_in_6m
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Atlas -> 6 MiB Projection");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- atlas bytes: `{}`", report.atlas.total_bytes);
+                    println!(
+                        "- known facts: `{:?}`",
+                        report.projection.source_known_fact_count
+                    );
+                    println!("- active facts: `{}`", report.projection.active_fact_count);
+                    println!("- `.laf` bytes: `{}`", report.runtime.laf_file_bytes);
+                    println!("- `.lrf` bytes: `{}`", report.runtime.lrf_file_bytes);
+                    println!(
+                        "- `.lrf` hot sections bytes: `{}`",
+                        report.runtime.lrf_hot_sections_bytes
+                    );
+                    println!(
+                        "- cache-only execution proven: `{}`",
+                        report.claim_boundary.cache_only_execution_proven
+                    );
+                    println!(
+                        "- Linux-profile nonlinear memory proven: `{}`",
+                        report.claim_boundary.linux_profile_nonlinear_memory_proven
+                    );
+                    println!(
+                        "- lossless Atlas storage in 6 MiB: `{}`",
+                        report.claim_boundary.atlas_lossless_storage_in_6m
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
                 }
             }
             Ok(EXIT_PASS)
