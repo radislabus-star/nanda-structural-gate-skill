@@ -38,6 +38,7 @@ fn build_report(repo: &Path) -> Value {
     let boundary_kernel = boundary_kernel_summary(repo);
     let structural_capacity = structural_capacity_summary();
     let claim_gates = claim_gate_summary();
+    let profile_claims = profile_claim_summary(repo);
     let packaging = packaging_summary(repo);
     let docs = docs_summary(repo);
 
@@ -161,11 +162,14 @@ fn build_report(repo: &Path) -> Value {
         "public_v1_ready": public_v1_ready,
         "checks": checks,
         "blockers": blockers,
+        "profile_claims": profile_claims,
         "claim_boundary": {
             "structural_gate_ready": public_v1_ready,
             "field_core_as_sole_engine": true,
             "broad_chat_llm_ready": false,
             "nonlinear_memory_proven": false,
+            "global_nonlinear_memory_proven": false,
+            "profile_nonlinear_memory_is_separate": true,
             "hardware_cache_residency_counter_proven": false,
             "safe_claim": "nanda-structural-gate is ready as a public structural gate only when this readiness report is PUBLIC_V1_READY. It is not a broad chat LLM or global nonlinear-memory proof."
         },
@@ -248,6 +252,40 @@ fn claim_gate_summary() -> Value {
         "llm_ready_blocked": !llm.allowed,
         "nonlinear_memory_verdict": nonlinear.verdict,
         "nonlinear_memory_blocked": !nonlinear.allowed
+    })
+}
+
+fn profile_claim_summary(repo: &Path) -> Value {
+    json!({
+        "claim_scope_policy": {
+            "profile_evidence_may_be_true_while_global_claim_stays_false": true,
+            "global_nonlinear_memory_proven": false,
+            "global_broad_chat_llm_ready": false
+        },
+        "linux_lrf_v2_profile": {
+            "scope": "linux-profile",
+            "proof_command": "nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query \"which package provides command bash\" --format json",
+            "profile_true_field": "claim_boundary.linux_profile_nonlinear_memory_proven",
+            "required_verdict": "LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN",
+            "requires_semantic_atom_contract": true,
+            "requires_spectral_center": true,
+            "global_claim_unlocked_by_this_alone": false
+        },
+        "linux_chat_profile_target": {
+            "scope": "linux-profile",
+            "command_alias": "linux-chat-profile-gate",
+            "ready_verdict": "LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM",
+            "requires_memory_proof": true,
+            "requires_broad_eval": true,
+            "requires_heldout_eval": true,
+            "requires_dialogue_learning": true,
+            "optional_vpn_training_gate": true,
+            "docs_mention_command": contains(repo.join("README.md"), "linux-chat-profile-gate")
+                && contains(repo.join("COMMANDS.md"), "linux-chat-profile-gate")
+                && contains(repo.join("nanda-structural-gate/SKILL.md"), "linux-chat-profile-gate"),
+            "global_llm_unlocked_by_this": false
+        },
+        "safe_reading": "Read top-level nonlinear_memory_proven as the global/public claim. Read linux_profile_nonlinear_memory_proven from linux-residual-proof as a profile-scoped proof."
     })
 }
 
@@ -439,6 +477,18 @@ mod tests {
         assert_eq!(report["mode"], "nanda-skill-readiness");
         assert_eq!(report["claim_boundary"]["broad_chat_llm_ready"], false);
         assert_eq!(report["claim_boundary"]["nonlinear_memory_proven"], false);
+        assert_eq!(
+            report["claim_boundary"]["profile_nonlinear_memory_is_separate"],
+            true
+        );
+        assert_eq!(
+            report["profile_claims"]["linux_lrf_v2_profile"]["global_claim_unlocked_by_this_alone"],
+            false
+        );
+        assert_eq!(
+            report["profile_claims"]["linux_chat_profile_target"]["ready_verdict"],
+            "LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM"
+        );
         let pattern16 = report["checks"]
             .as_array()
             .unwrap()

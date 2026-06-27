@@ -129,6 +129,7 @@ Current intended claim boundary:
 field_core_as_sole_engine = true
 llm_ready = false
 nonlinear_memory_proven = false
+global_nonlinear_memory_proven = false
 ```
 
 Inspect `nanda-field-audit --format json` as the canonical sole-engine proof.
@@ -162,6 +163,12 @@ Pattern16 skill-admission, claim boundaries, packaging, and documentation
 presence. `PUBLIC_V1_READY` means the structural-gate skill is ready as a
 public structural firewall; it still keeps LLM, nonlinear-memory, and hardware
 cache claims closed.
+Inspect top-level `profile_claims` when the question is profile-scoped
+LLMWave progress: Linux `.lrf v2` memory can be proven by
+`linux-residual-proof`, and bounded Linux chat can be promoted by
+`linux-chat-profile-gate`, while top-level `nonlinear_memory_proven` and
+`global_nonlinear_memory_proven` stay false until independent multi-profile
+evidence exists.
 
 Important profile boundary: plain `nanda-llmwave-big structural-capacity
 --format json` shows the default capacity profile. `nanda-skill-readiness`
@@ -278,6 +285,7 @@ nanda-llmwave-big linux-broad-eval-run --residual-pack .nanda/linux-active/linux
 nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --format json
 nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json
 nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-heldout-suite.json --out .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --format json
+nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json
 nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
 nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json
@@ -506,11 +514,17 @@ builds an evidence chain, applies anti-wave shortcut suppression, and returns a
 grounded decision for that one prompt.
 `linux-broad-suite-build` generates a Linux-profile eval suite from the active
 facts; `linux-broad-eval-run` executes the suite against `.lrf`; and
-`linux-profile-claim-gate` only allows
-`LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` when schema/residual memory
-proof and broad Linux-profile eval thresholds both pass. These commands expand
-the Linux-profile reasoning proof surface, but they still do not unlock general
-LLM, open-domain chat, scanner, or exploit claims.
+`linux-profile-claim-gate` allows
+`LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` only when proof-grade
+schema/residual memory and broad Linux-profile eval thresholds both pass.
+Proof-grade memory requires the full 65,536-fact active Linux profile, so tiny
+fixtures stay useful as mechanics tests but cannot promote the chat target. The
+same command has the alias `linux-chat-profile-gate`. With `--heldout-eval`,
+`--run-chat-learning-eval`, and optional `--run-vpn-training-eval`, it can
+promote the profile target to
+`LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM`. That stronger target still
+means Linux-only bounded chat over `.lrf` plus `.lwm` wave learning; it does not
+unlock general LLM, open-domain chat, scanner, or exploit claims.
 `linux-heldout-suite-build` adds a stricter profile suite: exact facts,
 near-name collisions, shortcut controls, and endpoint-scope checks. Use
 `linux-heldout-eval-run` before trusting the profile on noisy Linux facts.

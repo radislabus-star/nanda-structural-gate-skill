@@ -950,6 +950,10 @@ only for the structural-gate/firewall claim. Treat `PUBLIC_V1_REVIEW` as
 unresolved and inspect `blockers`. This readiness gate aggregates doctor,
 sole-engine field audit, Pattern16 skill-admission, claim boundaries,
 packaging, and documentation presence.
+Inspect `profile_claims` when the question is Linux-profile LLMWave progress:
+profile `.lrf v2` memory and bounded Linux chat have their own proof commands,
+but top-level `nonlinear_memory_proven` / `global_nonlinear_memory_proven` stay
+false until independent multi-profile evidence exists.
 Do not treat the raw default `nanda-llmwave-big structural-capacity --format
 json` profile as the public skill admission gate. `nanda-skill-readiness`
 checks the stronger `--noise-profile skill-admission` path internally. A default
@@ -1360,10 +1364,20 @@ to generate a Linux-profile eval suite from active facts.
 Use `nanda-llmwave-big linux-broad-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-broad-suite.json --out .nanda/linux-active/linux-broad-eval.json --max-facts 4 --format json`
 to execute that suite against `.lrf`.
 Use `nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --format json`
-to allow `LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` only when both
-schema/residual memory proof and broad Linux-profile eval thresholds pass. These
-commands expand the Linux-profile reasoning proof surface, but they still do
-not unlock general LLM, open-domain chat, scanner, or exploit claims.
+to allow `LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` only when proof-grade
+schema/residual memory and broad Linux-profile eval thresholds pass.
+Proof-grade memory requires the full 65,536-fact active Linux profile; tiny
+fixtures may exercise mechanics but must not promote the chat target.
+Use `nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json`
+when the claim is the stronger bounded Linux chat profile. That target requires
+proof-grade `.lrf` memory, broad eval, held-out eval, persistent `.lwm`
+dialogue learning, learned anti-wave replay, unrelated-route preservation, and
+VPN secret-boundary training if requested. Treat
+`LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM` as Linux-only bounded chat
+readiness, not general LLM, open-domain chat, scanner, exploit, or global
+nonlinear-memory proof.
+These commands expand the Linux-profile reasoning/chat proof surface, but they
+still do not unlock general LLM, open-domain chat, scanner, or exploit claims.
 Use `nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json`
 to build a stricter Linux-profile held-out suite with exact route facts,
 near-name collisions, shortcut controls, and endpoint-scope checks.

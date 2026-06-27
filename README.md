@@ -327,6 +327,10 @@ for the skill package. It returns `PUBLIC_V1_READY` only when doctor,
 sole-engine field audit, 1024 Pattern16 skill-admission, claim boundaries,
 Boundary Economics field/diff kernels, packaging, and documentation all pass.
 It is a skill readiness gate, not an LLM/nonlinear-memory/hardware-cache proof.
+Its `profile_claims` section makes the scope split explicit: Linux `.lrf v2`
+profile memory is proven through `linux-residual-proof`, and bounded Linux chat
+is proven through `linux-chat-profile-gate`, but the public/global
+`nonlinear_memory_proven` and broad chat LLM claims remain false.
 
 Do not confuse the raw capacity profile with the readiness admission profile.
 `nanda-llmwave-big structural-capacity --format json` reports the default
@@ -865,9 +869,20 @@ profile proof surface. The query wave fixes intent, anchors, route priors,
 negative boundaries, forbidden shortcuts, and answer policy. The reason run
 builds an evidence chain from `.lrf` schema/residual memory and applies anti-wave
 suppression to false shortcuts. The broad suite/eval pair checks generated
-Linux-profile questions, and the claim gate only allows
-`LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` when both schema/residual memory
-and broad Linux-profile eval pass.
+Linux-profile questions. The claim gate runs proof-grade `.lrf` memory
+admission and only allows `LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM` when
+schema/residual memory and broad Linux-profile eval pass. Proof-grade memory
+requires the full 65,536-fact active Linux profile, so tiny fixtures can test
+mechanics but cannot promote a chat-profile claim.
+
+`linux-chat-profile-gate` is an alias for the same owner with the full chat
+target enabled by flags. Pass `--heldout-eval`, `--run-chat-learning-eval`, and
+optional `--run-vpn-training-eval` to require proof-grade `.lrf` memory, broad
+eval, held-out eval, persistent `.lwm` dialogue learning, learned anti-wave
+replay, unrelated-route preservation, and VPN secret-boundary training. A pass
+is `LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM`: bounded Linux-profile
+chat readiness only, not general GPT-style chat and not a global nonlinear
+memory claim.
 
 `linux-heldout-suite-build` and `linux-heldout-eval-run` add stricter controls:
 exact route facts, near-name collisions, package/runtime shortcuts,
@@ -990,6 +1005,17 @@ nanda-llmwave-big linux-heldout-eval-run \
   --residual-pack .nanda/linux-active/linux-active-65k.lrf \
   --suite .nanda/linux-active/linux-heldout-suite.json \
   --out .nanda/linux-active/linux-heldout-eval.json \
+  --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-chat-profile-gate \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --broad-eval .nanda/linux-active/linux-broad-eval.json \
+  --heldout-eval .nanda/linux-active/linux-heldout-eval.json \
+  --run-chat-learning-eval \
+  --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm \
+  --run-vpn-training-eval \
+  --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm \
   --max-facts 4 \
   --format json
 

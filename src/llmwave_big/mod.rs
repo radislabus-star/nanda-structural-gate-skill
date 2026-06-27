@@ -480,8 +480,8 @@ enum LlmwaveBigCommand {
     /// Run Linux-profile evidence-chain reasoning for one question.
     #[command(name = "linux-reason-run")]
     LinuxReasonRun(LlmwaveBigLinuxReasonRunArgs),
-    /// Gate Linux-profile reasoning claims from memory and broad eval evidence.
-    #[command(name = "linux-profile-claim-gate")]
+    /// Gate Linux-profile reasoning/chat claims from memory and eval evidence.
+    #[command(name = "linux-profile-claim-gate", alias = "linux-chat-profile-gate")]
     LinuxProfileClaimGate(LlmwaveBigLinuxProfileClaimGateArgs),
     /// Build a Linux-profile held-out eval suite with near-collision controls.
     #[command(name = "linux-heldout-suite-build")]
@@ -1709,6 +1709,24 @@ struct LlmwaveBigLinuxProfileClaimGateArgs {
     residual_pack: PathBuf,
     #[arg(long = "broad-eval")]
     broad_eval: Option<PathBuf>,
+    #[arg(long = "heldout-eval")]
+    heldout_eval: Option<PathBuf>,
+    #[arg(long = "run-chat-learning-eval", default_value_t = false)]
+    run_chat_learning_eval: bool,
+    #[arg(
+        long = "chat-learning-memory",
+        default_value = ".nanda/linux-active/linux-chat-profile.lwm"
+    )]
+    chat_learning_memory: PathBuf,
+    #[arg(long = "run-vpn-training-eval", default_value_t = false)]
+    run_vpn_training_eval: bool,
+    #[arg(
+        long = "vpn-memory",
+        default_value = ".nanda/linux-active/linux-chat-profile-vpn.lwm"
+    )]
+    vpn_memory: PathBuf,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -4243,6 +4261,12 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 linux_profile::LinuxProfileClaimGateConfig {
                     residual_pack: args.residual_pack,
                     broad_eval: args.broad_eval,
+                    heldout_eval: args.heldout_eval,
+                    run_chat_learning_eval: args.run_chat_learning_eval,
+                    chat_learning_memory: args.chat_learning_memory,
+                    run_vpn_training_eval: args.run_vpn_training_eval,
+                    vpn_memory: args.vpn_memory,
+                    max_facts: args.max_facts,
                     out: args.out,
                 },
             )?;
@@ -4258,6 +4282,8 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "linux_profile_broad_chat_ready: {}",
                         report.claim_boundary.linux_profile_broad_chat_ready
                     );
+                    println!("chat_target_ready: {}", report.chat_target.ready);
+                    println!("chat_target_verdict: {}", report.chat_target.verdict);
                     println!(
                         "general_llm_ready: {}",
                         report.claim_boundary.general_llm_ready
@@ -4275,6 +4301,8 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- Linux-profile broad chat ready: `{}`",
                         report.claim_boundary.linux_profile_broad_chat_ready
                     );
+                    println!("- chat target ready: `{}`", report.chat_target.ready);
+                    println!("- chat target verdict: `{}`", report.chat_target.verdict);
                     println!(
                         "- general LLM ready: `{}`",
                         report.claim_boundary.general_llm_ready

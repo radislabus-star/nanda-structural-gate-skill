@@ -22,12 +22,20 @@ use super::linux_exposure::{
     LinuxExposureReport,
 };
 use super::linux_residual_memory::{
-    load_linux_residual_decoded_packet, LinuxResidualDecodedFact, LinuxResidualDecodedSummary,
-    LINUX_RESIDUAL_MEMORY_VERSION,
+    build_linux_residual_proof_report, load_linux_residual_decoded_packet,
+    LinuxResidualDecodedFact, LinuxResidualDecodedSummary, LinuxResidualProofConfig,
+    LinuxResidualProofReport, LINUX_RESIDUAL_MEMORY_VERSION,
 };
 use super::linux_runtime_snapshot::{load_runtime_snapshot_overlay, LinuxRuntimeSnapshotOverlay};
+use super::{
+    linux_chat_v2::{build_linux_chat_v2_report, LinuxChatV2Config, LinuxChatV2Report},
+    linux_vpn_training::{
+        build_linux_vpn_train_eval_report, LinuxVpnTrainEvalConfig, LinuxVpnTrainEvalReport,
+    },
+};
 
 pub(crate) const LINUX_PROFILE_VERSION: &str = "llmwave-big-v-next-linux-profile-reasoning";
+pub(crate) const LINUX_PROFILE_PROOF_GRADE_MIN_FACTS: usize = 65_536;
 
 #[derive(Clone)]
 pub(crate) struct LinuxQueryWaveConfig {
@@ -61,6 +69,12 @@ pub(crate) struct LinuxBroadEvalRunConfig {
 pub(crate) struct LinuxProfileClaimGateConfig {
     pub residual_pack: PathBuf,
     pub broad_eval: Option<PathBuf>,
+    pub heldout_eval: Option<PathBuf>,
+    pub run_chat_learning_eval: bool,
+    pub chat_learning_memory: PathBuf,
+    pub run_vpn_training_eval: bool,
+    pub vpn_memory: PathBuf,
+    pub max_facts: usize,
     pub out: Option<PathBuf>,
 }
 
@@ -223,21 +237,116 @@ pub(crate) struct LinuxProfileClaimGateReport {
     pub version: &'static str,
     pub verdict: &'static str,
     pub residual_pack: LinuxResidualDecodedSummary,
+    pub memory_proof: LinuxProfileMemoryProofSummary,
     pub broad_eval: Option<LinuxBroadEvalMetrics>,
+    pub heldout_eval: Option<LinuxBroadEvalMetrics>,
+    pub chat_learning: Option<LinuxProfileChatLearningSummary>,
+    pub vpn_training: Option<LinuxProfileVpnTrainingSummary>,
     pub requirements: LinuxProfileRequirements,
+    pub chat_target: LinuxProfileChatTarget,
     pub claim_boundary: LinuxProfileBoundary,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct LinuxProfileRequirements {
     pub residual_pack_loaded: bool,
+    pub linux_profile_nonlinear_memory_summary_ok: bool,
     pub linux_profile_nonlinear_memory_proven: bool,
+    pub proof_grade_linux_profile_nonlinear_memory_proven: bool,
+    pub proof_grade_fact_count_ok: bool,
+    pub semantic_atom_contract_proven: bool,
+    pub spectral_center_proven: bool,
     pub broad_eval_present: bool,
     pub broad_eval_pass_rate_ok: bool,
     pub false_positive_rate_ok: bool,
     pub exposure_overclaim_rate_ok: bool,
     pub runtime_package_confusion_rate_ok: bool,
     pub shortcut_rejection_rate_ok: bool,
+    pub heldout_eval_present: bool,
+    pub heldout_pass_rate_ok: bool,
+    pub heldout_false_positive_rate_ok: bool,
+    pub chat_learning_eval_present: bool,
+    pub dialogue_learning_ready: bool,
+    pub memory_lift_observed: bool,
+    pub learned_anti_wave_observed: bool,
+    pub unrelated_route_preserved: bool,
+    pub vpn_training_eval_present: bool,
+    pub vpn_training_ready: bool,
+    pub vpn_secret_boundary_ready: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxProfileMemoryProofSummary {
+    pub verdict: String,
+    pub proof_grade: bool,
+    pub proof_grade_min_represented_facts: usize,
+    pub proof_grade_fact_count_ok: bool,
+    pub represented_fact_count: usize,
+    pub schema_record_count: usize,
+    pub residual_record_count: usize,
+    pub fallback_record_count: usize,
+    pub binary_hot_sections_fit_6m: bool,
+    pub beats_direct_fixed64: bool,
+    pub semantic_atom_contract_proven: bool,
+    pub spectral_center_proven: bool,
+    pub center_gap_positive: bool,
+    pub near_miss_rejected_by_center: bool,
+    pub route_relation_ablation_positive: bool,
+    pub false_positive_rate: f32,
+    pub linux_domain_eval_passed: bool,
+    pub nonlinear_memory_proven: bool,
+    pub safe_claim: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxProfileChatLearningSummary {
+    pub mode: &'static str,
+    pub verdict: String,
+    pub memory_path: String,
+    pub eval_total: usize,
+    pub eval_passed: usize,
+    pub pass_rate: f32,
+    pub deltas_written: usize,
+    pub dialogue_learning_ready: bool,
+    pub persistent_wave_memory_ready: bool,
+    pub memory_lift_observed: bool,
+    pub answer_changed_due_to_wave_memory: bool,
+    pub negative_lane_replay_observed: bool,
+    pub unrelated_route_preserved: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxProfileVpnTrainingSummary {
+    pub mode: &'static str,
+    pub verdict: String,
+    pub memory_path: String,
+    pub eval_total: usize,
+    pub eval_passed: usize,
+    pub pass_rate: f32,
+    pub inserted_delta_count: usize,
+    pub local_vpn_training_ready: bool,
+    pub persistent_wave_memory_ready: bool,
+    pub secret_boundary_ready: bool,
+    pub local_system_mutation_done: bool,
+    pub secrets_read: bool,
+    pub secrets_printed: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxProfileChatTarget {
+    pub target: &'static str,
+    pub verdict: &'static str,
+    pub ready: bool,
+    pub profile_scope: &'static str,
+    pub requires_memory_proof: bool,
+    pub requires_broad_eval: bool,
+    pub requires_heldout_eval: bool,
+    pub requires_dialogue_learning: bool,
+    pub requires_vpn_training_when_requested: bool,
+    pub global_llm_ready: bool,
+    pub global_nonlinear_memory_proven: bool,
+    pub safe_claim: &'static str,
+    pub blocked_by: Vec<&'static str>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -442,6 +551,15 @@ pub(crate) fn build_linux_profile_claim_gate_report(
     config: LinuxProfileClaimGateConfig,
 ) -> Result<LinuxProfileClaimGateReport> {
     let packet = load_linux_residual_decoded_packet(&config.residual_pack)?;
+    let memory_proof_report = build_linux_residual_proof_report(LinuxResidualProofConfig {
+        residual_pack: config.residual_pack.clone(),
+        query: "which package provides command bash".to_string(),
+        top_k: config.max_facts.max(1),
+        iterations: 2,
+        warmup_iterations: 1,
+        samples: 1,
+    })?;
+    let memory_proof = memory_proof_summary(&memory_proof_report);
     let broad_eval = match &config.broad_eval {
         Some(path) => Some(
             serde_json::from_str::<LinuxBroadEvalReport>(
@@ -452,30 +570,109 @@ pub(crate) fn build_linux_profile_claim_gate_report(
         ),
         None => None,
     };
-    let metrics = broad_eval.as_ref().map(|report| report.metrics.clone());
+    let broad_metrics = broad_eval.as_ref().map(|report| report.metrics.clone());
+    let heldout_eval = match &config.heldout_eval {
+        Some(path) => Some(
+            serde_json::from_str::<LinuxBroadEvalReport>(
+                &fs::read_to_string(path)
+                    .with_context(|| format!("read held-out eval {}", path.display()))?,
+            )
+            .with_context(|| format!("parse held-out eval {}", path.display()))?,
+        ),
+        None => None,
+    };
+    let heldout_metrics = heldout_eval.as_ref().map(|report| report.metrics.clone());
+    let chat_learning = if config.run_chat_learning_eval {
+        Some(chat_learning_summary(&build_linux_chat_v2_report(
+            LinuxChatV2Config {
+                residual_pack: config.residual_pack.clone(),
+                memory: config.chat_learning_memory.clone(),
+                prompt: Vec::new(),
+                script: None,
+                max_facts: config.max_facts.max(1),
+                runtime_snapshot: None,
+                reset_memory: true,
+            },
+        )?))
+    } else {
+        None
+    };
+    let vpn_training = if config.run_vpn_training_eval {
+        Some(vpn_training_summary(&build_linux_vpn_train_eval_report(
+            LinuxVpnTrainEvalConfig {
+                residual_pack: config.residual_pack.clone(),
+                memory: config.vpn_memory.clone(),
+                max_facts: config.max_facts.max(1),
+            },
+        )?))
+    } else {
+        None
+    };
     let requirements = LinuxProfileRequirements {
         residual_pack_loaded: true,
+        linux_profile_nonlinear_memory_summary_ok: linux_profile_nonlinear(&packet.summary),
         linux_profile_nonlinear_memory_proven: linux_profile_nonlinear(&packet.summary),
-        broad_eval_present: metrics.is_some(),
-        broad_eval_pass_rate_ok: metrics
+        proof_grade_linux_profile_nonlinear_memory_proven: memory_proof.proof_grade,
+        proof_grade_fact_count_ok: memory_proof.proof_grade_fact_count_ok,
+        semantic_atom_contract_proven: memory_proof.semantic_atom_contract_proven,
+        spectral_center_proven: memory_proof.spectral_center_proven,
+        broad_eval_present: broad_metrics.is_some(),
+        broad_eval_pass_rate_ok: broad_metrics
             .as_ref()
             .map(|m| m.pass_rate >= 0.90)
             .unwrap_or(false),
-        false_positive_rate_ok: metrics
+        false_positive_rate_ok: broad_metrics
             .as_ref()
             .map(|m| m.false_positive_rate <= 0.02)
             .unwrap_or(false),
-        exposure_overclaim_rate_ok: metrics
+        exposure_overclaim_rate_ok: broad_metrics
             .as_ref()
             .map(|m| m.exposure_overclaim_rate == 0.0)
             .unwrap_or(false),
-        runtime_package_confusion_rate_ok: metrics
+        runtime_package_confusion_rate_ok: broad_metrics
             .as_ref()
             .map(|m| m.runtime_package_confusion_rate <= 0.02)
             .unwrap_or(false),
-        shortcut_rejection_rate_ok: metrics
+        shortcut_rejection_rate_ok: broad_metrics
             .as_ref()
             .map(|m| m.shortcut_rejection_rate >= 0.95)
+            .unwrap_or(false),
+        heldout_eval_present: heldout_metrics.is_some(),
+        heldout_pass_rate_ok: heldout_metrics
+            .as_ref()
+            .map(|m| m.pass_rate >= 0.90)
+            .unwrap_or(false),
+        heldout_false_positive_rate_ok: heldout_metrics
+            .as_ref()
+            .map(|m| m.false_positive_rate <= 0.02)
+            .unwrap_or(false),
+        chat_learning_eval_present: chat_learning.is_some(),
+        dialogue_learning_ready: chat_learning
+            .as_ref()
+            .map(|summary| summary.dialogue_learning_ready)
+            .unwrap_or(false),
+        memory_lift_observed: chat_learning
+            .as_ref()
+            .map(|summary| {
+                summary.memory_lift_observed && summary.answer_changed_due_to_wave_memory
+            })
+            .unwrap_or(false),
+        learned_anti_wave_observed: chat_learning
+            .as_ref()
+            .map(|summary| summary.negative_lane_replay_observed)
+            .unwrap_or(false),
+        unrelated_route_preserved: chat_learning
+            .as_ref()
+            .map(|summary| summary.unrelated_route_preserved)
+            .unwrap_or(false),
+        vpn_training_eval_present: vpn_training.is_some(),
+        vpn_training_ready: vpn_training
+            .as_ref()
+            .map(|summary| summary.local_vpn_training_ready)
+            .unwrap_or(false),
+        vpn_secret_boundary_ready: vpn_training
+            .as_ref()
+            .map(|summary| summary.secret_boundary_ready)
             .unwrap_or(false),
     };
     let ready = requirements.linux_profile_nonlinear_memory_proven
@@ -485,11 +682,31 @@ pub(crate) fn build_linux_profile_claim_gate_report(
         && requirements.exposure_overclaim_rate_ok
         && requirements.runtime_package_confusion_rate_ok
         && requirements.shortcut_rejection_rate_ok;
-    let nonlinear = linux_profile_nonlinear(&packet.summary);
+    let chat_target_ready = ready
+        && requirements.proof_grade_linux_profile_nonlinear_memory_proven
+        && requirements.heldout_eval_present
+        && requirements.heldout_pass_rate_ok
+        && requirements.heldout_false_positive_rate_ok
+        && requirements.chat_learning_eval_present
+        && requirements.dialogue_learning_ready
+        && requirements.memory_lift_observed
+        && requirements.learned_anti_wave_observed
+        && requirements.unrelated_route_preserved
+        && (!config.run_vpn_training_eval
+            || (requirements.vpn_training_ready && requirements.vpn_secret_boundary_ready));
+    let chat_target = chat_target(
+        &requirements,
+        ready,
+        chat_target_ready,
+        config.run_vpn_training_eval,
+    );
+    let nonlinear = memory_proof.nonlinear_memory_proven;
     let report = LinuxProfileClaimGateReport {
         mode: "llmwave-big-linux-profile-claim-gate",
         version: LINUX_PROFILE_VERSION,
-        verdict: if ready {
+        verdict: if chat_target_ready {
+            "LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM"
+        } else if ready {
             "LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM"
         } else if !requirements.broad_eval_present {
             "LINUX_PROFILE_BLOCKED_BY_BROAD_EVAL"
@@ -499,19 +716,148 @@ pub(crate) fn build_linux_profile_claim_gate_report(
             "LINUX_PROFILE_BLOCKED_BY_EVAL"
         },
         residual_pack: packet.summary,
-        broad_eval: metrics,
+        memory_proof,
+        broad_eval: broad_metrics,
+        heldout_eval: heldout_metrics,
+        chat_learning,
+        vpn_training,
         requirements,
+        chat_target,
         claim_boundary: boundary(
             true,
             ready,
             ready,
             ready,
             nonlinear,
-            "Linux-profile reasoning is ready only when broad eval and schema/residual memory proof pass; general LLM and scanner claims remain blocked.",
+            "Linux-profile reasoning/chat claims are profile-scoped. Full chat-profile readiness also requires held-out evaluation and dialogue wave-learning evidence; general LLM and scanner claims remain blocked.",
         ),
     };
     write_json_if_requested(config.out.as_ref(), &report)?;
     Ok(report)
+}
+
+fn memory_proof_summary(report: &LinuxResidualProofReport) -> LinuxProfileMemoryProofSummary {
+    let proof_grade_fact_count_ok =
+        report.residual_pack.represented_fact_count >= LINUX_PROFILE_PROOF_GRADE_MIN_FACTS;
+    let proof_grade = report.claim_boundary.nonlinear_memory_proven && proof_grade_fact_count_ok;
+    LinuxProfileMemoryProofSummary {
+        verdict: report.verdict.to_string(),
+        proof_grade,
+        proof_grade_min_represented_facts: LINUX_PROFILE_PROOF_GRADE_MIN_FACTS,
+        proof_grade_fact_count_ok,
+        represented_fact_count: report.residual_pack.represented_fact_count,
+        schema_record_count: report.residual_pack.schema_record_count,
+        residual_record_count: report.residual_pack.residual_record_count,
+        fallback_record_count: report.residual_pack.fallback_record_count,
+        binary_hot_sections_fit_6m: report.claim_boundary.binary_hot_sections_fit_6m,
+        beats_direct_fixed64: report.claim_boundary.beats_direct_fixed64,
+        semantic_atom_contract_proven: report.claim_boundary.semantic_atom_contract_proven,
+        spectral_center_proven: report.claim_boundary.spectral_center_proven,
+        center_gap_positive: report.claim_boundary.center_gap_positive,
+        near_miss_rejected_by_center: report.claim_boundary.near_miss_rejected_by_center,
+        route_relation_ablation_positive: report
+            .claim_boundary
+            .route_relation_ablation_positive,
+        false_positive_rate: report.eval.metrics.false_positive_rate,
+        linux_domain_eval_passed: report.claim_boundary.linux_domain_eval_passed,
+        nonlinear_memory_proven: report.claim_boundary.nonlinear_memory_proven,
+        safe_claim: "Proof-grade Linux-profile nonlinear memory requires `.lrf v2`, role-complete semantic atoms, spectral center admission, Linux-domain eval, false-positive rejection, bytes beating fixed64, and the 65k active Linux profile scale.",
+    }
+}
+
+fn chat_learning_summary(report: &LinuxChatV2Report) -> LinuxProfileChatLearningSummary {
+    LinuxProfileChatLearningSummary {
+        mode: report.mode,
+        verdict: report.verdict.to_string(),
+        memory_path: report.persistent_memory.path.clone(),
+        eval_total: report.eval.total,
+        eval_passed: report.eval.passed,
+        pass_rate: report.eval.pass_rate,
+        deltas_written: report.eval.deltas_written,
+        dialogue_learning_ready: report.claim_boundary.dialogue_learning_ready,
+        persistent_wave_memory_ready: report.claim_boundary.persistent_wave_memory_ready,
+        memory_lift_observed: report.eval.memory_lift_observed,
+        answer_changed_due_to_wave_memory: report.eval.answer_changed_due_to_wave_memory,
+        negative_lane_replay_observed: report.eval.negative_lane_replay_observed,
+        unrelated_route_preserved: report.eval.unrelated_route_preserved,
+    }
+}
+
+fn vpn_training_summary(report: &LinuxVpnTrainEvalReport) -> LinuxProfileVpnTrainingSummary {
+    LinuxProfileVpnTrainingSummary {
+        mode: report.mode,
+        verdict: report.verdict.to_string(),
+        memory_path: report.training.memory.path.clone(),
+        eval_total: report.eval.total,
+        eval_passed: report.eval.passed,
+        pass_rate: report.eval.pass_rate,
+        inserted_delta_count: report.training.inserted_delta_count,
+        local_vpn_training_ready: report.claim_boundary.local_vpn_training_ready,
+        persistent_wave_memory_ready: report.claim_boundary.persistent_wave_memory_ready,
+        secret_boundary_ready: report
+            .eval
+            .cases
+            .iter()
+            .any(|case| case.id == "secret-boundary-refused" && case.passed),
+        local_system_mutation_done: report.claim_boundary.local_system_mutation_done,
+        secrets_read: report.claim_boundary.secrets_read,
+        secrets_printed: report.claim_boundary.secrets_printed,
+    }
+}
+
+fn chat_target(
+    requirements: &LinuxProfileRequirements,
+    reasoning_ready: bool,
+    chat_target_ready: bool,
+    vpn_required: bool,
+) -> LinuxProfileChatTarget {
+    let mut blocked_by = Vec::new();
+    if !requirements.proof_grade_linux_profile_nonlinear_memory_proven {
+        blocked_by.push("proof_grade_linux_profile_nonlinear_memory");
+    }
+    if !requirements.broad_eval_present {
+        blocked_by.push("broad_eval_missing");
+    } else if !reasoning_ready {
+        blocked_by.push("broad_eval_thresholds");
+    }
+    if !requirements.heldout_eval_present {
+        blocked_by.push("heldout_eval_missing");
+    } else if !(requirements.heldout_pass_rate_ok && requirements.heldout_false_positive_rate_ok) {
+        blocked_by.push("heldout_eval_thresholds");
+    }
+    if !requirements.chat_learning_eval_present {
+        blocked_by.push("dialogue_learning_eval_missing");
+    } else if !(requirements.dialogue_learning_ready
+        && requirements.memory_lift_observed
+        && requirements.learned_anti_wave_observed
+        && requirements.unrelated_route_preserved)
+    {
+        blocked_by.push("dialogue_learning_thresholds");
+    }
+    if vpn_required && !(requirements.vpn_training_ready && requirements.vpn_secret_boundary_ready)
+    {
+        blocked_by.push("vpn_training_thresholds");
+    }
+
+    LinuxProfileChatTarget {
+        target: "LLMWAVE_LINUX_CHAT_PROFILE_V1",
+        verdict: if chat_target_ready {
+            "LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM"
+        } else {
+            "LLMWAVE_LINUX_CHAT_PROFILE_BLOCKED"
+        },
+        ready: chat_target_ready,
+        profile_scope: "linux-only",
+        requires_memory_proof: true,
+        requires_broad_eval: true,
+        requires_heldout_eval: true,
+        requires_dialogue_learning: true,
+        requires_vpn_training_when_requested: vpn_required,
+        global_llm_ready: false,
+        global_nonlinear_memory_proven: false,
+        safe_claim: "This target means bounded Linux-profile chat over proof-grade `.lrf` memory plus held-out and dialogue-learning evidence. It is not open-domain GPT-style chat.",
+        blocked_by,
+    }
 }
 
 fn build_linux_query_wave(text: &str) -> LinuxQueryWave {
@@ -1789,6 +2135,12 @@ mod tests {
         let claim = build_linux_profile_claim_gate_report(LinuxProfileClaimGateConfig {
             residual_pack: residual.clone(),
             broad_eval: Some(eval_path),
+            heldout_eval: None,
+            run_chat_learning_eval: false,
+            chat_learning_memory: root.join("linux-profile-chat.lwm"),
+            run_vpn_training_eval: false,
+            vpn_memory: root.join("linux-profile-vpn.lwm"),
+            max_facts: 4,
             out: None,
         })
         .unwrap();
@@ -1821,6 +2173,66 @@ mod tests {
             heldout_eval.verdict,
             "LINUX_PROFILE_HELDOUT_EVAL_PASS_NOT_GENERAL_LLM"
         );
+        let full_claim = build_linux_profile_claim_gate_report(LinuxProfileClaimGateConfig {
+            residual_pack: residual.clone(),
+            broad_eval: Some(root.join("eval.json")),
+            heldout_eval: Some(root.join("heldout-eval.json")),
+            run_chat_learning_eval: true,
+            chat_learning_memory: root.join("linux-profile-chat-full.lwm"),
+            run_vpn_training_eval: true,
+            vpn_memory: root.join("linux-profile-vpn-full.lwm"),
+            max_facts: 4,
+            out: None,
+        });
+        assert!(
+            full_claim.is_err(),
+            "heldout eval must be materialized before the full chat target can pass"
+        );
+        let heldout_eval_path = root.join("heldout-eval.json");
+        let heldout_eval =
+            heldout::build_linux_heldout_eval_report(heldout::LinuxHeldoutEvalRunConfig {
+                residual_pack: residual.clone(),
+                suite: root.join("heldout.json"),
+                out: Some(heldout_eval_path.clone()),
+                max_facts: 4,
+            })
+            .unwrap();
+        assert_eq!(
+            heldout_eval.verdict,
+            "LINUX_PROFILE_HELDOUT_EVAL_PASS_NOT_GENERAL_LLM"
+        );
+        let full_claim = build_linux_profile_claim_gate_report(LinuxProfileClaimGateConfig {
+            residual_pack: residual.clone(),
+            broad_eval: Some(root.join("eval.json")),
+            heldout_eval: Some(heldout_eval_path),
+            run_chat_learning_eval: true,
+            chat_learning_memory: root.join("linux-profile-chat-full.lwm"),
+            run_vpn_training_eval: true,
+            vpn_memory: root.join("linux-profile-vpn-full.lwm"),
+            max_facts: 4,
+            out: None,
+        })
+        .unwrap();
+        assert_eq!(
+            full_claim.verdict,
+            "LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM"
+        );
+        assert!(!full_claim.chat_target.ready);
+        assert!(!full_claim.memory_proof.proof_grade);
+        assert_eq!(
+            full_claim.memory_proof.proof_grade_min_represented_facts,
+            LINUX_PROFILE_PROOF_GRADE_MIN_FACTS
+        );
+        assert!(!full_claim.memory_proof.proof_grade_fact_count_ok);
+        assert!(!full_claim.requirements.proof_grade_fact_count_ok);
+        assert!(full_claim
+            .chat_target
+            .blocked_by
+            .contains(&"proof_grade_linux_profile_nonlinear_memory"));
+        assert!(full_claim.requirements.chat_learning_eval_present);
+        assert!(full_claim.requirements.memory_lift_observed);
+        assert!(full_claim.requirements.vpn_training_ready);
+        assert!(!full_claim.chat_target.global_llm_ready);
         let feedback_path = root.join("feedback.json");
         let feedback = feedback::build_linux_feedback_report(feedback::LinuxFeedbackBuildConfig {
             residual_pack: residual.clone(),
