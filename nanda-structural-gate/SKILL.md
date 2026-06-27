@@ -1333,6 +1333,16 @@ Use `nanda-llmwave-big linux-chat-v2 --residual-pack .nanda/linux-active/linux-a
 when the user wants to teach the bounded Linux-profile model through explicit
 dialogue feedback. Do not treat the transcript itself as memory; inspect the
 `.lwm` wave-delta records and the next turn's `memory_effect`.
+Use `nanda-llmwave-big linux-center-learn --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-center-learning.lwm --script examples/linux-center-learning.script --heldout-eval .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --reset-memory --format json`
+when the user asks whether Linux-profile memory can learn by moving centers, not
+just by appending a feedback log. The command must write and reload a persistent
+`.lwm` center memory file, reinforce confirmed schema centers, write correction
+residuals, create anti-centers for rejected shortcuts, promote repeated residual
+clusters, mark conflicting centers as split-available, decay weak candidates,
+protect verified centers, and show a real before/after lift. Treat
+`LINUX_DYNAMIC_CENTER_LEARNING_READY_NOT_GENERAL_LLM` as Linux-profile dynamic
+learning only: it is not general LLM readiness and not global nonlinear-memory
+proof.
 Use `nanda-llmwave-big linux-vpn-train --memory .nanda/linux-active/linux-vpn.lwm --reset-memory --format json`
 to write a safe local VPN training profile into persistent wave memory. It
 teaches bounded routes for WireGuard setup, status checks, DNS/routes,
@@ -1376,6 +1386,11 @@ VPN secret-boundary training if requested. Treat
 `LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM` as Linux-only bounded chat
 readiness, not general LLM, open-domain chat, scanner, exploit, or global
 nonlinear-memory proof.
+Add `--run-center-learning-eval --center-learning-memory .nanda/linux-active/linux-center-learning.lwm --center-learning-script examples/linux-center-learning.script`
+when the profile claim must also prove dynamic center learning. If the center
+subgate cannot show target-query improvement, memory lift, anti-center replay,
+no false-positive regression, no heldout regression, and unrelated-route
+preservation, do not promote the chat profile.
 These commands expand the Linux-profile reasoning/chat proof surface, but they
 still do not unlock general LLM, open-domain chat, scanner, or exploit claims.
 Use `nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json`

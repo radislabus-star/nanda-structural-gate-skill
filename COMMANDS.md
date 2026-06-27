@@ -275,6 +275,7 @@ nanda-llmwave-big linux-chat-v1 --residual-pack .nanda/linux-active/linux-active
 nanda-llmwave-big linux-chat-v1 --residual-pack .nanda/linux-active/linux-active-65k.lrf --script .nanda/linux-active/linux-chat.script --max-facts 4 --format json
 nanda-llmwave-big linux-chat-v2-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-chat-v2-eval.lwm --max-facts 4 --format json
 nanda-llmwave-big linux-chat-v2 --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-chat-v2.lwm --prompt "Which package provides command foocmd?" --prompt "learn accept: foocmd | linux.apt.command.provider | foopkg" --prompt "Which package provides command foocmd?" --max-facts 4 --format json
+nanda-llmwave-big linux-center-learn --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-center-learning.lwm --script examples/linux-center-learning.script --heldout-eval .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --reset-memory --format json
 nanda-llmwave-big linux-vpn-train --memory .nanda/linux-active/linux-vpn.lwm --reset-memory --format json
 nanda-llmwave-big linux-vpn-train-eval --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-vpn-eval.lwm --max-facts 4 --format json
 nanda-llmwave-big linux-query-wave --text "Is ssh externally exposed?" --format json
@@ -285,7 +286,7 @@ nanda-llmwave-big linux-broad-eval-run --residual-pack .nanda/linux-active/linux
 nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --format json
 nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json
 nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-heldout-suite.json --out .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --format json
-nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json
+nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-center-learning-eval --center-learning-memory .nanda/linux-active/linux-center-learning.lwm --center-learning-script examples/linux-center-learning.script --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json
 nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
 nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json
@@ -494,6 +495,16 @@ unrelated-route preservation. Treat
 `LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM` as local
 Linux-profile dialogue learning only, not general LLM readiness and not a final
 nonlinear-memory proof.
+`linux-center-learn` is the dynamic center-learning loop over `.lrf v2`
+schema/residual memory. It writes and reloads a persistent `.lwm` center memory
+file, reinforces confirmed centers, writes correction residuals, creates
+anti-centers for rejected shortcuts, promotes repeated residual clusters,
+marks overloaded/conflicting centers as split-available, decays weak candidates,
+and protects verified centers from random drift. It must show before/after lift,
+anti-center replay, no false-positive regression, held-out preservation, and an
+unrelated route still grounded. Treat
+`LINUX_DYNAMIC_CENTER_LEARNING_READY_NOT_GENERAL_LLM` as Linux-profile dynamic
+learning only, not a global nonlinear-memory or general LLM claim.
 `linux-vpn-train` writes a safe local VPN training profile into persistent
 wave memory: WireGuard setup, status checks, DNS/routes, NetworkManager import,
 TrustTunnel safety, and secret boundaries. It does not mutate the local system,
@@ -520,11 +531,11 @@ schema/residual memory and broad Linux-profile eval thresholds both pass.
 Proof-grade memory requires the full 65,536-fact active Linux profile, so tiny
 fixtures stay useful as mechanics tests but cannot promote the chat target. The
 same command has the alias `linux-chat-profile-gate`. With `--heldout-eval`,
-`--run-chat-learning-eval`, and optional `--run-vpn-training-eval`, it can
-promote the profile target to
+`--run-chat-learning-eval`, optional `--run-center-learning-eval`, and optional
+`--run-vpn-training-eval`, it can promote the profile target to
 `LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM`. That stronger target still
-means Linux-only bounded chat over `.lrf` plus `.lwm` wave learning; it does not
-unlock general LLM, open-domain chat, scanner, or exploit claims.
+means Linux-only bounded chat over `.lrf` plus `.lwm` wave/center learning; it
+does not unlock general LLM, open-domain chat, scanner, or exploit claims.
 `linux-heldout-suite-build` adds a stricter profile suite: exact facts,
 near-name collisions, shortcut controls, and endpoint-scope checks. Use
 `linux-heldout-eval-run` before trusting the profile on noisy Linux facts.

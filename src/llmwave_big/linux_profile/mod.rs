@@ -28,6 +28,10 @@ use super::linux_residual_memory::{
 };
 use super::linux_runtime_snapshot::{load_runtime_snapshot_overlay, LinuxRuntimeSnapshotOverlay};
 use super::{
+    linux_center_learning::{
+        build_linux_center_learn_report, center_learning_ready, LinuxCenterLearnConfig,
+        LinuxCenterLearnReport,
+    },
     linux_chat_v2::{build_linux_chat_v2_report, LinuxChatV2Config, LinuxChatV2Report},
     linux_vpn_training::{
         build_linux_vpn_train_eval_report, LinuxVpnTrainEvalConfig, LinuxVpnTrainEvalReport,
@@ -72,6 +76,9 @@ pub(crate) struct LinuxProfileClaimGateConfig {
     pub heldout_eval: Option<PathBuf>,
     pub run_chat_learning_eval: bool,
     pub chat_learning_memory: PathBuf,
+    pub run_center_learning_eval: bool,
+    pub center_learning_memory: PathBuf,
+    pub center_learning_script: Option<PathBuf>,
     pub run_vpn_training_eval: bool,
     pub vpn_memory: PathBuf,
     pub max_facts: usize,
@@ -241,6 +248,7 @@ pub(crate) struct LinuxProfileClaimGateReport {
     pub broad_eval: Option<LinuxBroadEvalMetrics>,
     pub heldout_eval: Option<LinuxBroadEvalMetrics>,
     pub chat_learning: Option<LinuxProfileChatLearningSummary>,
+    pub center_learning: Option<LinuxProfileCenterLearningSummary>,
     pub vpn_training: Option<LinuxProfileVpnTrainingSummary>,
     pub requirements: LinuxProfileRequirements,
     pub chat_target: LinuxProfileChatTarget,
@@ -270,6 +278,14 @@ pub(crate) struct LinuxProfileRequirements {
     pub memory_lift_observed: bool,
     pub learned_anti_wave_observed: bool,
     pub unrelated_route_preserved: bool,
+    pub center_learning_eval_present: bool,
+    pub dynamic_center_learning_ready: bool,
+    pub center_target_query_improved: bool,
+    pub center_memory_lift_observed: bool,
+    pub center_anti_replay_observed: bool,
+    pub center_false_positive_regression_free: bool,
+    pub center_heldout_regression_free: bool,
+    pub center_unrelated_route_preserved: bool,
     pub vpn_training_eval_present: bool,
     pub vpn_training_ready: bool,
     pub vpn_secret_boundary_ready: bool,
@@ -313,6 +329,21 @@ pub(crate) struct LinuxProfileChatLearningSummary {
     pub answer_changed_due_to_wave_memory: bool,
     pub negative_lane_replay_observed: bool,
     pub unrelated_route_preserved: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxProfileCenterLearningSummary {
+    pub mode: &'static str,
+    pub verdict: String,
+    pub memory_path: String,
+    pub dynamic_learning_ready: bool,
+    pub target_query_improved: bool,
+    pub memory_lift_observed: bool,
+    pub anti_center_replay_observed: bool,
+    pub false_positive_rate_regressed: bool,
+    pub heldout_regressed: bool,
+    pub unrelated_route_preserved: bool,
+    pub proof_grade_profile_scale: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -597,6 +628,21 @@ pub(crate) fn build_linux_profile_claim_gate_report(
     } else {
         None
     };
+    let center_learning = if config.run_center_learning_eval {
+        Some(center_learning_summary(&build_linux_center_learn_report(
+            LinuxCenterLearnConfig {
+                residual_pack: config.residual_pack.clone(),
+                memory: config.center_learning_memory.clone(),
+                script: config.center_learning_script.clone(),
+                heldout_eval: config.heldout_eval.clone(),
+                max_facts: config.max_facts.max(1),
+                reset_memory: true,
+                out: None,
+            },
+        )?))
+    } else {
+        None
+    };
     let vpn_training = if config.run_vpn_training_eval {
         Some(vpn_training_summary(&build_linux_vpn_train_eval_report(
             LinuxVpnTrainEvalConfig {
@@ -665,6 +711,35 @@ pub(crate) fn build_linux_profile_claim_gate_report(
             .as_ref()
             .map(|summary| summary.unrelated_route_preserved)
             .unwrap_or(false),
+        center_learning_eval_present: center_learning.is_some(),
+        dynamic_center_learning_ready: center_learning
+            .as_ref()
+            .map(|summary| summary.dynamic_learning_ready)
+            .unwrap_or(false),
+        center_target_query_improved: center_learning
+            .as_ref()
+            .map(|summary| summary.target_query_improved)
+            .unwrap_or(false),
+        center_memory_lift_observed: center_learning
+            .as_ref()
+            .map(|summary| summary.memory_lift_observed)
+            .unwrap_or(false),
+        center_anti_replay_observed: center_learning
+            .as_ref()
+            .map(|summary| summary.anti_center_replay_observed)
+            .unwrap_or(false),
+        center_false_positive_regression_free: center_learning
+            .as_ref()
+            .map(|summary| !summary.false_positive_rate_regressed)
+            .unwrap_or(false),
+        center_heldout_regression_free: center_learning
+            .as_ref()
+            .map(|summary| !summary.heldout_regressed)
+            .unwrap_or(false),
+        center_unrelated_route_preserved: center_learning
+            .as_ref()
+            .map(|summary| summary.unrelated_route_preserved)
+            .unwrap_or(false),
         vpn_training_eval_present: vpn_training.is_some(),
         vpn_training_ready: vpn_training
             .as_ref()
@@ -692,12 +767,21 @@ pub(crate) fn build_linux_profile_claim_gate_report(
         && requirements.memory_lift_observed
         && requirements.learned_anti_wave_observed
         && requirements.unrelated_route_preserved
+        && (!config.run_center_learning_eval
+            || (requirements.dynamic_center_learning_ready
+                && requirements.center_target_query_improved
+                && requirements.center_memory_lift_observed
+                && requirements.center_anti_replay_observed
+                && requirements.center_false_positive_regression_free
+                && requirements.center_heldout_regression_free
+                && requirements.center_unrelated_route_preserved))
         && (!config.run_vpn_training_eval
             || (requirements.vpn_training_ready && requirements.vpn_secret_boundary_ready));
     let chat_target = chat_target(
         &requirements,
         ready,
         chat_target_ready,
+        config.run_center_learning_eval,
         config.run_vpn_training_eval,
     );
     let nonlinear = memory_proof.nonlinear_memory_proven;
@@ -720,6 +804,7 @@ pub(crate) fn build_linux_profile_claim_gate_report(
         broad_eval: broad_metrics,
         heldout_eval: heldout_metrics,
         chat_learning,
+        center_learning,
         vpn_training,
         requirements,
         chat_target,
@@ -783,6 +868,40 @@ fn chat_learning_summary(report: &LinuxChatV2Report) -> LinuxProfileChatLearning
     }
 }
 
+fn center_learning_summary(report: &LinuxCenterLearnReport) -> LinuxProfileCenterLearningSummary {
+    LinuxProfileCenterLearningSummary {
+        mode: report.mode,
+        verdict: report.verdict.to_string(),
+        memory_path: report.memory_path.clone(),
+        dynamic_learning_ready: center_learning_ready(report),
+        target_query_improved: report
+            .dynamic_center_learning
+            .before_after
+            .target_query_improved,
+        memory_lift_observed: report
+            .dynamic_center_learning
+            .before_after
+            .memory_lift_observed,
+        anti_center_replay_observed: report
+            .dynamic_center_learning
+            .before_after
+            .anti_center_replay_observed,
+        false_positive_rate_regressed: report
+            .dynamic_center_learning
+            .before_after
+            .false_positive_rate_regressed,
+        heldout_regressed: report
+            .dynamic_center_learning
+            .before_after
+            .heldout_regressed,
+        unrelated_route_preserved: report
+            .dynamic_center_learning
+            .before_after
+            .unrelated_route_preserved,
+        proof_grade_profile_scale: report.claim_boundary.proof_grade_profile_scale,
+    }
+}
+
 fn vpn_training_summary(report: &LinuxVpnTrainEvalReport) -> LinuxProfileVpnTrainingSummary {
     LinuxProfileVpnTrainingSummary {
         mode: report.mode,
@@ -809,6 +928,7 @@ fn chat_target(
     requirements: &LinuxProfileRequirements,
     reasoning_ready: bool,
     chat_target_ready: bool,
+    center_learning_required: bool,
     vpn_required: bool,
 ) -> LinuxProfileChatTarget {
     let mut blocked_by = Vec::new();
@@ -833,6 +953,19 @@ fn chat_target(
         && requirements.unrelated_route_preserved)
     {
         blocked_by.push("dialogue_learning_thresholds");
+    }
+    if center_learning_required && !requirements.center_learning_eval_present {
+        blocked_by.push("dynamic_center_learning_eval_missing");
+    } else if center_learning_required
+        && !(requirements.dynamic_center_learning_ready
+            && requirements.center_target_query_improved
+            && requirements.center_memory_lift_observed
+            && requirements.center_anti_replay_observed
+            && requirements.center_false_positive_regression_free
+            && requirements.center_heldout_regression_free
+            && requirements.center_unrelated_route_preserved)
+    {
+        blocked_by.push("dynamic_center_learning_thresholds");
     }
     if vpn_required && !(requirements.vpn_training_ready && requirements.vpn_secret_boundary_ready)
     {
@@ -2138,6 +2271,9 @@ mod tests {
             heldout_eval: None,
             run_chat_learning_eval: false,
             chat_learning_memory: root.join("linux-profile-chat.lwm"),
+            run_center_learning_eval: false,
+            center_learning_memory: root.join("linux-profile-center.lwm"),
+            center_learning_script: None,
             run_vpn_training_eval: false,
             vpn_memory: root.join("linux-profile-vpn.lwm"),
             max_facts: 4,
@@ -2179,6 +2315,9 @@ mod tests {
             heldout_eval: Some(root.join("heldout-eval.json")),
             run_chat_learning_eval: true,
             chat_learning_memory: root.join("linux-profile-chat-full.lwm"),
+            run_center_learning_eval: false,
+            center_learning_memory: root.join("linux-profile-center-full.lwm"),
+            center_learning_script: None,
             run_vpn_training_eval: true,
             vpn_memory: root.join("linux-profile-vpn-full.lwm"),
             max_facts: 4,
@@ -2207,6 +2346,9 @@ mod tests {
             heldout_eval: Some(heldout_eval_path),
             run_chat_learning_eval: true,
             chat_learning_memory: root.join("linux-profile-chat-full.lwm"),
+            run_center_learning_eval: true,
+            center_learning_memory: root.join("linux-profile-center-full.lwm"),
+            center_learning_script: None,
             run_vpn_training_eval: true,
             vpn_memory: root.join("linux-profile-vpn-full.lwm"),
             max_facts: 4,
@@ -2218,6 +2360,14 @@ mod tests {
             "LINUX_PROFILE_REASONING_READY_NOT_GENERAL_LLM"
         );
         assert!(!full_claim.chat_target.ready);
+        assert!(
+            full_claim
+                .center_learning
+                .as_ref()
+                .expect("center learning summary")
+                .dynamic_learning_ready
+        );
+        assert!(full_claim.requirements.dynamic_center_learning_ready);
         assert!(!full_claim.memory_proof.proof_grade);
         assert_eq!(
             full_claim.memory_proof.proof_grade_min_represented_facts,

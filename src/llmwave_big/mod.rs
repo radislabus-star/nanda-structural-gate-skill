@@ -45,6 +45,7 @@ pub mod lexical_birth;
 pub mod linux_active_field;
 pub mod linux_atlas;
 pub mod linux_atlas_projection;
+pub mod linux_center_learning;
 pub mod linux_chat;
 pub mod linux_chat_v1;
 pub mod linux_chat_v2;
@@ -456,6 +457,9 @@ enum LlmwaveBigCommand {
     /// Run the built-in Linux Chat V2 persistent learning eval script.
     #[command(name = "linux-chat-v2-eval")]
     LinuxChatV2Eval(LlmwaveBigLinuxChatV2EvalArgs),
+    /// Run dynamic center learning over Linux `.lrf` schema/residual memory.
+    #[command(name = "linux-center-learn")]
+    LinuxCenterLearn(LlmwaveBigLinuxCenterLearnArgs),
     /// Train safe local VPN routes into persistent Linux-profile wave memory.
     #[command(name = "linux-vpn-train")]
     LinuxVpnTrain(LlmwaveBigLinuxVpnTrainArgs),
@@ -1586,6 +1590,32 @@ struct LlmwaveBigLinuxChatV2EvalArgs {
 }
 
 #[derive(Parser)]
+struct LlmwaveBigLinuxCenterLearnArgs {
+    #[arg(
+        long = "residual-pack",
+        default_value = ".nanda/linux-active/linux-active-65k.lrf"
+    )]
+    residual_pack: PathBuf,
+    #[arg(
+        long = "memory",
+        default_value = ".nanda/linux-active/linux-center-learning.lwm"
+    )]
+    memory: PathBuf,
+    #[arg(long = "script")]
+    script: Option<PathBuf>,
+    #[arg(long = "heldout-eval")]
+    heldout_eval: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long = "reset-memory", default_value_t = false)]
+    reset_memory: bool,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
 struct LlmwaveBigLinuxVpnTrainArgs {
     #[arg(long = "memory", default_value = ".nanda/linux-active/linux-vpn.lwm")]
     memory: PathBuf,
@@ -1718,6 +1748,15 @@ struct LlmwaveBigLinuxProfileClaimGateArgs {
         default_value = ".nanda/linux-active/linux-chat-profile.lwm"
     )]
     chat_learning_memory: PathBuf,
+    #[arg(long = "run-center-learning-eval", default_value_t = false)]
+    run_center_learning_eval: bool,
+    #[arg(
+        long = "center-learning-memory",
+        default_value = ".nanda/linux-active/linux-center-learning.lwm"
+    )]
+    center_learning_memory: PathBuf,
+    #[arg(long = "center-learning-script")]
+    center_learning_script: Option<PathBuf>,
     #[arg(long = "run-vpn-training-eval", default_value_t = false)]
     run_vpn_training_eval: bool,
     #[arg(
@@ -3968,6 +4007,90 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             }
             Ok(EXIT_PASS)
         }
+        LlmwaveBigCommand::LinuxCenterLearn(args) => {
+            let report = linux_center_learning::build_linux_center_learn_report(
+                linux_center_learning::LinuxCenterLearnConfig {
+                    residual_pack: args.residual_pack,
+                    memory: args.memory,
+                    script: args.script,
+                    heldout_eval: args.heldout_eval,
+                    max_facts: args.max_facts,
+                    reset_memory: args.reset_memory,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "linux_profile_dynamic_learning_ready: {}",
+                        report.claim_boundary.linux_profile_dynamic_learning_ready
+                    );
+                    println!(
+                        "target_query_improved: {}",
+                        report
+                            .dynamic_center_learning
+                            .before_after
+                            .target_query_improved
+                    );
+                    println!(
+                        "memory_lift_observed: {}",
+                        report
+                            .dynamic_center_learning
+                            .before_after
+                            .memory_lift_observed
+                    );
+                    println!(
+                        "anti_center_replay_observed: {}",
+                        report
+                            .dynamic_center_learning
+                            .before_after
+                            .anti_center_replay_observed
+                    );
+                    println!(
+                        "general_llm_ready: {}",
+                        report.claim_boundary.general_llm_ready
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux Center Learn");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- Linux-profile dynamic learning ready: `{}`",
+                        report.claim_boundary.linux_profile_dynamic_learning_ready
+                    );
+                    println!(
+                        "- target query improved: `{}`",
+                        report
+                            .dynamic_center_learning
+                            .before_after
+                            .target_query_improved
+                    );
+                    println!(
+                        "- memory lift observed: `{}`",
+                        report
+                            .dynamic_center_learning
+                            .before_after
+                            .memory_lift_observed
+                    );
+                    println!(
+                        "- anti-center replay observed: `{}`",
+                        report
+                            .dynamic_center_learning
+                            .before_after
+                            .anti_center_replay_observed
+                    );
+                    println!(
+                        "- general LLM ready: `{}`",
+                        report.claim_boundary.general_llm_ready
+                    );
+                    println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
         LlmwaveBigCommand::LinuxVpnTrain(args) => {
             let report = linux_vpn_training::build_linux_vpn_train_report(
                 linux_vpn_training::LinuxVpnTrainConfig {
@@ -4264,6 +4387,9 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     heldout_eval: args.heldout_eval,
                     run_chat_learning_eval: args.run_chat_learning_eval,
                     chat_learning_memory: args.chat_learning_memory,
+                    run_center_learning_eval: args.run_center_learning_eval,
+                    center_learning_memory: args.center_learning_memory,
+                    center_learning_script: args.center_learning_script,
                     run_vpn_training_eval: args.run_vpn_training_eval,
                     vpn_memory: args.vpn_memory,
                     max_facts: args.max_facts,

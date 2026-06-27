@@ -845,6 +845,16 @@ Treat `LINUX_CHAT_V2_PERSISTENT_WAVE_LEARNING_READY_NOT_GENERAL_LLM` as local
 Linux-profile dialogue learning only; it is not general LLM readiness and not a
 global nonlinear-memory proof.
 
+`linux-center-learn` is the dynamic center-learning loop for the Linux profile.
+It starts from `.lrf v2` schema/residual memory, writes a persistent `.lwm`
+center memory file, reloads it, and proves a before/after change: confirmed
+feedback reinforces a schema center, corrections write residuals, reject
+feedback creates anti-centers, repeated residuals can promote a center,
+conflicting centers can split, weak candidates decay, and verified centers are
+protected from random drift. Treat
+`LINUX_DYNAMIC_CENTER_LEARNING_READY_NOT_GENERAL_LLM` as Linux-profile dynamic
+learning only; it does not unlock general LLM or global nonlinear-memory claims.
+
 `linux-vpn-train` writes a safe local VPN training profile into persistent
 wave memory. It teaches bounded routes for WireGuard setup, local status
 checks, DNS/routes, NetworkManager import, TrustTunnel safety, and secret
@@ -876,13 +886,14 @@ requires the full 65,536-fact active Linux profile, so tiny fixtures can test
 mechanics but cannot promote a chat-profile claim.
 
 `linux-chat-profile-gate` is an alias for the same owner with the full chat
-target enabled by flags. Pass `--heldout-eval`, `--run-chat-learning-eval`, and
-optional `--run-vpn-training-eval` to require proof-grade `.lrf` memory, broad
-eval, held-out eval, persistent `.lwm` dialogue learning, learned anti-wave
-replay, unrelated-route preservation, and VPN secret-boundary training. A pass
-is `LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM`: bounded Linux-profile
-chat readiness only, not general GPT-style chat and not a global nonlinear
-memory claim.
+target enabled by flags. Pass `--heldout-eval`, `--run-chat-learning-eval`,
+optional `--run-center-learning-eval`, and optional `--run-vpn-training-eval` to
+require proof-grade `.lrf` memory, broad eval, held-out eval, persistent `.lwm`
+dialogue learning, dynamic center learning, learned anti-wave replay,
+unrelated-route preservation, and VPN secret-boundary training. A pass is
+`LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM`: bounded Linux-profile chat
+readiness only, not general GPT-style chat and not a global nonlinear memory
+claim.
 
 `linux-heldout-suite-build` and `linux-heldout-eval-run` add stricter controls:
 exact route facts, near-name collisions, package/runtime shortcuts,
@@ -929,6 +940,15 @@ nanda-llmwave-big linux-chat-v2 \
   --prompt "learn accept: foocmd | linux.apt.command.provider | foopkg" \
   --prompt "Which package provides command foocmd?" \
   --max-facts 4 \
+  --format json
+
+nanda-llmwave-big linux-center-learn \
+  --residual-pack .nanda/linux-active/linux-active-65k.lrf \
+  --memory .nanda/linux-active/linux-center-learning.lwm \
+  --script examples/linux-center-learning.script \
+  --heldout-eval .nanda/linux-active/linux-heldout-eval.json \
+  --max-facts 4 \
+  --reset-memory \
   --format json
 
 nanda-llmwave-big linux-vpn-train \
@@ -1014,6 +1034,9 @@ nanda-llmwave-big linux-chat-profile-gate \
   --heldout-eval .nanda/linux-active/linux-heldout-eval.json \
   --run-chat-learning-eval \
   --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm \
+  --run-center-learning-eval \
+  --center-learning-memory .nanda/linux-active/linux-center-learning.lwm \
+  --center-learning-script examples/linux-center-learning.script \
   --run-vpn-training-eval \
   --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm \
   --max-facts 4 \
