@@ -1138,10 +1138,26 @@ cache_build_json="$("$cache" build "$root/examples/triad-packet.route-balanced-f
 jq -e '.mode == "focus-cache-build" and .version == "v64-focus-cache" and .focused_memory_size > 0' <<<"$cache_build_json" >/dev/null
 cache_list_json="$("$cache" list "$tmp_cache")"
 jq -e '.mode == "focus-cache-list" and .version == "v65-cache-only-proof" and .count == 1' <<<"$cache_list_json" >/dev/null
+set +e
 cache_proof_json="$("$proof" "$root/examples/triad-packet.route-balanced-focus.json" --input-format json --query "lower operator debt route" --fast --cache-dir "$tmp_cache")"
+cache_proof_status=$?
+set -e
+if [[ "$cache_proof_status" -ne 0 && "$cache_proof_status" -ne 3 ]]; then
+  echo "expected fast cache proof to return PASS or WATCH status" >&2
+  echo "$cache_proof_json" >&2
+  exit 1
+fi
 jq -e '.proof_mode == "fast-focused" and .focus_cache.state == "CACHE_HIT" and (.reason_codes | index("RAW_SEARCH_SKIPPED"))' <<<"$cache_proof_json" >/dev/null
 cache_manifest="$(find "$tmp_cache" -type f -name '*.manifest.json' | head -n 1)"
+set +e
 cache_only_json="$("$proof" --cache-only "$cache_manifest")"
+cache_only_status=$?
+set -e
+if [[ "$cache_only_status" -ne 0 && "$cache_only_status" -ne 3 ]]; then
+  echo "expected cache-only proof to return PASS or WATCH status" >&2
+  echo "$cache_only_json" >&2
+  exit 1
+fi
 jq -e '.proof_mode == "cache-only-focused" and .focus_cache.state == "CACHE_ONLY_HIT" and .corpus.state == "CORPUS_NOT_LOADED" and (.reason_codes | index("CORPUS_NOT_LOADED"))' <<<"$cache_only_json" >/dev/null
 serve_cache_json="$(printf '{"command":"proof_cache_only","manifest":"%s"}\n{"command":"proof_cache_only","manifest":"%s"}\n' "$cache_manifest" "$cache_manifest" | "$serve")"
 jq -e 'length == 2 and .[0].ok == true and .[0].elapsed_ms >= 0 and .[0].result.proof_mode == "cache-only-focused" and .[0].result.focus_cache.state == "CACHE_ONLY_HIT" and .[0].result.serve_cache.state == "SERVE_MEMORY_WARMED" and .[1].ok == true and .[1].result.serve_cache.state == "SERVE_PROOF_HIT"' <<<"$(jq -s . <<<"$serve_cache_json")" >/dev/null

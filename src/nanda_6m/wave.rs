@@ -130,15 +130,30 @@ pub fn score_triad_projection(query: &PackedWave1024, triad: &PackedTriad32) -> 
     score_triad_projection_with_query_energy(query, triad, query.energy_i64())
 }
 
+pub(super) fn score_triad_projection_dot(query: &PackedWave1024, triad: &PackedTriad32) -> i64 {
+    projection_signed_query_sum(query, triad) * i64::from(projection_strength(triad))
+}
+
 pub fn score_triad_projection_with_query_energy(
     query: &PackedWave1024,
     triad: &PackedTriad32,
     query_energy: i64,
 ) -> PeakScore {
-    let mut state = projection_seed(triad);
     let strength = i64::from(projection_strength(triad));
-    let mut signed_query_sum: i64 = 0;
     let triad_energy = (WAVE_DIM as i64) * strength * strength;
+    let dot = projection_signed_query_sum(query, triad) * strength;
+    let denom = ((query_energy as f64).sqrt() * (triad_energy as f64).sqrt()).max(1.0);
+    PeakScore {
+        dot,
+        query_energy,
+        centroid_energy: triad_energy,
+        cosine: dot as f64 / denom,
+    }
+}
+
+fn projection_signed_query_sum(query: &PackedWave1024, triad: &PackedTriad32) -> i64 {
+    let mut state = projection_seed(triad);
+    let mut signed_query_sum: i64 = 0;
     for &query_value in &query.values {
         state = mix64(state);
         let query_value = i64::from(query_value);
@@ -148,14 +163,7 @@ pub fn score_triad_projection_with_query_energy(
             signed_query_sum += query_value;
         }
     }
-    let dot = signed_query_sum * strength;
-    let denom = ((query_energy as f64).sqrt() * (triad_energy as f64).sqrt()).max(1.0);
-    PeakScore {
-        dot,
-        query_energy,
-        centroid_energy: triad_energy,
-        cosine: dot as f64 / denom,
-    }
+    signed_query_sum
 }
 
 fn projection_seed(triad: &PackedTriad32) -> u64 {

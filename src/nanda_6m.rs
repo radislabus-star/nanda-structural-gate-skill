@@ -1378,19 +1378,18 @@ pub fn build_packed_support_field(
             anti_count,
         };
     }
-    let query_energy = query.energy_i64();
     for (index, triad) in memory.iter().copied().enumerate() {
         if axis.triad_id(triad) != top_id {
             continue;
         }
         considered = considered.saturating_add(1);
-        let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
-        if score.dot > 0 {
-            field.positive_dot += score.dot;
+        let dot = score_triad_projection_dot(query, &triad);
+        if dot > 0 {
+            field.positive_dot += dot;
             support_count = support_count.saturating_add(1);
             set_support_mask(&mut field.support_mask_a, &mut field.support_mask_b, index);
-        } else if score.dot < 0 {
-            field.negative_dot += score.dot;
+        } else if dot < 0 {
+            field.negative_dot += dot;
             anti_count = anti_count.saturating_add(1);
             set_support_mask(&mut field.anti_mask_a, &mut field.anti_mask_b, index);
         }
@@ -1409,7 +1408,6 @@ pub fn build_packed_triad_support_scores(
     scores_out: &mut [PackedTriadSupportScore],
 ) -> usize {
     let count = memory.len().min(scores_out.len());
-    let query_energy = query.energy_i64();
     for (index, (triad, out)) in memory
         .iter()
         .copied()
@@ -1417,12 +1415,12 @@ pub fn build_packed_triad_support_scores(
         .zip(scores_out.iter_mut())
         .enumerate()
     {
-        let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
+        let dot = score_triad_projection_dot(query, &triad);
         *out = PackedTriadSupportScore {
             route_id: triad.route_id,
             group_id: triad.group_id,
             record_index: index.min(usize::from(u16::MAX)) as u16,
-            dot: score.dot,
+            dot,
         };
     }
     count
@@ -1840,21 +1838,21 @@ fn run_active65k_discovery(
     let mut top_record = PackedActiveRecordCandidate::default();
     let mut checksum = 0u64;
     for (index, triad) in memory.iter().copied().enumerate() {
-        let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
+        let dot = score_triad_projection_dot(query, &triad);
         let record_index = index.min(usize::from(u16::MAX)) as u16;
         records_scanned = records_scanned.saturating_add(1);
-        if score.dot > 0 {
+        if dot > 0 {
             positive_records = positive_records.saturating_add(1);
-        } else if score.dot < 0 {
+        } else if dot < 0 {
             anti_records = anti_records.saturating_add(1);
         }
-        accumulate_active_axis(route_accumulators, triad.route_id, record_index, score.dot);
-        accumulate_active_axis(group_accumulators, triad.group_id, record_index, score.dot);
+        accumulate_active_axis(route_accumulators, triad.route_id, record_index, dot);
+        accumulate_active_axis(group_accumulators, triad.group_id, record_index, dot);
         let candidate = PackedActiveRecordCandidate {
             record_index,
             route_id: triad.route_id,
             group_id: triad.group_id,
-            dot: score.dot,
+            dot,
         };
         if candidate.dot > 0
             && (top_record.dot <= 0
@@ -1863,7 +1861,7 @@ fn run_active65k_discovery(
             top_record = candidate;
         }
         checksum = checksum
-            .wrapping_add(score.dot as u64)
+            .wrapping_add(dot as u64)
             .wrapping_add(u64::from(triad.route_id) << 7)
             .wrapping_add(u64::from(triad.group_id) << 17)
             .wrapping_add(u64::from(record_index));
@@ -1906,7 +1904,6 @@ fn run_active65k_proof_rescan(
         ..PackedSupportField::default()
     };
 
-    let query_energy = query.energy_i64();
     let mut route_considered = 0u16;
     let mut route_support = 0u16;
     let mut route_anti = 0u16;
@@ -1916,12 +1913,13 @@ fn run_active65k_proof_rescan(
     let mut records_scanned = 0u32;
     let mut checksum = 0u64;
     for (index, triad) in memory.iter().copied().enumerate() {
-        let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
         records_scanned = records_scanned.saturating_add(1);
+        let mut proof_dot = None;
         if route_id != 0 && triad.route_id == route_id {
+            let dot = *proof_dot.get_or_insert_with(|| score_triad_projection_dot(query, &triad));
             accumulate_support_field_with_dot(
                 &mut fields_out[0],
-                score.dot,
+                dot,
                 index,
                 &mut route_considered,
                 &mut route_support,
@@ -1929,9 +1927,10 @@ fn run_active65k_proof_rescan(
             );
         }
         if group_id != 0 && triad.group_id == group_id {
+            let dot = *proof_dot.get_or_insert_with(|| score_triad_projection_dot(query, &triad));
             accumulate_support_field_with_dot(
                 &mut fields_out[1],
-                score.dot,
+                dot,
                 index,
                 &mut group_considered,
                 &mut group_support,
@@ -1939,7 +1938,7 @@ fn run_active65k_proof_rescan(
             );
         }
         checksum = checksum
-            .wrapping_add(score.dot as u64)
+            .wrapping_add(proof_dot.unwrap_or(0) as u64)
             .wrapping_add(u64::from(triad.route_id) << 11)
             .wrapping_add(u64::from(triad.group_id) << 19);
     }
