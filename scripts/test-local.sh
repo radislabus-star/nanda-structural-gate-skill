@@ -2064,6 +2064,8 @@ EOF_BOUNDARY
 done
 boundary_pressure_json="$("$boundary_economics" "$tmp_boundary_pressure_repo" --format json || true)"
 jq -e '.boundary_core.owner == "field_core::boundary" and .boundary_core.commands_are_wrappers == true and .boundary_decision.verdict == "WATCH" and .boundary_decision.safe_to_edit == false and (.boundary_decision.reason | contains("repo-wide route pressure")) and (.boundary_decision.repair | index("rerun boundary economics with --atlas, --route, and --owner before cutting"))' <<<"$boundary_pressure_json" >/dev/null
+boundary_find_json="$("$boundary_economics" "$tmp_boundary_repo" --find-refactors --format json)"
+jq -e '.mode == "boundary-refactor-finder" and .boundary_core.owner == "field_core::boundary" and .boundary_core.commands_are_wrappers == true and .safe_to_edit == false and .ranking_policy.no_size_only_split == true and (.refactor_candidates | length) > 0' <<<"$boundary_find_json" >/dev/null
 boundary_pressure_dogfood_json="$("$dogfood" "$tmp_boundary_pressure_repo" --refactor-plan --boundary-economics --format json || true)"
 jq -e '.agent_decision.action == "REVIEW_REQUIRED" and .agent_decision.safe_to_edit == false and .agent_decision.boundary_economics_verdict == "WATCH" and .boundary_economics.boundary_decision.verdict == "WATCH"' <<<"$boundary_pressure_dogfood_json" >/dev/null
 boundary_atlas_path="$tmp_boundary_repo/.nanda/route-atlas.json"

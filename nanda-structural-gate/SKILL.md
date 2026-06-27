@@ -97,6 +97,7 @@ scripts/nanda-map task.md --domain code --normalize-paths
 scripts/nanda-map-code src/main.rs --format json
 scripts/nanda-map-code . --format json
 scripts/nanda-boundary-economics . --format json
+scripts/nanda-boundary-economics . --find-refactors --format json
 scripts/nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-display-flow --owner LayIbusEngine --format json
 scripts/nanda-build-atlas . --out .nanda/route-atlas.json
 scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
@@ -411,6 +412,12 @@ refactor; it starts from `atlas.routes[route].allowed_files` and narrows by
 owner/path so unrelated routes do not pollute the contract. If explicit
 `--owner` does not match the selected route atlas, treat the `WATCH` verdict
 and `safe_to_edit=false` as a stop; do not fall back to the whole route.
+Use `nanda-boundary-economics . --find-refactors --format json` for repo-wide
+candidate ranking. This mode returns `mode=boundary-refactor-finder`, keeps
+`safe_to_edit=false`, and ranks evidence-backed pressure without granting edit
+permission. It must not split on size alone; require
+`ranking_policy.no_size_only_split=true`, then rerun a route-scoped boundary
+pass before editing.
 Guard commands expose boundary output under `boundary_economics` and also keep
 top-level `boundary_decision` for compatibility. `WATCH` means do not cut;
 `VETO` means stop;
@@ -1546,6 +1553,7 @@ scripts/nanda-build-atlas . --out .nanda/route-atlas.json
 scripts/nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 scripts/nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
 scripts/nanda-boundary-economics . --format json
+scripts/nanda-boundary-economics . --find-refactors --format json
 scripts/nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-display-flow --owner LayIbusEngine --format json
 scripts/nanda-profile-guards . --iterations 50 --format json
 scripts/nanda-dogfood . --refactor-plan --boundary-economics --format json

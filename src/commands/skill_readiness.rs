@@ -87,6 +87,18 @@ fn build_report(repo: &Path) -> Value {
                     .unwrap_or(false)
                 && boundary_kernel["diff_field_not_more_permissive"]
                     .as_bool()
+                    .unwrap_or(false)
+                && boundary_kernel["refactor_finder_present"]
+                    .as_bool()
+                    .unwrap_or(false)
+                && boundary_kernel["refactor_finder_owner_is_field_core"]
+                    .as_bool()
+                    .unwrap_or(false)
+                && boundary_kernel["refactor_finder_safe_to_edit_false"]
+                    .as_bool()
+                    .unwrap_or(false)
+                && boundary_kernel["refactor_finder_no_size_only_split"]
+                    .as_bool()
                     .unwrap_or(false),
             boundary_kernel,
         ),
@@ -248,6 +260,7 @@ fn boundary_kernel_summary(repo: &Path) -> Value {
         "src/field_core/boundary/records.rs",
         "src/field_core/boundary/energy.rs",
         "src/field_core/boundary/diff.rs",
+        "src/field_core/boundary/refactors.rs",
         "src/field_core/boundary/util.rs",
     ];
     let diff_expected_files = [
@@ -309,6 +322,16 @@ fn boundary_kernel_summary(repo: &Path) -> Value {
         "diff --git a/src/field_core/boundary/mod.rs b/src/field_core/boundary/mod.rs\n--- a/src/field_core/boundary/mod.rs\n+++ b/src/field_core/boundary/mod.rs\n@@ -1 +1 @@\n-mod old;\n+mod diff;\n",
         None,
     );
+    let refactor_report = crate::field_core::boundary_find_refactors(
+        &repo.join("src/field_core/boundary"),
+        None,
+        None,
+        Some("source-flow"),
+        Some("field_core::boundary"),
+        readiness_boundary_route_for_path,
+        readiness_boundary_owner_for_path,
+    )
+    .unwrap_or_else(|err| json!({"error": err.to_string()}));
     json!({
         "owner": "field_core::boundary",
         "kernel_split_files_present": missing_files.is_empty(),
@@ -322,8 +345,13 @@ fn boundary_kernel_summary(repo: &Path) -> Value {
         "missing_diff_kernel_files": missing_diff_files,
         "diff_kernel_owner_is_field_core": diff_report["boundary_diff_kernel"]["owner"].as_str() == Some("field_core::boundary::diff"),
         "diff_field_not_more_permissive": diff_report["boundary_diff_kernel"]["field_equivalence"]["field_not_more_permissive"].as_bool().unwrap_or(false),
+        "refactor_finder_present": repo.join("src/field_core/boundary/refactors.rs").is_file(),
+        "refactor_finder_owner_is_field_core": refactor_report["boundary_core"]["owner"].as_str() == Some("field_core::boundary"),
+        "refactor_finder_safe_to_edit_false": refactor_report["safe_to_edit"].as_bool() == Some(false),
+        "refactor_finder_no_size_only_split": refactor_report["ranking_policy"]["no_size_only_split"].as_bool() == Some(true),
         "diff_typed_verdict": diff_report["verdict"].clone(),
         "diff_kernel_verdict": diff_report["boundary_diff_kernel"]["diff_verdict"].clone(),
+        "refactor_finder_verdict": refactor_report["verdict"].clone(),
         "selected_verdict": report["boundary_field_engine"]["selected_verdict"].clone(),
         "typed_verdict": report["boundary_decision"]["verdict"].clone()
     })

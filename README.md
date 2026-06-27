@@ -1335,6 +1335,7 @@ nanda-dogfood .
 nanda-map-code src/main.rs
 nanda-map-code .
 nanda-boundary-economics . --format json
+nanda-boundary-economics . --find-refactors --format json
 nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-display-flow --owner LayIbusEngine --format json
 nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
@@ -1423,6 +1424,12 @@ concrete refactor. Route-scoped mode starts from
 contract does not drag unrelated routes into the evidence. If an explicit
 `--owner` does not match the selected route atlas, the verdict is `WATCH` and
 `safe_to_edit=false`; the command must not fall back to the whole route.
+Use `nanda-boundary-economics . --find-refactors --format json` when you want a
+repo-wide ranking of possible refactor pressure. This mode returns
+`mode=boundary-refactor-finder`, keeps `safe_to_edit=false`, and ranks
+evidence-backed candidates without granting edit permission. It must not cut on
+file size alone; check `ranking_policy.no_size_only_split=true` and then run a
+route-scoped boundary pass before changing code.
 Guard commands expose the same contract under `boundary_economics` while
 keeping top-level `boundary_decision` for compatibility. Verdicts are
 `SPLIT_STRONG`, `SPLIT_WEAK`, `KEEP`, `MERGE_CANDIDATE`, `VETO`, and `WATCH`.
@@ -2301,6 +2308,7 @@ nanda-build-atlas . --out .nanda/route-atlas.json
 nanda-guard-action .nanda/route-atlas.json --symptom "IME not visible" --action-id ime.activate_engine --boundary-economics
 nanda-guard-diff .nanda/route-atlas.json --action-id ime.show_candidate --diff git.diff --boundary-economics
 nanda-boundary-economics . --format json
+nanda-boundary-economics . --find-refactors --format json
 nanda-boundary-economics . --atlas .nanda/route-atlas.json --route ime-display-flow --owner LayIbusEngine --format json
 nanda-profile-guards . --iterations 50 --format json
 nanda-dogfood . --out-dir .nanda/

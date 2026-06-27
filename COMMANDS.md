@@ -84,6 +84,7 @@ stay review-only.
 
 ```bash
 nanda-boundary-economics . --format json
+nanda-boundary-economics . --find-refactors --format json
 nanda-boundary-economics . \
   --atlas .nanda/route-atlas.json \
   --route ime-display-flow \
@@ -91,6 +92,12 @@ nanda-boundary-economics . \
   --format json
 nanda-dogfood . --refactor-plan --boundary-economics --format json
 ```
+
+`--find-refactors` is a ranking pass, not edit permission. It returns
+`mode=boundary-refactor-finder`, keeps `safe_to_edit=false`, and ranks
+evidence-backed candidates such as `SPLIT_STRONG`, `MERGE_CANDIDATE`, `WATCH`,
+or `VETO`. It must not split on size alone: the JSON includes
+`ranking_policy.no_size_only_split=true`.
 
 ## Field Core
 

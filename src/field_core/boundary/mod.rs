@@ -13,6 +13,7 @@ mod energy;
 mod facts;
 mod field_pass;
 mod records;
+mod refactors;
 mod util;
 
 use decision::{boundary_decision, empty_components, score_component};
@@ -25,6 +26,7 @@ use field_pass::{
     boundary_field_engine, boundary_field_equivalence, boundary_field_pass_admission,
 };
 use records::boundary_field_records;
+use refactors::boundary_refactor_finder;
 
 pub(crate) type BoundaryPathClassifier = fn(&str) -> String;
 
@@ -372,6 +374,26 @@ pub(crate) fn boundary_report(
     }))
 }
 
+pub(crate) fn boundary_find_refactors(
+    input: &Path,
+    atlas: Option<&Value>,
+    atlas_label: Option<String>,
+    route: Option<&str>,
+    owner: Option<&str>,
+    route_for_path: BoundaryPathClassifier,
+    owner_for_path: BoundaryPathClassifier,
+) -> Result<Value> {
+    boundary_refactor_finder(
+        input,
+        atlas,
+        atlas_label,
+        route,
+        owner,
+        route_for_path,
+        owner_for_path,
+    )
+}
+
 pub(crate) fn boundary_from_guard_action(atlas: &Value, action_out: &Value) -> Value {
     let route = action_out["route"].as_str();
     let route_node = route.map(|route| &atlas["routes"][route]);
@@ -633,5 +655,45 @@ mod tests {
             true
         );
         assert_eq!(report["boundary_field_engine"]["selected_verdict"], "WATCH");
+    }
+
+    #[test]
+    fn boundary_find_refactors_surfaces_thin_wrapper_candidate() {
+        let repo = temp_repo("find-refactors");
+        fs::write(
+            repo.join("src/core.rs"),
+            "pub fn core_decision() -> bool { true }\n",
+        )
+        .expect("write core");
+        fs::write(
+            repo.join("src/wrapper.rs"),
+            "pub fn wrapper() -> bool { core_decision() }\n",
+        )
+        .expect("write wrapper");
+
+        let report = boundary_find_refactors(
+            &repo,
+            None,
+            None,
+            None,
+            None,
+            route_for_path,
+            owner_for_path,
+        )
+        .expect("refactor finder report");
+
+        assert_eq!(report["mode"], "boundary-refactor-finder");
+        assert_eq!(report["boundary_core"]["owner"], "field_core::boundary");
+        assert_eq!(report["safe_to_edit"], false);
+        assert_eq!(report["ranking_policy"]["no_size_only_split"], true);
+        assert!(
+            report["refactor_candidates"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|candidate| candidate["verdict"] == "MERGE_CANDIDATE"),
+            "{}",
+            serde_json::to_string_pretty(&report).unwrap()
+        );
     }
 }
