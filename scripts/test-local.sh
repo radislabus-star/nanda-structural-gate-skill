@@ -1075,9 +1075,13 @@ rm -f "$drift_packet"
 hgate_json="$("$root/nanda-structural-gate/scripts/nanda-hgate" "$root/examples/triad-packet.hgate-size-only.json" --input-format json)"
 jq -e '.mode == "hierarchical-gate"' <<<"$hgate_json" >/dev/null
 jq -e '.hierarchical_decision.action == "STRUCTURALLY_ACCEPTED"' <<<"$hgate_json" >/dev/null
+jq -e '.hierarchical_decision.agent_interpretation == "STRUCTURALLY_ACCEPTED_WITH_SPLIT"' <<<"$hgate_json" >/dev/null
+jq -e '.hierarchical_decision.accepted_with_split == true' <<<"$hgate_json" >/dev/null
 jq -e '.hierarchical_decision.global_verdict == "WATCH"' <<<"$hgate_json" >/dev/null
 jq -e '.hierarchical_decision.global_size_only == true' <<<"$hgate_json" >/dev/null
 jq -e '.hierarchical_decision.local_pass == 17 and .hierarchical_decision.branches == 17' <<<"$hgate_json" >/dev/null
+grep -q "STRUCTURALLY_ACCEPTED_WITH_SPLIT" "$root/nanda-structural-gate/references/hierarchical-gate.md"
+grep -q "claim_boundary_gate" "$root/nanda-structural-gate/references/hierarchical-gate.md"
 set +e
 hgate_splice_json="$("$root/nanda-structural-gate/scripts/nanda-hgate" "$root/examples/triads.code-flow-splice.md" --domain code --format json)"
 hgate_splice_status=$?

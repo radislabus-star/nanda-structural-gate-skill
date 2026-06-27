@@ -1049,9 +1049,17 @@ pub(crate) fn hierarchical_decision(
             "Review hierarchical gate output before trusting the structure.",
         )
     };
+    let accepted_with_split = accepted && global_size_only;
+    let agent_interpretation = if accepted_with_split {
+        "STRUCTURALLY_ACCEPTED_WITH_SPLIT"
+    } else {
+        action
+    };
     json!({
         "action": action,
+        "agent_interpretation": agent_interpretation,
         "structurally_accepted": accepted,
+        "accepted_with_split": accepted_with_split,
         "global_verdict": global_report.verdict,
         "global_size_only": global_size_only,
         "branches": branch_count,

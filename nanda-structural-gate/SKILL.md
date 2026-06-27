@@ -376,6 +376,128 @@ returns a global verdict plus linked local branches. Treat
 `STRUCTURALLY_ACCEPTED` as "global WATCH is size-only and all local branches
 PASS"; treat `REPAIR_REQUIRED` as a hard stop; treat `SPLIT_REQUIRED` as
 unresolved.
+Inspect `hierarchical_decision.agent_interpretation`. When it is
+`STRUCTURALLY_ACCEPTED_WITH_SPLIT`, the old compatibility action may still be
+`STRUCTURALLY_ACCEPTED`, but the agent-facing meaning is stricter: the global
+packet was not a PASS; it was a size-only WATCH accepted only through a proof
+tree of local PASS branches and a clean claim boundary.
+
+## Large Packet / Hierarchical Gate Workflow
+
+If a packet returns `WATCH` only because of size, entity, triad, route, or
+evidence-count limits, do not treat it as semantic failure and do not simply
+raise the global limits. Hard limits are a guardrail against role mixing. Keep
+the hard limit, split the packet into coherent subclaims, run local gates, then
+aggregate the proof tree.
+
+Use this interpretation only when all of these are true:
+
+- global packet verdict is `WATCH`;
+- global `WATCH` is size-only: limits are present, but there is no semantic
+  conflict, no evidence gap, no foreign pull, and no Codex failure-field block;
+- every required subgate is `PASS`;
+- the claim-boundary gate is `PASS`;
+- no required local branch is truncated or missing.
+
+Then the final agent interpretation may be:
+
+```text
+STRUCTURALLY_ACCEPTED_WITH_SPLIT
+```
+
+This is not a softened `WATCH`. It means: "global WATCH was size-only;
+route-level subgates passed; aggregate status =
+STRUCTURALLY_ACCEPTED_WITH_SPLIT." If any subgate returns `WATCH`, the aggregate
+is `REVIEW_REQUIRED`. If any subgate returns `VETO`, the aggregate is
+`REPAIR_REQUIRED`. A global semantic-conflict `VETO` remains `VETO`. Missing
+evidence remains `WATCH` until supplied or explicitly moved into remaining
+debt.
+
+For large physics/R&D packets, split by the relation that could otherwise be
+role-confused:
+
+- `physics_route`;
+- `quantity_type`;
+- `body_group`;
+- `source_family`;
+- `claim_boundary`;
+- `remaining_debt`;
+- `validation_claim`.
+
+Recommended physics-style proof tree:
+
+```yaml
+global_skeleton_gate:
+  checks:
+    - previous node -> current node
+    - operator frozen or changed
+    - total coverage before/after
+    - unresolved debt count
+    - no validation overclaim
+
+subgate_source_rate:
+  checks:
+    - source-rate rows
+    - plume-rate rows
+    - pickup-rate rows
+
+subgate_dose_power:
+  checks:
+    - dose rows
+    - particle-power rows
+    - environment proxy rows
+
+subgate_sputtering:
+  checks:
+    - sputtering-yield rows
+    - source-rate rows
+    - whether the source is lab, model, observation, or proxy
+
+subgate_remaining_debt:
+  checks:
+    - what is intentionally not resolved
+    - which rows stay outside numeric acquisition
+    - which claims require later validation
+
+claim_boundary_gate:
+  checks:
+    - source-rate != lab sputtering yield
+    - dose proxy != species-resolved particle flux
+    - particle power != local flux density
+    - numeric coverage != external validation complete
+```
+
+Example shape for a hard-environment numeric-acquisition packet:
+
+```yaml
+hard-environment-v1:
+  global_skeleton:
+    coverage: "13/27 -> 23/27"
+    remaining_debt: 4
+    role_operator: frozen
+
+  source_rate_group:
+    bodies: [Io, Europa, Enceladus]
+
+  dose_power_group:
+    bodies: [Ganymede, Callisto, Rhea, Dione]
+
+  remaining_debt_group:
+    debts:
+      - Ganymede sputtering
+      - Callisto sputtering
+      - Rhea sputtering
+      - Dione sputtering
+
+  claim_boundary:
+    - not all rows are species-resolved fluxes
+    - not all rows are lab sputtering yields
+    - external validation not complete
+```
+
+Use `references/hierarchical-gate.md` when building or reviewing such split
+trees. The goal is not to make NANDA thicker; it is to make the check layered:
+top skeleton, local subgates, claim-boundary gate, then aggregate.
 Use `nanda-dogfood .` when you need a compact agent readiness check. If the
 repository has `examples/self-dogfood.nanda.json`, dogfood uses that curated
 packet. If no curated packet exists, it builds a low-confidence repo auto-field
@@ -1467,7 +1589,13 @@ raise a specific accepted route, not a whole topic.
 Check `hierarchical_decision` after `nanda-hgate`: it is the large-packet trust
 contract. A 54-triad packet may be accepted only if the global WATCH is
 size-only, `global_foreign_pull=0`, `local_veto=0`, `local_watch=0`, and all
-linked branches PASS.
+linked branches PASS. When the size-only path is accepted through local PASS
+branches, prefer the agent-facing
+`hierarchical_decision.agent_interpretation =
+STRUCTURALLY_ACCEPTED_WITH_SPLIT` wording. Do not write "WATCH almost PASS";
+write "global WATCH was size-only; route-level subgates passed; aggregate
+status = STRUCTURALLY_ACCEPTED_WITH_SPLIT." Without local PASS branches and a
+claim-boundary PASS, `WATCH` stays unresolved.
 Use `peak_decision.safe_to_answer` as the final retrieval trust gate. A found
 peak with `WATCH` state is useful context, not a final answer skeleton.
 
@@ -1712,6 +1840,9 @@ CLI exit codes:
 
 ## When To Load References
 
+- Read `references/hierarchical-gate.md` when a large packet hits size-only
+  WATCH, when using `nanda-hgate`, or when a physics/R&D packet needs skeleton
+  plus subgate aggregation.
 - Read `references/triad-packet.md` when building inputs for the checker.
 - Read `references/roadmap.md` when extending the implementation or deciding
   the next milestone.
