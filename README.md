@@ -2093,6 +2093,7 @@ Use it when you need real kernel timing rather than wrapper timing:
 ```bash
 nanda-bench6m --format text
 nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json
+nanda-bench6m --mode active-65k-discovery --active-65k-iterations 1 --format json
 nanda-bench6m --mode replay --replay-iterations 5000000 --format json
 nanda-bench6m --mode projection --projection-iterations 20000 --triads 64
 nanda-bench6m --mode lane --lane-iterations 5000000 --format json
@@ -2117,6 +2118,13 @@ the hot workspace bounded without per-record score arrays. A passing
 `active-65k-runtime` claim means the local runtime path exists; it does not
 claim broad chat readiness, global nonlinear-memory proof, or hardware
 cache-residency proof.
+
+`active-65k-discovery` is the fast interactive candidate path. It scans the
+same 65,536 active records once and skips the proof rescan, but it must return
+`authority.state=PROOF_REQUIRED`, `safe_to_answer=false`, and
+`candidate_without_proof_can_write_memory=false`. Use it to find a peak quickly;
+use the full `active-65k` proof path before treating that peak as an answer or
+writing it back into memory.
 
 `nanda-serve` is the JSONL agent API. It keeps one process alive and accepts
 requests such as `{"command":"doctor"}`, `{"command":"check","packet":...}`,

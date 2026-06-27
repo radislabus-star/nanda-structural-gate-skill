@@ -861,6 +861,7 @@ nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src exampl
 
 ```bash
 nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json
+nanda-bench6m --mode active-65k-discovery --active-65k-iterations 1 --format json
 nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
 nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json

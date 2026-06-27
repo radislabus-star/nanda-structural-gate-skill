@@ -848,12 +848,73 @@ pub struct PackedActive65kProof {
     pub checksum: u64,
 }
 
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PackedActive65kAuthorityState {
+    Proved = 1,
+    ProofRequired = 2,
+    ProofRejected = 3,
+    #[default]
+    Review = 255,
+}
+
+impl PackedActive65kAuthorityState {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Proved => "PROVED",
+            Self::ProofRequired => "PROOF_REQUIRED",
+            Self::ProofRejected => "PROOF_REJECTED",
+            Self::Review => "AUTHORITY_REVIEW",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PackedActive65kAuthority {
+    pub state: PackedActive65kAuthorityState,
+    pub safe_to_answer: bool,
+    pub proof_required: bool,
+    pub proof_rescan_completed: bool,
+    pub candidate_without_proof_can_answer: bool,
+    pub candidate_without_proof_can_write_memory: bool,
+}
+
+impl PackedActive65kAuthority {
+    pub const fn proof_required() -> Self {
+        Self {
+            state: PackedActive65kAuthorityState::ProofRequired,
+            safe_to_answer: false,
+            proof_required: true,
+            proof_rescan_completed: false,
+            candidate_without_proof_can_answer: false,
+            candidate_without_proof_can_write_memory: false,
+        }
+    }
+
+    pub const fn from_proof(decision: PackedPeakDecision, proof_completed: bool) -> Self {
+        let proved = proof_completed && decision.safe_to_answer;
+        Self {
+            state: if proved {
+                PackedActive65kAuthorityState::Proved
+            } else {
+                PackedActive65kAuthorityState::ProofRejected
+            },
+            safe_to_answer: proved,
+            proof_required: !proved,
+            proof_rescan_completed: proof_completed,
+            candidate_without_proof_can_answer: false,
+            candidate_without_proof_can_write_memory: false,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct PackedActive65kRun {
     pub usage: PackedActive65kUsage,
     pub discovery: PackedActive65kDiscovery,
     pub proof: PackedActive65kProof,
     pub decision: PackedPeakDecision,
+    pub authority: PackedActive65kAuthority,
     pub ran: bool,
 }
 
@@ -1686,11 +1747,77 @@ pub fn run_packed_active65k_cycle(
         memory.len(),
         1,
     );
+    let proof_completed = proof.records_scanned as usize == memory.len()
+        && usize::from(proof.fields_built) == ACTIVE65K_PROOF_FIELDS
+        && usize::from(proof.lanes_compiled) == ACTIVE65K_PROOF_FIELDS;
     PackedActive65kRun {
         usage,
         discovery,
         proof,
         decision,
+        authority: PackedActive65kAuthority::from_proof(decision, proof_completed),
+        ran: true,
+    }
+}
+
+pub fn run_packed_active65k_discovery_cycle(
+    memory: &[PackedTriad32],
+    query: &PackedWave1024,
+    arena: &mut PackedActive65kArena,
+    centroids: usize,
+    resident_lanes: usize,
+) -> PackedActive65kRun {
+    let mut usage = validate_active65k_runtime(memory.len(), centroids, resident_lanes);
+    usage.proof_rescan = false;
+    let layout = arena.layout();
+    if layout.allocated_bytes < usage.workspace_required_bytes || !layout.all_cacheline_aligned {
+        usage.state = PackedActive65kState::WorkspaceTooSmall;
+        usage.workspace_fits = false;
+        return PackedActive65kRun {
+            usage,
+            authority: PackedActive65kAuthority::proof_required(),
+            ..PackedActive65kRun::default()
+        };
+    }
+    if query.energy_i64() <= 0 {
+        usage.state = PackedActive65kState::EmptyQuery;
+        return PackedActive65kRun {
+            usage,
+            authority: PackedActive65kAuthority::proof_required(),
+            ..PackedActive65kRun::default()
+        };
+    }
+    if !usage.ready() {
+        return PackedActive65kRun {
+            usage,
+            authority: PackedActive65kAuthority::proof_required(),
+            ..PackedActive65kRun::default()
+        };
+    }
+
+    arena.reset();
+    let discovery = run_active65k_discovery(
+        memory,
+        query,
+        arena.route_accumulators.as_mut_slice(),
+        arena.group_accumulators.as_mut_slice(),
+        arena.top_records.as_mut_slice(),
+    );
+    let mut decision = evaluate_packed_peak_decision(
+        discovery.route_peak,
+        discovery.group_peak,
+        query.energy_i64().max(0) as u64,
+        memory.len(),
+        1,
+    );
+    decision.verdict_pass = false;
+    decision.safe_to_answer = false;
+    PackedActive65kRun {
+        usage,
+        discovery,
+        proof: PackedActive65kProof::default(),
+        decision,
+        authority: PackedActive65kAuthority::proof_required(),
         ran: true,
     }
 }
@@ -1710,6 +1837,7 @@ fn run_active65k_discovery(
     let mut records_scanned = 0u32;
     let mut positive_records = 0u32;
     let mut anti_records = 0u32;
+    let mut top_record = PackedActiveRecordCandidate::default();
     let mut checksum = 0u64;
     for (index, triad) in memory.iter().copied().enumerate() {
         let score = score_triad_projection_with_query_energy(query, &triad, query_energy);
@@ -1722,20 +1850,26 @@ fn run_active65k_discovery(
         }
         accumulate_active_axis(route_accumulators, triad.route_id, record_index, score.dot);
         accumulate_active_axis(group_accumulators, triad.group_id, record_index, score.dot);
-        offer_active_top_record(
-            top_records,
-            PackedActiveRecordCandidate {
-                record_index,
-                route_id: triad.route_id,
-                group_id: triad.group_id,
-                dot: score.dot,
-            },
-        );
+        let candidate = PackedActiveRecordCandidate {
+            record_index,
+            route_id: triad.route_id,
+            group_id: triad.group_id,
+            dot: score.dot,
+        };
+        if candidate.dot > 0
+            && (top_record.dot <= 0
+                || active_record_order(&candidate, &top_record) == core::cmp::Ordering::Greater)
+        {
+            top_record = candidate;
+        }
         checksum = checksum
             .wrapping_add(score.dot as u64)
             .wrapping_add(u64::from(triad.route_id) << 7)
             .wrapping_add(u64::from(triad.group_id) << 17)
             .wrapping_add(u64::from(record_index));
+    }
+    if let Some(slot) = top_records.first_mut() {
+        *slot = top_record;
     }
     PackedActive65kDiscovery {
         records_scanned,
@@ -1743,11 +1877,7 @@ fn run_active65k_discovery(
         anti_records,
         route_peak: active_axis_peak(route_accumulators, query_energy),
         group_peak: active_axis_peak(group_accumulators, query_energy),
-        top_record: top_records
-            .iter()
-            .copied()
-            .max_by(active_record_order)
-            .unwrap_or_default(),
+        top_record,
         checksum,
     }
 }
@@ -2368,6 +2498,54 @@ mod tests {
         assert!(run.discovery.group_peak.top_id > 0);
         assert!(run.discovery.checksum > 0);
         assert!(run.proof.checksum > 0);
+        assert!(run.authority.proof_rescan_completed);
+        assert!(!run.authority.candidate_without_proof_can_answer);
+        assert!(!run.authority.candidate_without_proof_can_write_memory);
+    }
+
+    #[test]
+    fn active65k_discovery_cycle_requires_proof_before_authority() {
+        let memory: Vec<PackedTriad32> = (0..ACTIVE_FIELD_RECORDS)
+            .map(|idx| {
+                let idx = idx as u32;
+                PackedTriad32::new(PackedTriadInput {
+                    subject_id: 1_000 + idx,
+                    object_id: 10_000 + idx.wrapping_mul(3),
+                    evidence_ref: 100_000 + idx.wrapping_mul(7),
+                    wave_seed: 0x6500_0000u32.wrapping_add(idx.wrapping_mul(97)),
+                    relation_id: (10 + (idx % 31)) as u16,
+                    route_id: (1 + (idx % 7)) as u16,
+                    group_id: (1 + (idx % 11)) as u16,
+                    role_pack: (((idx % 16) as u16) << 8) | ((idx % 13) as u16),
+                    flags: (idx % 5) as u16,
+                    lane_hint: (idx % 17) as u16,
+                    check: 0x55aa ^ (idx as u16).wrapping_mul(13),
+                    confidence: 160 + (idx % 80) as u8,
+                    polarity: (idx % 2) as u8,
+                })
+            })
+            .collect();
+        let query = project_triads(&memory[..8]);
+        let mut arena = PackedActive65kArena::new();
+
+        let run = run_packed_active65k_discovery_cycle(&memory, &query, &mut arena, 18, 0);
+
+        assert!(run.ran);
+        assert_eq!(run.usage.state, PackedActive65kState::Ready);
+        assert_eq!(run.discovery.records_scanned as usize, ACTIVE_FIELD_RECORDS);
+        assert_eq!(run.proof.records_scanned, 0);
+        assert!(!run.usage.proof_rescan);
+        assert_eq!(
+            run.authority.state,
+            PackedActive65kAuthorityState::ProofRequired
+        );
+        assert!(run.authority.proof_required);
+        assert!(!run.authority.safe_to_answer);
+        assert!(!run.authority.proof_rescan_completed);
+        assert!(!run.authority.candidate_without_proof_can_answer);
+        assert!(!run.authority.candidate_without_proof_can_write_memory);
+        assert!(!run.decision.safe_to_answer);
+        assert!(!run.decision.verdict_pass);
     }
 
     #[test]

@@ -821,6 +821,12 @@ record active field. Inspect `active_65k.runtime_contract.full_active_scan`,
 `no_per_record_score_arrays`. `claim-gate --claim active-65k-runtime` allows
 only the local runtime claim; it still keeps broad chat readiness, global
 nonlinear-memory proof, and hardware cache-residency proof closed.
+Use `nanda-bench6m --mode active-65k-discovery --active-65k-iterations 1 --format json`
+only for fast interactive peak discovery. It must report
+`active_65k_discovery.authority.state=PROOF_REQUIRED`,
+`safe_to_answer=false`, and `candidate_without_proof_can_write_memory=false`.
+Do not use discovery output as answer authority or persistent memory evidence;
+run the full `active-65k` proof path before answering from the peak.
 Use `nanda-llmwave-big structural-capacity --format json` when the next claim
 is whether LLMWave-Big beats the old robust 128-pattern checkpoint. This gate
 is fixed to 1024 Pattern16 macro-cells only: 1024 patterns, 16 directed edges

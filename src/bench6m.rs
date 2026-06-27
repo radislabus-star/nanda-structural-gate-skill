@@ -47,6 +47,8 @@ enum Bench6mMode {
     HotCycle,
     #[value(name = "active-65k")]
     Active65k,
+    #[value(name = "active-65k-discovery")]
+    Active65kDiscovery,
     ActiveCore,
     WriteDensity,
     Consolidate,
@@ -86,6 +88,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     );
     let include_hot_cycle = matches!(args.mode, Bench6mMode::HotCycle | Bench6mMode::All);
     let include_active65k = matches!(args.mode, Bench6mMode::Active65k);
+    let include_active65k_discovery = matches!(args.mode, Bench6mMode::Active65kDiscovery);
     let include_active_core = matches!(args.mode, Bench6mMode::ActiveCore | Bench6mMode::All);
     let include_write_density = matches!(args.mode, Bench6mMode::WriteDensity | Bench6mMode::All);
     let include_consolidate = matches!(args.mode, Bench6mMode::Consolidate | Bench6mMode::All);
@@ -209,6 +212,13 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     } else {
         None
     };
+    let active65k_discovery = if include_active65k_discovery {
+        Some(bench6m_active65k_discovery(
+            args.active_65k_iterations.max(1),
+        ))
+    } else {
+        None
+    };
     let active_core = if include_active_core {
         Some(bench6m_active_core(args.support_build_iterations))
     } else {
@@ -255,6 +265,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "support_bucket_build_compile_sweep": support_bucket_build_compile_sweep,
             "hot_cycle": hot_cycle,
             "active_65k": active65k,
+            "active_65k_discovery": active65k_discovery,
             "active_core": active_core,
             "write_density": write_density,
             "consolidate": consolidate,
@@ -292,6 +303,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
             "support_bucket_build_compile_sweep": "Build cached support score buckets, assemble fields, compile aligned lanes, and apply the sweep.",
             "hot_cycle": "Single typed hot-cycle call: score cache, route/group buckets, support fields, lane compilation, and aligned sweep.",
             "active_65k": "Full 65,536-record active field scan with streaming route/group accumulators and a proof rescan; no per-record score arrays.",
+            "active_65k_discovery": "Fast 65,536-record candidate discovery only. It skips proof rescan, returns PROOF_REQUIRED, and cannot authorize answers or memory writes.",
             "active_core": "LLMWave-Big v171-v180 typed active-core sample cycle: schema/residual projection, settle/peak/veto/reconstruct.",
             "write_density": "LLMWave-Big v191-v205 typed reconstructability/write-density microbenchmark.",
             "consolidate": "LLMWave-Big v206-v218 typed consolidation count/merge/decay microbenchmark.",
@@ -322,6 +334,94 @@ fn bench6m_active_core(iterations: u64) -> Value {
             "json_parsing",
             "atlas_loading",
             "report_serialization"
+        ]
+    })
+}
+
+fn bench6m_active65k_discovery(iterations: u64) -> Value {
+    let memory = bench6m_triads(nanda_6m::ACTIVE_FIELD_RECORDS);
+    let query = nanda_6m::project_triads(&memory[..8]);
+    let mut arena = nanda_6m::PackedActive65kArena::new();
+    let arena_layout = arena.layout();
+    let mut checksum: u64 = 0;
+    let mut last = nanda_6m::PackedActive65kRun::default();
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let run = nanda_6m::run_packed_active65k_discovery_cycle(
+            black_box(memory.as_slice()),
+            black_box(&query),
+            &mut arena,
+            18,
+            0,
+        );
+        checksum = checksum
+            .wrapping_add(run.discovery.checksum)
+            .wrapping_add(u64::from(run.decision.safe_to_answer))
+            .wrapping_add(u64::from(run.authority.proof_required));
+        last = run;
+    }
+    let elapsed = start.elapsed();
+    let total_ns = elapsed.as_nanos() as f64;
+    let ns_per_op = total_ns / iterations as f64;
+    let scanned_per_iteration = u64::from(last.discovery.records_scanned);
+    json!({
+        "mode": "active-65k-discovery",
+        "kernel": "run_packed_active65k_discovery_cycle",
+        "iterations": iterations,
+        "active_records": nanda_6m::ACTIVE_FIELD_RECORDS,
+        "records_scanned_per_iteration": scanned_per_iteration,
+        "discovery_records_scanned": last.discovery.records_scanned,
+        "proof_records_scanned": last.proof.records_scanned,
+        "total_ns": elapsed.as_nanos(),
+        "ns_per_op": ns_per_op,
+        "ns_per_record_scanned": ns_per_op / scanned_per_iteration.max(1) as f64,
+        "ops_per_second": 1_000_000_000.0 / ns_per_op.max(1.0),
+        "records_scanned_per_second": (scanned_per_iteration as f64 * iterations as f64) / elapsed.as_secs_f64().max(1e-9),
+        "arena": "packed-active-65k-arena",
+        "arena_allocated_bytes": arena_layout.allocated_bytes,
+        "arena_alignment_bytes": arena_layout.alignment_bytes,
+        "arena_all_cacheline_aligned": arena_layout.all_cacheline_aligned,
+        "workspace_bounded": arena_layout.allocated_bytes <= nanda_6m::WORKSPACE_BYTES,
+        "workspace_budget_bytes": nanda_6m::WORKSPACE_BYTES,
+        "no_per_record_score_arrays": true,
+        "json_used_in_hot_loop": false,
+        "heap_allocations_in_hot_loop": 0,
+        "runtime_contract": active65k_usage_json(last.usage),
+        "authority": active65k_authority_json(last.authority),
+        "route_peak": axis_peak_json(last.discovery.route_peak),
+        "group_peak": axis_peak_json(last.discovery.group_peak),
+        "top_record": {
+            "record_index": last.discovery.top_record.record_index,
+            "route_id": last.discovery.top_record.route_id,
+            "group_id": last.discovery.top_record.group_id,
+            "dot": last.discovery.top_record.dot
+        },
+        "peak_decision": {
+            "state": last.decision.state.as_str(),
+            "verdict": last.decision.verdict_str(),
+            "safe_to_answer": last.decision.safe_to_answer,
+            "reason": last.decision.reason()
+        },
+        "claim_boundary": {
+            "interactive_discovery_ready": last.usage.ready() && last.ran,
+            "answer_authority_ready": false,
+            "proof_required": true,
+            "full_proof_not_cut": true,
+            "full_active_scan": last.usage.full_active_scan,
+            "streaming_discovery": last.usage.streaming_discovery,
+            "proof_rescan": last.usage.proof_rescan,
+            "llm_ready": false,
+            "nonlinear_memory_proven": false,
+            "cache_only_execution_proven": false
+        },
+        "checksum": checksum,
+        "not_measured": [
+            "cli_startup",
+            "json_parsing",
+            "training_artifact_loading",
+            "report_serialization",
+            "proof_rescan",
+            "hardware_perf_counters"
         ]
     })
 }
@@ -377,6 +477,7 @@ fn bench6m_active65k(iterations: u64) -> Value {
         "json_used_in_hot_loop": false,
         "heap_allocations_in_hot_loop": 0,
         "runtime_contract": active65k_usage_json(last.usage),
+        "authority": active65k_authority_json(last.authority),
         "route_peak": axis_peak_json(last.discovery.route_peak),
         "group_peak": axis_peak_json(last.discovery.group_peak),
         "top_record": {
@@ -1169,6 +1270,17 @@ fn active65k_usage_json(usage: nanda_6m::PackedActive65kUsage) -> Value {
     })
 }
 
+fn active65k_authority_json(authority: nanda_6m::PackedActive65kAuthority) -> Value {
+    json!({
+        "state": authority.state.as_str(),
+        "safe_to_answer": authority.safe_to_answer,
+        "proof_required": authority.proof_required,
+        "proof_rescan_completed": authority.proof_rescan_completed,
+        "candidate_without_proof_can_answer": authority.candidate_without_proof_can_answer,
+        "candidate_without_proof_can_write_memory": authority.candidate_without_proof_can_write_memory
+    })
+}
+
 fn axis_peak_json(peak: nanda_6m::PackedAxisPeak) -> Value {
     json!({
         "top_id": peak.top_id,
@@ -1366,6 +1478,18 @@ fn print_bench6m_text(out: &Value) {
             active["records_scanned_per_second"].as_f64().unwrap_or(0.0)
         );
     }
+    if !out["benchmarks"]["active_65k_discovery"].is_null() {
+        let active = &out["benchmarks"]["active_65k_discovery"];
+        println!(
+            "active-65k-discovery: {} iters / {} active records / {:.2} ns/op / {:.2} ns/record / {:.0} records/s / authority {}",
+            active["iterations"].as_u64().unwrap_or(0),
+            active["active_records"].as_u64().unwrap_or(0),
+            active["ns_per_op"].as_f64().unwrap_or(0.0),
+            active["ns_per_record_scanned"].as_f64().unwrap_or(0.0),
+            active["records_scanned_per_second"].as_f64().unwrap_or(0.0),
+            active["authority"]["state"].as_str().unwrap_or("")
+        );
+    }
     println!("scope: no JSON, no file IO, no process spawn");
 }
 
@@ -1516,6 +1640,17 @@ fn print_bench6m_md(out: &Value) {
             active["active_records"].as_u64().unwrap_or(0),
             active["ns_per_op"].as_f64().unwrap_or(0.0),
             active["ns_per_record_scanned"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["active_65k_discovery"].is_null() {
+        let active = &out["benchmarks"]["active_65k_discovery"];
+        println!(
+            "- active-65k-discovery: `{}` iterations, `{}` active records, `{:.2}` ns/op, `{:.2}` ns/record, authority `{}`",
+            active["iterations"].as_u64().unwrap_or(0),
+            active["active_records"].as_u64().unwrap_or(0),
+            active["ns_per_op"].as_f64().unwrap_or(0.0),
+            active["ns_per_record_scanned"].as_f64().unwrap_or(0.0),
+            active["authority"]["state"].as_str().unwrap_or("")
         );
     }
     println!("- scope: no JSON, no file IO, no process spawn");
