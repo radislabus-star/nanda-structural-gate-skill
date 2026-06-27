@@ -293,6 +293,15 @@ This is the only supported claim that the registered large pipelines share one
 field physics owner. It does not imply broad chat readiness, nonlinear memory
 proof, or hardware cache residency.
 
+The same audit also exposes `local_physics_inventory`. It scans `src/**/*.rs`
+for remaining field-physics surfaces and classifies them as owned field core,
+field-core wrappers, packed numeric kernels, structural legacy readouts, domain
+fixture readouts, or unknown local physics candidates. Require
+`local_physics_inventory.totals.local_physics_candidates == 0` before claiming
+there are no unknown local physics copies. Structural and domain readouts are
+review debt: they name what to migrate next, but they do not weaken the
+sole-engine claim.
+
 `structural-capacity` is fixed to 1024 Pattern16 macro-cells. It intentionally
 does not expose `--patterns`, 256/512 modes, a smaller cell shape, or a ladder.
 The gate checks clean and noisy retrieval plus cold, role-swap, route-splice,

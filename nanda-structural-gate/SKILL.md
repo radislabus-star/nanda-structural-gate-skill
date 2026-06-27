@@ -910,6 +910,14 @@ global sole-engine claim, and only when
 `sole_engine_contract.local_physics_copies_allowed=false` and
 `sole_engine_contract.big_pipelines ==
 sole_engine_contract.field_core_backed_pipelines`.
+Then inspect `local_physics_inventory`: it scans source files for remaining
+field-physics surfaces and classifies them as `field_core_owned`,
+`field_core_backed_wrapper`, `packed_numeric_kernel`,
+`structural_legacy_readout`, `domain_fixture_readout`, or
+`local_physics_candidate`. Require `local_physics_candidates=0` before saying
+there are no unknown local physics copies. Treat `domain_fixture_readout` and
+`structural_legacy_readout` as migration debt, not as LLM readiness and not as
+a reason to weaken the sole-engine contract.
 Also inspect
 `field_engine_contract`: structural cutover may be default when the structural
 suite passes, packed cutover is allowed only as an explicit packed-only path

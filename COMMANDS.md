@@ -134,6 +134,15 @@ sole_engine_contract.local_physics_copies_allowed = false
 sole_engine_contract.field_core_as_sole_engine = true
 ```
 
+Also inspect `local_physics_inventory`. It scans `src/**/*.rs` for remaining
+field-physics surfaces and classifies them as `field_core_owned`,
+`field_core_backed_wrapper`, `packed_numeric_kernel`,
+`structural_legacy_readout`, `domain_fixture_readout`, or
+`local_physics_candidate`. Require `local_physics_candidates = 0` before
+claiming there are no unknown local physics copies. `domain_fixture_readout`
+and `structural_legacy_readout` are review debt: they do not weaken the
+sole-engine claim, but they name the next migration targets.
+
 The registered big pipelines include structural search, packed hot runtime,
 LLMWave cognitive reports, Pattern16 structural capacity, lens scan, mature
 anti-wave, feedback memory, and the repository guard workflow. This proves one

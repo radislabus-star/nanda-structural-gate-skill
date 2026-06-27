@@ -61,7 +61,10 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
         .as_bool()
         .unwrap_or(false);
     let sole_engine = field_core::build_sole_engine_audit(structural_cutover_suite_pass);
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let local_physics = field_core::build_local_physics_audit(&cwd);
     let sole_engine_value = serde_json::to_value(&sole_engine)?;
+    let local_physics_value = serde_json::to_value(&local_physics)?;
     let field_operation_contract = json!({
         "version": "unified-field-operation-contract-v1",
         "peak_owner": "field_core::peak::FieldPeakResult",
@@ -139,6 +142,19 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "field_core_as_sole_engine".to_string(),
             json!(sole_engine.field_core_as_sole_engine),
         );
+        object.insert("local_physics_inventory_present".to_string(), json!(true));
+        object.insert(
+            "local_physics_scan_available".to_string(),
+            json!(local_physics.source_scan_available),
+        );
+        object.insert(
+            "local_physics_candidates".to_string(),
+            json!(local_physics.totals.local_physics_candidates),
+        );
+        object.insert(
+            "domain_fixture_readout_debt".to_string(),
+            json!(local_physics.totals.domain_fixture_readouts),
+        );
     }
     let out = json!({
         "mode": "unified-field-audit",
@@ -157,6 +173,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
             "memory_delta": "FieldMemoryDeltaSummary"
         },
         "sole_engine_contract": sole_engine_value,
+        "local_physics_inventory": local_physics_value,
         "families": [
             {
                 "family": "structural",
@@ -261,6 +278,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                     .as_bool()
                     .unwrap_or(false)
             );
+            println!("local_physics_inventory: {}", local_physics.verdict);
         }
         OutputFormat::Md => {
             println!("# Unified Field Audit\n");
@@ -272,6 +290,7 @@ pub(crate) fn field_audit_cmd(args: FieldAuditArgs) -> Result<u8> {
                     .as_bool()
                     .unwrap_or(false)
             );
+            println!("- local physics inventory: `{}`", local_physics.verdict);
         }
     }
     Ok(EXIT_PASS)
