@@ -832,6 +832,10 @@ compatibility gate; the preferred Linux-profile cache entrypoint is:
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --format json
+nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
+nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
+nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command foocmd" --format json
+nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active --reset-scratch --format json
 # Optional heavy profile/eval path:
 nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
 ```
@@ -854,6 +858,18 @@ readiness only. Treat
 `LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM` as the heavier
 profile/eval readiness path. Neither is open-domain chat, a general LLM, or
 global nonlinear-memory proof.
+
+`linux-chat-core-learn` is the unified ChatCore feedback writer. It appends an
+explicit accepted fact or rejected shortcut to a `.lwm` source overlay; it does
+not write the query text as a fact, does not write the answer packet as a fact,
+and never mutates `chat-core.hot` directly. After a learning write, the authority
+gate and `ask` must return stale until `linux-chat-core-build` recompiles
+`.lrf + .lwm` into a fresh `.hot`. `linux-chat-core-learn-eval` proves the
+scratch loop: target query blocked before learning, overlay written, cache stale,
+ask blocked while stale, hot rebuilt, learned answer read from
+`compiled_chat_core_hot`, learned anti-wave suppresses a shortcut, and unrelated
+bash/systemctl routes stay preserved. Its ready verdict is
+`LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM`.
 
 `linux-exposure-run` is the first Linux exposure reasoning layer over that
 schema/residual memory. It reconstructs the `.lrf` facts for explanation, then
@@ -2519,6 +2535,7 @@ Run local tests:
 scripts/test-local.sh                 # changed-file checks; clean worktree checks last commit
 scripts/test-local.sh --since HEAD~1  # explicit changed range
 scripts/test-local.sh --suite chatcore # fast Linux ChatCore hot-cache readout
+scripts/test-local.sh --suite chatcore-learn # ChatCore overlay learning loop
 scripts/test-local.sh --suite chatcore-build # slow rebuild + fast authority gate
 scripts/benchmark-v0.sh
 scripts/test-edge-cases.sh

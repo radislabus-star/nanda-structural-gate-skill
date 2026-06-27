@@ -55,7 +55,7 @@ while (($#)); do
       ;;
     --help|-h)
       cat <<'EOF'
-Usage: scripts/test-local.sh [--suite changed|smoke|chatcore|chatcore-build|field|wrappers|full] [--since <git-ref>]
+Usage: scripts/test-local.sh [--suite changed|smoke|chatcore|chatcore-learn|chatcore-build|field|wrappers|full] [--since <git-ref>]
        scripts/test-local.sh [--fast|--full]
 
 Runs the local regression suite.
@@ -67,6 +67,9 @@ Suites:
   smoke      Fast baseline: fmt, check, build, version, skill readiness,
              edge cases. No Linux ChatCore rebuild.
   chatcore   Fast Linux ChatCore ask/no-index/stale checks over existing `.hot`.
+  chatcore-learn
+             Linux ChatCore overlay learning loop: learn -> stale -> rebuild
+             -> answer lift -> anti-wave -> unrelated route preserved.
   chatcore-build
              Heavy Linux ChatCore rebuild + gate + fast ChatCore checks.
   field      Heavy field-core sole-engine audit only.
@@ -76,8 +79,8 @@ Suites:
 
 Environment:
   NANDA_TEST_LOCAL_FULL=1   Same as --full.
-  NANDA_TEST_LOCAL_MODE=full|fast|changed|smoke|chatcore|chatcore-build|field|wrappers
-  NANDA_TEST_LOCAL_SUITE=changed|smoke|chatcore|chatcore-build|field|wrappers|full
+  NANDA_TEST_LOCAL_MODE=full|fast|changed|smoke|chatcore|chatcore-learn|chatcore-build|field|wrappers
+  NANDA_TEST_LOCAL_SUITE=changed|smoke|chatcore|chatcore-learn|chatcore-build|field|wrappers|full
   NANDA_TEST_LOCAL_SINCE=<git-ref>   Same as --since.
 EOF
       exit 0
@@ -90,7 +93,7 @@ EOF
   shift
 done
 case "$test_local_suite" in
-  changed|smoke|chatcore|chatcore-build|field|wrappers|full) ;;
+  changed|smoke|chatcore|chatcore-learn|chatcore-build|field|wrappers|full) ;;
   *)
     echo "unknown test-local suite: $test_local_suite" >&2
     exit 2
@@ -180,6 +183,11 @@ run_chatcore_suite() {
   cargo test --manifest-path "$root/Cargo.toml" linux_chat_core >/dev/null
   [[ -f "$root/.nanda/linux-active/linux-active-65k.lrf" ]] || return 0
 
+  chat_core_gate_json="$("$llmwave_big" linux-chat-core-gate --memory-root "$root/.nanda/linux-active" --format json)"
+  if ! jq -e '.cache_status.cache_fresh == true' <<<"$chat_core_gate_json" >/dev/null; then
+    "$llmwave_big" linux-chat-core-build --memory-root "$root/.nanda/linux-active" --format json >/dev/null
+  fi
+
   chat_core_ask_json="$("$llmwave_big" linux-chat-core-ask --memory-root "$root/.nanda/linux-active" --text "which package provides command bash" --format json)"
   jq -e '.verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .grounded_packet.answer_allowed == true and .grounded_packet.readout_source == "compiled_chat_core_hot" and (.grounded_packet.domain_suites | index("packages")) and (.grounded_packet.evidence[] | select(.subject == "bash" and .object == "bash"))' <<<"$chat_core_ask_json" >/dev/null
 
@@ -218,6 +226,16 @@ run_chatcore_build_suite() {
   jq -e '.verdict == "LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM" and .profile_gate == null and .cache_status.cache_fresh == true and .chat_core.safe_to_answer_from_cache == true and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_gate_json" >/dev/null
 
   run_chatcore_suite
+}
+
+run_chatcore_learn_suite() {
+  run_rust_baseline
+  [[ -f "$root/.nanda/linux-active/linux-active-65k.lrf" ]] || return 0
+
+  chat_core_learn_json="$("$llmwave_big" linux-chat-core-learn-eval --memory-root "$root/.nanda/linux-active" --reset-scratch --format json)"
+  jq -e '.verdict == "LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM" and .learning_loop.before_blocked == true and .learning_loop.overlay_written == true and .learning_loop.cache_marked_stale == true and .learning_loop.ask_blocked_while_stale == true and .learning_loop.rebuild_required == true and .learning_loop.hot_rebuilt == true and .learning_loop.answer_from_hot == true and .learning_loop.target_query_improved == true and .learning_loop.anti_center_replay_observed == true and .learning_loop.unrelated_route_preserved == true and .learning_loop.false_positive_regressed == false' <<<"$chat_core_learn_json" >/dev/null
+  jq -e '.claim_boundary.hot_cache_learns_directly == false and .claim_boundary.overlay_is_source_of_truth_for_learning == true and .claim_boundary.cache_rebuild_required_after_overlay_write == true and .claim_boundary.general_llm_ready == false and .claim_boundary.global_nonlinear_memory_proven == false' <<<"$chat_core_learn_json" >/dev/null
+  jq -e '.after.readout_source == "compiled_chat_core_hot" and (.after.evidence_memory_kinds | index("learned_overlay")) and .anti_wave.state == "LEARNED_ANTI_WAVE_SUPPRESSED" and (.anti_wave.evidence_memory_kinds | index("learned_anti_wave")) and .regression.bash_preserved == true and .regression.systemctl_preserved == true and .regression.false_positive_regressed == false' <<<"$chat_core_learn_json" >/dev/null
 }
 
 run_field_suite() {
@@ -271,6 +289,7 @@ run_changed_suite() {
 
   needs_rust=0
   needs_chatcore=0
+  needs_chatcore_learn=0
   needs_field=0
   needs_wrappers=0
   needs_edges=0
@@ -285,6 +304,11 @@ run_changed_suite() {
     case "$path" in
       src/llmwave_big/linux_chat_core.rs|src/llmwave_big/mod.rs|examples/linux-chat-core.profile.json|README.md|COMMANDS.md|nanda-structural-gate/SKILL.md)
         needs_chatcore=1
+        ;;
+    esac
+    case "$path" in
+      src/llmwave_big/linux_chat_core.rs|src/llmwave_big/mod.rs)
+        needs_chatcore_learn=1
         ;;
     esac
     case "$path" in
@@ -325,6 +349,9 @@ run_changed_suite() {
     [[ "$needs_rust" -eq 1 ]] || run_rust_baseline
     run_chatcore_suite
   fi
+  if ((needs_chatcore_learn)); then
+    run_chatcore_learn_suite
+  fi
   if ((needs_field)); then
     run_field_suite
   fi
@@ -357,6 +384,12 @@ case "$test_local_suite" in
   chatcore-build)
     git -C "$root" diff --check
     run_chatcore_build_suite
+    echo ok
+    exit 0
+    ;;
+  chatcore-learn)
+    git -C "$root" diff --check
+    run_chatcore_learn_suite
     echo ok
     exit 0
     ;;

@@ -1405,6 +1405,8 @@ view:
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --format json
+nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
+nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active --reset-scratch --format json
 ```
 
 Read ChatCore literally: cache is a compiled runtime view, not source memory.
@@ -1434,6 +1436,14 @@ readiness only. Treat
 `LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM` as the heavier
 profile/eval readiness path. General LLM, open-domain chat, scanner, and global
 nonlinear claims remain blocked.
+For learning, use `linux-chat-core-learn`: feedback writes only to a `.lwm`
+source overlay and must make cache authority stale. Do not write query text or
+answer packets as facts. Do not mutate `chat-core.hot` directly. Rebuild with
+`linux-chat-core-build`, then ask again; only a fresh rebuilt `.hot` may change
+answer behavior. Use `linux-chat-core-learn-eval` to verify the full scratch
+loop: before blocked, overlay written, stale gate, stale ask blocked, rebuild,
+learned answer from `compiled_chat_core_hot`, learned anti-wave replay, and
+unrelated bash/systemctl routes preserved.
 These commands expand the Linux-profile reasoning/chat proof surface, but they
 still do not unlock general LLM, open-domain chat, scanner, or exploit claims.
 Use `nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json`

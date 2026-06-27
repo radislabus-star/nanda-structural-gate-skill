@@ -500,6 +500,12 @@ enum LlmwaveBigCommand {
     /// Return a compact grounded packet through the unified Linux ChatCore cache.
     #[command(name = "linux-chat-core-ask")]
     LinuxChatCoreAsk(LlmwaveBigLinuxChatCoreAskArgs),
+    /// Write ChatCore feedback into a source `.lwm` overlay and mark cache stale.
+    #[command(name = "linux-chat-core-learn")]
+    LinuxChatCoreLearn(LlmwaveBigLinuxChatCoreLearnArgs),
+    /// Prove the ChatCore overlay -> stale -> rebuild -> improved answer loop.
+    #[command(name = "linux-chat-core-learn-eval")]
+    LinuxChatCoreLearnEval(LlmwaveBigLinuxChatCoreLearnEvalArgs),
     /// Build a Linux-profile held-out eval suite with near-collision controls.
     #[command(name = "linux-heldout-suite-build")]
     LinuxHeldoutSuiteBuild(LlmwaveBigLinuxHeldoutSuiteBuildArgs),
@@ -1863,6 +1869,60 @@ struct LlmwaveBigLinuxChatCoreAskArgs {
     cache_dir: Option<PathBuf>,
     #[arg(long = "manifest")]
     manifest: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxChatCoreLearnArgs {
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "profile")]
+    profile: Option<PathBuf>,
+    #[arg(long = "residual-pack")]
+    residual_pack: Option<PathBuf>,
+    #[arg(long = "dialogue-overlay")]
+    dialogue_overlay: Option<PathBuf>,
+    #[arg(long = "centers-overlay")]
+    centers_overlay: Option<PathBuf>,
+    #[arg(long = "vpn-overlay")]
+    vpn_overlay: Option<PathBuf>,
+    #[arg(long = "broad-eval")]
+    broad_eval: Option<PathBuf>,
+    #[arg(long = "heldout-eval")]
+    heldout_eval: Option<PathBuf>,
+    #[arg(long = "cache-dir")]
+    cache_dir: Option<PathBuf>,
+    #[arg(long = "accept", conflicts_with = "reject")]
+    accept: Option<String>,
+    #[arg(long = "reject", conflicts_with = "accept")]
+    reject: Option<String>,
+    #[arg(long = "domain")]
+    domain: Option<String>,
+    #[arg(long = "overlay")]
+    overlay: Option<String>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigLinuxChatCoreLearnEvalArgs {
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "profile")]
+    profile: Option<PathBuf>,
+    #[arg(long = "residual-pack")]
+    residual_pack: Option<PathBuf>,
+    #[arg(long = "cache-dir")]
+    cache_dir: Option<PathBuf>,
+    #[arg(long = "reset-scratch", default_value_t = false)]
+    reset_scratch: bool,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
     #[arg(long)]
@@ -4947,6 +5007,150 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     );
                     println!("- state: `{}`", report.grounded_packet.decision_state);
                     println!("- answer: {}", report.grounded_packet.answer);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxChatCoreLearn(args) => {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: args.profile,
+                    residual_pack: args.residual_pack,
+                    dialogue_overlay: args.dialogue_overlay,
+                    centers_overlay: args.centers_overlay,
+                    vpn_overlay: args.vpn_overlay,
+                    broad_eval: args.broad_eval,
+                    heldout_eval: args.heldout_eval,
+                    cache_dir: args.cache_dir,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_learn_report(
+                linux_chat_core::LinuxChatCoreLearnConfig {
+                    profile: paths.profile,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    broad_eval: paths.broad_eval,
+                    heldout_eval: paths.heldout_eval,
+                    cache_dir: paths.cache_dir,
+                    accept: args.accept,
+                    reject: args.reject,
+                    domain: args.domain,
+                    overlay: args.overlay,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!(
+                        "overlay_written: {}",
+                        report.learning_update.overlay_written
+                    );
+                    println!(
+                        "cache_marked_stale: {}",
+                        report.learning_update.cache_marked_stale
+                    );
+                    println!(
+                        "hot_not_mutated_directly: {}",
+                        report.learning_update.hot_not_mutated_directly
+                    );
+                    println!("selected_overlay: {}", report.selected_overlay.overlay_id);
+                    println!("route: {}", report.learned_delta.route);
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux ChatCore Learn");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- overlay written: `{}`",
+                        report.learning_update.overlay_written
+                    );
+                    println!(
+                        "- cache marked stale: `{}`",
+                        report.learning_update.cache_marked_stale
+                    );
+                    println!(
+                        "- hot mutated directly: `{}`",
+                        !report.learning_update.hot_not_mutated_directly
+                    );
+                    println!("- overlay: `{}`", report.selected_overlay.overlay_id);
+                    println!("- route: `{}`", report.learned_delta.route);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxChatCoreLearnEval(args) => {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: args.profile,
+                    residual_pack: args.residual_pack,
+                    dialogue_overlay: None,
+                    centers_overlay: None,
+                    vpn_overlay: None,
+                    broad_eval: None,
+                    heldout_eval: None,
+                    cache_dir: args.cache_dir,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_learn_eval_report(
+                linux_chat_core::LinuxChatCoreLearnEvalConfig {
+                    profile: paths.profile,
+                    residual_pack: paths.residual_pack,
+                    cache_dir: paths.cache_dir,
+                    reset_scratch: args.reset_scratch,
+                    max_facts: args.max_facts,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("before_blocked: {}", report.learning_loop.before_blocked);
+                    println!("overlay_written: {}", report.learning_loop.overlay_written);
+                    println!(
+                        "cache_marked_stale: {}",
+                        report.learning_loop.cache_marked_stale
+                    );
+                    println!("hot_rebuilt: {}", report.learning_loop.hot_rebuilt);
+                    println!(
+                        "target_query_improved: {}",
+                        report.learning_loop.target_query_improved
+                    );
+                    println!(
+                        "anti_center_replay_observed: {}",
+                        report.learning_loop.anti_center_replay_observed
+                    );
+                    println!(
+                        "unrelated_route_preserved: {}",
+                        report.learning_loop.unrelated_route_preserved
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux ChatCore Learn Eval");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!(
+                        "- target query improved: `{}`",
+                        report.learning_loop.target_query_improved
+                    );
+                    println!(
+                        "- answer from hot: `{}`",
+                        report.learning_loop.answer_from_hot
+                    );
+                    println!(
+                        "- anti-wave observed: `{}`",
+                        report.learning_loop.anti_center_replay_observed
+                    );
+                    println!(
+                        "- unrelated route preserved: `{}`",
+                        report.learning_loop.unrelated_route_preserved
+                    );
                 }
             }
             Ok(EXIT_PASS)

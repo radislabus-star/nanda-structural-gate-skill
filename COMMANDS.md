@@ -296,6 +296,8 @@ nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --form
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --max-facts 4 --format json
+nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
+nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active --reset-scratch --format json
 nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
 nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json
@@ -582,6 +584,18 @@ full runtime cache. `cache_is_runtime_index_not_prompt_payload=true` means the
 hot cache is a runtime readout, not prompt context. Use the grounded packet as a
 small external memory packet, not as a replacement for the LLM and not as
 global nonlinear-memory proof.
+`linux-chat-core-learn` appends explicit feedback to a source `.lwm` overlay:
+accepted facts become learned overlay records, and rejected shortcuts become
+learned anti-wave records. It never writes query text or answer packets as facts
+and never mutates `chat-core.hot` directly. The write policy is
+`append_overlay_then_recompile_cache`: after the overlay changes, the authority
+gate and `ask` must report stale until `linux-chat-core-build` rebuilds the hot
+cache. `linux-chat-core-learn-eval` runs a scratch proof of that loop: before
+blocked, overlay written, cache stale, ask blocked while stale, hot rebuilt,
+target answer lifted from `compiled_chat_core_hot`, learned anti-wave replayed,
+bash/systemctl preserved, and no false-positive regression. Its ready verdict
+remains Linux-profile scoped:
+`LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM`.
 `linux-heldout-suite-build` adds a stricter profile suite: exact facts,
 near-name collisions, shortcut controls, and endpoint-scope checks. Use
 `linux-heldout-eval-run` before trusting the profile on noisy Linux facts.

@@ -21,8 +21,13 @@ use super::linux_profile::{
 use super::linux_residual_memory::{
     load_linux_residual_decoded_packet, LinuxResidualDecodedFact, LinuxResidualDecodedSummary,
 };
+use super::persistent_wave_memory::{
+    append_delta, build_delta_record, load_memory, PersistentWaveDeltaRecord,
+    PersistentWaveDeltaSpec, PersistentWaveMemorySummary, DELTA_NEGATIVE, DELTA_POSITIVE,
+};
 
-pub(crate) const LINUX_CHAT_CORE_VERSION: &str = "llmwave-big-v-next-linux-chat-core-hot-v3";
+pub(crate) const LINUX_CHAT_CORE_VERSION: &str =
+    "llmwave-big-v-next-linux-chat-core-hot-v3-learning-loop";
 pub(crate) const DEFAULT_LINUX_CHAT_CORE_PROFILE: &str = "examples/linux-chat-core.profile.json";
 const HOT_MAGIC: &[u8] = b"LLMWCHATCORE3\0";
 const HOT_FORMAT_VERSION: u32 = 3;
@@ -69,6 +74,33 @@ pub(crate) struct LinuxChatCoreAskConfig {
     pub vpn_overlay: PathBuf,
     pub cache_dir: PathBuf,
     pub manifest: Option<PathBuf>,
+    pub max_facts: usize,
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Clone)]
+pub(crate) struct LinuxChatCoreLearnConfig {
+    pub profile: PathBuf,
+    pub residual_pack: PathBuf,
+    pub dialogue_overlay: PathBuf,
+    pub centers_overlay: PathBuf,
+    pub vpn_overlay: PathBuf,
+    pub broad_eval: Option<PathBuf>,
+    pub heldout_eval: Option<PathBuf>,
+    pub cache_dir: PathBuf,
+    pub accept: Option<String>,
+    pub reject: Option<String>,
+    pub domain: Option<String>,
+    pub overlay: Option<String>,
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Clone)]
+pub(crate) struct LinuxChatCoreLearnEvalConfig {
+    pub profile: PathBuf,
+    pub residual_pack: PathBuf,
+    pub cache_dir: PathBuf,
+    pub reset_scratch: bool,
     pub max_facts: usize,
     pub out: Option<PathBuf>,
 }
@@ -310,6 +342,122 @@ pub(crate) struct LinuxChatCoreAskReport {
     pub grounded_packet: LinuxChatCoreGroundedPacket,
     pub token_economics: LinuxChatCoreAskTokenEconomics,
     pub claim_boundary: LinuxChatCoreClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreLearnReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub selected_overlay: LinuxChatCoreSelectedOverlay,
+    pub learned_delta: LinuxChatCoreLearnedDelta,
+    pub overlay_summary: PersistentWaveMemorySummary,
+    pub cache_status_before: LinuxChatCoreCacheStatus,
+    pub cache_status_after: LinuxChatCoreCacheStatus,
+    pub learning_update: LinuxChatCoreLearningUpdate,
+    pub claim_boundary: LinuxChatCoreLearningClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreLearnEvalReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub scratch_root: String,
+    pub learning_loop: LinuxChatCoreLearningLoop,
+    pub before: LinuxChatCoreAskSummary,
+    pub stale_after_learn: LinuxChatCoreAskSummary,
+    pub after: LinuxChatCoreAskSummary,
+    pub anti_wave: LinuxChatCoreAskSummary,
+    pub regression: LinuxChatCoreLearningRegression,
+    pub claim_boundary: LinuxChatCoreLearningClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreSelectedOverlay {
+    pub overlay_id: String,
+    pub overlay_kind: String,
+    pub path: String,
+    pub domain_scope: Vec<String>,
+    pub source_of_truth: bool,
+    pub write_policy: String,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreLearnedDelta {
+    pub delta_state: String,
+    pub source_prompt: String,
+    pub intent: String,
+    pub route: String,
+    pub subject: String,
+    pub relation: String,
+    pub object: String,
+    pub polarity: String,
+    pub reason: String,
+    pub hot_memory_kind_after_rebuild: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreLearningUpdate {
+    pub overlay_written: bool,
+    pub cache_marked_stale: bool,
+    pub rebuild_required: bool,
+    pub hot_not_mutated_directly: bool,
+    pub base_lrf_not_mutated: bool,
+    pub hot_hash_before: String,
+    pub hot_hash_after: String,
+    pub base_lrf_hash_before: String,
+    pub base_lrf_hash_after: String,
+    pub write_policy: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreLearningLoop {
+    pub before_blocked: bool,
+    pub overlay_written: bool,
+    pub cache_marked_stale: bool,
+    pub ask_blocked_while_stale: bool,
+    pub rebuild_required: bool,
+    pub hot_rebuilt: bool,
+    pub after_answer_changed: bool,
+    pub answer_from_hot: bool,
+    pub target_query_improved: bool,
+    pub anti_center_replay_observed: bool,
+    pub unrelated_route_preserved: bool,
+    pub false_positive_regressed: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreLearningRegression {
+    pub bash_preserved: bool,
+    pub systemctl_preserved: bool,
+    pub unrelated_route_preserved: bool,
+    pub false_positive_regressed: bool,
+    pub mini_heldout_passed: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreAskSummary {
+    pub query: String,
+    pub verdict: String,
+    pub cache_fresh: bool,
+    pub answer_allowed: bool,
+    pub state: String,
+    pub readout_source: String,
+    pub answer: String,
+    pub evidence_memory_kinds: Vec<String>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreLearningClaimBoundary {
+    pub linux_profile_dynamic_learning_ready: bool,
+    pub hot_cache_learns_directly: bool,
+    pub overlay_is_source_of_truth_for_learning: bool,
+    pub cache_rebuild_required_after_overlay_write: bool,
+    pub general_llm_ready: bool,
+    pub global_nonlinear_memory_proven: bool,
+    pub safe_claim: &'static str,
+    pub blocked_claims: Vec<&'static str>,
 }
 
 #[derive(Serialize, Clone)]
@@ -628,8 +776,49 @@ pub(crate) fn build_linux_chat_core_ask_report(
     } else {
         None
     };
+    let learned_anti_wave_hits = hot_cache
+        .as_ref()
+        .map(|cache| learned_anti_wave_hits(cache, &config.text, &query_wave))
+        .unwrap_or_default();
     let packet = match reason {
         Some(report) => {
+            if !learned_anti_wave_hits.is_empty() {
+                let evidence = learned_anti_wave_hits
+                    .iter()
+                    .map(grounded_evidence_from_fact_preview)
+                    .collect::<Vec<_>>();
+                let compact_evidence = evidence
+                    .iter()
+                    .map(compact_grounded_evidence)
+                    .collect::<Vec<_>>();
+                return build_chat_core_ask_report_with_packet(
+                    config,
+                    manifest,
+                    cache_status,
+                    domain_runtime,
+                    LinuxChatCoreGroundedPacket {
+                        cache_fresh: true,
+                        answer_allowed: false,
+                        readout_source: "compiled_chat_core_hot".to_string(),
+                        cache_is_runtime_index_not_prompt_payload: true,
+                        domain_suites: active_domain_suites
+                            .iter()
+                            .map(|domain| domain.domain_id.clone())
+                            .collect(),
+                        decision_state: "LEARNED_ANTI_WAVE_SUPPRESSED".to_string(),
+                        answer: learned_anti_wave_answer(&learned_anti_wave_hits),
+                        intent: query_wave.intent,
+                        route_priors: query_wave.route_priors,
+                        evidence_count: evidence.len(),
+                        anti_wave_hits: learned_anti_wave_hits
+                            .iter()
+                            .map(|fact| format!("{} does not prove {}", fact.subject, fact.object))
+                            .collect(),
+                        evidence,
+                        compact_evidence,
+                    },
+                );
+            }
             let packet_evidence = selected_packet_evidence(&report);
             LinuxChatCoreGroundedPacket {
                 cache_fresh: true,
@@ -678,6 +867,16 @@ pub(crate) fn build_linux_chat_core_ask_report(
             compact_evidence: Vec::new(),
         },
     };
+    build_chat_core_ask_report_with_packet(config, manifest, cache_status, domain_runtime, packet)
+}
+
+fn build_chat_core_ask_report_with_packet(
+    config: LinuxChatCoreAskConfig,
+    manifest: PathBuf,
+    cache_status: LinuxChatCoreCacheStatus,
+    domain_runtime: Option<LinuxChatCoreDomainRuntime>,
+    packet: LinuxChatCoreGroundedPacket,
+) -> Result<LinuxChatCoreAskReport> {
     let token_economics = ask_token_economics(&manifest, &packet)?;
     let report = LinuxChatCoreAskReport {
         mode: "llmwave-big-linux-chat-core-ask",
@@ -696,6 +895,559 @@ pub(crate) fn build_linux_chat_core_ask_report(
     };
     write_json_if_requested(config.out.as_deref(), &report)?;
     Ok(report)
+}
+
+pub(crate) fn build_linux_chat_core_learn_report(
+    config: LinuxChatCoreLearnConfig,
+) -> Result<LinuxChatCoreLearnReport> {
+    let overrides = ChatCoreSpecOverrides {
+        residual_pack: &config.residual_pack,
+        dialogue_overlay: &config.dialogue_overlay,
+        centers_overlay: &config.centers_overlay,
+        vpn_overlay: &config.vpn_overlay,
+        broad_eval: &config.broad_eval,
+        heldout_eval: &config.heldout_eval,
+        cache_dir: &config.cache_dir,
+    };
+    let spec = load_chat_core_spec(&config.profile, &overrides)?;
+    let manifest_path = PathBuf::from(&spec.cache.manifest_path);
+    let hot_path = PathBuf::from(&spec.cache.hot_path);
+    let base_lrf_path = PathBuf::from(&spec.source_memory.residual_pack);
+    let cache_status_before = evaluate_cache(&spec, &manifest_path)?;
+    let hot_hash_before = optional_hash_file(&hot_path)?;
+    let base_lrf_hash_before = optional_hash_file(&base_lrf_path)?;
+    let learn_request = parse_chat_core_learn_request(
+        config.accept.as_deref(),
+        config.reject.as_deref(),
+        config.domain.as_deref(),
+        config.overlay.as_deref(),
+    )?;
+    let selected_overlay = select_learning_overlay(&spec, &learn_request)?;
+    let record = build_delta_record(PersistentWaveDeltaSpec {
+        delta_state: learn_request.delta_state.clone(),
+        source_prompt: learn_request.source_prompt.clone(),
+        intent: learn_request.intent.clone(),
+        route: learn_request.route.clone(),
+        subject: learn_request.subject.clone(),
+        relation: learn_request.relation.clone(),
+        object: learn_request.object.clone(),
+        polarity: learn_request.polarity.clone(),
+        reason: learn_request.reason.clone(),
+        strength: learn_request.strength,
+    });
+    let overlay_path = PathBuf::from(&selected_overlay.path);
+    let overlay_summary = append_delta(&overlay_path, record.clone())?;
+    let cache_status_after = evaluate_cache(&spec, &manifest_path)?;
+    let hot_hash_after = optional_hash_file(&hot_path)?;
+    let base_lrf_hash_after = optional_hash_file(&base_lrf_path)?;
+    let cache_marked_stale = !cache_status_after.cache_fresh
+        && cache_status_after.stale_reasons.iter().any(|reason| {
+            reason == "source_memory_hash_changed" || reason == "cache_manifest_missing"
+        });
+    let report = LinuxChatCoreLearnReport {
+        mode: "llmwave-big-linux-chat-core-learn",
+        version: LINUX_CHAT_CORE_VERSION,
+        verdict: if cache_marked_stale {
+            "LLMWAVE_CHAT_CORE_OVERLAY_WRITTEN_CACHE_STALE"
+        } else {
+            "LLMWAVE_CHAT_CORE_OVERLAY_WRITTEN_CACHE_REBUILD_REQUIRED"
+        },
+        selected_overlay: LinuxChatCoreSelectedOverlay {
+            overlay_id: selected_overlay.overlay_id.clone(),
+            overlay_kind: selected_overlay.overlay_kind.clone(),
+            path: selected_overlay.path.clone(),
+            domain_scope: selected_overlay.domain_scope.clone(),
+            source_of_truth: selected_overlay.source_of_truth,
+            write_policy: selected_overlay.write_policy.clone(),
+        },
+        learned_delta: LinuxChatCoreLearnedDelta {
+            delta_state: record.delta_state,
+            source_prompt: record.source_prompt,
+            intent: record.intent,
+            route: record.route,
+            subject: record.subject,
+            relation: record.relation,
+            object: record.object,
+            polarity: record.polarity,
+            reason: record.reason,
+            hot_memory_kind_after_rebuild: if learn_request.delta_state == DELTA_NEGATIVE {
+                "learned_anti_wave"
+            } else {
+                "learned_overlay"
+            },
+        },
+        overlay_summary,
+        cache_status_before,
+        cache_status_after,
+        learning_update: LinuxChatCoreLearningUpdate {
+            overlay_written: true,
+            cache_marked_stale,
+            rebuild_required: true,
+            hot_not_mutated_directly: hot_hash_before == hot_hash_after,
+            base_lrf_not_mutated: base_lrf_hash_before == base_lrf_hash_after,
+            hot_hash_before,
+            hot_hash_after,
+            base_lrf_hash_before,
+            base_lrf_hash_after,
+            write_policy: "append_overlay_then_recompile_cache",
+        },
+        claim_boundary: learning_claim_boundary(false),
+    };
+    write_json_if_requested(config.out.as_deref(), &report)?;
+    Ok(report)
+}
+
+pub(crate) fn build_linux_chat_core_learn_eval_report(
+    config: LinuxChatCoreLearnEvalConfig,
+) -> Result<LinuxChatCoreLearnEvalReport> {
+    let scratch_root = config.cache_dir.join("chat-core-learn-eval");
+    if config.reset_scratch && scratch_root.exists() {
+        fs::remove_dir_all(&scratch_root)
+            .with_context(|| format!("remove {}", scratch_root.display()))?;
+    }
+    fs::create_dir_all(&scratch_root)
+        .with_context(|| format!("create {}", scratch_root.display()))?;
+    let scratch_cache = scratch_root.join("cache");
+    let dialogue_overlay = scratch_root.join("dialogue.lwm");
+    let centers_overlay = scratch_root.join("centers.lwm");
+    let vpn_overlay = scratch_root.join("vpn.lwm");
+    let no_eval: Option<PathBuf> = None;
+    let paths = ChatCoreSpecOverrides {
+        residual_pack: &config.residual_pack,
+        dialogue_overlay: &dialogue_overlay,
+        centers_overlay: &centers_overlay,
+        vpn_overlay: &vpn_overlay,
+        broad_eval: &no_eval,
+        heldout_eval: &no_eval,
+        cache_dir: &scratch_cache,
+    };
+    let spec = load_chat_core_spec(&config.profile, &paths)?;
+    compile_chat_core_cache(&spec)?;
+
+    let target_query = "which package provides command foocmd";
+    let before = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        text: target_query.to_string(),
+        residual_pack: config.residual_pack.clone(),
+        dialogue_overlay: dialogue_overlay.clone(),
+        centers_overlay: centers_overlay.clone(),
+        vpn_overlay: vpn_overlay.clone(),
+        cache_dir: scratch_cache.clone(),
+        manifest: None,
+        max_facts: config.max_facts.max(1),
+        out: None,
+    })?;
+    let learn = build_linux_chat_core_learn_report(LinuxChatCoreLearnConfig {
+        profile: config.profile.clone(),
+        residual_pack: config.residual_pack.clone(),
+        dialogue_overlay: dialogue_overlay.clone(),
+        centers_overlay: centers_overlay.clone(),
+        vpn_overlay: vpn_overlay.clone(),
+        broad_eval: None,
+        heldout_eval: None,
+        cache_dir: scratch_cache.clone(),
+        accept: Some("foocmd | linux.apt.command.package-command | foopkg".to_string()),
+        reject: None,
+        domain: None,
+        overlay: Some("dialogue".to_string()),
+        out: None,
+    })?;
+    let stale_after_learn = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        text: target_query.to_string(),
+        residual_pack: config.residual_pack.clone(),
+        dialogue_overlay: dialogue_overlay.clone(),
+        centers_overlay: centers_overlay.clone(),
+        vpn_overlay: vpn_overlay.clone(),
+        cache_dir: scratch_cache.clone(),
+        manifest: None,
+        max_facts: config.max_facts.max(1),
+        out: None,
+    })?;
+    let hot_hash_before_rebuild = hash_file(&PathBuf::from(&spec.cache.hot_path))?;
+    compile_chat_core_cache(&spec)?;
+    let hot_hash_after_rebuild = hash_file(&PathBuf::from(&spec.cache.hot_path))?;
+    let after = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        text: target_query.to_string(),
+        residual_pack: config.residual_pack.clone(),
+        dialogue_overlay: dialogue_overlay.clone(),
+        centers_overlay: centers_overlay.clone(),
+        vpn_overlay: vpn_overlay.clone(),
+        cache_dir: scratch_cache.clone(),
+        manifest: None,
+        max_facts: config.max_facts.max(1),
+        out: None,
+    })?;
+    let bash = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        text: "which package provides command bash".to_string(),
+        residual_pack: config.residual_pack.clone(),
+        dialogue_overlay: dialogue_overlay.clone(),
+        centers_overlay: centers_overlay.clone(),
+        vpn_overlay: vpn_overlay.clone(),
+        cache_dir: scratch_cache.clone(),
+        manifest: None,
+        max_facts: config.max_facts.max(1),
+        out: None,
+    })?;
+    let systemctl = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        text: "which package provides command systemctl".to_string(),
+        residual_pack: config.residual_pack.clone(),
+        dialogue_overlay: dialogue_overlay.clone(),
+        centers_overlay: centers_overlay.clone(),
+        vpn_overlay: vpn_overlay.clone(),
+        cache_dir: scratch_cache.clone(),
+        manifest: None,
+        max_facts: config.max_facts.max(1),
+        out: None,
+    })?;
+    let reject = build_linux_chat_core_learn_report(LinuxChatCoreLearnConfig {
+        profile: config.profile.clone(),
+        residual_pack: config.residual_pack.clone(),
+        dialogue_overlay: dialogue_overlay.clone(),
+        centers_overlay: centers_overlay.clone(),
+        vpn_overlay: vpn_overlay.clone(),
+        broad_eval: None,
+        heldout_eval: None,
+        cache_dir: scratch_cache.clone(),
+        accept: None,
+        reject: Some("package_installed implies vpn_running".to_string()),
+        domain: Some("vpn".to_string()),
+        overlay: Some("vpn".to_string()),
+        out: None,
+    })?;
+    compile_chat_core_cache(&spec)?;
+    let anti_wave = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        text: "does package installed prove vpn running".to_string(),
+        residual_pack: config.residual_pack.clone(),
+        dialogue_overlay,
+        centers_overlay,
+        vpn_overlay,
+        cache_dir: scratch_cache.clone(),
+        manifest: None,
+        max_facts: config.max_facts.max(1),
+        out: None,
+    })?;
+
+    let before_summary = ask_summary(target_query, &before);
+    let stale_summary = ask_summary(target_query, &stale_after_learn);
+    let after_summary = ask_summary(target_query, &after);
+    let anti_summary = ask_summary("does package installed prove vpn running", &anti_wave);
+    let bash_preserved = bash.grounded_packet.answer_allowed
+        && bash
+            .grounded_packet
+            .answer
+            .to_ascii_lowercase()
+            .contains("bash");
+    let systemctl_preserved = systemctl.grounded_packet.answer_allowed
+        && systemctl
+            .grounded_packet
+            .answer
+            .to_ascii_lowercase()
+            .contains("systemd");
+    let target_query_improved = !before.grounded_packet.answer_allowed
+        && after.grounded_packet.answer_allowed
+        && after
+            .grounded_packet
+            .answer
+            .to_ascii_lowercase()
+            .contains("foopkg")
+        && after
+            .grounded_packet
+            .evidence
+            .iter()
+            .any(|evidence| evidence.memory_kind == "learned_overlay");
+    let anti_center_replay_observed = !anti_wave.grounded_packet.answer_allowed
+        && anti_wave.grounded_packet.decision_state == "LEARNED_ANTI_WAVE_SUPPRESSED";
+    let unrelated_route_preserved = bash_preserved && systemctl_preserved;
+    let false_positive_regressed = !anti_center_replay_observed;
+    let loop_report = LinuxChatCoreLearningLoop {
+        before_blocked: !before.grounded_packet.answer_allowed,
+        overlay_written: learn.learning_update.overlay_written
+            && reject.learning_update.overlay_written,
+        cache_marked_stale: learn.learning_update.cache_marked_stale
+            && reject.learning_update.cache_marked_stale,
+        ask_blocked_while_stale: !stale_after_learn.grounded_packet.answer_allowed
+            && stale_after_learn.grounded_packet.decision_state == "CACHE_STALE_NO_AUTHORITY",
+        rebuild_required: true,
+        hot_rebuilt: hot_hash_before_rebuild != hot_hash_after_rebuild,
+        after_answer_changed: before.grounded_packet.answer != after.grounded_packet.answer,
+        answer_from_hot: after.grounded_packet.readout_source == "compiled_chat_core_hot",
+        target_query_improved,
+        anti_center_replay_observed,
+        unrelated_route_preserved,
+        false_positive_regressed,
+    };
+    let regression = LinuxChatCoreLearningRegression {
+        bash_preserved,
+        systemctl_preserved,
+        unrelated_route_preserved,
+        false_positive_regressed,
+        mini_heldout_passed: unrelated_route_preserved && !false_positive_regressed,
+    };
+    let ready = loop_report.before_blocked
+        && loop_report.overlay_written
+        && loop_report.cache_marked_stale
+        && loop_report.ask_blocked_while_stale
+        && loop_report.hot_rebuilt
+        && loop_report.target_query_improved
+        && loop_report.answer_from_hot
+        && loop_report.anti_center_replay_observed
+        && loop_report.unrelated_route_preserved
+        && !loop_report.false_positive_regressed;
+    let report = LinuxChatCoreLearnEvalReport {
+        mode: "llmwave-big-linux-chat-core-learn-eval",
+        version: LINUX_CHAT_CORE_VERSION,
+        verdict: if ready {
+            "LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM"
+        } else {
+            "LLMWAVE_CHAT_CORE_LEARNING_BLOCKED"
+        },
+        scratch_root: path_string(&scratch_root),
+        learning_loop: loop_report,
+        before: before_summary,
+        stale_after_learn: stale_summary,
+        after: after_summary,
+        anti_wave: anti_summary,
+        regression,
+        claim_boundary: learning_claim_boundary(ready),
+    };
+    write_json_if_requested(config.out.as_deref(), &report)?;
+    Ok(report)
+}
+
+struct ChatCoreLearnRequest {
+    delta_state: String,
+    source_prompt: String,
+    intent: String,
+    route: String,
+    subject: String,
+    relation: String,
+    object: String,
+    polarity: String,
+    reason: String,
+    overlay_id: Option<String>,
+    domain: Option<String>,
+    strength: i16,
+}
+
+fn parse_chat_core_learn_request(
+    accept: Option<&str>,
+    reject: Option<&str>,
+    domain: Option<&str>,
+    overlay: Option<&str>,
+) -> Result<ChatCoreLearnRequest> {
+    match (accept, reject) {
+        (Some(_), Some(_)) => anyhow::bail!("choose exactly one of --accept or --reject"),
+        (None, None) => anyhow::bail!("missing --accept or --reject learning input"),
+        (Some(raw), None) => {
+            let fact = parse_pipe_fact(raw)?;
+            let route = normalize_accept_route(&fact.route);
+            let (relation, _, _) = role_contract_for_route(&route, false);
+            let (subject, object) =
+                normalize_accept_subject_object(&fact.route, &fact.subject, &fact.object);
+            Ok(ChatCoreLearnRequest {
+                delta_state: DELTA_POSITIVE.to_string(),
+                source_prompt: raw.to_string(),
+                intent: intent_for_route(&route),
+                route,
+                subject,
+                relation,
+                object,
+                polarity: "positive".to_string(),
+                reason: "accepted ChatCore feedback writes a source overlay delta".to_string(),
+                overlay_id: overlay.map(str::to_string),
+                domain: domain.map(str::to_string),
+                strength: 24,
+            })
+        }
+        (None, Some(raw)) => {
+            let (subject, route, object) = if raw.contains('|') {
+                let fact = parse_pipe_fact(raw)?;
+                (fact.subject, fact.route, fact.object)
+            } else if let Some((left, right)) = raw.split_once("implies") {
+                (
+                    normalize_token(left),
+                    reject_route_for_domain(domain),
+                    normalize_token(right),
+                )
+            } else {
+                anyhow::bail!("--reject expects `subject | route | object` or `A implies B`");
+            };
+            let route = normalize_reject_route(&route, domain);
+            Ok(ChatCoreLearnRequest {
+                delta_state: DELTA_NEGATIVE.to_string(),
+                source_prompt: raw.to_string(),
+                intent: intent_for_route(&route),
+                route,
+                subject,
+                relation: "does not prove".to_string(),
+                object,
+                polarity: "negative".to_string(),
+                reason: "rejected ChatCore shortcut writes an anti-wave overlay delta".to_string(),
+                overlay_id: overlay.map(str::to_string),
+                domain: domain.map(str::to_string),
+                strength: 28,
+            })
+        }
+    }
+}
+
+struct ParsedPipeFact {
+    subject: String,
+    route: String,
+    object: String,
+}
+
+fn parse_pipe_fact(raw: &str) -> Result<ParsedPipeFact> {
+    let parts = raw.split('|').map(str::trim).collect::<Vec<_>>();
+    if parts.len() != 3 || parts.iter().any(|part| part.is_empty()) {
+        anyhow::bail!("expected `subject | route | object`, got `{raw}`");
+    }
+    Ok(ParsedPipeFact {
+        subject: normalize_token(parts[0]),
+        route: parts[1].to_string(),
+        object: normalize_token(parts[2]),
+    })
+}
+
+fn normalize_token(value: &str) -> String {
+    value.trim().replace(' ', "_")
+}
+
+fn normalize_accept_route(route: &str) -> String {
+    match route {
+        "linux.apt.command.package-command" => "linux.apt.command.provider".to_string(),
+        value => value.to_string(),
+    }
+}
+
+fn normalize_reject_route(route: &str, domain: Option<&str>) -> String {
+    if route.trim().is_empty() {
+        reject_route_for_domain(domain)
+    } else {
+        route.to_string()
+    }
+}
+
+fn normalize_accept_subject_object(route: &str, subject: &str, object: &str) -> (String, String) {
+    match route {
+        "linux.apt.command.package-command" => (subject.to_string(), object.to_string()),
+        _ => (subject.to_string(), object.to_string()),
+    }
+}
+
+fn reject_route_for_domain(domain: Option<&str>) -> String {
+    match domain.unwrap_or("").trim() {
+        "vpn" => "linux.vpn.status".to_string(),
+        "exposure" | "socket" => "linux.boundary.socket".to_string(),
+        _ => "linux.chatcore.anti_wave".to_string(),
+    }
+}
+
+fn intent_for_route(route: &str) -> String {
+    match route {
+        "linux.apt.command.provider"
+        | "linux.apt.command.package-command"
+        | "linux.package.binary" => "command_provider",
+        "linux.vpn.status" | "linux.vpn.config" | "linux.vpn.action" => "vpn_runtime",
+        "linux.boundary.socket" | "linux.chatcore.anti_wave" => "boundary_rejection",
+        _ => "linux_profile_fact",
+    }
+    .to_string()
+}
+
+fn role_contract_for_route(route: &str, negative: bool) -> (String, String, String) {
+    match route {
+        "linux.apt.command.provider" => (
+            "provided by package".to_string(),
+            "command".to_string(),
+            "package".to_string(),
+        ),
+        "linux.apt.command.package-command" => (
+            "provides command".to_string(),
+            "package".to_string(),
+            "command".to_string(),
+        ),
+        "linux.package.binary" => (
+            "provides binary".to_string(),
+            "package".to_string(),
+            "binary".to_string(),
+        ),
+        "linux.vpn.status" if negative => (
+            "does not prove".to_string(),
+            "shortcut".to_string(),
+            "runtime_state".to_string(),
+        ),
+        "linux.boundary.socket" | "linux.chatcore.anti_wave" if negative => (
+            "does not prove".to_string(),
+            "shortcut".to_string(),
+            "boundary".to_string(),
+        ),
+        _ if negative => (
+            "does not prove".to_string(),
+            "shortcut".to_string(),
+            "boundary".to_string(),
+        ),
+        _ => (
+            "supports route".to_string(),
+            "subject".to_string(),
+            "object".to_string(),
+        ),
+    }
+}
+
+fn select_learning_overlay<'a>(
+    spec: &'a LinuxChatCoreSpec,
+    request: &ChatCoreLearnRequest,
+) -> Result<&'a LinuxChatCoreOverlaySpec> {
+    let preferred = request.overlay_id.as_deref().unwrap_or_else(|| {
+        if request.domain.as_deref() == Some("vpn") {
+            "vpn"
+        } else {
+            "dialogue"
+        }
+    });
+    spec.overlays
+        .iter()
+        .find(|overlay| overlay.overlay_id == preferred)
+        .with_context(|| format!("ChatCore overlay not found in profile: {preferred}"))
+}
+
+fn optional_hash_file(path: &Path) -> Result<String> {
+    if path.exists() {
+        hash_file(path)
+    } else {
+        Ok("missing".to_string())
+    }
+}
+
+fn ask_summary(query: &str, report: &LinuxChatCoreAskReport) -> LinuxChatCoreAskSummary {
+    LinuxChatCoreAskSummary {
+        query: query.to_string(),
+        verdict: report.verdict.to_string(),
+        cache_fresh: report.cache_status.cache_fresh,
+        answer_allowed: report.grounded_packet.answer_allowed,
+        state: report.grounded_packet.decision_state.clone(),
+        readout_source: report.grounded_packet.readout_source.clone(),
+        answer: report.grounded_packet.answer.clone(),
+        evidence_memory_kinds: report
+            .grounded_packet
+            .evidence
+            .iter()
+            .map(|evidence| evidence.memory_kind.clone())
+            .collect(),
+    }
+}
+
+fn learning_claim_boundary(ready: bool) -> LinuxChatCoreLearningClaimBoundary {
+    LinuxChatCoreLearningClaimBoundary {
+        linux_profile_dynamic_learning_ready: ready,
+        hot_cache_learns_directly: false,
+        overlay_is_source_of_truth_for_learning: true,
+        cache_rebuild_required_after_overlay_write: true,
+        general_llm_ready: false,
+        global_nonlinear_memory_proven: false,
+        safe_claim: "ChatCore learning writes source `.lwm` overlays, marks the compiled cache stale, and only changes answer behavior after rebuilding `.hot` from `.lrf` + overlays.",
+        blocked_claims: vec!["general_llm_ready", "global_nonlinear_memory_proven"],
+    }
 }
 
 fn selected_packet_evidence(report: &LinuxReasonReport) -> Vec<LinuxEvidenceStep> {
@@ -728,6 +1480,91 @@ fn command_provider_step_matches_anchor(step: &LinuxEvidenceStep, anchor: &str) 
         }
         _ => false,
     }
+}
+
+fn learned_anti_wave_hits(
+    cache: &LinuxChatCoreHotCache,
+    text: &str,
+    query: &LinuxQueryWave,
+) -> Vec<LinuxChatCoreFactPreview> {
+    let normalized_text = normalize_match_text(text);
+    let mut query_terms = query
+        .anchors
+        .iter()
+        .chain(query.forbidden_shortcuts.iter())
+        .map(|term| normalize_match_text(term))
+        .collect::<Vec<_>>();
+    query_terms.push(normalized_text.clone());
+    cache
+        .readout_facts
+        .iter()
+        .filter(|fact| fact.memory_kind == "learned_anti_wave")
+        .filter(|fact| {
+            let subject = normalize_match_text(&fact.subject);
+            let object = normalize_match_text(&fact.object);
+            let subject_hit = query_terms.iter().any(|term| {
+                !subject.is_empty() && (term.contains(&subject) || subject.contains(term))
+            });
+            let object_hit = query_terms.iter().any(|term| {
+                !object.is_empty() && (term.contains(&object) || object.contains(term))
+            });
+            (subject_hit && object_hit)
+                || (!subject.is_empty()
+                    && !object.is_empty()
+                    && normalized_text.contains(&subject)
+                    && normalized_text.contains(&object))
+        })
+        .take(4)
+        .cloned()
+        .collect()
+}
+
+fn normalize_match_text(text: &str) -> String {
+    text.to_ascii_lowercase()
+        .replace(['_', '-', '/', ':'], " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn grounded_evidence_from_fact_preview(
+    fact: &LinuxChatCoreFactPreview,
+) -> LinuxChatCoreGroundedEvidence {
+    LinuxChatCoreGroundedEvidence {
+        route: fact.route.clone(),
+        role: format!("{}->{}", fact.subject_role, fact.object_role),
+        subject: fact.subject.clone(),
+        relation: fact.relation.clone(),
+        object: fact.object.clone(),
+        polarity: fact.polarity.clone(),
+        memory_kind: fact.memory_kind.clone(),
+        confidence: fact.confidence,
+    }
+}
+
+fn compact_grounded_evidence(evidence: &LinuxChatCoreGroundedEvidence) -> String {
+    format!(
+        "{} | role={} | subject={} | relation={} | object={} | polarity={} | memory={} | confidence={}",
+        evidence.route,
+        evidence.role,
+        evidence.subject,
+        evidence.relation,
+        evidence.object,
+        evidence.polarity,
+        evidence.memory_kind,
+        evidence.confidence
+    )
+}
+
+fn learned_anti_wave_answer(hits: &[LinuxChatCoreFactPreview]) -> String {
+    hits.first()
+        .map(|fact| {
+            format!(
+                "Learned anti-wave boundary: {} does not prove {}.",
+                fact.subject, fact.object
+            )
+        })
+        .unwrap_or_else(|| "Learned anti-wave boundary suppresses this shortcut.".to_string())
 }
 
 fn domain_runtime_report(domains: &[LinuxChatCoreDomainSpec]) -> LinuxChatCoreDomainRuntime {
@@ -903,12 +1740,13 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
     let source_artifacts = source_artifacts(spec)?;
     let decoded_packet =
         load_linux_residual_decoded_packet(&PathBuf::from(&spec.source_memory.residual_pack))?;
-    let route_index = route_index(&decoded_packet.facts);
+    let mut active_facts = decoded_packet.facts.clone();
+    active_facts.extend(load_overlay_facts(&spec.overlays)?);
+    let route_index = route_index(&active_facts);
     let domain_registry_hash = hash_json(&spec.domains)?;
     let overlay_registry_hash = hash_json(&spec.overlays)?;
     let spec_hash = hash_json(spec)?;
-    let readout_facts = decoded_packet
-        .facts
+    let readout_facts = active_facts
         .iter()
         .map(LinuxChatCoreFactPreview::from_decoded_fact)
         .collect::<Vec<_>>();
@@ -916,7 +1754,7 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
     let index = LinuxChatCoreCacheIndex {
         profile_id: spec.profile_id.clone(),
         residual_summary: decoded_packet.summary.clone(),
-        represented_fact_count: decoded_packet.summary.represented_fact_count,
+        represented_fact_count: active_facts.len(),
         schema_record_count: decoded_packet.summary.schema_record_count,
         residual_record_count: decoded_packet.summary.residual_record_count,
         fallback_record_count: decoded_packet.summary.fallback_record_count,
@@ -1226,6 +2064,74 @@ fn source_artifacts(spec: &LinuxChatCoreSpec) -> Result<Vec<LinuxChatCoreArtifac
     Ok(artifacts)
 }
 
+fn load_overlay_facts(
+    overlays: &[LinuxChatCoreOverlaySpec],
+) -> Result<Vec<LinuxResidualDecodedFact>> {
+    let mut facts = Vec::new();
+    for overlay in overlays {
+        let path = PathBuf::from(&overlay.path);
+        let Ok(memory) = load_memory(&path) else {
+            continue;
+        };
+        for record in memory.records {
+            if let Some(fact) = overlay_record_to_fact(&record) {
+                facts.push(fact);
+            }
+        }
+    }
+    Ok(facts)
+}
+
+fn overlay_record_to_fact(record: &PersistentWaveDeltaRecord) -> Option<LinuxResidualDecodedFact> {
+    let negative = record.delta_state == DELTA_NEGATIVE || record.polarity == "negative";
+    if record.delta_state != DELTA_POSITIVE && !negative {
+        return None;
+    }
+    let route = normalize_hot_route_from_record(record);
+    let (default_relation, subject_role, object_role) = role_contract_for_route(&route, negative);
+    let relation = if negative {
+        "does not prove".to_string()
+    } else if record.relation.trim().is_empty() {
+        default_relation
+    } else {
+        normalize_relation_for_route(&route, &record.relation)
+    };
+    Some(LinuxResidualDecodedFact {
+        route,
+        subject: record.subject.clone(),
+        subject_role,
+        relation,
+        object: record.object.clone(),
+        object_role,
+        polarity: if negative { "negative" } else { "positive" },
+        evidence_kind: "chatcore_overlay".to_string(),
+        confidence: if negative { 92 } else { 96 },
+        memory_kind: if negative {
+            "learned_anti_wave"
+        } else {
+            "learned_overlay"
+        },
+    })
+}
+
+fn normalize_hot_route_from_record(record: &PersistentWaveDeltaRecord) -> String {
+    match record.route.as_str() {
+        "linux.apt.command.package-command" if record.relation == "provided by package" => {
+            "linux.apt.command.provider".to_string()
+        }
+        route => route.to_string(),
+    }
+}
+
+fn normalize_relation_for_route(route: &str, relation: &str) -> String {
+    match route {
+        "linux.apt.command.provider" => "provided by package".to_string(),
+        "linux.apt.command.package-command" => "provides command".to_string(),
+        "linux.package.binary" => "provides binary".to_string(),
+        _ => relation.to_string(),
+    }
+}
+
 fn route_index(
     facts: &[super::linux_residual_memory::LinuxResidualDecodedFact],
 ) -> Vec<LinuxChatCoreRouteIndexEntry> {
@@ -1299,6 +2205,8 @@ fn stable_polarity(value: &str) -> &'static str {
 fn stable_memory_kind(value: &str) -> &'static str {
     match value {
         "fallback" => "fallback",
+        "learned_anti_wave" => "learned_anti_wave",
+        "learned_overlay" => "learned_overlay",
         "residual" => "residual",
         "schema" => "schema",
         _ => "unknown",
@@ -2239,5 +3147,100 @@ mod tests {
             .stale_reasons
             .contains(&"source_memory_hash_changed".to_string()));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn chat_core_learn_accept_normalizes_command_provider() {
+        let request = parse_chat_core_learn_request(
+            Some("foocmd | linux.apt.command.package-command | foopkg"),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(request.delta_state, DELTA_POSITIVE);
+        assert_eq!(request.route, "linux.apt.command.provider");
+        assert_eq!(request.intent, "command_provider");
+        assert_eq!(request.subject, "foocmd");
+        assert_eq!(request.object, "foopkg");
+        assert_eq!(request.relation, "provided by package");
+    }
+
+    #[test]
+    fn chat_core_overlay_delta_projects_to_learned_fact() {
+        let record = build_delta_record(PersistentWaveDeltaSpec {
+            delta_state: DELTA_POSITIVE.to_string(),
+            source_prompt: "learn accept".to_string(),
+            intent: "command_provider".to_string(),
+            route: "linux.apt.command.provider".to_string(),
+            subject: "foocmd".to_string(),
+            relation: "provided by package".to_string(),
+            object: "foopkg".to_string(),
+            polarity: "positive".to_string(),
+            reason: "unit test".to_string(),
+            strength: 24,
+        });
+        let fact = overlay_record_to_fact(&record).unwrap();
+        assert_eq!(fact.route, "linux.apt.command.provider");
+        assert_eq!(fact.subject_role, "command");
+        assert_eq!(fact.object_role, "package");
+        assert_eq!(fact.memory_kind, "learned_overlay");
+    }
+
+    #[test]
+    fn chat_core_anti_wave_hits_require_learned_lane() {
+        let fallback_negative = LinuxChatCoreFactPreview {
+            route: "linux.boundary.socket".to_string(),
+            subject: "package_installed".to_string(),
+            subject_role: "shortcut".to_string(),
+            relation: "does not prove".to_string(),
+            object: "vpn_running".to_string(),
+            object_role: "runtime_state".to_string(),
+            polarity: "negative".to_string(),
+            evidence_kind: "fixture".to_string(),
+            confidence: 90,
+            memory_kind: "fallback".to_string(),
+        };
+        let learned_negative = LinuxChatCoreFactPreview {
+            memory_kind: "learned_anti_wave".to_string(),
+            ..fallback_negative.clone()
+        };
+        let cache = LinuxChatCoreHotCache {
+            residual_summary: LinuxResidualDecodedSummary {
+                path: "unit-test.lrf".to_string(),
+                file_bytes: 0,
+                wave_dim: 1024,
+                represented_fact_count: 0,
+                schema_record_count: 0,
+                residual_record_count: 0,
+                fallback_record_count: 0,
+                route_count: 0,
+                corpus_hash64: 0,
+                promotion_threshold: 0,
+                binary_hot_sections_bytes: 0,
+                direct_fixed_baseline_bytes: 0,
+                cold_label_count: 0,
+                cold_label_table_bytes: 0,
+                binary_hot_sections_fit_6m: true,
+                beats_direct_fixed64: true,
+            },
+            route_index: Vec::new(),
+            readout_facts: vec![fallback_negative, learned_negative],
+            domains: Vec::new(),
+        };
+        let query = LinuxQueryWave {
+            intent: "boundary_rejection".to_string(),
+            anchors: Vec::new(),
+            route_priors: Vec::new(),
+            required_routes: Vec::new(),
+            negative_boundaries: Vec::new(),
+            forbidden_shortcuts: Vec::new(),
+            polarity: "question".to_string(),
+            answer_policy: "deny_shortcut".to_string(),
+        };
+        let hits =
+            learned_anti_wave_hits(&cache, "does package installed prove vpn running", &query);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].memory_kind, "learned_anti_wave");
     }
 }
