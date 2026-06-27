@@ -441,7 +441,10 @@ center admission layer plus `semantic_atom_contract` to pass. Inspect
 channels, and `surface_text_length_is_not_mass`. Inspect `spectral_center`: it
 reports schema center separation, wrong-center rejection, role-swap near-miss
 collapse, route/relation ablation drop, fallback preservation, and
-`center_contract.version = field-center-contract-v1`.
+`center_contract.version = field-center-contract-v1`. If the packet is legacy
+`LLMWLRF1`, the command returns `LRF_REPACK_REQUIRED` and `safe_to_use=false`;
+rebuild it with `linux-pack-residual` before proof, projection, exposure, or
+chat commands.
 Treat `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory
 proof: real binary schema/residual storage beats fixed64 bytes, preserves the
 Linux-domain eval, passes `LINUX_ROLE_COMPLETE_SEMANTIC_ATOMS_PROVEN`, and passes

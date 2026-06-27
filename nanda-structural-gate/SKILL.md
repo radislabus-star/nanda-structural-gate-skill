@@ -1286,7 +1286,10 @@ role-swap near-miss collapse when subject/object roles are evaluable, and
 `route_relation_ablation_drop` measures whether route/relation modes are
 causal for separation. `spectral_center.center_contract.version =
 field-center-contract-v1` is the shared read-only center contract; it is not an
-authority override. It is not broad chat readiness and not exposure reasoning.
+authority override. If an old `LLMWLRF1` packet is passed, the command returns
+`LRF_REPACK_REQUIRED`, `safe_to_use=false`, and a `linux-pack-residual` command;
+do not run proof/projection/exposure/chat from that artifact until it is
+rebuilt as `LLMWLRF2`. It is not broad chat readiness and not exposure reasoning.
 Use `nanda-llmwave-big linux-atlas-projection --atlas-dir .nanda/linux-atlas --hot-pack .nanda/linux-active/linux-active-65k.laf --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
 to run the Phase 18 Atlas-to-6MB cognitive projection gate. It audits the cold
 Atlas by metadata/manifest, runs `.laf` cache proof and `.lrf` schema/residual

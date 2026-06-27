@@ -27,7 +27,9 @@ use crate::WAVE_DIM;
 pub(crate) const LINUX_RESIDUAL_MEMORY_VERSION: &str = "llmwave-big-v-next-linux-schema-residual";
 
 const LRF_MAGIC: &[u8; 8] = b"LLMWLRF2";
+const LRF_V1_MAGIC: &[u8; 8] = b"LLMWLRF1";
 const LRF_FORMAT_VERSION: u32 = 2;
+const LRF_REPACK_REQUIRED_VERDICT: &str = "LRF_REPACK_REQUIRED";
 const LRF_HEADER_BYTES: usize = 64;
 const SCHEMA_RECORD_BYTES: usize = 32;
 const RESIDUAL_RECORD_BYTES: usize = 32;
@@ -65,6 +67,46 @@ pub(crate) struct LinuxResidualPackReport {
     pub packet: LinuxResidualPacketSummary,
     pub economics: LinuxResidualEconomics,
     pub claim_boundary: LinuxResidualPackClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxResidualRepackRequiredReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub residual_pack: String,
+    pub detected: LinuxResidualDetectedFormat,
+    pub required: LinuxResidualRequiredFormat,
+    pub safe_to_use: bool,
+    pub repack_command: String,
+    pub claim_boundary: LinuxResidualRepackClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxResidualDetectedFormat {
+    pub magic: String,
+    pub format_version: Option<u32>,
+    pub format_name: &'static str,
+    pub legacy_v1: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxResidualRequiredFormat {
+    pub magic: &'static str,
+    pub format_version: u32,
+    pub format_name: &'static str,
+    pub schema_key: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxResidualRepackClaimBoundary {
+    pub proof_not_run: bool,
+    pub old_packet_not_accepted_as_v2: bool,
+    pub nonlinear_memory_proven: bool,
+    pub linux_profile_nonlinear_memory_proven: bool,
+    pub broad_chat_llm_ready: bool,
+    pub safe_claim: &'static str,
+    pub blocked_by: Vec<&'static str>,
 }
 
 #[derive(Serialize, Clone)]
@@ -668,6 +710,77 @@ pub(crate) fn build_linux_residual_pack_report(
             ],
         },
     })
+}
+
+pub(crate) fn linux_residual_repack_required_report(
+    residual_pack: &PathBuf,
+) -> Result<Option<LinuxResidualRepackRequiredReport>> {
+    let mut file = fs::File::open(residual_pack)
+        .with_context(|| format!("open linux residual packet {}", residual_pack.display()))?;
+    let mut header_prefix = [0u8; 12];
+    let read = file
+        .read(&mut header_prefix)
+        .with_context(|| format!("read linux residual header {}", residual_pack.display()))?;
+    if read < LRF_MAGIC.len() {
+        return Ok(None);
+    }
+    let mut magic = [0u8; 8];
+    magic.copy_from_slice(&header_prefix[..8]);
+    let detected_version = if read >= 12 {
+        Some(u32::from_le_bytes([
+            header_prefix[8],
+            header_prefix[9],
+            header_prefix[10],
+            header_prefix[11],
+        ]))
+    } else {
+        None
+    };
+    if &magic == LRF_MAGIC && detected_version == Some(LRF_FORMAT_VERSION) {
+        return Ok(None);
+    }
+    if &magic != LRF_V1_MAGIC {
+        return Ok(None);
+    }
+
+    let path = residual_pack.display().to_string();
+    Ok(Some(LinuxResidualRepackRequiredReport {
+        mode: "llmwave-big-linux-residual-proof",
+        version: LINUX_RESIDUAL_MEMORY_VERSION,
+        verdict: LRF_REPACK_REQUIRED_VERDICT,
+        residual_pack: path.clone(),
+        detected: LinuxResidualDetectedFormat {
+            magic: magic_label(&magic),
+            format_version: detected_version,
+            format_name: "lrf-v1-route-relation-polarity-schema",
+            legacy_v1: true,
+        },
+        required: LinuxResidualRequiredFormat {
+            magic: "LLMWLRF2",
+            format_version: LRF_FORMAT_VERSION,
+            format_name:
+                "lrf-v2-role-complete-schema32-residual32-fallback64-plus-cold-label-table",
+            schema_key: "route+relation+subject_role+object_role+polarity+evidence_kind",
+        },
+        safe_to_use: false,
+        repack_command: format!(
+            "nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out {path} --format json"
+        ),
+        claim_boundary: LinuxResidualRepackClaimBoundary {
+            proof_not_run: true,
+            old_packet_not_accepted_as_v2: true,
+            nonlinear_memory_proven: false,
+            linux_profile_nonlinear_memory_proven: false,
+            broad_chat_llm_ready: false,
+            safe_claim: "The residual packet is legacy LLMWLRF1. Repack it as LLMWLRF2 before running proof, projection, exposure, or chat commands. A v1 packet must not be treated as role-complete nonlinear memory.",
+            blocked_by: vec![
+                "legacy_lrf_v1_packet",
+                "role_complete_schema_key_missing",
+                "semantic_atom_contract_not_run",
+                "spectral_center_gate_not_run",
+            ],
+        },
+    }))
 }
 
 pub(crate) fn build_linux_residual_proof_report(
@@ -2013,8 +2126,16 @@ fn parse_lrf_header(bytes: &[u8]) -> Result<LrfHeaderFields> {
     let mut cursor = Cursor::new(bytes);
     let mut magic = [0u8; 8];
     cursor.read_exact(&mut magic)?;
+    if magic == *LRF_V1_MAGIC {
+        bail!(
+            "{LRF_REPACK_REQUIRED_VERDICT}: detected legacy LLMWLRF1 packet; rebuild with `nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json`"
+        );
+    }
     if &magic != LRF_MAGIC {
-        bail!("invalid linux residual packet magic");
+        bail!(
+            "unsupported linux residual packet magic `{}`; expected LLMWLRF2",
+            magic_label(&magic)
+        );
     }
     let version = read_u32(&mut cursor)?;
     if version != LRF_FORMAT_VERSION {
@@ -2055,6 +2176,10 @@ fn parse_lrf_header(bytes: &[u8]) -> Result<LrfHeaderFields> {
         represented_fact_count,
         promotion_threshold,
     })
+}
+
+fn magic_label(magic: &[u8; 8]) -> String {
+    String::from_utf8_lossy(magic).to_string()
 }
 
 fn lrf_binary_sections_bytes(header: LrfHeaderFields) -> Result<usize> {
@@ -2424,6 +2549,34 @@ mod tests {
     use super::super::linux_atlas::LinuxAtlasEvidence;
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn legacy_lrf_v1_reports_repack_required() {
+        let root = unique_tmp_dir("linux-residual-v1-repack-required");
+        fs::create_dir_all(&root).unwrap();
+        let old_pack = root.join("legacy.lrf");
+        let mut header = vec![0u8; LRF_HEADER_BYTES];
+        header[..8].copy_from_slice(b"LLMWLRF1");
+        header[8..12].copy_from_slice(&1u32.to_le_bytes());
+        fs::write(&old_pack, &header).unwrap();
+
+        let report = linux_residual_repack_required_report(&old_pack)
+            .unwrap()
+            .expect("v1 packet should require repack");
+        assert_eq!(report.verdict, "LRF_REPACK_REQUIRED");
+        assert_eq!(report.detected.magic, "LLMWLRF1");
+        assert!(report.detected.legacy_v1);
+        assert_eq!(report.required.magic, "LLMWLRF2");
+        assert!(!report.safe_to_use);
+        assert!(report.repack_command.contains("linux-pack-residual"));
+
+        let err = match parse_lrf_packet(&fs::read(&old_pack).unwrap()) {
+            Ok(_) => panic!("legacy v1 packet should not parse as v2"),
+            Err(err) => err,
+        };
+        assert!(err.to_string().contains("LRF_REPACK_REQUIRED"));
+        let _ = fs::remove_dir_all(root);
+    }
 
     #[test]
     fn linux_residual_packet_roundtrip_proves_schema_memory() {

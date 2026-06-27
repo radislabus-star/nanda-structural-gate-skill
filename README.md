@@ -786,7 +786,9 @@ width, required route/relation/role/polarity/evidence channels, and
 schema centers, wrong-center separation, role-swap near-miss collapse,
 route/relation ablation drop, and fallback-outlier preservation. It also emits
 `spectral_center.center_contract.version = field-center-contract-v1`, the same
-read-only center language used by Boundary Economics. Treat
+read-only center language used by Boundary Economics. If an old `LLMWLRF1`
+packet is passed to this command, it returns `LRF_REPACK_REQUIRED` with a
+repack command instead of treating the legacy packet as proof. Treat
 `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear-memory proof:
 the active Linux field is genuinely written and retrieved through binary
 schema/residual memory, fits the 6 MiB hot budget, saves bytes versus fixed64,

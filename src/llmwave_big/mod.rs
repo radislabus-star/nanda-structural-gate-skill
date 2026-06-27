@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use std::path::PathBuf;
 
-use super::{nanda_6m, OutputFormat, CORE_VERSION, EXIT_PASS, WAVE_DIM};
+use super::{nanda_6m, OutputFormat, CORE_VERSION, EXIT_PASS, EXIT_WATCH, WAVE_DIM};
 
 pub mod active_core;
 pub mod answer_surface;
@@ -3375,6 +3375,37 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::LinuxResidualProof(args) => {
+            if let Some(report) =
+                linux_residual_memory::linux_residual_repack_required_report(&args.residual_pack)?
+            {
+                match args.format {
+                    OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                    OutputFormat::Text => {
+                        println!("{}", report.verdict);
+                        println!("residual_pack: {}", report.residual_pack);
+                        println!("detected_magic: {}", report.detected.magic);
+                        println!("required_magic: {}", report.required.magic);
+                        println!("required_format: {}", report.required.format_name);
+                        println!("safe_to_use: {}", report.safe_to_use);
+                        println!("repack_command: {}", report.repack_command);
+                    }
+                    OutputFormat::Md => {
+                        println!("# LLMWave Linux Residual Repack Required");
+                        println!();
+                        println!("- verdict: `{}`", report.verdict);
+                        println!("- residual pack: `{}`", report.residual_pack);
+                        println!("- detected magic: `{}`", report.detected.magic);
+                        println!("- required magic: `{}`", report.required.magic);
+                        println!("- required format: `{}`", report.required.format_name);
+                        println!("- safe to use: `{}`", report.safe_to_use);
+                        println!();
+                        println!("```bash");
+                        println!("{}", report.repack_command);
+                        println!("```");
+                    }
+                }
+                return Ok(EXIT_WATCH);
+            }
             let report = linux_residual_memory::build_linux_residual_proof_report(
                 linux_residual_memory::LinuxResidualProofConfig {
                     residual_pack: args.residual_pack,
