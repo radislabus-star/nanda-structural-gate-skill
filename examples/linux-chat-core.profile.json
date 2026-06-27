@@ -51,6 +51,8 @@
       "domain_id": "packages",
       "routes": [
         "linux.apt.command.provider",
+        "linux.apt.command.package-command",
+        "linux.package.binary",
         "linux.package.file.owner"
       ],
       "negative_routes": [
@@ -65,6 +67,7 @@
     {
       "domain_id": "systemd",
       "routes": [
+        "linux.systemd.exec",
         "linux.systemd.unit.exec",
         "linux.systemd.unit.state"
       ],
@@ -95,8 +98,11 @@
     {
       "domain_id": "exposure",
       "routes": [
+        "linux.socket.runtime",
+        "linux.firewall.runtime",
         "linux.exposure.socket",
-        "linux.firewall.boundary"
+        "linux.firewall.boundary",
+        "linux.boundary.socket"
       ],
       "negative_routes": [
         "listening_local_socket_does_not_prove_external_exposure"

@@ -14,16 +14,18 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::linux_profile::{
-    build_linux_profile_claim_gate_report, build_linux_reason_report_from_decoded_facts,
-    LinuxEvidenceStep, LinuxProfileClaimGateConfig, LinuxProfileClaimGateReport, LinuxReasonReport,
+    build_linux_profile_claim_gate_report, build_linux_query_wave_report,
+    build_linux_reason_report_from_decoded_facts, LinuxEvidenceStep, LinuxProfileClaimGateConfig,
+    LinuxProfileClaimGateReport, LinuxQueryWave, LinuxQueryWaveConfig, LinuxReasonReport,
 };
 use super::linux_residual_memory::{
     load_linux_residual_decoded_packet, LinuxResidualDecodedFact, LinuxResidualDecodedSummary,
 };
 
-pub(crate) const LINUX_CHAT_CORE_VERSION: &str = "llmwave-big-v-next-linux-chat-core";
+pub(crate) const LINUX_CHAT_CORE_VERSION: &str = "llmwave-big-v-next-linux-chat-core-hot-v2";
 pub(crate) const DEFAULT_LINUX_CHAT_CORE_PROFILE: &str = "examples/linux-chat-core.profile.json";
-const HOT_MAGIC: &[u8] = b"LLMWCHATCORE1\n";
+const HOT_MAGIC: &[u8] = b"LLMWCHATCORE2\0";
+const HOT_FORMAT_VERSION: u32 = 2;
 
 #[derive(Clone)]
 pub(crate) struct LinuxChatCoreBuildConfig {
@@ -187,6 +189,14 @@ pub(crate) struct LinuxChatCoreCacheIndex {
     pub cache_contract: LinuxChatCoreCacheContract,
 }
 
+#[derive(Clone)]
+struct LinuxChatCoreHotCache {
+    residual_summary: LinuxResidualDecodedSummary,
+    route_index: Vec<LinuxChatCoreRouteIndexEntry>,
+    readout_facts: Vec<LinuxChatCoreFactPreview>,
+    domains: Vec<LinuxChatCoreDomainSpec>,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct LinuxChatCoreFactPreview {
     pub route: String,
@@ -215,7 +225,26 @@ pub(crate) struct LinuxChatCoreCacheContract {
     pub compiled_from_source_hashes: bool,
     pub no_secret_scan: bool,
     pub hot_cache_has_no_authority_without_gate: bool,
+    pub hot_cache_contains_binary_readout_records: bool,
+    pub json_index_required_for_answer_authority: bool,
     pub stale_detection_required: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreDomainRuntime {
+    pub interface: &'static str,
+    pub suite_count: usize,
+    pub suites: Vec<LinuxChatCoreDomainSuiteReport>,
+    pub json_index_used_for_domain_runtime: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreDomainSuiteReport {
+    pub domain_id: String,
+    pub route_count: usize,
+    pub negative_route_count: usize,
+    pub overlay_count: usize,
+    pub action_scope: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -227,6 +256,7 @@ pub(crate) struct LinuxChatCoreBuildReport {
     pub manifest: LinuxChatCoreCacheManifest,
     pub source_status: LinuxChatCoreSourceStatus,
     pub cache: LinuxChatCoreCompiledCache,
+    pub domain_runtime: LinuxChatCoreDomainRuntime,
     pub token_economics: LinuxChatCoreCacheTokenEconomics,
     pub claim_boundary: LinuxChatCoreClaimBoundary,
 }
@@ -241,6 +271,7 @@ pub(crate) struct LinuxChatCoreGateReport {
     pub cache_status: LinuxChatCoreCacheStatus,
     pub source_status: LinuxChatCoreSourceStatus,
     pub profile_gate: Option<LinuxProfileClaimGateReport>,
+    pub domain_runtime: LinuxChatCoreDomainRuntime,
     pub chat_core: LinuxChatCoreAuthority,
     pub token_economics: LinuxChatCoreCacheTokenEconomics,
     pub claim_boundary: LinuxChatCoreClaimBoundary,
@@ -253,6 +284,7 @@ pub(crate) struct LinuxChatCoreAskReport {
     pub verdict: &'static str,
     pub text: String,
     pub cache_status: LinuxChatCoreCacheStatus,
+    pub domain_runtime: Option<LinuxChatCoreDomainRuntime>,
     pub grounded_packet: LinuxChatCoreGroundedPacket,
     pub token_economics: LinuxChatCoreAskTokenEconomics,
     pub claim_boundary: LinuxChatCoreClaimBoundary,
@@ -315,6 +347,10 @@ pub(crate) struct LinuxChatCoreCompiledCache {
     pub index_sha256: String,
     pub manifest_path: String,
     pub manifest_sha256: String,
+    pub hot_readout_record_count: usize,
+    pub hot_route_record_count: usize,
+    pub hot_domain_record_count: usize,
+    pub json_index_required_for_answer_authority: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -347,6 +383,7 @@ pub(crate) struct LinuxChatCoreGroundedPacket {
     pub answer_allowed: bool,
     pub readout_source: String,
     pub cache_is_runtime_index_not_prompt_payload: bool,
+    pub domain_suites: Vec<String>,
     pub decision_state: String,
     pub answer: String,
     pub intent: String,
@@ -403,6 +440,7 @@ pub(crate) fn build_linux_chat_core_cache_report(
         cache_token_economics(&compiled.manifest.source_artifacts, &compiled.manifest);
     let cache = compiled.cache;
     let manifest = compiled.manifest;
+    let domain_runtime = domain_runtime_report(&spec.domains);
     let report = LinuxChatCoreBuildReport {
         mode: "llmwave-big-linux-chat-core-build",
         version: LINUX_CHAT_CORE_VERSION,
@@ -411,6 +449,7 @@ pub(crate) fn build_linux_chat_core_cache_report(
         manifest,
         source_status,
         cache,
+        domain_runtime,
         token_economics,
         claim_boundary: claim_boundary(true, false, false),
     };
@@ -465,6 +504,7 @@ pub(crate) fn build_linux_chat_core_gate_report(
         .map(|gate| gate.chat_target.ready)
         .unwrap_or(false);
     let chat_core_ready = cache_status.cache_fresh && profile_ready;
+    let domain_runtime = domain_runtime_report(&spec.domains);
     let report = LinuxChatCoreGateReport {
         mode: "llmwave-big-linux-chat-core-gate",
         version: LINUX_CHAT_CORE_VERSION,
@@ -480,6 +520,7 @@ pub(crate) fn build_linux_chat_core_gate_report(
         cache_status: cache_status.clone(),
         source_status,
         profile_gate,
+        domain_runtime,
         chat_core: LinuxChatCoreAuthority {
             safe_to_use_cache: cache_status.cache_fresh,
             safe_to_answer_from_cache: chat_core_ready,
@@ -505,15 +546,26 @@ pub(crate) fn build_linux_chat_core_ask_report(
         .clone()
         .unwrap_or_else(|| config.cache_dir.join("chat-core.manifest.json"));
     let cache_status = evaluate_cache_from_manifest_for_ask(&manifest, &config)?;
-    let reason = if cache_status.cache_fresh {
-        let cache_index = load_cache_index_from_manifest(&manifest)?;
-        let facts = cache_index
-            .readout_facts
-            .iter()
-            .map(LinuxChatCoreFactPreview::to_decoded_fact)
-            .collect::<Vec<_>>();
+    let hot_cache = if cache_status.cache_fresh {
+        Some(load_hot_cache_from_manifest(&manifest)?)
+    } else {
+        None
+    };
+    let domain_runtime = hot_cache
+        .as_ref()
+        .map(|cache| domain_runtime_report(&cache.domains));
+    let query_wave = build_linux_query_wave_report(LinuxQueryWaveConfig {
+        text: config.text.clone(),
+    })
+    .query_wave;
+    let active_domain_suites = hot_cache
+        .as_ref()
+        .map(|cache| select_domain_suites(&cache.domains, &query_wave))
+        .unwrap_or_default();
+    let reason = if let Some(cache) = &hot_cache {
+        let facts = hot_facts_for_query(cache, &query_wave, &active_domain_suites);
         Some(build_linux_reason_report_from_decoded_facts(
-            cache_index.residual_summary,
+            cache.residual_summary.clone(),
             &facts,
             &config.text,
             config.max_facts.max(1),
@@ -527,8 +579,12 @@ pub(crate) fn build_linux_chat_core_ask_report(
             LinuxChatCoreGroundedPacket {
                 cache_fresh: true,
                 answer_allowed: report.decision.answer_allowed,
-                readout_source: "compiled_chat_core_index".to_string(),
+                readout_source: "compiled_chat_core_hot".to_string(),
                 cache_is_runtime_index_not_prompt_payload: true,
+                domain_suites: active_domain_suites
+                    .iter()
+                    .map(|domain| domain.domain_id.clone())
+                    .collect(),
                 decision_state: report.decision.state,
                 answer: report.decision.answer,
                 intent: report.query_wave.intent,
@@ -556,6 +612,7 @@ pub(crate) fn build_linux_chat_core_ask_report(
             answer_allowed: false,
             readout_source: "none_cache_stale".to_string(),
             cache_is_runtime_index_not_prompt_payload: true,
+            domain_suites: Vec::new(),
             decision_state: "CACHE_STALE_NO_AUTHORITY".to_string(),
             answer: "Cache is stale or missing; rebuild and gate ChatCore before using it as answer support.".to_string(),
             intent: "unknown".to_string(),
@@ -577,6 +634,7 @@ pub(crate) fn build_linux_chat_core_ask_report(
         },
         text: config.text,
         cache_status: cache_status.clone(),
+        domain_runtime,
         grounded_packet: packet,
         token_economics,
         claim_boundary: claim_boundary(cache_status.cache_fresh, true, false),
@@ -614,6 +672,79 @@ fn command_provider_step_matches_anchor(step: &LinuxEvidenceStep, anchor: &str) 
             object == anchor || object.rsplit('/').next().is_some_and(|name| name == anchor)
         }
         _ => false,
+    }
+}
+
+fn domain_runtime_report(domains: &[LinuxChatCoreDomainSpec]) -> LinuxChatCoreDomainRuntime {
+    LinuxChatCoreDomainRuntime {
+        interface: "DomainSuite::select_routes",
+        suite_count: domains.len(),
+        suites: domains
+            .iter()
+            .map(|domain| LinuxChatCoreDomainSuiteReport {
+                domain_id: domain.domain_id.clone(),
+                route_count: domain.routes.len(),
+                negative_route_count: domain.negative_routes.len(),
+                overlay_count: domain.overlay_ids.len(),
+                action_scope: domain.action_scope.clone(),
+            })
+            .collect(),
+        json_index_used_for_domain_runtime: false,
+    }
+}
+
+fn select_domain_suites(
+    domains: &[LinuxChatCoreDomainSpec],
+    query: &LinuxQueryWave,
+) -> Vec<LinuxChatCoreDomainSpec> {
+    let query_routes = query_route_set(query);
+    domains
+        .iter()
+        .filter(|domain| {
+            domain
+                .routes
+                .iter()
+                .chain(domain.negative_routes.iter())
+                .any(|route| query_routes.contains(route))
+        })
+        .cloned()
+        .collect()
+}
+
+fn query_route_set(query: &LinuxQueryWave) -> BTreeSet<String> {
+    query
+        .route_priors
+        .iter()
+        .chain(query.required_routes.iter())
+        .chain(query.negative_boundaries.iter())
+        .cloned()
+        .collect()
+}
+
+fn hot_facts_for_query(
+    cache: &LinuxChatCoreHotCache,
+    query: &LinuxQueryWave,
+    active_domains: &[LinuxChatCoreDomainSpec],
+) -> Vec<LinuxResidualDecodedFact> {
+    let mut routes = query_route_set(query);
+    for domain in active_domains {
+        routes.extend(domain.routes.iter().cloned());
+        routes.extend(domain.negative_routes.iter().cloned());
+    }
+    let selected = cache
+        .readout_facts
+        .iter()
+        .filter(|fact| routes.is_empty() || routes.contains(&fact.route))
+        .map(LinuxChatCoreFactPreview::to_decoded_fact)
+        .collect::<Vec<_>>();
+    if selected.is_empty() {
+        cache
+            .readout_facts
+            .iter()
+            .map(LinuxChatCoreFactPreview::to_decoded_fact)
+            .collect()
+    } else {
+        selected
     }
 }
 
@@ -718,15 +849,15 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
     let decoded_packet =
         load_linux_residual_decoded_packet(&PathBuf::from(&spec.source_memory.residual_pack))?;
     let route_index = route_index(&decoded_packet.facts);
-    let source_hash = combined_hash(
-        source_artifacts
-            .iter()
-            .map(|artifact| artifact.sha256.as_str()),
-    );
-    let route_index_hash = hash_json(&route_index)?;
     let domain_registry_hash = hash_json(&spec.domains)?;
     let overlay_registry_hash = hash_json(&spec.overlays)?;
     let spec_hash = hash_json(spec)?;
+    let readout_facts = decoded_packet
+        .facts
+        .iter()
+        .map(LinuxChatCoreFactPreview::from_decoded_fact)
+        .collect::<Vec<_>>();
+    let domains = spec.domains.clone();
     let index = LinuxChatCoreCacheIndex {
         profile_id: spec.profile_id.clone(),
         residual_summary: decoded_packet.summary.clone(),
@@ -734,63 +865,28 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
         schema_record_count: decoded_packet.summary.schema_record_count,
         residual_record_count: decoded_packet.summary.residual_record_count,
         fallback_record_count: decoded_packet.summary.fallback_record_count,
-        route_index,
-        readout_facts: decoded_packet
-            .facts
-            .iter()
-            .map(LinuxChatCoreFactPreview::from_decoded_fact)
-            .collect(),
-        domains: spec.domains.clone(),
+        route_index: route_index.clone(),
+        readout_facts: readout_facts.clone(),
+        domains: domains.clone(),
         overlays: spec.overlays.clone(),
         source_artifacts: source_artifacts.clone(),
         cache_contract: LinuxChatCoreCacheContract {
             compiled_from_source_hashes: true,
             no_secret_scan: true,
             hot_cache_has_no_authority_without_gate: true,
+            hot_cache_contains_binary_readout_records: true,
+            json_index_required_for_answer_authority: false,
             stale_detection_required: true,
         },
     };
     let index_bytes = serde_json::to_vec_pretty(&index)?;
-    let mut hot = Vec::new();
-    hot.extend_from_slice(HOT_MAGIC);
-    hot.extend_from_slice(spec.profile_id.as_bytes());
-    hot.extend_from_slice(b"\nsource:");
-    hot.extend_from_slice(source_hash.as_bytes());
-    hot.extend_from_slice(b"\ndomains:");
-    hot.extend_from_slice(domain_registry_hash.as_bytes());
-    hot.extend_from_slice(b"\noverlays:");
-    hot.extend_from_slice(overlay_registry_hash.as_bytes());
-    hot.extend_from_slice(b"\nroute-index:");
-    hot.extend_from_slice(route_index_hash.as_bytes());
-    hot.extend_from_slice(b"\nfacts:");
-    hot.extend_from_slice(
-        decoded_packet
-            .summary
-            .represented_fact_count
-            .to_string()
-            .as_bytes(),
-    );
-    hot.extend_from_slice(b"\nschemas:");
-    hot.extend_from_slice(
-        decoded_packet
-            .summary
-            .schema_record_count
-            .to_string()
-            .as_bytes(),
-    );
-    hot.extend_from_slice(b"\nresiduals:");
-    hot.extend_from_slice(
-        decoded_packet
-            .summary
-            .residual_record_count
-            .to_string()
-            .as_bytes(),
-    );
-    hot.extend_from_slice(b"\n");
-    for domain in &spec.domains {
-        hot.extend_from_slice(domain.domain_id.as_bytes());
-        hot.extend_from_slice(b"\0");
-    }
+    let hot_cache = LinuxChatCoreHotCache {
+        residual_summary: decoded_packet.summary.clone(),
+        route_index,
+        readout_facts,
+        domains,
+    };
+    let hot = encode_hot_cache(&hot_cache)?;
     let hot_hash = hash_bytes(&hot);
     let index_hash = hash_bytes(&index_bytes);
     let hot_path = PathBuf::from(&spec.cache.hot_path);
@@ -827,6 +923,10 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
         index_sha256: manifest.index_sha256.clone(),
         manifest_path: path_string(&manifest_path),
         manifest_sha256: hash_bytes(&manifest_bytes),
+        hot_readout_record_count: hot_cache.readout_facts.len(),
+        hot_route_record_count: hot_cache.route_index.len(),
+        hot_domain_record_count: hot_cache.domains.len(),
+        json_index_required_for_answer_authority: false,
     };
     Ok(CompiledChatCore { manifest, cache })
 }
@@ -889,11 +989,6 @@ fn evaluate_cache(
         stale_reasons.push("hot_cache_missing".to_string());
     } else if hash_file(&hot_path)? != manifest.hot_sha256 {
         stale_reasons.push("hot_cache_hash_changed".to_string());
-    }
-    if !index_present {
-        stale_reasons.push("cache_index_missing".to_string());
-    } else if hash_file(&index_path)? != manifest.index_sha256 {
-        stale_reasons.push("cache_index_hash_changed".to_string());
     }
     Ok(LinuxChatCoreCacheStatus {
         manifest_present: true,
@@ -962,11 +1057,6 @@ fn evaluate_cache_from_manifest(manifest_path: &Path) -> Result<LinuxChatCoreCac
         stale_reasons.push("hot_cache_missing".to_string());
     } else if hash_file(&hot_path)? != manifest.hot_sha256 {
         stale_reasons.push("hot_cache_hash_changed".to_string());
-    }
-    if !index_present {
-        stale_reasons.push("cache_index_missing".to_string());
-    } else if hash_file(&index_path)? != manifest.index_sha256 {
-        stale_reasons.push("cache_index_hash_changed".to_string());
     }
     Ok(LinuxChatCoreCacheStatus {
         manifest_present: true,
@@ -1152,16 +1242,247 @@ fn stable_memory_kind(value: &str) -> &'static str {
     }
 }
 
-fn load_cache_index_from_manifest(manifest_path: &Path) -> Result<LinuxChatCoreCacheIndex> {
+fn encode_hot_cache(cache: &LinuxChatCoreHotCache) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(HOT_MAGIC);
+    write_u32(&mut bytes, HOT_FORMAT_VERSION);
+    encode_summary(&mut bytes, &cache.residual_summary)?;
+    write_u64(&mut bytes, cache.route_index.len() as u64);
+    for route in &cache.route_index {
+        write_string(&mut bytes, &route.route)?;
+        write_u64(&mut bytes, route.fact_count as u64);
+        write_string_vec(&mut bytes, &route.relations)?;
+        write_string_vec(&mut bytes, &route.memory_kinds)?;
+        write_string_vec(&mut bytes, &route.polarities)?;
+    }
+    write_u64(&mut bytes, cache.domains.len() as u64);
+    for domain in &cache.domains {
+        write_string(&mut bytes, &domain.domain_id)?;
+        write_string_vec(&mut bytes, &domain.routes)?;
+        write_string_vec(&mut bytes, &domain.negative_routes)?;
+        write_string_vec(&mut bytes, &domain.overlay_ids)?;
+        write_string(&mut bytes, &domain.action_scope)?;
+    }
+    write_u64(&mut bytes, cache.readout_facts.len() as u64);
+    for fact in &cache.readout_facts {
+        write_string(&mut bytes, &fact.route)?;
+        write_string(&mut bytes, &fact.subject)?;
+        write_string(&mut bytes, &fact.subject_role)?;
+        write_string(&mut bytes, &fact.relation)?;
+        write_string(&mut bytes, &fact.object)?;
+        write_string(&mut bytes, &fact.object_role)?;
+        write_string(&mut bytes, &fact.polarity)?;
+        write_string(&mut bytes, &fact.evidence_kind)?;
+        write_u8(&mut bytes, fact.confidence);
+        write_string(&mut bytes, &fact.memory_kind)?;
+    }
+    Ok(bytes)
+}
+
+fn load_hot_cache_from_manifest(manifest_path: &Path) -> Result<LinuxChatCoreHotCache> {
     let manifest: LinuxChatCoreCacheManifest = serde_json::from_slice(
         &fs::read(manifest_path).with_context(|| format!("read {}", manifest_path.display()))?,
     )
     .with_context(|| format!("parse {}", manifest_path.display()))?;
-    let index_path = PathBuf::from(&manifest.index_path);
-    serde_json::from_slice(
-        &fs::read(&index_path).with_context(|| format!("read {}", index_path.display()))?,
-    )
-    .with_context(|| format!("parse {}", index_path.display()))
+    let hot_path = PathBuf::from(&manifest.hot_path);
+    let bytes = fs::read(&hot_path).with_context(|| format!("read {}", hot_path.display()))?;
+    if hash_bytes(&bytes) != manifest.hot_sha256 {
+        anyhow::bail!("chat-core hot cache hash mismatch: {}", hot_path.display());
+    }
+    decode_hot_cache(&bytes).with_context(|| format!("decode {}", hot_path.display()))
+}
+
+fn decode_hot_cache(bytes: &[u8]) -> Result<LinuxChatCoreHotCache> {
+    let mut pos = 0usize;
+    let magic = read_exact(bytes, &mut pos, HOT_MAGIC.len())?;
+    if magic != HOT_MAGIC {
+        anyhow::bail!("invalid chat-core hot cache magic");
+    }
+    let version = read_u32(bytes, &mut pos)?;
+    if version != HOT_FORMAT_VERSION {
+        anyhow::bail!("unsupported chat-core hot cache format: {version}");
+    }
+    let residual_summary = decode_summary(bytes, &mut pos)?;
+    let route_count = read_len(bytes, &mut pos)?;
+    let mut route_index = Vec::with_capacity(route_count);
+    for _ in 0..route_count {
+        route_index.push(LinuxChatCoreRouteIndexEntry {
+            route: read_string(bytes, &mut pos)?,
+            fact_count: read_usize(bytes, &mut pos)?,
+            relations: read_string_vec(bytes, &mut pos)?,
+            memory_kinds: read_string_vec(bytes, &mut pos)?,
+            polarities: read_string_vec(bytes, &mut pos)?,
+        });
+    }
+    let domain_count = read_len(bytes, &mut pos)?;
+    let mut domains = Vec::with_capacity(domain_count);
+    for _ in 0..domain_count {
+        domains.push(LinuxChatCoreDomainSpec {
+            domain_id: read_string(bytes, &mut pos)?,
+            routes: read_string_vec(bytes, &mut pos)?,
+            negative_routes: read_string_vec(bytes, &mut pos)?,
+            overlay_ids: read_string_vec(bytes, &mut pos)?,
+            action_scope: read_string(bytes, &mut pos)?,
+        });
+    }
+    let fact_count = read_len(bytes, &mut pos)?;
+    let mut readout_facts = Vec::with_capacity(fact_count);
+    for _ in 0..fact_count {
+        readout_facts.push(LinuxChatCoreFactPreview {
+            route: read_string(bytes, &mut pos)?,
+            subject: read_string(bytes, &mut pos)?,
+            subject_role: read_string(bytes, &mut pos)?,
+            relation: read_string(bytes, &mut pos)?,
+            object: read_string(bytes, &mut pos)?,
+            object_role: read_string(bytes, &mut pos)?,
+            polarity: read_string(bytes, &mut pos)?,
+            evidence_kind: read_string(bytes, &mut pos)?,
+            confidence: read_u8(bytes, &mut pos)?,
+            memory_kind: read_string(bytes, &mut pos)?,
+        });
+    }
+    if pos != bytes.len() {
+        anyhow::bail!("chat-core hot cache has trailing bytes");
+    }
+    Ok(LinuxChatCoreHotCache {
+        residual_summary,
+        route_index,
+        readout_facts,
+        domains,
+    })
+}
+
+fn encode_summary(bytes: &mut Vec<u8>, summary: &LinuxResidualDecodedSummary) -> Result<()> {
+    write_string(bytes, &summary.path)?;
+    write_u64(bytes, summary.file_bytes as u64);
+    write_u32(bytes, summary.wave_dim);
+    write_u64(bytes, summary.represented_fact_count as u64);
+    write_u64(bytes, summary.schema_record_count as u64);
+    write_u64(bytes, summary.residual_record_count as u64);
+    write_u64(bytes, summary.fallback_record_count as u64);
+    write_u64(bytes, summary.route_count as u64);
+    write_u64(bytes, summary.corpus_hash64);
+    write_u64(bytes, summary.promotion_threshold as u64);
+    write_u64(bytes, summary.binary_hot_sections_bytes as u64);
+    write_u64(bytes, summary.direct_fixed_baseline_bytes as u64);
+    write_u64(bytes, summary.cold_label_count as u64);
+    write_u64(bytes, summary.cold_label_table_bytes as u64);
+    write_bool(bytes, summary.binary_hot_sections_fit_6m);
+    write_bool(bytes, summary.beats_direct_fixed64);
+    Ok(())
+}
+
+fn decode_summary(bytes: &[u8], pos: &mut usize) -> Result<LinuxResidualDecodedSummary> {
+    Ok(LinuxResidualDecodedSummary {
+        path: read_string(bytes, pos)?,
+        file_bytes: read_usize(bytes, pos)?,
+        wave_dim: read_u32(bytes, pos)?,
+        represented_fact_count: read_usize(bytes, pos)?,
+        schema_record_count: read_usize(bytes, pos)?,
+        residual_record_count: read_usize(bytes, pos)?,
+        fallback_record_count: read_usize(bytes, pos)?,
+        route_count: read_usize(bytes, pos)?,
+        corpus_hash64: read_u64(bytes, pos)?,
+        promotion_threshold: read_usize(bytes, pos)?,
+        binary_hot_sections_bytes: read_usize(bytes, pos)?,
+        direct_fixed_baseline_bytes: read_usize(bytes, pos)?,
+        cold_label_count: read_usize(bytes, pos)?,
+        cold_label_table_bytes: read_usize(bytes, pos)?,
+        binary_hot_sections_fit_6m: read_bool(bytes, pos)?,
+        beats_direct_fixed64: read_bool(bytes, pos)?,
+    })
+}
+
+fn write_u8(bytes: &mut Vec<u8>, value: u8) {
+    bytes.push(value);
+}
+
+fn write_bool(bytes: &mut Vec<u8>, value: bool) {
+    write_u8(bytes, u8::from(value));
+}
+
+fn write_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn write_u64(bytes: &mut Vec<u8>, value: u64) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn write_string(bytes: &mut Vec<u8>, value: &str) -> Result<()> {
+    write_u32(bytes, value.len().try_into()?);
+    bytes.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+
+fn write_string_vec(bytes: &mut Vec<u8>, values: &[String]) -> Result<()> {
+    write_u64(bytes, values.len() as u64);
+    for value in values {
+        write_string(bytes, value)?;
+    }
+    Ok(())
+}
+
+fn read_exact<'a>(bytes: &'a [u8], pos: &mut usize, len: usize) -> Result<&'a [u8]> {
+    let end = pos
+        .checked_add(len)
+        .context("chat-core hot cache offset overflow")?;
+    let slice = bytes
+        .get(*pos..end)
+        .context("truncated chat-core hot cache")?;
+    *pos = end;
+    Ok(slice)
+}
+
+fn read_u8(bytes: &[u8], pos: &mut usize) -> Result<u8> {
+    Ok(*read_exact(bytes, pos, 1)?
+        .first()
+        .context("truncated chat-core u8")?)
+}
+
+fn read_bool(bytes: &[u8], pos: &mut usize) -> Result<bool> {
+    match read_u8(bytes, pos)? {
+        0 => Ok(false),
+        1 => Ok(true),
+        value => anyhow::bail!("invalid chat-core bool: {value}"),
+    }
+}
+
+fn read_u32(bytes: &[u8], pos: &mut usize) -> Result<u32> {
+    let mut raw = [0u8; 4];
+    raw.copy_from_slice(read_exact(bytes, pos, 4)?);
+    Ok(u32::from_le_bytes(raw))
+}
+
+fn read_u64(bytes: &[u8], pos: &mut usize) -> Result<u64> {
+    let mut raw = [0u8; 8];
+    raw.copy_from_slice(read_exact(bytes, pos, 8)?);
+    Ok(u64::from_le_bytes(raw))
+}
+
+fn read_usize(bytes: &[u8], pos: &mut usize) -> Result<usize> {
+    Ok(read_u64(bytes, pos)?.try_into()?)
+}
+
+fn read_len(bytes: &[u8], pos: &mut usize) -> Result<usize> {
+    read_usize(bytes, pos)
+}
+
+fn read_string(bytes: &[u8], pos: &mut usize) -> Result<String> {
+    let len = read_u32(bytes, pos)? as usize;
+    let raw = read_exact(bytes, pos, len)?;
+    Ok(std::str::from_utf8(raw)
+        .context("chat-core hot cache string is not UTF-8")?
+        .to_string())
+}
+
+fn read_string_vec(bytes: &[u8], pos: &mut usize) -> Result<Vec<String>> {
+    let len = read_len(bytes, pos)?;
+    let mut values = Vec::with_capacity(len);
+    for _ in 0..len {
+        values.push(read_string(bytes, pos)?);
+    }
+    Ok(values)
 }
 
 fn source_status(artifacts: &[LinuxChatCoreArtifactDigest]) -> LinuxChatCoreSourceStatus {
@@ -1215,7 +1536,7 @@ fn cache_token_economics(
         cache_estimated_tokens: estimate_tokens_from_bytes(cache_total_bytes),
         cache_vs_source_bytes_ratio: ratio_f32(cache_total_bytes, source_artifacts_bytes),
         cache_is_runtime_index_not_prompt_payload: true,
-        note: "This estimates prompt/context scale only. The full cache index is a runtime readout, not a prompt payload. It is not a model-specific BPE tokenizer count.",
+        note: "This estimates prompt/context scale only. The binary hot cache is a runtime readout, and the JSON index is debug/explain only; neither is a prompt payload. It is not a model-specific BPE tokenizer count.",
     }
 }
 
@@ -1458,6 +1779,65 @@ mod tests {
         assert_eq!(structured.subject, "bash");
         assert_eq!(structured.object, "bash");
         assert_eq!(structured.memory_kind, "residual");
+    }
+
+    #[test]
+    fn chat_core_hot_cache_roundtrip_contains_binary_readout() {
+        let cache = LinuxChatCoreHotCache {
+            residual_summary: LinuxResidualDecodedSummary {
+                path: "unit.lrf".to_string(),
+                file_bytes: 128,
+                wave_dim: 1024,
+                represented_fact_count: 1,
+                schema_record_count: 1,
+                residual_record_count: 1,
+                fallback_record_count: 0,
+                route_count: 1,
+                corpus_hash64: 42,
+                promotion_threshold: 2,
+                binary_hot_sections_bytes: 64,
+                direct_fixed_baseline_bytes: 64,
+                cold_label_count: 3,
+                cold_label_table_bytes: 96,
+                binary_hot_sections_fit_6m: true,
+                beats_direct_fixed64: true,
+            },
+            route_index: vec![LinuxChatCoreRouteIndexEntry {
+                route: "linux.apt.command.package-command".to_string(),
+                fact_count: 1,
+                relations: vec!["provides command".to_string()],
+                memory_kinds: vec!["residual".to_string()],
+                polarities: vec!["positive".to_string()],
+            }],
+            readout_facts: vec![LinuxChatCoreFactPreview {
+                route: "linux.apt.command.package-command".to_string(),
+                subject: "bash".to_string(),
+                subject_role: "package".to_string(),
+                relation: "provides command".to_string(),
+                object: "bash".to_string(),
+                object_role: "command".to_string(),
+                polarity: "positive".to_string(),
+                evidence_kind: "package_metadata".to_string(),
+                confidence: 82,
+                memory_kind: "residual".to_string(),
+            }],
+            domains: vec![LinuxChatCoreDomainSpec {
+                domain_id: "packages".to_string(),
+                routes: vec!["linux.apt.command.package-command".to_string()],
+                negative_routes: vec![],
+                overlay_ids: vec!["dialogue".to_string()],
+                action_scope: "read_only_answer_support".to_string(),
+            }],
+        };
+        let bytes = encode_hot_cache(&cache).unwrap();
+        assert!(bytes.starts_with(HOT_MAGIC));
+        assert!(bytes.len() > 128);
+        let decoded = decode_hot_cache(&bytes).unwrap();
+        assert_eq!(decoded.readout_facts.len(), 1);
+        assert_eq!(decoded.route_index.len(), 1);
+        assert_eq!(decoded.domains.len(), 1);
+        assert_eq!(decoded.readout_facts[0].subject, "bash");
+        assert_eq!(decoded.readout_facts[0].object, "bash");
     }
 
     #[test]

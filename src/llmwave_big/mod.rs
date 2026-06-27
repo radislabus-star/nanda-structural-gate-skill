@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use super::{nanda_6m, OutputFormat, CORE_VERSION, EXIT_PASS, EXIT_WATCH, WAVE_DIM};
 
@@ -1784,37 +1784,24 @@ struct LlmwaveBigLinuxProfileClaimGateArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigLinuxChatCoreBuildArgs {
-    #[arg(
-        long = "profile",
-        default_value = linux_chat_core::DEFAULT_LINUX_CHAT_CORE_PROFILE
-    )]
-    profile: PathBuf,
-    #[arg(
-        long = "residual-pack",
-        default_value = ".nanda/linux-active/linux-active-65k.lrf"
-    )]
-    residual_pack: PathBuf,
-    #[arg(
-        long = "dialogue-overlay",
-        default_value = ".nanda/linux-active/linux-chat-profile.lwm"
-    )]
-    dialogue_overlay: PathBuf,
-    #[arg(
-        long = "centers-overlay",
-        default_value = ".nanda/linux-active/linux-center-learning.lwm"
-    )]
-    centers_overlay: PathBuf,
-    #[arg(
-        long = "vpn-overlay",
-        default_value = ".nanda/linux-active/linux-chat-profile-vpn.lwm"
-    )]
-    vpn_overlay: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "profile")]
+    profile: Option<PathBuf>,
+    #[arg(long = "residual-pack")]
+    residual_pack: Option<PathBuf>,
+    #[arg(long = "dialogue-overlay")]
+    dialogue_overlay: Option<PathBuf>,
+    #[arg(long = "centers-overlay")]
+    centers_overlay: Option<PathBuf>,
+    #[arg(long = "vpn-overlay")]
+    vpn_overlay: Option<PathBuf>,
     #[arg(long = "broad-eval")]
     broad_eval: Option<PathBuf>,
     #[arg(long = "heldout-eval")]
     heldout_eval: Option<PathBuf>,
-    #[arg(long = "cache-dir", default_value = ".nanda/linux-active/cache")]
-    cache_dir: PathBuf,
+    #[arg(long = "cache-dir")]
+    cache_dir: Option<PathBuf>,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -1823,39 +1810,26 @@ struct LlmwaveBigLinuxChatCoreBuildArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigLinuxChatCoreGateArgs {
-    #[arg(
-        long = "profile",
-        default_value = linux_chat_core::DEFAULT_LINUX_CHAT_CORE_PROFILE
-    )]
-    profile: PathBuf,
-    #[arg(
-        long = "residual-pack",
-        default_value = ".nanda/linux-active/linux-active-65k.lrf"
-    )]
-    residual_pack: PathBuf,
-    #[arg(
-        long = "dialogue-overlay",
-        default_value = ".nanda/linux-active/linux-chat-profile.lwm"
-    )]
-    dialogue_overlay: PathBuf,
-    #[arg(
-        long = "centers-overlay",
-        default_value = ".nanda/linux-active/linux-center-learning.lwm"
-    )]
-    centers_overlay: PathBuf,
-    #[arg(
-        long = "vpn-overlay",
-        default_value = ".nanda/linux-active/linux-chat-profile-vpn.lwm"
-    )]
-    vpn_overlay: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "profile")]
+    profile: Option<PathBuf>,
+    #[arg(long = "residual-pack")]
+    residual_pack: Option<PathBuf>,
+    #[arg(long = "dialogue-overlay")]
+    dialogue_overlay: Option<PathBuf>,
+    #[arg(long = "centers-overlay")]
+    centers_overlay: Option<PathBuf>,
+    #[arg(long = "vpn-overlay")]
+    vpn_overlay: Option<PathBuf>,
     #[arg(long = "broad-eval")]
     broad_eval: Option<PathBuf>,
     #[arg(long = "heldout-eval")]
     heldout_eval: Option<PathBuf>,
     #[arg(long = "center-learning-script")]
     center_learning_script: Option<PathBuf>,
-    #[arg(long = "cache-dir", default_value = ".nanda/linux-active/cache")]
-    cache_dir: PathBuf,
+    #[arg(long = "cache-dir")]
+    cache_dir: Option<PathBuf>,
     #[arg(long = "manifest")]
     manifest: Option<PathBuf>,
     #[arg(long = "rebuild-cache", default_value_t = false)]
@@ -1872,28 +1846,18 @@ struct LlmwaveBigLinuxChatCoreGateArgs {
 struct LlmwaveBigLinuxChatCoreAskArgs {
     #[arg(long = "text")]
     text: String,
-    #[arg(
-        long = "residual-pack",
-        default_value = ".nanda/linux-active/linux-active-65k.lrf"
-    )]
-    residual_pack: PathBuf,
-    #[arg(
-        long = "dialogue-overlay",
-        default_value = ".nanda/linux-active/linux-chat-profile.lwm"
-    )]
-    dialogue_overlay: PathBuf,
-    #[arg(
-        long = "centers-overlay",
-        default_value = ".nanda/linux-active/linux-center-learning.lwm"
-    )]
-    centers_overlay: PathBuf,
-    #[arg(
-        long = "vpn-overlay",
-        default_value = ".nanda/linux-active/linux-chat-profile-vpn.lwm"
-    )]
-    vpn_overlay: PathBuf,
-    #[arg(long = "cache-dir", default_value = ".nanda/linux-active/cache")]
-    cache_dir: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "residual-pack")]
+    residual_pack: Option<PathBuf>,
+    #[arg(long = "dialogue-overlay")]
+    dialogue_overlay: Option<PathBuf>,
+    #[arg(long = "centers-overlay")]
+    centers_overlay: Option<PathBuf>,
+    #[arg(long = "vpn-overlay")]
+    vpn_overlay: Option<PathBuf>,
+    #[arg(long = "cache-dir")]
+    cache_dir: Option<PathBuf>,
     #[arg(long = "manifest")]
     manifest: Option<PathBuf>,
     #[arg(long = "max-facts", default_value_t = 4)]
@@ -1902,6 +1866,84 @@ struct LlmwaveBigLinuxChatCoreAskArgs {
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
     format: OutputFormat,
+}
+
+struct ResolvedLinuxChatCorePaths {
+    profile: PathBuf,
+    residual_pack: PathBuf,
+    dialogue_overlay: PathBuf,
+    centers_overlay: PathBuf,
+    vpn_overlay: PathBuf,
+    broad_eval: Option<PathBuf>,
+    heldout_eval: Option<PathBuf>,
+    cache_dir: PathBuf,
+}
+
+struct LinuxChatCorePathOverrides {
+    profile: Option<PathBuf>,
+    residual_pack: Option<PathBuf>,
+    dialogue_overlay: Option<PathBuf>,
+    centers_overlay: Option<PathBuf>,
+    vpn_overlay: Option<PathBuf>,
+    broad_eval: Option<PathBuf>,
+    heldout_eval: Option<PathBuf>,
+    cache_dir: Option<PathBuf>,
+}
+
+fn resolve_linux_chat_core_paths(
+    memory_root: Option<PathBuf>,
+    overrides: LinuxChatCorePathOverrides,
+) -> ResolvedLinuxChatCorePaths {
+    let root = normalize_existing_path(
+        memory_root.unwrap_or_else(|| PathBuf::from(".nanda/linux-active")),
+    );
+    let root_profile = root.join("chat-core.profile.json");
+    let default_profile = if root_profile.exists() {
+        normalize_existing_path(root_profile)
+    } else {
+        normalize_existing_path(PathBuf::from(
+            linux_chat_core::DEFAULT_LINUX_CHAT_CORE_PROFILE,
+        ))
+    };
+    let optional_existing = |path: PathBuf| path.exists().then(|| normalize_existing_path(path));
+    ResolvedLinuxChatCorePaths {
+        profile: overrides
+            .profile
+            .map(normalize_existing_path)
+            .unwrap_or(default_profile),
+        residual_pack: overrides
+            .residual_pack
+            .map(normalize_existing_path)
+            .unwrap_or_else(|| root.join("linux-active-65k.lrf")),
+        dialogue_overlay: overrides
+            .dialogue_overlay
+            .map(normalize_existing_path)
+            .unwrap_or_else(|| root.join("linux-chat-profile.lwm")),
+        centers_overlay: overrides
+            .centers_overlay
+            .map(normalize_existing_path)
+            .unwrap_or_else(|| root.join("linux-center-learning.lwm")),
+        vpn_overlay: overrides
+            .vpn_overlay
+            .map(normalize_existing_path)
+            .unwrap_or_else(|| root.join("linux-chat-profile-vpn.lwm")),
+        broad_eval: overrides
+            .broad_eval
+            .map(normalize_existing_path)
+            .or_else(|| optional_existing(root.join("linux-broad-eval.json"))),
+        heldout_eval: overrides
+            .heldout_eval
+            .map(normalize_existing_path)
+            .or_else(|| optional_existing(root.join("linux-heldout-eval.json"))),
+        cache_dir: overrides
+            .cache_dir
+            .map(normalize_existing_path)
+            .unwrap_or_else(|| root.join("cache")),
+    }
+}
+
+fn normalize_existing_path(path: PathBuf) -> PathBuf {
+    fs::canonicalize(&path).unwrap_or(path)
 }
 
 #[derive(Parser)]
@@ -4571,8 +4613,9 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::LinuxChatCoreBuild(args) => {
-            let report = linux_chat_core::build_linux_chat_core_cache_report(
-                linux_chat_core::LinuxChatCoreBuildConfig {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
                     profile: args.profile,
                     residual_pack: args.residual_pack,
                     dialogue_overlay: args.dialogue_overlay,
@@ -4581,6 +4624,18 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     broad_eval: args.broad_eval,
                     heldout_eval: args.heldout_eval,
                     cache_dir: args.cache_dir,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_cache_report(
+                linux_chat_core::LinuxChatCoreBuildConfig {
+                    profile: paths.profile,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    broad_eval: paths.broad_eval,
+                    heldout_eval: paths.heldout_eval,
+                    cache_dir: paths.cache_dir,
                     out: args.out,
                 },
             )?;
@@ -4590,7 +4645,20 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!("{}", report.verdict);
                     println!("profile_id: {}", report.spec.profile_id);
                     println!("hot_path: {}", report.cache.hot_path);
+                    println!("hot_bytes: {}", report.cache.hot_bytes);
+                    println!(
+                        "hot_readout_record_count: {}",
+                        report.cache.hot_readout_record_count
+                    );
+                    println!(
+                        "hot_domain_record_count: {}",
+                        report.cache.hot_domain_record_count
+                    );
                     println!("index_path: {}", report.cache.index_path);
+                    println!(
+                        "json_index_required_for_answer_authority: {}",
+                        report.cache.json_index_required_for_answer_authority
+                    );
                     println!("manifest_path: {}", report.cache.manifest_path);
                     println!(
                         "cache_is_source_of_truth: {}",
@@ -4617,6 +4685,15 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!("- verdict: `{}`", report.verdict);
                     println!("- profile: `{}`", report.spec.profile_id);
                     println!("- hot cache: `{}`", report.cache.hot_path);
+                    println!("- hot bytes: `{}`", report.cache.hot_bytes);
+                    println!(
+                        "- hot readout records: `{}`",
+                        report.cache.hot_readout_record_count
+                    );
+                    println!(
+                        "- JSON index required for answer authority: `{}`",
+                        report.cache.json_index_required_for_answer_authority
+                    );
                     println!("- index: `{}`", report.cache.index_path);
                     println!("- manifest: `{}`", report.cache.manifest_path);
                     println!(
@@ -4628,8 +4705,9 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::LinuxChatCoreGate(args) => {
-            let report = linux_chat_core::build_linux_chat_core_gate_report(
-                linux_chat_core::LinuxChatCoreGateConfig {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
                     profile: args.profile,
                     residual_pack: args.residual_pack,
                     dialogue_overlay: args.dialogue_overlay,
@@ -4637,8 +4715,20 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     vpn_overlay: args.vpn_overlay,
                     broad_eval: args.broad_eval,
                     heldout_eval: args.heldout_eval,
-                    center_learning_script: args.center_learning_script,
                     cache_dir: args.cache_dir,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_gate_report(
+                linux_chat_core::LinuxChatCoreGateConfig {
+                    profile: paths.profile,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    broad_eval: paths.broad_eval,
+                    heldout_eval: paths.heldout_eval,
+                    center_learning_script: args.center_learning_script,
+                    cache_dir: paths.cache_dir,
                     manifest: args.manifest,
                     rebuild_cache: args.rebuild_cache,
                     max_facts: args.max_facts,
@@ -4650,6 +4740,8 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 OutputFormat::Text => {
                     println!("{}", report.verdict);
                     println!("cache_fresh: {}", report.cache_status.cache_fresh);
+                    println!("hot_present: {}", report.cache_status.hot_present);
+                    println!("debug_index_present: {}", report.cache_status.index_present);
                     println!("safe_to_use_cache: {}", report.chat_core.safe_to_use_cache);
                     println!(
                         "safe_to_answer_from_cache: {}",
@@ -4676,6 +4768,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!();
                     println!("- verdict: `{}`", report.verdict);
                     println!("- cache fresh: `{}`", report.cache_status.cache_fresh);
+                    println!("- hot present: `{}`", report.cache_status.hot_present);
+                    println!(
+                        "- debug index present: `{}`",
+                        report.cache_status.index_present
+                    );
                     println!(
                         "- safe to answer from cache: `{}`",
                         report.chat_core.safe_to_answer_from_cache
@@ -4689,14 +4786,27 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             Ok(EXIT_PASS)
         }
         LlmwaveBigCommand::LinuxChatCoreAsk(args) => {
-            let report = linux_chat_core::build_linux_chat_core_ask_report(
-                linux_chat_core::LinuxChatCoreAskConfig {
-                    text: args.text,
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: None,
                     residual_pack: args.residual_pack,
                     dialogue_overlay: args.dialogue_overlay,
                     centers_overlay: args.centers_overlay,
                     vpn_overlay: args.vpn_overlay,
+                    broad_eval: None,
+                    heldout_eval: None,
                     cache_dir: args.cache_dir,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_ask_report(
+                linux_chat_core::LinuxChatCoreAskConfig {
+                    text: args.text,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    cache_dir: paths.cache_dir,
                     manifest: args.manifest,
                     max_facts: args.max_facts,
                     out: args.out,
@@ -4708,6 +4818,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!("{}", report.verdict);
                     println!("cache_fresh: {}", report.cache_status.cache_fresh);
                     println!("answer_allowed: {}", report.grounded_packet.answer_allowed);
+                    println!("readout_source: {}", report.grounded_packet.readout_source);
+                    println!(
+                        "domain_suites: {}",
+                        report.grounded_packet.domain_suites.join(",")
+                    );
                     println!("state: {}", report.grounded_packet.decision_state);
                     println!("answer: {}", report.grounded_packet.answer);
                     println!(
@@ -4739,6 +4854,10 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- answer allowed: `{}`",
                         report.grounded_packet.answer_allowed
+                    );
+                    println!(
+                        "- readout source: `{}`",
+                        report.grounded_packet.readout_source
                     );
                     println!("- state: `{}`", report.grounded_packet.decision_state);
                     println!("- answer: {}", report.grounded_packet.answer);

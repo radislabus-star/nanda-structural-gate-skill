@@ -1396,14 +1396,15 @@ drift-budget enforcement, no false-positive regression, no heldout regression,
 and unrelated-route preservation, do not promote the chat profile.
 Prefer `nanda-llmwave-big linux-chat-core-build` plus
 `nanda-llmwave-big linux-chat-core-gate` when the task is to use the Linux
-profile as Codex/LLM memory. ChatCore loads
-`examples/linux-chat-core.profile.json`, treats `.lrf` plus `.lwm` overlays as
-source memory, and compiles a cache view:
+profile as Codex/LLM memory. The normal interface is `--memory-root
+.nanda/linux-active`; explicit source flags are overrides. ChatCore treats
+`.lrf` plus `.lwm` overlays as source memory, and compiles a binary hot cache
+view:
 
 ```bash
-nanda-llmwave-big linux-chat-core-build --profile examples/linux-chat-core.profile.json --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --cache-dir .nanda/linux-active/cache --format json
-nanda-llmwave-big linux-chat-core-gate --profile examples/linux-chat-core.profile.json --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --center-learning-script examples/linux-center-learning.script --cache-dir .nanda/linux-active/cache --max-facts 4 --format json
-nanda-llmwave-big linux-chat-core-ask --text "which package provides command bash" --cache-dir .nanda/linux-active/cache --format json
+nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
+nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
+nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --format json
 ```
 
 Read ChatCore literally: cache is a compiled runtime view, not source memory.
@@ -1416,15 +1417,18 @@ implicit build. It writes cache only with explicit `--rebuild-cache`; prefer
 older Linux profile gate as a compatibility subgate on scratch `.lwm` eval files
 so it does not mutate source overlays. Inspect `token_economics` before claiming
 the cache saves context: estimates use `ceil(bytes / 4)` and compare compact
-grounded packets against source/cache-index size, not exact model tokenizer
-counts. `linux-chat-core-ask` is the
-compact grounded-packet surface for Codex/LLM use: it refuses stale source
-overrides, reads the compiled cache-index readout projection, then returns
-intent, route priors, answer state, structured `evidence[]`, legacy
+grounded packets against source/runtime-cache size, not exact model tokenizer
+counts. `chat-core.hot` is the answer-authority binary runtime readout;
+`chat-core.index.json` is debug/explain only. A missing JSON index must not
+force `ask` back to source decoding when `.hot` and source hashes still match.
+`linux-chat-core-ask` is the compact grounded-packet surface for Codex/LLM use:
+it refuses stale source overrides, reads `chat-core.hot`, reports
+`readout_source="compiled_chat_core_hot"`, then returns intent, route priors,
+answer state, selected domain suites, structured `evidence[]`, legacy
 `compact_evidence`, and anti-wave hits. Treat
 `cache_is_runtime_index_not_prompt_payload=true` as a hard interpretation rule:
-the full cache index is a runtime readout, not prompt context; use only the
-grounded packet as the small external memory payload. Treat
+the hot cache is a runtime readout, not prompt context; use only the grounded
+packet as the small external memory payload. Treat
 `LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as Linux-profile cache
 readiness only; general LLM, open-domain chat, scanner, and global nonlinear
 claims remain blocked.

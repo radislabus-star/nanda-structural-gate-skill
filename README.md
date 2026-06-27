@@ -802,17 +802,19 @@ and proves `spectral_center.verdict = LINUX_SPECTRAL_CENTER_PROVEN`. It is still
 not broad chat readiness and not exposure reasoning.
 
 `linux-chat-core-build` and `linux-chat-core-gate` are the unified Linux
-ChatCore memory/cache layer. ChatCore loads
-`examples/linux-chat-core.profile.json`, treats `.lrf v2` plus `.lwm` overlays
-as source memory, then compiles a fast cache view:
+ChatCore memory/cache layer. The normal entrypoint is `--memory-root
+.nanda/linux-active`; explicit `--profile`, `--residual-pack`, `--*-overlay`,
+`--*-eval`, and `--cache-dir` flags are source overrides for tests or unusual
+layouts. ChatCore treats `.lrf v2` plus `.lwm` overlays as source memory, then
+compiles a binary hot cache view:
 
 ```text
 .nanda/linux-active/linux-active-65k.lrf
 .nanda/linux-active/linux-chat-profile.lwm
 .nanda/linux-active/linux-center-learning.lwm
 .nanda/linux-active/linux-chat-profile-vpn.lwm
-  -> .nanda/linux-active/cache/chat-core.hot
-  -> .nanda/linux-active/cache/chat-core.index.json
+  -> .nanda/linux-active/cache/chat-core.hot         # binary runtime readout
+  -> .nanda/linux-active/cache/chat-core.index.json  # debug/explain artifact
   -> .nanda/linux-active/cache/chat-core.manifest.json
 ```
 
@@ -826,22 +828,24 @@ write cache artifacts. The old `linux-chat-profile-gate` remains a
 compatibility gate; the preferred Linux-profile entrypoint is now:
 
 ```bash
-nanda-llmwave-big linux-chat-core-build --profile examples/linux-chat-core.profile.json --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --cache-dir .nanda/linux-active/cache --format json
-nanda-llmwave-big linux-chat-core-gate --profile examples/linux-chat-core.profile.json --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --center-learning-script examples/linux-center-learning.script --cache-dir .nanda/linux-active/cache --max-facts 4 --format json
-nanda-llmwave-big linux-chat-core-ask --text "which package provides command bash" --cache-dir .nanda/linux-active/cache --format json
+nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
+nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
+nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --format json
 ```
 
 `linux-chat-core-ask` is the intended compact packet surface for Codex/LLM use:
-it refuses stale cache, reads the compiled cache-index readout projection, and
-returns intent, route priors, answer state, structured `evidence[]`, legacy
-`compact_evidence`, and anti-wave hits. `ask` rechecks the source paths passed
-on the CLI against the manifest; an override mismatch returns stale instead of
-answering from an old cache. Inspect `token_economics` to estimate how many
-prompt tokens the compact packet saves versus sending the source artifacts or
-the whole cache index. The estimate is `ceil(bytes / 4)`, not an exact model
-tokenizer count. Read `cache_is_runtime_index_not_prompt_payload=true`
-literally: the index is a runtime readout, not something to paste into prompt
-context. Treat
+it refuses stale cache, reads `chat-core.hot` directly, reports
+`readout_source="compiled_chat_core_hot"`, and returns intent, route priors,
+answer state, structured `evidence[]`, legacy `compact_evidence`, domain suites,
+and anti-wave hits. `chat-core.index.json` is not answer authority and may be
+deleted without blocking `ask` if the binary `.hot` and source hashes still
+match. `ask` rechecks the source paths passed on the CLI against the manifest;
+an override mismatch returns stale instead of answering from an old cache.
+Inspect `token_economics` to estimate how many prompt tokens the compact packet
+saves versus sending the source artifacts or the full runtime cache. The
+estimate is `ceil(bytes / 4)`, not an exact model tokenizer count. Read
+`cache_is_runtime_index_not_prompt_payload=true` literally: the hot cache is a
+runtime readout, not something to paste into prompt context. Treat
 `LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as Linux-profile cache
 readiness only: it is not open-domain chat, not a general LLM, and not global
 nonlinear-memory proof.
@@ -2507,7 +2511,9 @@ local gates: PASS per pair
 Run local tests:
 
 ```bash
-scripts/test-local.sh
+scripts/test-local.sh                 # default: changed-file checks
+scripts/test-local.sh --suite chatcore # fast Linux ChatCore hot-cache readout
+scripts/test-local.sh --suite chatcore-build # slow rebuild + gate
 scripts/benchmark-v0.sh
 scripts/test-edge-cases.sh
 ```
@@ -2520,7 +2526,7 @@ Release notes are maintained in [CHANGELOG.md](CHANGELOG.md). Before tagging a
 release, run:
 
 ```bash
-scripts/test-local.sh
+scripts/test-local.sh --full
 scripts/test-edge-cases.sh
 scripts/benchmark-v0.sh
 nanda-doctor

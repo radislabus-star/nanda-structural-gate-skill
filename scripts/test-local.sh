@@ -2,6 +2,86 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+test_local_suite="${NANDA_TEST_LOCAL_SUITE:-changed}"
+case "${NANDA_TEST_LOCAL_MODE:-}" in
+  fast)
+    test_local_suite="changed"
+    ;;
+  full)
+    test_local_suite="full"
+    ;;
+  "")
+    ;;
+  *)
+    test_local_suite="$NANDA_TEST_LOCAL_MODE"
+    ;;
+esac
+case "${NANDA_TEST_LOCAL_FULL:-0}" in
+  1|true|TRUE|yes|YES|full|FULL)
+    test_local_suite="full"
+    ;;
+esac
+while (($#)); do
+  arg="$1"
+  case "$arg" in
+    --fast)
+      test_local_suite="chatcore"
+      ;;
+    --full)
+      test_local_suite="full"
+      ;;
+    --suite)
+      shift
+      if (($# == 0)); then
+        echo "--suite requires a value" >&2
+        exit 2
+      fi
+      test_local_suite="$1"
+      ;;
+    --suite=*)
+      test_local_suite="${arg#--suite=}"
+      ;;
+    --help|-h)
+      cat <<'EOF'
+Usage: scripts/test-local.sh [--suite changed|smoke|chatcore|chatcore-build|field|wrappers|full]
+       scripts/test-local.sh [--fast|--full]
+
+Runs the local regression suite.
+
+Suites:
+  changed    Default. Inspect git changed files and run only relevant route
+             checks. This is the mode to use after ordinary edits.
+  smoke      Fast baseline: fmt, check, build, version, skill readiness,
+             edge cases. No Linux ChatCore rebuild.
+  chatcore   Fast Linux ChatCore ask/no-index/stale checks over existing `.hot`.
+  chatcore-build
+             Heavy Linux ChatCore rebuild + gate + fast ChatCore checks.
+  field      Heavy field-core sole-engine audit only.
+  wrappers   CLI wrapper/help smoke only.
+  full       Legacy full release/audit sweep across the historical LLMWave
+             roadmap and all wrappers. Slow by design.
+
+Environment:
+  NANDA_TEST_LOCAL_FULL=1   Same as --full.
+  NANDA_TEST_LOCAL_MODE=full|fast|changed|smoke|chatcore|chatcore-build|field|wrappers
+  NANDA_TEST_LOCAL_SUITE=changed|smoke|chatcore|chatcore-build|field|wrappers|full
+EOF
+      exit 0
+      ;;
+    *)
+      echo "unknown test-local argument: $arg" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+case "$test_local_suite" in
+  changed|smoke|chatcore|chatcore-build|field|wrappers|full) ;;
+  *)
+    echo "unknown test-local suite: $test_local_suite" >&2
+    exit 2
+    ;;
+esac
 checker="$root/nanda-structural-gate/scripts/nanda-check"
 gate="$root/nanda-structural-gate/scripts/nanda-gate"
 init_task="$root/nanda-structural-gate/scripts/nanda-init-task"
@@ -57,6 +137,204 @@ field_audit="$root/nanda-structural-gate/scripts/nanda-field-audit"
 field_equivalence="$root/nanda-structural-gate/scripts/nanda-field-equivalence"
 field_cutover="$root/nanda-structural-gate/scripts/nanda-field-cutover"
 field_plate="$root/nanda-structural-gate/scripts/nanda-field-plate"
+
+run_rust_baseline() {
+  cargo fmt --check --manifest-path "$root/Cargo.toml"
+  cargo check --manifest-path "$root/Cargo.toml" >/dev/null
+}
+
+run_version_readiness() {
+  version_text="$("$root/target/debug/nanda" --version)"
+  grep -q '^nanda ' <<<"$version_text"
+  grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
+  grep -q 'nanda_6m:' <<<"$version_text"
+
+  skill_readiness_json="$("$skill_readiness" --format json)"
+  jq -e '.mode == "nanda-skill-readiness" and .verdict == "PUBLIC_V1_READY" and .public_v1_ready == true and (.blockers | length) == 0' <<<"$skill_readiness_json" >/dev/null
+  jq -e '.claim_boundary.structural_gate_ready == true and .claim_boundary.broad_chat_llm_ready == false and .claim_boundary.nonlinear_memory_proven == false and .claim_boundary.hardware_cache_residency_counter_proven == false' <<<"$skill_readiness_json" >/dev/null
+}
+
+run_smoke_suite() {
+  git -C "$root" diff --check
+  run_rust_baseline
+  cargo build --manifest-path "$root/Cargo.toml" >/dev/null
+  run_version_readiness
+  "$root/scripts/test-edge-cases.sh" >/dev/null
+}
+
+run_chatcore_suite() {
+  cargo test --manifest-path "$root/Cargo.toml" linux_chat_core >/dev/null
+  [[ -f "$root/.nanda/linux-active/linux-active-65k.lrf" ]] || return 0
+
+  chat_core_ask_json="$("$llmwave_big" linux-chat-core-ask --memory-root "$root/.nanda/linux-active" --text "which package provides command bash" --format json)"
+  jq -e '.verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .grounded_packet.answer_allowed == true and .grounded_packet.readout_source == "compiled_chat_core_hot" and (.grounded_packet.domain_suites | index("packages")) and (.grounded_packet.evidence[] | select(.subject == "bash" and .object == "bash"))' <<<"$chat_core_ask_json" >/dev/null
+
+  chat_index_path="$root/.nanda/linux-active/cache/chat-core.index.json"
+  if [[ -f "$chat_index_path" ]]; then
+    tmp_chat_index="$(mktemp)"
+    restore_chat_index() {
+      if [[ -n "${tmp_chat_index:-}" && -f "$tmp_chat_index" ]]; then
+        mv "$tmp_chat_index" "$chat_index_path"
+      fi
+    }
+    trap restore_chat_index EXIT
+    mv "$chat_index_path" "$tmp_chat_index"
+    chat_core_no_index_json="$("$llmwave_big" linux-chat-core-ask --memory-root "$root/.nanda/linux-active" --text "which package provides command bash" --format json)"
+    jq -e '.verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .cache_status.index_present == false and .grounded_packet.readout_source == "compiled_chat_core_hot" and .grounded_packet.answer_allowed == true' <<<"$chat_core_no_index_json" >/dev/null
+    restore_chat_index
+    trap - EXIT
+  fi
+
+  tmp_dialogue_overlay="$(mktemp)"
+  cp "$root/.nanda/linux-active/linux-chat-profile.lwm" "$tmp_dialogue_overlay"
+  printf '\n# mutated changed stale check\n' >>"$tmp_dialogue_overlay"
+  chat_core_stale_json="$("$llmwave_big" linux-chat-core-ask --memory-root "$root/.nanda/linux-active" --dialogue-overlay "$tmp_dialogue_overlay" --text "which package provides command bash" --format json)"
+  rm -f "$tmp_dialogue_overlay"
+  jq -e '.verdict == "LINUX_CHAT_CORE_CACHE_STALE" and .cache_status.cache_fresh == false and .grounded_packet.answer_allowed == false and .grounded_packet.decision_state == "CACHE_STALE_NO_AUTHORITY" and (.cache_status.stale_reasons | index("source_memory_hash_changed"))' <<<"$chat_core_stale_json" >/dev/null
+}
+
+run_chatcore_build_suite() {
+  run_rust_baseline
+  [[ -f "$root/.nanda/linux-active/linux-active-65k.lrf" ]] || return 0
+
+  chat_core_build_json="$("$llmwave_big" linux-chat-core-build --memory-root "$root/.nanda/linux-active" --format json)"
+  jq -e '.verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .cache.hot_readout_record_count > 0 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_build_json" >/dev/null
+
+  chat_core_gate_json="$("$llmwave_big" linux-chat-core-gate --memory-root "$root/.nanda/linux-active" --format json)"
+  jq -e '.verdict == "LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .chat_core.safe_to_answer_from_cache == true and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_gate_json" >/dev/null
+
+  run_chatcore_suite
+}
+
+run_field_suite() {
+  field_audit_json="$("$field_audit" --format json)"
+  jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .acceptance.field_core_as_sole_engine == true and .acceptance.llm_ready == false and .acceptance.nonlinear_memory_proven == false' <<<"$field_audit_json" >/dev/null
+}
+
+run_wrappers_suite() {
+  "$llmwave_big" --help | grep -q "Usage:"
+  "$skill_readiness" --help | grep -q "Usage:"
+  "$field_audit" --help | grep -q "Usage:"
+  "$guard_action" --help | grep -q "Usage:"
+  "$guard_diff" --help | grep -q "Usage:"
+}
+
+run_changed_suite() {
+  git -C "$root" diff --check
+  mapfile -t changed_paths < <(
+    {
+      git -C "$root" diff --name-only --diff-filter=ACMRTUXB HEAD
+      git -C "$root" ls-files --others --exclude-standard
+    } | sed '/^$/d' | sort -u
+  )
+
+  if ((${#changed_paths[@]} == 0)); then
+    echo ok
+    exit 0
+  fi
+
+  needs_rust=0
+  needs_chatcore=0
+  needs_field=0
+  needs_wrappers=0
+  needs_edges=0
+  needs_bash_syntax=0
+
+  for path in "${changed_paths[@]}"; do
+    case "$path" in
+      Cargo.toml|Cargo.lock|src/*.rs|src/**/*.rs)
+        needs_rust=1
+        ;;
+    esac
+    case "$path" in
+      src/llmwave_big/linux_chat_core.rs|src/llmwave_big/mod.rs|examples/linux-chat-core.profile.json|README.md|COMMANDS.md|nanda-structural-gate/SKILL.md)
+        needs_chatcore=1
+        ;;
+    esac
+    case "$path" in
+      src/field_core/*|src/field_core/**/*)
+        needs_field=1
+        ;;
+    esac
+    case "$path" in
+      nanda-structural-gate/scripts/*|scripts/install-local.sh)
+        needs_wrappers=1
+        ;;
+    esac
+    case "$path" in
+      scripts/*.sh|nanda-structural-gate/scripts/*)
+        needs_bash_syntax=1
+        ;;
+    esac
+    case "$path" in
+      examples/triad-*|scripts/test-edge-cases.sh)
+        needs_edges=1
+        ;;
+    esac
+  done
+
+  if ((needs_bash_syntax)); then
+    for path in "${changed_paths[@]}"; do
+      case "$path" in
+        scripts/*.sh)
+          bash -n "$root/$path"
+          ;;
+      esac
+    done
+  fi
+  if ((needs_rust)); then
+    run_rust_baseline
+  fi
+  if ((needs_chatcore)); then
+    [[ "$needs_rust" -eq 1 ]] || run_rust_baseline
+    run_chatcore_suite
+  fi
+  if ((needs_field)); then
+    run_field_suite
+  fi
+  if ((needs_wrappers)); then
+    run_wrappers_suite
+  fi
+  if ((needs_edges)); then
+    "$root/scripts/test-edge-cases.sh" >/dev/null
+  fi
+}
+
+case "$test_local_suite" in
+  changed)
+    run_changed_suite
+    echo ok
+    exit 0
+    ;;
+  smoke)
+    run_smoke_suite
+    echo ok
+    exit 0
+    ;;
+  chatcore)
+    git -C "$root" diff --check
+    run_rust_baseline
+    run_chatcore_suite
+    echo ok
+    exit 0
+    ;;
+  chatcore-build)
+    git -C "$root" diff --check
+    run_chatcore_build_suite
+    echo ok
+    exit 0
+    ;;
+  field)
+    run_field_suite
+    echo ok
+    exit 0
+    ;;
+  wrappers)
+    run_wrappers_suite
+    echo ok
+    exit 0
+    ;;
+esac
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
@@ -513,17 +791,20 @@ big_linux_chat_core_missing_gate_json="$("$llmwave_big" linux-chat-core-gate --r
 jq -e '.mode == "llmwave-big-linux-chat-core-gate" and .verdict == "LINUX_CHAT_CORE_CACHE_STALE" and .cache_status.cache_fresh == false and (.cache_status.stale_reasons | index("cache_manifest_missing")) and .profile_gate == null and .chat_core.safe_to_use_cache == false and .chat_core.safe_to_answer_from_cache == false and .token_economics.cache_total_bytes == 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true' <<<"$big_linux_chat_core_missing_gate_json" >/dev/null
 test ! -e "$tmp_linux_chat_core_missing_cache/chat-core.manifest.json"
 big_linux_chat_core_build_json="$("$llmwave_big" linux-chat-core-build --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --broad-eval "$tmp_linux_profile_eval" --heldout-eval "$tmp_linux_heldout_eval" --cache-dir "$tmp_linux_chat_core_cache" --format json)"
-jq -e '.mode == "llmwave-big-linux-chat-core-build" and .verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .manifest.profile_id == "linux-chat-core" and .manifest.cache_is_source_of_truth == false and .source_status.source_memory_loaded == true and .source_status.overlays_present == 3 and .token_economics.source_artifacts_estimated_tokens > 0 and .token_economics.cache_estimated_tokens > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_build_json" >/dev/null
+jq -e '.mode == "llmwave-big-linux-chat-core-build" and .verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .manifest.profile_id == "linux-chat-core" and .manifest.cache_is_source_of_truth == false and .source_status.source_memory_loaded == true and .source_status.overlays_present == 3 and .cache.hot_readout_record_count == 8 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false and .token_economics.source_artifacts_estimated_tokens > 0 and .token_economics.cache_estimated_tokens > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_build_json" >/dev/null
 test -s "$tmp_linux_chat_core_cache/chat-core.hot"
 test -s "$tmp_linux_chat_core_cache/chat-core.index.json"
 test -s "$tmp_linux_chat_core_cache/chat-core.manifest.json"
-jq -e '.represented_fact_count == 8 and (.route_index | length) > 0 and (.readout_facts | length) == 8 and .cache_contract.hot_cache_has_no_authority_without_gate == true' "$tmp_linux_chat_core_cache/chat-core.index.json" >/dev/null
+jq -e '.represented_fact_count == 8 and (.route_index | length) > 0 and (.readout_facts | length) == 8 and .cache_contract.hot_cache_has_no_authority_without_gate == true and .cache_contract.hot_cache_contains_binary_readout_records == true and .cache_contract.json_index_required_for_answer_authority == false' "$tmp_linux_chat_core_cache/chat-core.index.json" >/dev/null
 big_linux_chat_core_gate_json="$("$llmwave_big" linux-chat-core-gate --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --broad-eval "$tmp_linux_profile_eval" --heldout-eval "$tmp_linux_heldout_eval" --cache-dir "$tmp_linux_chat_core_cache" --max-facts 4 --format json)"
-jq -e '.mode == "llmwave-big-linux-chat-core-gate" and .cache_status.cache_fresh == true and .cache_status.cache_is_source_of_truth == false and .chat_core.safe_to_use_cache == true and .chat_core.source_hash_matched == true and .chat_core.cache_is_source_of_truth == false and .chat_core.compatibility_wrapper_for_linux_chat_profile_gate == true and .claim_boundary.stale_cache_blocks_answer_authority == true and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_gate_json" >/dev/null
+jq -e '.mode == "llmwave-big-linux-chat-core-gate" and .cache_status.cache_fresh == true and .cache_status.cache_is_source_of_truth == false and .domain_runtime.json_index_used_for_domain_runtime == false and .chat_core.safe_to_use_cache == true and .chat_core.source_hash_matched == true and .chat_core.cache_is_source_of_truth == false and .chat_core.compatibility_wrapper_for_linux_chat_profile_gate == true and .claim_boundary.stale_cache_blocks_answer_authority == true and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_gate_json" >/dev/null
 big_linux_chat_core_ask_json="$("$llmwave_big" linux-chat-core-ask --text "which package provides command bash" --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --cache-dir "$tmp_linux_chat_core_cache" --max-facts 4 --format json)"
-jq -e '.mode == "llmwave-big-linux-chat-core-ask" and .verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .grounded_packet.cache_fresh == true and .grounded_packet.answer_allowed == true and .grounded_packet.readout_source == "compiled_chat_core_index" and .grounded_packet.cache_is_runtime_index_not_prompt_payload == true and .grounded_packet.decision_state == "ANSWER_GROUNDED" and (.grounded_packet.answer | ascii_downcase | contains("bash")) and (.grounded_packet.evidence[] | select((.route == "linux.apt.command.provider" or .route == "linux.apt.command.package-command") and .role == "provider" and .subject == "bash" and .object == "bash" and (.memory_kind | length > 0))) and (.grounded_packet.compact_evidence[] | contains("subject=bash")) and .token_economics.grounded_packet_estimated_tokens > 0 and .token_economics.actual_answer_context_estimated_tokens == .token_economics.grounded_packet_estimated_tokens and .token_economics.estimated_tokens_saved_vs_source > 0 and .token_economics.estimated_tokens_saved_vs_cache_index > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true' <<<"$big_linux_chat_core_ask_json" >/dev/null
+jq -e '.mode == "llmwave-big-linux-chat-core-ask" and .verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .grounded_packet.cache_fresh == true and .grounded_packet.answer_allowed == true and .grounded_packet.readout_source == "compiled_chat_core_hot" and (.grounded_packet.domain_suites | index("packages")) and .grounded_packet.cache_is_runtime_index_not_prompt_payload == true and .grounded_packet.decision_state == "ANSWER_GROUNDED" and (.grounded_packet.answer | ascii_downcase | contains("bash")) and (.grounded_packet.evidence[] | select((.route == "linux.apt.command.provider" or .route == "linux.apt.command.package-command") and .role == "provider" and .subject == "bash" and .object == "bash" and (.memory_kind | length > 0))) and (.grounded_packet.compact_evidence[] | contains("subject=bash")) and .domain_runtime.json_index_used_for_domain_runtime == false and .token_economics.grounded_packet_estimated_tokens > 0 and .token_economics.actual_answer_context_estimated_tokens == .token_economics.grounded_packet_estimated_tokens and .token_economics.estimated_tokens_saved_vs_source > 0 and .token_economics.estimated_tokens_saved_vs_cache_index > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true' <<<"$big_linux_chat_core_ask_json" >/dev/null
 big_linux_chat_core_ask_systemctl_json="$("$llmwave_big" linux-chat-core-ask --text "which package provides command systemctl" --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --cache-dir "$tmp_linux_chat_core_cache" --max-facts 4 --format json)"
 jq -e '.mode == "llmwave-big-linux-chat-core-ask" and .verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .grounded_packet.answer_allowed == true and .grounded_packet.decision_state == "ANSWER_GROUNDED" and (.grounded_packet.answer | contains("systemd")) and (.grounded_packet.evidence[] | select(.route == "linux.package.binary" and .role == "provider" and .subject == "systemd" and .relation == "provides binary" and .object == "/usr/bin/systemctl" and (.memory_kind | length > 0)))' <<<"$big_linux_chat_core_ask_systemctl_json" >/dev/null
+rm "$tmp_linux_chat_core_cache/chat-core.index.json"
+big_linux_chat_core_ask_no_index_json="$("$llmwave_big" linux-chat-core-ask --text "which package provides command bash" --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --cache-dir "$tmp_linux_chat_core_cache" --max-facts 4 --format json)"
+jq -e '.mode == "llmwave-big-linux-chat-core-ask" and .verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .cache_status.index_present == false and .grounded_packet.readout_source == "compiled_chat_core_hot" and .grounded_packet.answer_allowed == true and (.grounded_packet.evidence[] | select(.subject == "bash" and .object == "bash"))' <<<"$big_linux_chat_core_ask_no_index_json" >/dev/null
 printf '\n# stale check\n' >>"$tmp_linux_chat_profile_center_memory"
 big_linux_chat_core_stale_json="$("$llmwave_big" linux-chat-core-ask --text "which package provides command bash" --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --cache-dir "$tmp_linux_chat_core_cache" --max-facts 4 --format json)"
 jq -e '.mode == "llmwave-big-linux-chat-core-ask" and .verdict == "LINUX_CHAT_CORE_CACHE_STALE" and .cache_status.cache_fresh == false and (.cache_status.stale_reasons | index("source_memory_hash_changed")) and .grounded_packet.answer_allowed == false and .grounded_packet.decision_state == "CACHE_STALE_NO_AUTHORITY"' <<<"$big_linux_chat_core_stale_json" >/dev/null
@@ -2347,12 +2628,14 @@ cat >"$tmp_field_report/cognitive.json" <<'EOF_FIELD'
 EOF_FIELD
 field_cognitive_json="$("$field_report" --from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.family == "cognitive" and .basis.axis_policy == "l2_surface_l3_schema_axes" and .claim_boundary.not_llm_ready == true and .claim_boundary.not_nonlinear_memory_proof == true and (.query.signature | type == "string" and length == 16) and .compute_probe.version == "unified-field-compute-v1"' <<<"$field_cognitive_json" >/dev/null
-field_audit_json="$("$field_audit" --format json)"
-jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .overall_state == "FIELD_CORE_SOLE_ENGINE_ACTIVE_LLM_NOT_READY" and .acceptance.one_field_pass == true and .acceptance.field_core_as_semantic_engine == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.semantic_equivalence_gate == true and .acceptance.structural_dual_run_active == true and .acceptance.structural_cutover_eval_ready == true and .acceptance.structural_cutover_suite_available == true and .acceptance.structural_cutover_suite_pass == true and .acceptance.structural_field_core_as_sole_engine == true and .families[0].sole_engine == true and .families[1].sole_engine == true and .families[2].sole_engine == true and .structural_cutover_suite.suite == "structural-standard" and .structural_cutover_suite.acceptance.cases_checked == 4 and .structural_cutover_suite.acceptance.structural_cutover_suite_pass == true and .acceptance.packed_dual_run_active == true and .acceptance.packed_hot_core_exception == false and .acceptance.packed_field_core_as_sole_engine == true and .acceptance.packed_field_record_view == true and .acceptance.cognitive_dual_run_active == true and .acceptance.cognitive_field_core_as_sole_engine == true and .acceptance.cognitive_claim_guard_blocks_llm == true and .acceptance.unified_lens_contract == true and .acceptance.unified_anti_wave_contract == true and .acceptance.unified_memory_delta_store == true and .acceptance.route_scoped_extraction_required == false and .acceptance.field_core_as_sole_engine == true and .acceptance.llm_ready == false and .acceptance.nonlinear_memory_proven == false and (.next_required_steps | length) == 0' <<<"$field_audit_json" >/dev/null
-jq -e '.sole_engine_contract.version == "unified-field-sole-engine-v1" and .sole_engine_contract.big_pipelines == .sole_engine_contract.field_core_backed_pipelines and .sole_engine_contract.local_physics_copies_allowed == false and .sole_engine_contract.field_core_as_sole_engine == true and .acceptance.sole_engine_registry == true and .acceptance.big_pipelines_registered == .acceptance.field_core_backed_pipelines and (.sole_engine_contract.pipeline_consumers[] | select(.pipeline == "llmwave-lens-scan") | .uses_field_pass == true and .local_physics_allowed == false)' <<<"$field_audit_json" >/dev/null
-jq -e '.field_engine_contract.version == "unified-field-engine-contract-v1" and .field_engine_contract.policy_owner == "field_core::engine::FieldEngineDecision" and .field_engine_contract.families_checked == 3 and .field_engine_contract.global_sole_engine == true and .field_engine_contract.llm_ready == false and .field_engine_contract.nonlinear_memory_proven == false and .acceptance.three_family_engine_contract == true and .acceptance.field_engine_policy_in_field_core == true and .acceptance.structural_cutover_mode_available == true and .field_engine_contract.structural.cutover_allowed == true and .field_engine_contract.structural.cutover_mode == "default" and .field_engine_contract.structural.structural_sole_engine == true and .field_engine_contract.structural.scope == "structural" and .acceptance.packed_field_engine_guard == true and .acceptance.packed_cutover_blocked_by_hot_guard == false and .field_engine_contract.packed.cutover_allowed == true and .field_engine_contract.packed.blocked_by == null and .field_engine_contract.packed.packed_sole_engine == true and .field_engine_contract.packed.scope == "packed" and .acceptance.cognitive_field_engine_guard == true and .acceptance.cognitive_cutover_blocked_by_claim_guard == false and .field_engine_contract.cognitive.cutover_allowed == true and .field_engine_contract.cognitive.cognitive_sole_engine == true and .field_engine_contract.cognitive.scope == "cognitive" and .field_engine_contract.cognitive.chat_engine == false and .field_engine_contract.cognitive.llm_ready == false' <<<"$field_audit_json" >/dev/null
-jq -e '.local_physics_inventory.version == "field-local-physics-audit-v1" and .local_physics_inventory.source_scan_available == true and .local_physics_inventory.verdict == "FIELD_CORE_SOLE_ENGINE_WITH_REVIEW_DEBT" and .local_physics_inventory.totals.local_physics_candidates == 0 and .local_physics_inventory.totals.domain_fixture_readouts > 0 and .local_physics_inventory.totals.structural_legacy_readouts > 0 and .acceptance.local_physics_inventory_present == true and .acceptance.local_physics_candidates == 0' <<<"$field_audit_json" >/dev/null
-jq -e '.field_operation_contract.version == "unified-field-operation-contract-v1" and .field_operation_contract.peak_owner == "field_core::peak::FieldPeakResult" and .field_operation_contract.coherence_owner == "field_core::coherence::FieldCoherenceResult" and .field_operation_contract.anti_wave_owner == "field_core::anti_wave::FieldAntiWaveEffect" and .field_operation_contract.readout_owner == "field_core::readout::FieldReadoutResult" and .field_operation_contract.local_path_owner == "field_core::readout::FieldLocalPathResult" and .field_operation_contract.structural_decision_uses_field_core == true and .acceptance.field_core_owns_peak_contract == true and .acceptance.field_core_owns_coherence_contract == true and .acceptance.field_core_owns_anti_wave_contract == true and .acceptance.field_core_owns_readout_contract == true and .acceptance.field_core_owns_local_path_contract == true and .acceptance.structural_decision_uses_field_core == true' <<<"$field_audit_json" >/dev/null
+if [[ "$test_local_suite" == "full" ]]; then
+  field_audit_json="$("$field_audit" --format json)"
+  jq -e '.mode == "unified-field-audit" and .version == "unified-field-pass-v1" and .overall_state == "FIELD_CORE_SOLE_ENGINE_ACTIVE_LLM_NOT_READY" and .acceptance.one_field_pass == true and .acceptance.field_core_as_semantic_engine == true and .acceptance.feedback_memory_delta_unified == true and .acceptance.semantic_equivalence_gate == true and .acceptance.structural_dual_run_active == true and .acceptance.structural_cutover_eval_ready == true and .acceptance.structural_cutover_suite_available == true and .acceptance.structural_cutover_suite_pass == true and .acceptance.structural_field_core_as_sole_engine == true and .families[0].sole_engine == true and .families[1].sole_engine == true and .families[2].sole_engine == true and .structural_cutover_suite.suite == "structural-standard" and .structural_cutover_suite.acceptance.cases_checked == 4 and .structural_cutover_suite.acceptance.structural_cutover_suite_pass == true and .acceptance.packed_dual_run_active == true and .acceptance.packed_hot_core_exception == false and .acceptance.packed_field_core_as_sole_engine == true and .acceptance.packed_field_record_view == true and .acceptance.cognitive_dual_run_active == true and .acceptance.cognitive_field_core_as_sole_engine == true and .acceptance.cognitive_claim_guard_blocks_llm == true and .acceptance.unified_lens_contract == true and .acceptance.unified_anti_wave_contract == true and .acceptance.unified_memory_delta_store == true and .acceptance.route_scoped_extraction_required == false and .acceptance.field_core_as_sole_engine == true and .acceptance.llm_ready == false and .acceptance.nonlinear_memory_proven == false and (.next_required_steps | length) == 0' <<<"$field_audit_json" >/dev/null
+  jq -e '.sole_engine_contract.version == "unified-field-sole-engine-v1" and .sole_engine_contract.big_pipelines == .sole_engine_contract.field_core_backed_pipelines and .sole_engine_contract.local_physics_copies_allowed == false and .sole_engine_contract.field_core_as_sole_engine == true and .acceptance.sole_engine_registry == true and .acceptance.big_pipelines_registered == .acceptance.field_core_backed_pipelines and (.sole_engine_contract.pipeline_consumers[] | select(.pipeline == "llmwave-lens-scan") | .uses_field_pass == true and .local_physics_allowed == false)' <<<"$field_audit_json" >/dev/null
+  jq -e '.field_engine_contract.version == "unified-field-engine-contract-v1" and .field_engine_contract.policy_owner == "field_core::engine::FieldEngineDecision" and .field_engine_contract.families_checked == 3 and .field_engine_contract.global_sole_engine == true and .field_engine_contract.llm_ready == false and .field_engine_contract.nonlinear_memory_proven == false and .acceptance.three_family_engine_contract == true and .acceptance.field_engine_policy_in_field_core == true and .acceptance.structural_cutover_mode_available == true and .field_engine_contract.structural.cutover_allowed == true and .field_engine_contract.structural.cutover_mode == "default" and .field_engine_contract.structural.structural_sole_engine == true and .field_engine_contract.structural.scope == "structural" and .acceptance.packed_field_engine_guard == true and .acceptance.packed_cutover_blocked_by_hot_guard == false and .field_engine_contract.packed.cutover_allowed == true and .field_engine_contract.packed.blocked_by == null and .field_engine_contract.packed.packed_sole_engine == true and .field_engine_contract.packed.scope == "packed" and .acceptance.cognitive_field_engine_guard == true and .acceptance.cognitive_cutover_blocked_by_claim_guard == false and .field_engine_contract.cognitive.cutover_allowed == true and .field_engine_contract.cognitive.cognitive_sole_engine == true and .field_engine_contract.cognitive.scope == "cognitive" and .field_engine_contract.cognitive.chat_engine == false and .field_engine_contract.cognitive.llm_ready == false' <<<"$field_audit_json" >/dev/null
+  jq -e '.local_physics_inventory.version == "field-local-physics-audit-v1" and .local_physics_inventory.source_scan_available == true and .local_physics_inventory.verdict == "FIELD_CORE_SOLE_ENGINE_WITH_REVIEW_DEBT" and .local_physics_inventory.totals.local_physics_candidates == 0 and .local_physics_inventory.totals.domain_fixture_readouts > 0 and .local_physics_inventory.totals.structural_legacy_readouts > 0 and .acceptance.local_physics_inventory_present == true and .acceptance.local_physics_candidates == 0' <<<"$field_audit_json" >/dev/null
+  jq -e '.field_operation_contract.version == "unified-field-operation-contract-v1" and .field_operation_contract.peak_owner == "field_core::peak::FieldPeakResult" and .field_operation_contract.coherence_owner == "field_core::coherence::FieldCoherenceResult" and .field_operation_contract.anti_wave_owner == "field_core::anti_wave::FieldAntiWaveEffect" and .field_operation_contract.readout_owner == "field_core::readout::FieldReadoutResult" and .field_operation_contract.local_path_owner == "field_core::readout::FieldLocalPathResult" and .field_operation_contract.structural_decision_uses_field_core == true and .acceptance.field_core_owns_peak_contract == true and .acceptance.field_core_owns_coherence_contract == true and .acceptance.field_core_owns_anti_wave_contract == true and .acceptance.field_core_owns_readout_contract == true and .acceptance.field_core_owns_local_path_contract == true and .acceptance.structural_decision_uses_field_core == true' <<<"$field_audit_json" >/dev/null
+fi
 field_equivalence_json="$("$field_equivalence" --structural-from "$tmp_field_report/structural.json" --packed-from "$tmp_field_report/packed.json" --cognitive-from "$tmp_field_report/cognitive.json" --format json)"
 jq -e '.mode == "unified-field-equivalence" and .version == "unified-field-pass-v1" and .acceptance.equivalent_contract == true and .acceptance.all_have_field_pass == true and .acceptance.all_have_memory_delta == true and .acceptance.field_core_as_sole_engine == false and .acceptance.llm_ready == false' <<<"$field_equivalence_json" >/dev/null
 printf '%s\n' "$trap_search_json" >"$tmp_field_report/cutover-focused.json"
