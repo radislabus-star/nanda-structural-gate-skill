@@ -65,7 +65,12 @@ boundary verdicts are raised into `agent_decision`. The policy owner is
 functions, API edges, call edges, runtime effects, tests, and foreign pulls into
 shared `field_core` records for downstream field checks. It also includes
 `boundary_field_pass`, `field_equivalence`, `owner_gravity`, and
-`boundary_energy`. The selected agent verdict is
+`boundary_energy`. It also includes `boundary_center`, a read-only
+center-of-mass diagnostic over route/owner/test/runtime/API/foreign evidence.
+Use `boundary_center.center_gap`, `owner_center_gap`, and `verdict_hint` to see
+whether the change has one clear structural center or is split across owners or
+routes. It never changes `safe_to_edit`; `WATCH` and `VETO` remain binding. The
+selected agent verdict is
 `boundary_field_engine.selected_verdict`: the field candidate can be stricter
 than typed Boundary Economics, but `field_equivalence.field_not_more_permissive`
 must stay true before it is used. The implementation owner is the split
@@ -420,16 +425,25 @@ represented by a 6 MiB active projection. It explicitly does not claim lossless
 Atlas storage, hardware PMU cache residency, global nonlinear memory, or general
 LLM readiness.
 `linux-pack-residual` materializes the same Linux Active Field as a `.lrf`
-binary schema/residual memory: repeated `route+relation+polarity` modes become
-`SchemaRecord32`, subject/object variation becomes `ResidualRecord32`, and
-one-off facts stay as `FallbackRecord64`. Treat
+binary schema/residual memory: repeated role-complete
+`route+relation+subject_role+object_role+polarity+evidence_kind` modes become
+`SchemaRecord32`, subject/object filler variation becomes `ResidualRecord32`,
+and one-off facts stay as `FallbackRecord64` with packed role/evidence channels.
+Surface text length stays in cold labels and is not semantic mass. Treat
 `LINUX_SCHEMA_RESIDUAL_PACKET_READY_NOT_PROOF` as written binary memory only.
 `linux-residual-proof` scans the `.lrf` schema/residual/fallback sections,
-runs the Linux domain eval and lexical duel, and compares the actual binary hot
-section bytes against a direct fixed64 baseline. Treat
-`LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory proof:
-real binary schema/residual storage beats fixed64 bytes and preserves the
-Linux-domain eval. It is not broad chat readiness or exposure reasoning.
+runs the Linux domain eval and lexical duel, compares the actual binary hot
+section bytes against a direct fixed64 baseline, and requires the spectral
+center admission layer plus `semantic_atom_contract` to pass. Inspect
+`semantic_atom_contract`: it reports fixed hot record width, required role/evidence
+channels, and `surface_text_length_is_not_mass`. Inspect `spectral_center`: it
+reports schema center separation, wrong-center rejection, role-swap near-miss
+collapse, route/relation ablation drop, and fallback preservation.
+Treat `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory
+proof: real binary schema/residual storage beats fixed64 bytes, preserves the
+Linux-domain eval, passes `LINUX_ROLE_COMPLETE_SEMANTIC_ATOMS_PROVEN`, and passes
+`LINUX_SPECTRAL_CENTER_PROVEN`. It is not broad chat readiness or exposure
+reasoning.
 `linux-exposure-run` reads the `.lrf` schema/residual memory and builds a
 boundary-aware Linux exposure field: local sockets, bind scope, firewall allow
 facts, service context, and negative boundary facts. Treat

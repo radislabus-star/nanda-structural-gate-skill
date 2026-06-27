@@ -769,19 +769,29 @@ LLM readiness remain closed.
 
 `linux-pack-residual` is the next Linux SysField memory layer. It writes a
 `.lrf` binary packet with real schema/residual sections instead of only
-reporting density economics. Repeated `route+relation+polarity` facts are
-promoted into `SchemaRecord32`, subject/object/evidence variation is stored as
-`ResidualRecord32`, and one-off facts stay as `FallbackRecord64` so weak schemas
-do not swallow unique facts.
+reporting density economics. Repeated role-complete
+`route+relation+subject_role+object_role+polarity+evidence_kind` atoms are
+promoted into `SchemaRecord32`, subject/object filler variation is stored as
+`ResidualRecord32`, and one-off facts stay as `FallbackRecord64` with packed
+role/evidence channels so weak schemas do not swallow unique facts. Surface text
+length stays in the cold label table; it is not semantic mass in the hot memory.
 
 `linux-residual-proof` loads that `.lrf` packet, scans the schema/residual and
-fallback sections as binary records, runs the Linux eval and lexical duel, and
-checks the actual hot-section bytes against the direct fixed64 baseline. Treat
+fallback sections as binary records, runs the Linux eval and lexical duel,
+checks the actual hot-section bytes against the direct fixed64 baseline, and
+requires both the role-complete semantic atom contract and the spectral center
+admission layer to pass. The semantic atom layer verifies fixed hot record
+width, required route/relation/role/polarity/evidence channels, and
+`surface_text_length_is_not_mass`. The spectral layer computes role-complete
+schema centers, wrong-center separation, role-swap near-miss collapse,
+route/relation ablation drop, and fallback-outlier preservation. Treat
 `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear-memory proof:
 the active Linux field is genuinely written and retrieved through binary
 schema/residual memory, fits the 6 MiB hot budget, saves bytes versus fixed64,
-and keeps the Linux-domain eval green. It is still not broad chat readiness and
-not exposure reasoning.
+keeps the Linux-domain eval green, proves
+`semantic_atom_contract.verdict = LINUX_ROLE_COMPLETE_SEMANTIC_ATOMS_PROVEN`,
+and proves `spectral_center.verdict = LINUX_SPECTRAL_CENTER_PROVEN`. It is still
+not broad chat readiness and not exposure reasoning.
 
 `linux-exposure-run` is the first Linux exposure reasoning layer over that
 schema/residual memory. It reconstructs the `.lrf` facts for explanation, then
@@ -1423,7 +1433,13 @@ into facts, typed decision, field pass, records, owner/energy, utility modules,
 and a diff subkernel (`diff.rs` plus `diff/` facts/routes/parser/version/
 records/field-pass/report modules); `nanda-skill-readiness` checks this as
 `boundary_field_kernel` so the policy does not drift back into command
-wrappers. Use repo-wide mode to find
+wrappers. The JSON also includes `boundary_center`, a read-only
+center-of-mass diagnostic. It reports the dominant route center, dominant owner
+center, first-vs-second `center_gap`, owner gap, and masses for foreign routes,
+cross-owner calls, runtime risk, public API, adapter leak, tests, and boundary
+tax. Read it as an explanation of where the change is structurally pulled, not
+as permission to edit: `decision_affects_safe_to_edit=false`, so `WATCH` and
+`VETO` are not weakened by a pretty center. Use repo-wide mode to find
 possible split pressure only; if
 repo-wide mode sees foreign route pressure but the score is not strong enough
 for an autonomous split, it returns `WATCH` and asks for a route-scoped pass.

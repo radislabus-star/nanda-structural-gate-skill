@@ -529,7 +529,13 @@ may be stricter than the typed core, never softer. Use
 `boundary_field_engine.selected_verdict` as the agent-facing verdict when it is
 present; `boundary_decision.verdict` is the typed explanation kept for
 compatibility. Inspect `owner_gravity` and `boundary_energy` to decide whether
-a proposed boundary reduces confusion or only adds wrapper/API tax. Use
+a proposed boundary reduces confusion or only adds wrapper/API tax. Inspect
+`boundary_center` when you need the center-of-mass view: route center, owner
+center, center gap, foreign-route mass, cross-owner mass, runtime risk mass,
+public API mass, adapter leak mass, and test-anchor mass. It is read-only
+diagnostics only; `decision_affects_safe_to_edit=false` means it must not
+weaken `WATCH`, `VETO`, or `field_equivalence.field_not_more_permissive=false`.
+Use
 repo-wide mode only to find possible split pressure. If repo-wide mode sees
 foreign route pressure but the boundary score is not strong enough for an
 autonomous split, treat the `WATCH` verdict as a stop and rerun a route-scoped
@@ -1251,17 +1257,32 @@ Treat `LINUX_PMU_CACHE_RESIDENCY_PROVEN` as host-local PMU evidence only. Treat
 not turn it into a PASS.
 Use `nanda-llmwave-big linux-pack-residual --atlas-dir .nanda/linux-atlas --max-active-facts 65536 --out .nanda/linux-active/linux-active-65k.lrf --format json`
 to materialize the Linux Active Field as actual binary schema/residual memory.
-The `.lrf` packet stores repeated `route+relation+polarity` modes once as
-`SchemaRecord32`, per-fact subject/object variation as `ResidualRecord32`, and
-one-off facts as `FallbackRecord64`. Treat
+The `.lrf` packet stores repeated role-complete
+`route+relation+subject_role+object_role+polarity+evidence_kind` modes once as
+`SchemaRecord32`, per-fact subject/object filler variation as
+`ResidualRecord32`, and one-off facts as `FallbackRecord64` with packed
+role/evidence channels. Surface text length stays in cold labels and is not
+semantic mass. Treat
 `LINUX_SCHEMA_RESIDUAL_PACKET_READY_NOT_PROOF` as written binary memory only.
 Use `nanda-llmwave-big linux-residual-proof --residual-pack .nanda/linux-active/linux-active-65k.lrf --query "which package provides command bash" --format json`
 to scan the `.lrf` binary sections, run the Linux-domain eval plus lexical
-duel, and compare actual hot-section bytes against direct fixed64 storage.
+duel, compare actual hot-section bytes against direct fixed64 storage, and
+require both `semantic_atom_contract` and the spectral center admission layer to
+pass.
 Treat `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory
 proof only: schema/residual binary storage is real, retrieval works on the
-Linux eval, and bytes beat fixed64. It is not broad chat readiness and not
-exposure reasoning.
+Linux eval, bytes beat fixed64,
+`semantic_atom_contract.verdict = LINUX_ROLE_COMPLETE_SEMANTIC_ATOMS_PROVEN`,
+and
+`spectral_center.verdict = LINUX_SPECTRAL_CENTER_PROVEN`. Inspect
+`semantic_atom_contract`: it proves fixed hot record width, required role/evidence
+channels, and `surface_text_length_is_not_mass`. Inspect
+`spectral_center.metrics`: `average_center_gap` measures correct schema center
+separation from the best wrong center, `average_role_swap_gap` measures
+role-swap near-miss collapse when subject/object roles are evaluable, and
+`route_relation_ablation_drop` measures whether route/relation modes are
+causal for separation. It is not broad chat readiness and not exposure
+reasoning.
 Use `nanda-llmwave-big linux-atlas-projection --atlas-dir .nanda/linux-atlas --hot-pack .nanda/linux-active/linux-active-65k.laf --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
 to run the Phase 18 Atlas-to-6MB cognitive projection gate. It audits the cold
 Atlas by metadata/manifest, runs `.laf` cache proof and `.lrf` schema/residual
