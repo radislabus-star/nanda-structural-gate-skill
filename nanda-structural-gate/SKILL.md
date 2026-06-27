@@ -1404,7 +1404,7 @@ view:
 ```bash
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --format json
+nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
 nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
 nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active --reset-scratch --format json
 ```
@@ -1430,7 +1430,22 @@ answer state, selected domain suites, structured `evidence[]`, legacy
 `compact_evidence`, and anti-wave hits. Treat
 `cache_is_runtime_index_not_prompt_payload=true` as a hard interpretation rule:
 the hot cache is a runtime readout, not prompt context; use only the grounded
-packet as the small external memory payload. Treat
+packet as the small external memory payload.
+Grounded packet budgets are adaptive. `--target-packet-tokens` is a ceiling, not
+a quota; padding is forbidden. Do not ask ChatCore to fill a prompt budget with
+extra prose. Inspect `grounded_packet.packet_profile`, `packet_tokens`,
+`packet_underfilled`, `packet_truncated`, `selected_evidence_count`,
+`available_evidence_count`, `selected_anti_wave_count`, `missing_evidence`,
+`ranking_policy`, `no_padding`, and `budget_is_ceiling_not_quota`. Profiles are
+`exact_fact`, `action_plan`, `troubleshooting`, `multi_route_conflict`,
+`safety_refusal`, and `uncertain`. Exact facts should stay small. Action,
+troubleshooting, and conflict packets may be larger only when evidence supports
+them; if required evidence is missing, treat
+`PACKET_UNDERFILLED_NEEDS_MORE_CONTEXT` as review/no-answer authority, not as a
+short answer. Every `evidence[]` item must preserve route, subject, relation,
+object, subject_role, object_role, polarity, evidence_kind, memory_kind, and
+confidence. Anti-wave evidence must survive safety and route-boundary packets.
+Treat
 `LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM` as cache-authority
 readiness only. Treat
 `LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM` as the heavier

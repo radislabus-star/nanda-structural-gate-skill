@@ -35,6 +35,7 @@ const HOT_FORMAT_VERSION: u32 = 3;
 const HOT_FORMAT: &str = "interned-packed-readout-v3";
 const HOT_TARGET_BYTES: u64 = 6 * 1024 * 1024;
 const PACKED_FACT_RECORD_BYTES: u64 = 37;
+const PACKET_RANKING_POLICY: &str = "exact_anchor > required_route > route_prior > domain_route > anti_wave_boundary > learned_memory > confidence; budget_is_ceiling_not_quota; no_padding";
 
 #[derive(Clone)]
 pub(crate) struct LinuxChatCoreBuildConfig {
@@ -76,6 +77,8 @@ pub(crate) struct LinuxChatCoreAskConfig {
     pub cache_dir: PathBuf,
     pub manifest: Option<PathBuf>,
     pub max_facts: usize,
+    pub packet_profile: Option<String>,
+    pub target_packet_tokens: Option<u64>,
     pub out: Option<PathBuf>,
 }
 
@@ -623,6 +626,22 @@ pub(crate) struct LinuxChatCoreGroundedPacket {
     pub answer: String,
     pub intent: String,
     pub route_priors: Vec<String>,
+    pub packet_profile: String,
+    pub packet_budget_tokens: u64,
+    pub packet_tokens: u64,
+    pub packet_underfilled: bool,
+    pub packet_truncated: bool,
+    pub evidence_coverage: LinuxChatCoreEvidenceCoverage,
+    pub selected_evidence_count: usize,
+    pub available_evidence_count: usize,
+    pub omitted_evidence_count: usize,
+    pub selected_anti_wave_count: usize,
+    pub missing_evidence: Vec<String>,
+    pub ranking_policy: &'static str,
+    pub no_padding: bool,
+    pub budget_is_ceiling_not_quota: bool,
+    pub truncation_reason: Option<String>,
+    pub omitted_routes: Vec<String>,
     pub evidence_count: usize,
     pub anti_wave_hits: Vec<String>,
     pub evidence: Vec<LinuxChatCoreGroundedEvidence>,
@@ -630,15 +649,53 @@ pub(crate) struct LinuxChatCoreGroundedPacket {
 }
 
 #[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreEvidenceCoverage {
+    pub exact_anchor_matches: usize,
+    pub route_matches: usize,
+    pub domain_matches: usize,
+    pub selected_routes: Vec<String>,
+    pub omitted_routes: Vec<String>,
+    pub anti_wave_preserved: bool,
+    pub role_complete: bool,
+    pub answer_policy: String,
+}
+
+#[derive(Serialize, Clone)]
 pub(crate) struct LinuxChatCoreGroundedEvidence {
     pub route: String,
     pub role: String,
+    pub subject_role: String,
     pub subject: String,
     pub relation: String,
+    pub object_role: String,
     pub object: String,
     pub polarity: String,
+    pub evidence_kind: String,
     pub memory_kind: String,
     pub confidence: u8,
+}
+
+#[derive(Clone)]
+struct LinuxChatCorePacketProfileSpec {
+    profile: String,
+    budget_tokens: u64,
+    min_evidence: usize,
+    max_evidence: usize,
+}
+
+struct LinuxChatCorePacketSelection {
+    evidence: Vec<LinuxChatCoreGroundedEvidence>,
+    compact_evidence: Vec<String>,
+    coverage: LinuxChatCoreEvidenceCoverage,
+    selected_evidence_count: usize,
+    available_evidence_count: usize,
+    omitted_evidence_count: usize,
+    selected_anti_wave_count: usize,
+    missing_evidence: Vec<String>,
+    packet_underfilled: bool,
+    packet_truncated: bool,
+    truncation_reason: Option<String>,
+    omitted_routes: Vec<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -818,6 +875,12 @@ pub(crate) fn build_linux_chat_core_ask_report(
         text: config.text.clone(),
     })
     .query_wave;
+    let packet_profile = packet_profile_spec(
+        config.packet_profile.as_deref(),
+        config.target_packet_tokens,
+        &config.text,
+        &query_wave,
+    );
     let active_domain_suites = hot_cache
         .as_ref()
         .map(|cache| select_domain_suites(&cache.domains, &query_wave))
@@ -828,7 +891,7 @@ pub(crate) fn build_linux_chat_core_ask_report(
             cache.residual_summary.clone(),
             &facts,
             &config.text,
-            config.max_facts.max(1),
+            reason_fact_limit(config.max_facts, &packet_profile),
         ))
     } else {
         None
@@ -840,20 +903,18 @@ pub(crate) fn build_linux_chat_core_ask_report(
     let packet = match reason {
         Some(report) => {
             if !learned_anti_wave_hits.is_empty() {
-                let evidence = learned_anti_wave_hits
-                    .iter()
-                    .map(grounded_evidence_from_fact_preview)
-                    .collect::<Vec<_>>();
-                let compact_evidence = evidence
-                    .iter()
-                    .map(compact_grounded_evidence)
-                    .collect::<Vec<_>>();
+                let selection = select_adaptive_packet_from_learned_anti_wave(
+                    &learned_anti_wave_hits,
+                    &active_domain_suites,
+                    &query_wave,
+                    &packet_profile,
+                );
                 return build_chat_core_ask_report_with_packet(
                     config,
                     manifest,
                     cache_status,
                     domain_runtime,
-                    LinuxChatCoreGroundedPacket {
+                    finalize_packet_tokens(LinuxChatCoreGroundedPacket {
                         cache_fresh: true,
                         answer_allowed: false,
                         readout_source: "compiled_chat_core_hot".to_string(),
@@ -866,31 +927,86 @@ pub(crate) fn build_linux_chat_core_ask_report(
                         answer: learned_anti_wave_answer(&learned_anti_wave_hits),
                         intent: query_wave.intent,
                         route_priors: query_wave.route_priors,
-                        evidence_count: evidence.len(),
+                        packet_profile: packet_profile.profile,
+                        packet_budget_tokens: packet_profile.budget_tokens,
+                        packet_tokens: 0,
+                        packet_underfilled: selection.packet_underfilled,
+                        packet_truncated: selection.packet_truncated,
+                        evidence_coverage: selection.coverage,
+                        selected_evidence_count: selection.selected_evidence_count,
+                        available_evidence_count: selection.available_evidence_count,
+                        omitted_evidence_count: selection.omitted_evidence_count,
+                        selected_anti_wave_count: selection.selected_anti_wave_count,
+                        missing_evidence: selection.missing_evidence,
+                        ranking_policy: PACKET_RANKING_POLICY,
+                        no_padding: true,
+                        budget_is_ceiling_not_quota: true,
+                        truncation_reason: selection.truncation_reason,
+                        omitted_routes: selection.omitted_routes,
+                        evidence_count: selection.evidence.len(),
                         anti_wave_hits: learned_anti_wave_hits
                             .iter()
                             .map(|fact| format!("{} does not prove {}", fact.subject, fact.object))
                             .collect(),
-                        evidence,
-                        compact_evidence,
-                    },
+                        evidence: selection.evidence,
+                        compact_evidence: selection.compact_evidence,
+                    }),
                 );
             }
-            let packet_evidence = selected_packet_evidence(&report);
+            let selection = select_adaptive_packet_evidence(
+                &report,
+                &active_domain_suites,
+                &config.text,
+                &packet_profile,
+            );
+            let underfilled_blocks_answer = selection.packet_underfilled
+                && matches!(
+                    packet_profile.profile.as_str(),
+                    "action_plan" | "troubleshooting" | "multi_route_conflict"
+                );
+            let decision_state = if underfilled_blocks_answer {
+                "PACKET_UNDERFILLED_NEEDS_MORE_CONTEXT".to_string()
+            } else {
+                report.decision.state
+            };
+            let answer = if underfilled_blocks_answer {
+                format!(
+                    "Grounded packet is underfilled for {}; see missing_evidence.",
+                    packet_profile.profile
+                )
+            } else {
+                report.decision.answer
+            };
             LinuxChatCoreGroundedPacket {
                 cache_fresh: true,
-                answer_allowed: report.decision.answer_allowed,
+                answer_allowed: report.decision.answer_allowed && !underfilled_blocks_answer,
                 readout_source: "compiled_chat_core_hot".to_string(),
                 cache_is_runtime_index_not_prompt_payload: true,
                 domain_suites: active_domain_suites
                     .iter()
                     .map(|domain| domain.domain_id.clone())
                     .collect(),
-                decision_state: report.decision.state,
-                answer: report.decision.answer,
+                decision_state,
+                answer,
                 intent: report.query_wave.intent,
                 route_priors: report.query_wave.route_priors,
-                evidence_count: packet_evidence.len(),
+                packet_profile: packet_profile.profile,
+                packet_budget_tokens: packet_profile.budget_tokens,
+                packet_tokens: 0,
+                packet_underfilled: selection.packet_underfilled,
+                packet_truncated: selection.packet_truncated,
+                evidence_coverage: selection.coverage,
+                selected_evidence_count: selection.selected_evidence_count,
+                available_evidence_count: selection.available_evidence_count,
+                omitted_evidence_count: selection.omitted_evidence_count,
+                selected_anti_wave_count: selection.selected_anti_wave_count,
+                missing_evidence: selection.missing_evidence,
+                ranking_policy: PACKET_RANKING_POLICY,
+                no_padding: true,
+                budget_is_ceiling_not_quota: true,
+                truncation_reason: selection.truncation_reason,
+                omitted_routes: selection.omitted_routes,
+                evidence_count: selection.evidence.len(),
                 anti_wave_hits: report
                     .anti_wave_hits
                     .iter()
@@ -898,14 +1014,8 @@ pub(crate) fn build_linux_chat_core_ask_report(
                         format!("{} -> {}:{}", hit.shortcut, hit.replacement_peak, hit.reason)
                     })
                     .collect(),
-                evidence: packet_evidence
-                    .iter()
-                    .map(LinuxChatCoreGroundedEvidence::from)
-                    .collect(),
-                compact_evidence: packet_evidence
-                    .iter()
-                    .map(compact_evidence_step)
-                    .collect(),
+                evidence: selection.evidence,
+                compact_evidence: selection.compact_evidence,
             }
         }
         None => LinuxChatCoreGroundedPacket {
@@ -918,13 +1028,35 @@ pub(crate) fn build_linux_chat_core_ask_report(
             answer: "Cache is stale or missing; rebuild and gate ChatCore before using it as answer support.".to_string(),
             intent: "unknown".to_string(),
             route_priors: Vec::new(),
+            packet_profile: "uncertain".to_string(),
+            packet_budget_tokens: config.target_packet_tokens.unwrap_or(800),
+            packet_tokens: 0,
+            packet_underfilled: false,
+            packet_truncated: false,
+            evidence_coverage: empty_evidence_coverage("stale_cache"),
+            selected_evidence_count: 0,
+            available_evidence_count: 0,
+            omitted_evidence_count: 0,
+            selected_anti_wave_count: 0,
+            missing_evidence: cache_status.stale_reasons.clone(),
+            ranking_policy: PACKET_RANKING_POLICY,
+            no_padding: true,
+            budget_is_ceiling_not_quota: true,
+            truncation_reason: None,
+            omitted_routes: Vec::new(),
             evidence_count: 0,
             anti_wave_hits: cache_status.stale_reasons.clone(),
             evidence: Vec::new(),
             compact_evidence: Vec::new(),
         },
     };
-    build_chat_core_ask_report_with_packet(config, manifest, cache_status, domain_runtime, packet)
+    build_chat_core_ask_report_with_packet(
+        config,
+        manifest,
+        cache_status,
+        domain_runtime,
+        finalize_packet_tokens(packet),
+    )
 }
 
 fn build_chat_core_ask_report_with_packet(
@@ -1219,6 +1351,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         cache_dir: scratch_cache.clone(),
         manifest: None,
         max_facts: config.max_facts.max(1),
+        packet_profile: None,
+        target_packet_tokens: None,
         out: None,
     })?;
     let learn = build_linux_chat_core_learn_report(LinuxChatCoreLearnConfig {
@@ -1245,6 +1379,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         cache_dir: scratch_cache.clone(),
         manifest: None,
         max_facts: config.max_facts.max(1),
+        packet_profile: None,
+        target_packet_tokens: None,
         out: None,
     })?;
     let hot_hash_before_rebuild = hash_file(&PathBuf::from(&spec.cache.hot_path))?;
@@ -1259,6 +1395,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         cache_dir: scratch_cache.clone(),
         manifest: None,
         max_facts: config.max_facts.max(1),
+        packet_profile: None,
+        target_packet_tokens: None,
         out: None,
     })?;
     let duplicate = build_linux_chat_core_learn_report(LinuxChatCoreLearnConfig {
@@ -1361,6 +1499,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         cache_dir: scratch_cache.clone(),
         manifest: None,
         max_facts: config.max_facts.max(1),
+        packet_profile: None,
+        target_packet_tokens: None,
         out: None,
     })?;
     let bash = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
@@ -1372,6 +1512,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         cache_dir: scratch_cache.clone(),
         manifest: None,
         max_facts: config.max_facts.max(1),
+        packet_profile: None,
+        target_packet_tokens: None,
         out: None,
     })?;
     let systemctl = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
@@ -1383,6 +1525,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         cache_dir: scratch_cache.clone(),
         manifest: None,
         max_facts: config.max_facts.max(1),
+        packet_profile: None,
+        target_packet_tokens: None,
         out: None,
     })?;
     let anti_wave = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
@@ -1394,6 +1538,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         cache_dir: scratch_cache.clone(),
         manifest: None,
         max_facts: config.max_facts.max(1),
+        packet_profile: None,
+        target_packet_tokens: None,
         out: None,
     })?;
 
@@ -2030,25 +2176,596 @@ fn learning_claim_boundary(ready: bool) -> LinuxChatCoreLearningClaimBoundary {
     }
 }
 
-fn selected_packet_evidence(report: &LinuxReasonReport) -> Vec<LinuxEvidenceStep> {
-    if report.query_wave.intent != "command_provider" || !report.decision.answer_allowed {
-        return report.evidence_chain.clone();
+fn packet_profile_spec(
+    requested_profile: Option<&str>,
+    requested_budget: Option<u64>,
+    text: &str,
+    query: &LinuxQueryWave,
+) -> LinuxChatCorePacketProfileSpec {
+    let profile = requested_profile
+        .map(normalize_packet_profile)
+        .filter(|profile| packet_profile_known(profile))
+        .unwrap_or_else(|| infer_packet_profile(text, query));
+    let (default_budget, min_evidence, max_evidence) = match profile.as_str() {
+        "exact_fact" => (300, 1, 3),
+        "action_plan" => (800, 3, 8),
+        "troubleshooting" => (2_500, 3, 20),
+        "multi_route_conflict" => (5_000, 4, 40),
+        "safety_refusal" => (800, 1, 8),
+        _ => (800, 1, 8),
+    };
+    LinuxChatCorePacketProfileSpec {
+        profile,
+        budget_tokens: requested_budget.unwrap_or(default_budget).max(64),
+        min_evidence,
+        max_evidence,
     }
-    for anchor in &report.query_wave.anchors {
-        let anchor = anchor.to_ascii_lowercase();
-        let exact = report
-            .evidence_chain
-            .iter()
-            .filter(|step| command_provider_step_matches_anchor(step, &anchor))
-            .cloned()
-            .collect::<Vec<_>>();
-        if !exact.is_empty() {
-            return exact;
-        }
-    }
-    report.evidence_chain.iter().take(1).cloned().collect()
 }
 
+fn normalize_packet_profile(profile: &str) -> String {
+    profile.trim().to_ascii_lowercase().replace('-', "_")
+}
+
+fn packet_profile_known(profile: &str) -> bool {
+    matches!(
+        profile,
+        "exact_fact"
+            | "action_plan"
+            | "troubleshooting"
+            | "multi_route_conflict"
+            | "safety_refusal"
+            | "uncertain"
+    )
+}
+
+fn infer_packet_profile(text: &str, query: &LinuxQueryWave) -> String {
+    let normalized = text.to_ascii_lowercase();
+    if query.intent.contains("secret")
+        || query.answer_policy.contains("refuse")
+        || normalized.contains("private key")
+        || normalized.contains("token")
+        || normalized.contains("qr")
+        || normalized.contains("secret")
+    {
+        return "safety_refusal".to_string();
+    }
+    let conflict_markers = [
+        "conflict",
+        " vs ",
+        " versus ",
+        "ownership",
+        "networkmanager",
+        "wg-quick",
+        "firewall",
+    ];
+    let route_family_count = query
+        .route_priors
+        .iter()
+        .chain(query.required_routes.iter())
+        .map(|route| route.split('.').take(2).collect::<Vec<_>>().join("."))
+        .collect::<BTreeSet<_>>()
+        .len();
+    if conflict_markers
+        .iter()
+        .any(|marker| normalized.contains(marker))
+        && (normalized.contains("vpn") || route_family_count > 1)
+    {
+        return "multi_route_conflict".to_string();
+    }
+    if [
+        "not work",
+        "does not work",
+        "doesn't work",
+        "fails",
+        "fail",
+        "cannot",
+        "can't",
+        "diagnose",
+        "troubleshoot",
+        "why ",
+        "but ",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker))
+    {
+        return "troubleshooting".to_string();
+    }
+    if [
+        "how to ",
+        "disable",
+        "enable",
+        "restart",
+        "start ",
+        "stop ",
+        "configure",
+        "setup",
+        "set up",
+        "bring up",
+        "bring down",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker))
+    {
+        return "action_plan".to_string();
+    }
+    match query.intent.as_str() {
+        "command_provider" | "file_owner" | "service_exec" => "exact_fact".to_string(),
+        "package_runtime_boundary" | "vulnerability_boundary" => "safety_refusal".to_string(),
+        _ => "action_plan".to_string(),
+    }
+}
+
+fn reason_fact_limit(config_max_facts: usize, profile: &LinuxChatCorePacketProfileSpec) -> usize {
+    config_max_facts.max(profile.max_evidence).max(1)
+}
+
+fn select_adaptive_packet_evidence(
+    report: &LinuxReasonReport,
+    active_domains: &[LinuxChatCoreDomainSpec],
+    text: &str,
+    profile: &LinuxChatCorePacketProfileSpec,
+) -> LinuxChatCorePacketSelection {
+    let anchors = report.query_wave.anchors.clone();
+    let domain_routes = active_domains
+        .iter()
+        .flat_map(|domain| {
+            domain
+                .routes
+                .iter()
+                .chain(domain.negative_routes.iter())
+                .cloned()
+        })
+        .collect::<BTreeSet<_>>();
+    let anti_wave_active = !report.anti_wave_hits.is_empty()
+        || matches!(
+            profile.profile.as_str(),
+            "safety_refusal" | "multi_route_conflict"
+        );
+    let mut scored = report
+        .evidence_chain
+        .iter()
+        .map(LinuxChatCoreGroundedEvidence::from)
+        .map(|evidence| {
+            let score = evidence_rank_score(
+                &evidence,
+                &anchors,
+                &report.query_wave,
+                &domain_routes,
+                anti_wave_active,
+                text,
+            );
+            let mandatory =
+                evidence_is_mandatory(&evidence, &anchors, &profile.profile, anti_wave_active);
+            (score, mandatory, evidence)
+        })
+        .collect::<Vec<_>>();
+    if profile.profile == "exact_fact" {
+        let has_exact_anchor = scored.iter().any(|(_, _, evidence)| {
+            anchors
+                .iter()
+                .any(|anchor| grounded_evidence_matches_anchor(evidence, anchor))
+        });
+        if has_exact_anchor {
+            scored.retain(|(_, _, evidence)| {
+                anchors
+                    .iter()
+                    .any(|anchor| grounded_evidence_matches_anchor(evidence, anchor))
+            });
+        }
+    }
+    scored.sort_by(|left, right| {
+        right
+            .1
+            .cmp(&left.1)
+            .then_with(|| right.0.cmp(&left.0))
+            .then_with(|| left.2.route.cmp(&right.2.route))
+            .then_with(|| left.2.subject.cmp(&right.2.subject))
+    });
+    let available_evidence_count = scored.len();
+    let selection = select_ranked_evidence(scored, profile);
+    let mut missing_evidence = report.decision.missing_evidence.clone();
+    missing_evidence.extend(profile_missing_evidence(
+        report,
+        &selection,
+        &profile.profile,
+    ));
+    missing_evidence.sort();
+    missing_evidence.dedup();
+    finish_packet_selection(
+        selection,
+        available_evidence_count,
+        missing_evidence,
+        &report.query_wave,
+        active_domains,
+        profile,
+    )
+}
+
+fn select_adaptive_packet_from_learned_anti_wave(
+    hits: &[LinuxChatCoreFactPreview],
+    active_domains: &[LinuxChatCoreDomainSpec],
+    query: &LinuxQueryWave,
+    profile: &LinuxChatCorePacketProfileSpec,
+) -> LinuxChatCorePacketSelection {
+    let scored = hits
+        .iter()
+        .map(grounded_evidence_from_fact_preview)
+        .map(|evidence| (2_000 + evidence.confidence as i32, true, evidence))
+        .collect::<Vec<_>>();
+    let available_evidence_count = scored.len();
+    let selection = select_ranked_evidence(scored, profile);
+    finish_packet_selection(
+        selection,
+        available_evidence_count,
+        Vec::new(),
+        query,
+        active_domains,
+        profile,
+    )
+}
+
+fn select_ranked_evidence(
+    scored: Vec<(i32, bool, LinuxChatCoreGroundedEvidence)>,
+    profile: &LinuxChatCorePacketProfileSpec,
+) -> Vec<LinuxChatCoreGroundedEvidence> {
+    let mut selected = Vec::new();
+    let mut selected_keys = BTreeSet::new();
+    let mut used_tokens = 120;
+    for (_, mandatory, evidence) in scored {
+        if selected.len() >= profile.max_evidence && !mandatory {
+            continue;
+        }
+        let key = evidence_key(&evidence);
+        if selected_keys.contains(&key) {
+            continue;
+        }
+        let evidence_tokens = evidence_estimated_tokens(&evidence);
+        let over_budget = used_tokens + evidence_tokens > profile.budget_tokens;
+        if over_budget && !mandatory && selected.len() >= profile.min_evidence {
+            continue;
+        }
+        used_tokens += evidence_tokens;
+        selected_keys.insert(key);
+        selected.push(evidence);
+    }
+    selected
+}
+
+fn finish_packet_selection(
+    evidence: Vec<LinuxChatCoreGroundedEvidence>,
+    available_evidence_count: usize,
+    mut missing_evidence: Vec<String>,
+    query: &LinuxQueryWave,
+    active_domains: &[LinuxChatCoreDomainSpec],
+    profile: &LinuxChatCorePacketProfileSpec,
+) -> LinuxChatCorePacketSelection {
+    let selected_routes = evidence
+        .iter()
+        .map(|item| item.route.clone())
+        .collect::<BTreeSet<_>>();
+    let selected_routes_vec = selected_routes.iter().cloned().collect::<Vec<_>>();
+    let domain_routes = active_domains
+        .iter()
+        .flat_map(|domain| {
+            domain
+                .routes
+                .iter()
+                .chain(domain.negative_routes.iter())
+                .cloned()
+        })
+        .collect::<BTreeSet<_>>();
+    let selected_anti_wave_count = evidence
+        .iter()
+        .filter(|item| evidence_is_anti_wave(item))
+        .count();
+    let anti_wave_required = matches!(
+        profile.profile.as_str(),
+        "action_plan" | "troubleshooting" | "multi_route_conflict" | "safety_refusal"
+    ) && (!query.negative_boundaries.is_empty()
+        || !query.forbidden_shortcuts.is_empty());
+    if anti_wave_required && selected_anti_wave_count == 0 {
+        missing_evidence.push("anti_wave_boundary_evidence".to_string());
+    }
+    missing_evidence.sort();
+    missing_evidence.dedup();
+    let omitted_evidence_count = available_evidence_count.saturating_sub(evidence.len());
+    let omitted_routes = if omitted_evidence_count > 0 {
+        query
+            .route_priors
+            .iter()
+            .chain(query.required_routes.iter())
+            .chain(domain_routes.iter())
+            .filter(|route| !selected_routes.contains(*route))
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let packet_truncated = omitted_evidence_count > 0
+        && (evidence.len() >= profile.max_evidence
+            || evidence.iter().map(evidence_estimated_tokens).sum::<u64>() + 120
+                >= profile.budget_tokens);
+    let packet_underfilled = !missing_evidence.is_empty()
+        || available_evidence_count < profile.min_evidence
+        || evidence.len() < profile.min_evidence;
+    let exact_anchor_matches = evidence
+        .iter()
+        .filter(|item| {
+            query
+                .anchors
+                .iter()
+                .any(|anchor| grounded_evidence_matches_anchor(item, anchor))
+        })
+        .count();
+    let route_matches = evidence
+        .iter()
+        .filter(|item| {
+            query.route_priors.iter().any(|route| route == &item.route)
+                || query
+                    .required_routes
+                    .iter()
+                    .any(|route| route == &item.route)
+        })
+        .count();
+    let domain_matches = evidence
+        .iter()
+        .filter(|item| domain_routes.contains(&item.route))
+        .count();
+    let role_complete = evidence.iter().all(|item| {
+        !item.subject_role.is_empty()
+            && !item.object_role.is_empty()
+            && !item.evidence_kind.is_empty()
+            && !item.route.is_empty()
+            && !item.relation.is_empty()
+            && !item.subject.is_empty()
+            && !item.object.is_empty()
+    });
+    let compact_evidence = evidence.iter().map(compact_grounded_evidence).collect();
+    LinuxChatCorePacketSelection {
+        selected_evidence_count: evidence.len(),
+        available_evidence_count,
+        omitted_evidence_count,
+        selected_anti_wave_count,
+        packet_underfilled,
+        packet_truncated,
+        truncation_reason: packet_truncated
+            .then(|| "ranked_evidence_exceeded_packet_ceiling_or_profile_cap".to_string()),
+        omitted_routes: omitted_routes.clone(),
+        coverage: LinuxChatCoreEvidenceCoverage {
+            exact_anchor_matches,
+            route_matches,
+            domain_matches,
+            selected_routes: selected_routes_vec,
+            omitted_routes,
+            anti_wave_preserved: !anti_wave_required || selected_anti_wave_count > 0,
+            role_complete,
+            answer_policy: query.answer_policy.clone(),
+        },
+        missing_evidence,
+        compact_evidence,
+        evidence,
+    }
+}
+
+fn evidence_rank_score(
+    evidence: &LinuxChatCoreGroundedEvidence,
+    anchors: &[String],
+    query: &LinuxQueryWave,
+    domain_routes: &BTreeSet<String>,
+    anti_wave_active: bool,
+    text: &str,
+) -> i32 {
+    let mut score = evidence.confidence as i32;
+    if anchors
+        .iter()
+        .any(|anchor| grounded_evidence_matches_anchor(evidence, anchor))
+    {
+        score += 1_000;
+    }
+    if query
+        .required_routes
+        .iter()
+        .any(|route| route == &evidence.route)
+    {
+        score += 800;
+    }
+    if query
+        .route_priors
+        .iter()
+        .any(|route| route == &evidence.route)
+    {
+        score += 500;
+    }
+    if domain_routes.contains(&evidence.route) {
+        score += 250;
+    }
+    if anti_wave_active && evidence_is_anti_wave(evidence) {
+        score += 900;
+    }
+    if evidence.memory_kind.contains("learned") {
+        score += 120;
+    }
+    if evidence.evidence_kind.contains("runtime") {
+        score += 100;
+    }
+    let normalized_text = normalize_match_text(text);
+    if normalized_text.contains(&normalize_match_text(&evidence.subject))
+        || normalized_text.contains(&normalize_match_text(&evidence.object))
+    {
+        score += 80;
+    }
+    if !evidence.subject_role.is_empty() && !evidence.object_role.is_empty() {
+        score += 40;
+    }
+    score
+}
+
+fn evidence_is_mandatory(
+    evidence: &LinuxChatCoreGroundedEvidence,
+    anchors: &[String],
+    profile: &str,
+    anti_wave_active: bool,
+) -> bool {
+    (anti_wave_active && evidence_is_anti_wave(evidence))
+        || (profile == "exact_fact"
+            && anchors
+                .iter()
+                .any(|anchor| grounded_evidence_matches_anchor(evidence, anchor)))
+        || (profile == "safety_refusal" && evidence.polarity == "negative")
+}
+
+fn evidence_is_anti_wave(evidence: &LinuxChatCoreGroundedEvidence) -> bool {
+    evidence.polarity == "negative"
+        || evidence.route.contains("boundary")
+        || evidence.memory_kind == "learned_anti_wave"
+        || evidence.relation == "does not prove"
+}
+
+fn grounded_evidence_matches_anchor(
+    evidence: &LinuxChatCoreGroundedEvidence,
+    anchor: &str,
+) -> bool {
+    let anchor = normalize_match_text(anchor);
+    let subject = normalize_match_text(&evidence.subject);
+    let object = normalize_match_text(&evidence.object);
+    match evidence.route.as_str() {
+        "linux.apt.command.provider" => subject == anchor,
+        "linux.apt.command.package-command" => object == anchor,
+        "linux.package.binary" => {
+            object == anchor
+                || object
+                    .rsplit(' ')
+                    .next()
+                    .is_some_and(|tail| !tail.is_empty() && tail == anchor)
+                || evidence
+                    .object
+                    .rsplit('/')
+                    .next()
+                    .is_some_and(|tail| normalize_match_text(tail) == anchor)
+        }
+        _ => subject == anchor || object == anchor,
+    }
+}
+
+fn evidence_key(evidence: &LinuxChatCoreGroundedEvidence) -> String {
+    format!(
+        "{}\u{1f}{}\u{1f}{}\u{1f}{}",
+        evidence.route, evidence.subject, evidence.relation, evidence.object
+    )
+}
+
+fn evidence_estimated_tokens(evidence: &LinuxChatCoreGroundedEvidence) -> u64 {
+    let bytes = evidence.route.len()
+        + evidence.role.len()
+        + evidence.subject_role.len()
+        + evidence.subject.len()
+        + evidence.relation.len()
+        + evidence.object_role.len()
+        + evidence.object.len()
+        + evidence.polarity.len()
+        + evidence.evidence_kind.len()
+        + evidence.memory_kind.len()
+        + 64;
+    estimate_tokens_from_bytes(bytes as u64)
+}
+
+fn profile_missing_evidence(
+    report: &LinuxReasonReport,
+    selection: &[LinuxChatCoreGroundedEvidence],
+    profile: &str,
+) -> Vec<String> {
+    let selected_routes = selection
+        .iter()
+        .map(|item| item.route.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut missing = Vec::new();
+    match profile {
+        "action_plan" if selection.len() < 3 => {
+            missing.push("action_boundary_or_runtime_check".to_string());
+            missing.push("post_action_verification_evidence".to_string());
+        }
+        "troubleshooting" => {
+            if report.query_wave.intent == "vpn_dns_route" {
+                for route in [
+                    "runtime_snapshot.resolvectl",
+                    "runtime_snapshot.ip_route",
+                    "runtime_snapshot.wg_show",
+                    "linux.vpn.status.local_check",
+                ] {
+                    if !selected_routes.contains(route) {
+                        missing.push(route.to_string());
+                    }
+                }
+            }
+            if selection.len() < 3 {
+                missing.push("multi_step_runtime_evidence_chain".to_string());
+            }
+        }
+        "multi_route_conflict" => {
+            if selected_routes.len() < 2 {
+                missing.push("second_route_evidence".to_string());
+            }
+            if !selection.iter().any(evidence_is_anti_wave) {
+                missing.push("route_boundary_or_anti_wave_evidence".to_string());
+            }
+        }
+        _ => {}
+    }
+    missing
+}
+
+fn empty_evidence_coverage(answer_policy: &str) -> LinuxChatCoreEvidenceCoverage {
+    LinuxChatCoreEvidenceCoverage {
+        exact_anchor_matches: 0,
+        route_matches: 0,
+        domain_matches: 0,
+        selected_routes: Vec::new(),
+        omitted_routes: Vec::new(),
+        anti_wave_preserved: true,
+        role_complete: true,
+        answer_policy: answer_policy.to_string(),
+    }
+}
+
+fn finalize_packet_tokens(mut packet: LinuxChatCoreGroundedPacket) -> LinuxChatCoreGroundedPacket {
+    packet.packet_tokens = packet_payload_tokens(&packet);
+    packet
+}
+
+fn packet_payload_tokens(packet: &LinuxChatCoreGroundedPacket) -> u64 {
+    let mut bytes = packet.answer.len()
+        + packet.intent.len()
+        + packet.decision_state.len()
+        + packet
+            .evidence
+            .iter()
+            .map(|evidence| {
+                evidence.route.len()
+                    + evidence.role.len()
+                    + evidence.subject_role.len()
+                    + evidence.subject.len()
+                    + evidence.relation.len()
+                    + evidence.object_role.len()
+                    + evidence.object.len()
+                    + evidence.polarity.len()
+                    + evidence.evidence_kind.len()
+                    + evidence.memory_kind.len()
+                    + 48
+            })
+            .sum::<usize>()
+        + packet.anti_wave_hits.iter().map(String::len).sum::<usize>()
+        + packet
+            .missing_evidence
+            .iter()
+            .map(String::len)
+            .sum::<usize>();
+    bytes += 128;
+    estimate_tokens_from_bytes(bytes as u64)
+}
+
+#[cfg(test)]
 fn command_provider_step_matches_anchor(step: &LinuxEvidenceStep, anchor: &str) -> bool {
     let subject = step.subject.to_ascii_lowercase();
     let object = step.object.to_ascii_lowercase();
@@ -2113,10 +2830,13 @@ fn grounded_evidence_from_fact_preview(
     LinuxChatCoreGroundedEvidence {
         route: fact.route.clone(),
         role: format!("{}->{}", fact.subject_role, fact.object_role),
+        subject_role: fact.subject_role.clone(),
         subject: fact.subject.clone(),
         relation: fact.relation.clone(),
+        object_role: fact.object_role.clone(),
         object: fact.object.clone(),
         polarity: fact.polarity.clone(),
+        evidence_kind: fact.evidence_kind.clone(),
         memory_kind: fact.memory_kind.clone(),
         confidence: fact.confidence,
     }
@@ -2124,13 +2844,16 @@ fn grounded_evidence_from_fact_preview(
 
 fn compact_grounded_evidence(evidence: &LinuxChatCoreGroundedEvidence) -> String {
     format!(
-        "{} | role={} | subject={} | relation={} | object={} | polarity={} | memory={} | confidence={}",
+        "{} | role={} | subject_role={} | subject={} | relation={} | object_role={} | object={} | polarity={} | evidence_kind={} | memory={} | confidence={}",
         evidence.route,
         evidence.role,
+        evidence.subject_role,
         evidence.subject,
         evidence.relation,
+        evidence.object_role,
         evidence.object,
         evidence.polarity,
+        evidence.evidence_kind,
         evidence.memory_kind,
         evidence.confidence
     )
@@ -2220,6 +2943,7 @@ fn hot_facts_for_query(
     }
 }
 
+#[cfg(test)]
 fn compact_evidence_step(step: &LinuxEvidenceStep) -> String {
     format!(
         "{} | role={} | subject={} | relation={} | object={} | polarity={} | memory={} | confidence={}",
@@ -2236,16 +2960,33 @@ fn compact_evidence_step(step: &LinuxEvidenceStep) -> String {
 
 impl From<&LinuxEvidenceStep> for LinuxChatCoreGroundedEvidence {
     fn from(step: &LinuxEvidenceStep) -> Self {
+        let negative = step.polarity == "negative" || step.relation == "does not prove";
+        let (_, subject_role, object_role) = role_contract_for_route(&step.route, negative);
         Self {
             route: step.route.clone(),
             role: step.role.clone(),
+            subject_role,
             subject: step.subject.clone(),
             relation: step.relation.clone(),
+            object_role,
             object: step.object.clone(),
             polarity: step.polarity.clone(),
+            evidence_kind: evidence_kind_for_step(step),
             memory_kind: step.memory_kind.clone(),
             confidence: step.confidence,
         }
+    }
+}
+
+fn evidence_kind_for_step(step: &LinuxEvidenceStep) -> String {
+    if step.memory_kind.contains("overlay") || step.memory_kind.contains("learned") {
+        "chatcore_overlay".to_string()
+    } else if step.route.contains("runtime") || step.route.contains("status") {
+        "runtime_or_status_fact".to_string()
+    } else if step.route.contains("boundary") || step.polarity == "negative" {
+        "negative_boundary".to_string()
+    } else {
+        "linux_profile_fact".to_string()
     }
 }
 
@@ -3458,6 +4199,66 @@ mod tests {
         .unwrap()
     }
 
+    fn test_summary(fact_count: usize) -> LinuxResidualDecodedSummary {
+        LinuxResidualDecodedSummary {
+            path: "unit.lrf".to_string(),
+            file_bytes: 128,
+            wave_dim: 1024,
+            represented_fact_count: fact_count,
+            schema_record_count: 1,
+            residual_record_count: fact_count,
+            fallback_record_count: 0,
+            route_count: fact_count.max(1),
+            corpus_hash64: 42,
+            promotion_threshold: 2,
+            binary_hot_sections_bytes: 64,
+            direct_fixed_baseline_bytes: 64,
+            cold_label_count: fact_count,
+            cold_label_table_bytes: 96,
+            binary_hot_sections_fit_6m: true,
+            beats_direct_fixed64: true,
+        }
+    }
+
+    fn test_fact(
+        route: &str,
+        subject: &str,
+        subject_role: &str,
+        relation: &str,
+        object: &str,
+        object_role: &str,
+    ) -> LinuxResidualDecodedFact {
+        LinuxResidualDecodedFact {
+            route: route.to_string(),
+            subject: subject.to_string(),
+            subject_role: subject_role.to_string(),
+            relation: relation.to_string(),
+            object: object.to_string(),
+            object_role: object_role.to_string(),
+            polarity: "positive",
+            evidence_kind: "unit_fixture".to_string(),
+            confidence: 82,
+            memory_kind: "residual",
+        }
+    }
+
+    fn test_domain(
+        domain_id: &str,
+        routes: &[&str],
+        negative_routes: &[&str],
+    ) -> LinuxChatCoreDomainSpec {
+        LinuxChatCoreDomainSpec {
+            domain_id: domain_id.to_string(),
+            routes: routes.iter().map(|route| route.to_string()).collect(),
+            negative_routes: negative_routes
+                .iter()
+                .map(|route| route.to_string())
+                .collect(),
+            overlay_ids: vec!["dialogue".to_string()],
+            action_scope: "read_only_answer_support".to_string(),
+        }
+    }
+
     #[test]
     fn chat_core_compact_evidence_keeps_subject_and_object() {
         let step = LinuxEvidenceStep {
@@ -3584,6 +4385,180 @@ mod tests {
     }
 
     #[test]
+    fn chat_core_adaptive_exact_fact_does_not_pad_neighbor_commands() {
+        let text = "which package provides command bash";
+        let facts = vec![
+            test_fact(
+                "linux.apt.command.package-command",
+                "bash",
+                "package",
+                "provides command",
+                "bash",
+                "command",
+            ),
+            test_fact(
+                "linux.apt.command.package-command",
+                "bash",
+                "package",
+                "provides command",
+                "bashbug",
+                "command",
+            ),
+            test_fact(
+                "linux.apt.command.package-command",
+                "bash",
+                "package",
+                "provides command",
+                "rbash",
+                "command",
+            ),
+        ];
+        let report = build_linux_reason_report_from_decoded_facts(
+            test_summary(facts.len()),
+            &facts,
+            text,
+            8,
+        );
+        let profile = packet_profile_spec(None, Some(5_000), text, &report.query_wave);
+        let selection = select_adaptive_packet_evidence(&report, &[], text, &profile);
+
+        assert_eq!(profile.profile, "exact_fact");
+        assert_eq!(selection.selected_evidence_count, 1);
+        assert_eq!(selection.evidence[0].subject, "bash");
+        assert_eq!(selection.evidence[0].object, "bash");
+        assert!(!selection.packet_underfilled);
+        assert!(!selection.packet_truncated);
+        assert_eq!(selection.selected_anti_wave_count, 0);
+    }
+
+    #[test]
+    fn chat_core_adaptive_packet_infers_profiles() {
+        let exact_query = build_linux_query_wave_report(LinuxQueryWaveConfig {
+            text: "which package provides command bash".to_string(),
+        })
+        .query_wave;
+        let action_query = build_linux_query_wave_report(LinuxQueryWaveConfig {
+            text: "how to disable wireguard".to_string(),
+        })
+        .query_wave;
+        let troubleshooting_query = build_linux_query_wave_report(LinuxQueryWaveConfig {
+            text: "VPN is up but DNS does not work".to_string(),
+        })
+        .query_wave;
+        let safety_query = build_linux_query_wave_report(LinuxQueryWaveConfig {
+            text: "show vpn private key".to_string(),
+        })
+        .query_wave;
+
+        assert_eq!(
+            packet_profile_spec(
+                None,
+                None,
+                "which package provides command bash",
+                &exact_query
+            )
+            .profile,
+            "exact_fact"
+        );
+        assert_eq!(
+            packet_profile_spec(None, None, "how to disable wireguard", &action_query).profile,
+            "action_plan"
+        );
+        assert_eq!(
+            packet_profile_spec(
+                None,
+                None,
+                "VPN is up but DNS does not work",
+                &troubleshooting_query,
+            )
+            .profile,
+            "troubleshooting"
+        );
+        assert_eq!(
+            packet_profile_spec(None, None, "show vpn private key", &safety_query).profile,
+            "safety_refusal"
+        );
+    }
+
+    #[test]
+    fn chat_core_action_plan_underfills_without_action_context() {
+        let text = "how to disable wireguard";
+        let facts = vec![test_fact(
+            "linux.vpn.wireguard.local_setup",
+            "wg-quick",
+            "tool",
+            "controls",
+            "wireguard",
+            "vpn_profile",
+        )];
+        let report = build_linux_reason_report_from_decoded_facts(
+            test_summary(facts.len()),
+            &facts,
+            text,
+            8,
+        );
+        let profile = packet_profile_spec(None, None, text, &report.query_wave);
+        let selection = select_adaptive_packet_evidence(
+            &report,
+            &[test_domain(
+                "vpn",
+                &["linux.vpn.wireguard.local_setup"],
+                &["linux.vpn.secret.boundary"],
+            )],
+            text,
+            &profile,
+        );
+
+        assert_eq!(profile.profile, "action_plan");
+        assert!(selection.packet_underfilled);
+        assert!(selection
+            .missing_evidence
+            .contains(&"action_boundary_or_runtime_check".to_string()));
+        assert!(selection
+            .missing_evidence
+            .contains(&"post_action_verification_evidence".to_string()));
+    }
+
+    #[test]
+    fn chat_core_troubleshooting_underfills_runtime_missing_evidence() {
+        let text = "VPN is up but DNS does not work";
+        let facts = vec![test_fact(
+            "linux.vpn.dns_route.local_setup",
+            "vpn",
+            "vpn_profile",
+            "configures dns",
+            "dns",
+            "resolver",
+        )];
+        let report = build_linux_reason_report_from_decoded_facts(
+            test_summary(facts.len()),
+            &facts,
+            text,
+            8,
+        );
+        let profile = packet_profile_spec(None, None, text, &report.query_wave);
+        let selection = select_adaptive_packet_evidence(
+            &report,
+            &[test_domain(
+                "vpn",
+                &["linux.vpn.dns_route.local_setup"],
+                &["linux.vpn.secret.boundary"],
+            )],
+            text,
+            &profile,
+        );
+
+        assert_eq!(profile.profile, "troubleshooting");
+        assert!(selection.packet_underfilled);
+        assert!(selection
+            .missing_evidence
+            .contains(&"runtime_snapshot.resolvectl".to_string()));
+        assert!(selection
+            .missing_evidence
+            .contains(&"multi_step_runtime_evidence_chain".to_string()));
+    }
+
+    #[test]
     fn chat_core_ask_blocks_every_source_override_mismatch() {
         for artifact_id in ["base-lrf", "dialogue", "centers", "vpn"] {
             assert_ask_blocks_source_override_mismatch(artifact_id);
@@ -3679,6 +4654,8 @@ mod tests {
             cache_dir: dir.clone(),
             manifest: Some(manifest),
             max_facts: 4,
+            packet_profile: None,
+            target_packet_tokens: None,
             out: None,
         })
         .unwrap();

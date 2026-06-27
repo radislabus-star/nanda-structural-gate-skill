@@ -118,7 +118,12 @@
       "routes": [
         "linux.vpn.status",
         "linux.vpn.enable",
-        "linux.vpn.disable"
+        "linux.vpn.disable",
+        "linux.vpn.wireguard.local_setup",
+        "linux.vpn.status.local_check",
+        "linux.vpn.dns_route.local_setup",
+        "linux.vpn.trusttunnel.local_safety",
+        "linux.vpn.secret.boundary"
       ],
       "negative_routes": [
         "vpn_package_installed_does_not_prove_tunnel_active",

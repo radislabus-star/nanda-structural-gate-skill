@@ -1871,6 +1871,10 @@ struct LlmwaveBigLinuxChatCoreAskArgs {
     manifest: Option<PathBuf>,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
+    #[arg(long = "packet-profile")]
+    packet_profile: Option<String>,
+    #[arg(long = "target-packet-tokens")]
+    target_packet_tokens: Option<u64>,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -4955,6 +4959,8 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     cache_dir: paths.cache_dir,
                     manifest: args.manifest,
                     max_facts: args.max_facts,
+                    packet_profile: args.packet_profile,
+                    target_packet_tokens: args.target_packet_tokens,
                     out: args.out,
                 },
             )?;
@@ -4974,6 +4980,20 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "grounded_packet_estimated_tokens: {}",
                         report.token_economics.grounded_packet_estimated_tokens
+                    );
+                    println!("packet_profile: {}", report.grounded_packet.packet_profile);
+                    println!(
+                        "packet_budget_tokens: {}",
+                        report.grounded_packet.packet_budget_tokens
+                    );
+                    println!("packet_tokens: {}", report.grounded_packet.packet_tokens);
+                    println!(
+                        "packet_underfilled: {}",
+                        report.grounded_packet.packet_underfilled
+                    );
+                    println!(
+                        "packet_truncated: {}",
+                        report.grounded_packet.packet_truncated
                     );
                     println!(
                         "actual_answer_context_estimated_tokens: {}",
@@ -5004,6 +5024,15 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- readout source: `{}`",
                         report.grounded_packet.readout_source
+                    );
+                    println!(
+                        "- packet profile: `{}`",
+                        report.grounded_packet.packet_profile
+                    );
+                    println!(
+                        "- packet tokens: `{}` / `{}`",
+                        report.grounded_packet.packet_tokens,
+                        report.grounded_packet.packet_budget_tokens
                     );
                     println!("- state: `{}`", report.grounded_packet.decision_state);
                     println!("- answer: {}", report.grounded_packet.answer);

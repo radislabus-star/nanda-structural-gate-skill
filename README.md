@@ -831,7 +831,7 @@ compatibility gate; the preferred Linux-profile cache entrypoint is:
 ```bash
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --format json
+nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
 nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command foocmd" --format json
@@ -848,6 +848,21 @@ and anti-wave hits. `chat-core.index.json` is not answer authority and may be
 deleted without blocking `ask` if the binary `.hot` and source hashes still
 match. `ask` rechecks the source paths passed on the CLI against the manifest;
 an override mismatch returns stale instead of answering from an old cache.
+Grounded packets are adaptive and evidence-driven. `--target-packet-tokens` is
+a ceiling, not a quota; padding is forbidden. Exact facts should stay tiny,
+while action/troubleshooting/conflict prompts may receive larger route evidence
+only when the cache actually has useful facts. `grounded_packet.packet_profile`
+is one of `exact_fact`, `action_plan`, `troubleshooting`,
+`multi_route_conflict`, `safety_refusal`, or `uncertain`. Inspect
+`packet_tokens`, `packet_underfilled`, `packet_truncated`,
+`selected_evidence_count`, `available_evidence_count`, `selected_anti_wave_count`,
+`missing_evidence`, `ranking_policy`, `no_padding`, and
+`budget_is_ceiling_not_quota`. A packet that lacks required action,
+troubleshooting, or conflict evidence returns
+`PACKET_UNDERFILLED_NEEDS_MORE_CONTEXT` instead of inventing a full answer.
+Every evidence fact preserves route, subject/object, subject_role/object_role,
+polarity, evidence_kind, memory_kind, and confidence. Anti-wave evidence is
+mandatory for safety and route-boundary packets.
 Inspect `token_economics` to estimate how many prompt tokens the compact packet
 saves versus sending the source artifacts or the full runtime cache. The
 estimate is `ceil(bytes / 4)`, not an exact model tokenizer count. Read

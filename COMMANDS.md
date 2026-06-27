@@ -295,7 +295,7 @@ nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/li
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --max-facts 4 --format json
+nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --max-facts 4 --target-packet-tokens 300 --format json
 nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
 nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active --reset-scratch --format json
 nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
@@ -584,6 +584,18 @@ full runtime cache. `cache_is_runtime_index_not_prompt_payload=true` means the
 hot cache is a runtime readout, not prompt context. Use the grounded packet as a
 small external memory packet, not as a replacement for the LLM and not as
 global nonlinear-memory proof.
+`ask` now builds adaptive grounded packets. Use `--packet-profile` only when the
+caller already knows the intent class; otherwise the query wave infers
+`exact_fact`, `action_plan`, `troubleshooting`, `multi_route_conflict`,
+`safety_refusal`, or `uncertain`. `--target-packet-tokens` is a ceiling, not a
+quota: the packet must not be padded to fill it. Exact facts normally select
+only the direct anchor evidence; action/troubleshooting/conflict packets select
+ranked route evidence up to the budget and report `packet_underfilled` plus
+`missing_evidence` when the cache lacks runtime/action/conflict proof. Check
+`packet_tokens`, `packet_truncated`, `omitted_evidence_count`,
+`selected_anti_wave_count`, `ranking_policy`, `no_padding=true`, and
+`budget_is_ceiling_not_quota=true`. Anti-wave evidence must survive safety and
+route-boundary packets; stale cache still blocks ask before packet selection.
 `linux-chat-core-learn` appends explicit feedback to a source `.lwm` overlay:
 accepted facts become learned overlay records, and rejected shortcuts become
 learned anti-wave records. It never writes query text or answer packets as facts
