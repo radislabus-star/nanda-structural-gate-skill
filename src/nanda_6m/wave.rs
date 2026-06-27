@@ -126,14 +126,17 @@ pub fn score_centroid(query: &PackedWave1024, centroid: &PackedCentroid1024) -> 
     query.score_centroid(centroid)
 }
 
+#[inline(always)]
 pub fn score_triad_projection(query: &PackedWave1024, triad: &PackedTriad32) -> PeakScore {
     score_triad_projection_with_query_energy(query, triad, query.energy_i64())
 }
 
+#[inline(always)]
 pub(super) fn score_triad_projection_dot(query: &PackedWave1024, triad: &PackedTriad32) -> i64 {
     projection_signed_query_sum(query, triad) * i64::from(projection_strength(triad))
 }
 
+#[inline(always)]
 pub fn score_triad_projection_with_query_energy(
     query: &PackedWave1024,
     triad: &PackedTriad32,
@@ -151,6 +154,7 @@ pub fn score_triad_projection_with_query_energy(
     }
 }
 
+#[inline(always)]
 fn projection_signed_query_sum(query: &PackedWave1024, triad: &PackedTriad32) -> i64 {
     let mut state = projection_seed(triad);
     let mut signed_query_sum: i64 = 0;
@@ -161,16 +165,21 @@ fn projection_signed_query_sum(query: &PackedWave1024, triad: &PackedTriad32) ->
         () => {{
             state = mix64(state);
             let query_value = i64::from(values[index]);
-            if (state & 1) == 0 {
-                signed_query_sum -= query_value;
-            } else {
-                signed_query_sum += query_value;
-            }
+            let negative_mask = ((state & 1) as i64).wrapping_sub(1);
+            signed_query_sum += (query_value ^ negative_mask) - negative_mask;
             index += 1;
         }};
     }
 
-    while index + 8 <= WAVE_DIM {
+    while index + 16 <= WAVE_DIM {
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
         projection_step!();
         projection_step!();
         projection_step!();
@@ -205,6 +214,7 @@ fn projection_signed_query_sum_scalar_reference(
     signed_query_sum
 }
 
+#[inline(always)]
 fn projection_seed(triad: &PackedTriad32) -> u64 {
     let mut state = u64::from(triad.wave_seed) << 32 | u64::from(triad.check);
     state ^= u64::from(triad.subject_id).rotate_left(7);
@@ -218,6 +228,7 @@ fn projection_seed(triad: &PackedTriad32) -> u64 {
     mix64(state)
 }
 
+#[inline(always)]
 fn projection_strength(triad: &PackedTriad32) -> i16 {
     let base = 1 + i16::from(triad.confidence / 64);
     if triad.polarity & 1 == 0 {
@@ -227,6 +238,7 @@ fn projection_strength(triad: &PackedTriad32) -> i16 {
     }
 }
 
+#[inline(always)]
 fn mix64(mut value: u64) -> u64 {
     value = value.wrapping_add(0x9e37_79b9_7f4a_7c15);
     value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
