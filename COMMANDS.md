@@ -69,8 +69,9 @@ shared `field_core` records for downstream field checks. It also includes
 `boundary_field_engine.selected_verdict`: the field candidate can be stricter
 than typed Boundary Economics, but `field_equivalence.field_not_more_permissive`
 must stay true before it is used. The implementation owner is the split
-`src/field_core/boundary/` kernel, including the post-edit diff kernel in
-`src/field_core/boundary/diff.rs`; `nanda-skill-readiness` checks
+`src/field_core/boundary/` kernel, including the post-edit diff kernel
+entrypoint `src/field_core/boundary/diff.rs` and its `diff/` submodules;
+`nanda-skill-readiness` checks
 `boundary_field_kernel` so CLI commands remain wrappers instead of policy
 owners.
 

@@ -423,7 +423,9 @@ command is only a wrapper. Treat drift back into `commands/boundary.rs` as a
 core ownership regression. Treat loss of `boundary_field_records` as a field
 integration regression. Treat loss of the split boundary kernel modules
 (`facts`, `decision`, `field_pass`, `records`, `energy`, `diff`, `util`) or
-loss of the `nanda-skill-readiness` `boundary_field_kernel` PASS check as a
+loss of the split diff subkernel modules (`types`, `parser`, `routes`,
+`version`, `facts`, `decision`, `records`, `field_pass`, `report`) or loss of
+the `nanda-skill-readiness` `boundary_field_kernel` PASS check as a
 public-readiness regression.
 When `nanda-dogfood . --refactor-plan --boundary-economics` is used, inspect
 `agent_decision.boundary_economics_verdict`: a boundary `WATCH` downgrades an

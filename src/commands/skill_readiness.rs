@@ -79,6 +79,9 @@ fn build_report(repo: &Path) -> Value {
                 && boundary_kernel["diff_kernel_present"]
                     .as_bool()
                     .unwrap_or(false)
+                && boundary_kernel["diff_kernel_split_files_present"]
+                    .as_bool()
+                    .unwrap_or(false)
                 && boundary_kernel["diff_kernel_owner_is_field_core"]
                     .as_bool()
                     .unwrap_or(false)
@@ -247,7 +250,23 @@ fn boundary_kernel_summary(repo: &Path) -> Value {
         "src/field_core/boundary/diff.rs",
         "src/field_core/boundary/util.rs",
     ];
+    let diff_expected_files = [
+        "src/field_core/boundary/diff/types.rs",
+        "src/field_core/boundary/diff/parser.rs",
+        "src/field_core/boundary/diff/routes.rs",
+        "src/field_core/boundary/diff/version.rs",
+        "src/field_core/boundary/diff/facts.rs",
+        "src/field_core/boundary/diff/decision.rs",
+        "src/field_core/boundary/diff/records.rs",
+        "src/field_core/boundary/diff/field_pass.rs",
+        "src/field_core/boundary/diff/report.rs",
+    ];
     let missing_files = expected_files
+        .iter()
+        .filter(|file| !repo.join(file).is_file())
+        .copied()
+        .collect::<Vec<_>>();
+    let missing_diff_files = diff_expected_files
         .iter()
         .filter(|file| !repo.join(file).is_file())
         .copied()
@@ -299,6 +318,8 @@ fn boundary_kernel_summary(repo: &Path) -> Value {
         "field_not_more_permissive": report["field_equivalence"]["field_not_more_permissive"].as_bool().unwrap_or(false),
         "selected_verdict_present": report["boundary_field_engine"]["selected_verdict"].as_str().is_some(),
         "diff_kernel_present": repo.join("src/field_core/boundary/diff.rs").is_file(),
+        "diff_kernel_split_files_present": missing_diff_files.is_empty(),
+        "missing_diff_kernel_files": missing_diff_files,
         "diff_kernel_owner_is_field_core": diff_report["boundary_diff_kernel"]["owner"].as_str() == Some("field_core::boundary::diff"),
         "diff_field_not_more_permissive": diff_report["boundary_diff_kernel"]["field_equivalence"]["field_not_more_permissive"].as_bool().unwrap_or(false),
         "diff_typed_verdict": diff_report["verdict"].clone(),

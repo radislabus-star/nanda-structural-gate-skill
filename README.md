@@ -1409,8 +1409,9 @@ not be more permissive. `boundary_field_engine.selected_verdict` is the
 agent-facing cutover verdict used for exit codes and dogfood decisions, while
 `boundary_decision.verdict` remains the stable typed-core explanation for
 compatibility. The boundary kernel is split under `src/field_core/boundary/`
-into facts, typed decision, field pass, records, owner/energy, diff, and
-utility modules; `nanda-skill-readiness` checks this as
+into facts, typed decision, field pass, records, owner/energy, utility modules,
+and a diff subkernel (`diff.rs` plus `diff/` facts/routes/parser/version/
+records/field-pass/report modules); `nanda-skill-readiness` checks this as
 `boundary_field_kernel` so the policy does not drift back into command
 wrappers. Use repo-wide mode to find
 possible split pressure only; if
