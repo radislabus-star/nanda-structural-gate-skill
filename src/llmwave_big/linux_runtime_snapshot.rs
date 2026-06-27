@@ -400,15 +400,31 @@ fn push_fact(
     polarity: &'static str,
     confidence: u8,
 ) {
+    let (subject_role, object_role) = runtime_snapshot_roles(route, relation);
     facts.push(LinuxResidualDecodedFact {
         route: route.to_string(),
         subject: subject.to_string(),
+        subject_role: subject_role.to_string(),
         relation: relation.to_string(),
         object: object.to_string(),
+        object_role: object_role.to_string(),
         polarity,
+        evidence_kind: "runtime_snapshot".to_string(),
         confidence,
         memory_kind: "runtime-snapshot",
     });
+}
+
+fn runtime_snapshot_roles(route: &str, relation: &str) -> (&'static str, &'static str) {
+    if relation == "allows port" {
+        ("firewall_policy", "network_port")
+    } else if relation == "listens on" {
+        ("protocol", "socket_endpoint")
+    } else if route.contains("systemd") {
+        ("service", "runtime_state")
+    } else {
+        ("subject", "object")
+    }
 }
 
 fn rule_is_allow(value: &Value) -> bool {

@@ -53,6 +53,7 @@ pub mod linux_hot_packet;
 pub mod linux_profile;
 pub mod linux_residual_memory;
 pub mod linux_runtime_snapshot;
+pub mod linux_spectral_memory;
 pub mod linux_vpn_control;
 pub mod linux_vpn_training;
 pub mod loader;

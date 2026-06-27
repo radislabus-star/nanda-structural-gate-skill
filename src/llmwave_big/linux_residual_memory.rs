@@ -1,10 +1,10 @@
 //! Binary Linux schema/residual memory packet and proof path.
 //!
 //! `.laf` is the direct fixed-record Linux hot packet. `.lrf` is the nonlinear
-//! memory candidate: repeated route+relation+polarity facts are promoted into
-//! compact schema records, per-fact subject/object details become residuals, and
+//! memory candidate: repeated role-complete semantic atoms are promoted into
+//! compact schema records, per-fact subject/object fillers become residuals, and
 //! one-off facts remain full fixed fallbacks. The proof path scans those binary
-//! sections directly and keeps labels as cold explain data.
+//! sections directly and keeps surface labels as cold explain data.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -21,12 +21,13 @@ use super::linux_active_field::{
     build_linux_active_fact_window, score_linux_fact_terms, LinuxFactScoreTerms,
 };
 use super::linux_atlas::{LinuxAtlasFact, LINUX_ATLAS_VERSION};
+use super::linux_spectral_memory::{build_linux_spectral_center_report, LinuxSpectralCenterReport};
 use crate::WAVE_DIM;
 
 pub(crate) const LINUX_RESIDUAL_MEMORY_VERSION: &str = "llmwave-big-v-next-linux-schema-residual";
 
-const LRF_MAGIC: &[u8; 8] = b"LLMWLRF1";
-const LRF_FORMAT_VERSION: u32 = 1;
+const LRF_MAGIC: &[u8; 8] = b"LLMWLRF2";
+const LRF_FORMAT_VERSION: u32 = 2;
 const LRF_HEADER_BYTES: usize = 64;
 const SCHEMA_RECORD_BYTES: usize = 32;
 const RESIDUAL_RECORD_BYTES: usize = 32;
@@ -143,6 +144,8 @@ pub(crate) struct LinuxResidualProofReport {
     pub benchmark: LinuxResidualBenchmarkSummary,
     pub eval: LinuxResidualEvalSummary,
     pub economics: LinuxResidualEconomics,
+    pub semantic_atom_contract: LinuxSemanticAtomContractReport,
+    pub spectral_center: LinuxSpectralCenterReport,
     pub claim_boundary: LinuxResidualProofClaimBoundary,
 }
 
@@ -271,12 +274,78 @@ pub(crate) struct LinuxResidualProofClaimBoundary {
     pub beats_direct_fixed64: bool,
     pub linux_domain_eval_passed: bool,
     pub false_positive_rate_zero: bool,
+    pub semantic_atom_contract_proven: bool,
+    pub semantic_atom_gate_required: bool,
+    pub spectral_center_proven: bool,
+    pub spectral_center_gate_required: bool,
+    pub center_gap_positive: bool,
+    pub near_miss_rejected_by_center: bool,
+    pub route_relation_ablation_positive: bool,
     pub binary_hot_sections_fit_6m: bool,
     pub nonlinear_memory_proven: bool,
     pub linux_profile_nonlinear_memory_proven: bool,
     pub exposure_layer_ready: bool,
     pub broad_chat_llm_ready: bool,
     pub cache_only_execution_proven: bool,
+    pub safe_claim: &'static str,
+    pub blocked_claims: Vec<&'static str>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxSemanticAtomContractReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub required_channels: Vec<&'static str>,
+    pub hot_record_policy: LinuxSemanticAtomHotRecordPolicy,
+    pub metrics: LinuxSemanticAtomMetrics,
+    pub gates: LinuxSemanticAtomGates,
+    pub claim_boundary: LinuxSemanticAtomClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxSemanticAtomHotRecordPolicy {
+    pub schema_record_bytes: usize,
+    pub residual_record_bytes: usize,
+    pub fallback_record_bytes: usize,
+    pub schema_center_channels: Vec<&'static str>,
+    pub residual_filler_channels: Vec<&'static str>,
+    pub fallback_packed_channels: Vec<&'static str>,
+    pub surface_text_length_is_not_mass: bool,
+    pub cold_labels_excluded_from_hot_mass: bool,
+    pub fixed_hot_record_width: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxSemanticAtomMetrics {
+    pub decoded_fact_count: usize,
+    pub role_complete_fact_count: usize,
+    pub role_complete_rate: f32,
+    pub residual_fact_count: usize,
+    pub fallback_fact_count: usize,
+    pub distinct_subject_roles: usize,
+    pub distinct_object_roles: usize,
+    pub distinct_evidence_kinds: usize,
+    pub max_surface_text_bytes: usize,
+    pub hot_mass_depends_on_surface_length: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxSemanticAtomGates {
+    pub fixed_hot_records: bool,
+    pub required_channels_present: bool,
+    pub role_channels_present: bool,
+    pub evidence_kind_present: bool,
+    pub surface_text_length_not_mass: bool,
+    pub cold_labels_are_not_hot_mass: bool,
+    pub semantic_atom_contract_proven: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxSemanticAtomClaimBoundary {
+    pub role_complete_semantic_atoms_proven: bool,
+    pub nonlinear_memory_proven_by_itself: bool,
+    pub broad_chat_llm_ready: bool,
     pub safe_claim: &'static str,
     pub blocked_claims: Vec<&'static str>,
 }
@@ -311,9 +380,12 @@ pub(crate) struct LinuxResidualDecodedSummary {
 pub(crate) struct LinuxResidualDecodedFact {
     pub route: String,
     pub subject: String,
+    pub subject_role: String,
     pub relation: String,
     pub object: String,
+    pub object_role: String,
     pub polarity: &'static str,
+    pub evidence_kind: String,
     pub confidence: u8,
     pub memory_kind: &'static str,
 }
@@ -322,7 +394,10 @@ pub(crate) struct LinuxResidualDecodedFact {
 struct SchemaKey {
     route: String,
     relation: String,
+    subject_role: String,
+    object_role: String,
     polarity: String,
+    evidence_kind: String,
 }
 
 #[derive(Clone)]
@@ -332,9 +407,10 @@ struct LinuxSchemaRecord32 {
     relation_hash: u64,
     route_id: u16,
     relation_id: u16,
+    subject_role_id: u8,
+    object_role_id: u8,
     polarity_id: u8,
-    mean_confidence: u8,
-    fact_count_bucket: u16,
+    evidence_kind_id: u8,
 }
 
 #[derive(Clone)]
@@ -362,7 +438,7 @@ struct LinuxFallbackRecord64 {
     object_id: u32,
     confidence: u8,
     polarity_id: u8,
-    reserved_u16: u16,
+    role_evidence_pack: u16,
     evidence_hash: u32,
 }
 
@@ -616,6 +692,10 @@ pub(crate) fn build_linux_residual_proof_report(
     );
     let top_k = config.top_k.max(1);
     let eval = run_linux_residual_eval(&packet, top_k);
+    let decoded_packet = load_linux_residual_decoded_packet(&config.residual_pack)?;
+    let semantic_atom_contract =
+        build_linux_semantic_atom_contract_report(&decoded_packet.summary, &decoded_packet.facts);
+    let spectral_center = build_linux_spectral_center_report(&config.residual_pack)?;
     let packet_summary =
         proof_packet_summary(&sections, config.residual_pack.display().to_string());
     let binary_hot_sections_fit_6m = packet_summary.binary_hot_sections_fit_6m;
@@ -633,6 +713,8 @@ pub(crate) fn build_linux_residual_proof_report(
     let linux_domain_eval_passed =
         eval.metrics.total > 0 && eval.metrics.passed == eval.metrics.total;
     let false_positive_rate_zero = eval.metrics.false_positive_rate == 0.0;
+    let semantic_atom_contract_proven = semantic_atom_contract.gates.semantic_atom_contract_proven;
+    let spectral_center_proven = spectral_center.gates.spectral_center_proven;
     let full_represented_fact_scan =
         benchmark.represented_facts_per_scan == sections.header.represented_fact_count;
     let nonlinear_memory_proven = packet_summary.binary_hot_sections_fit_6m
@@ -644,7 +726,9 @@ pub(crate) fn build_linux_residual_proof_report(
         && full_represented_fact_scan
         && benchmark.top_score > 0
         && linux_domain_eval_passed
-        && false_positive_rate_zero;
+        && false_positive_rate_zero
+        && semantic_atom_contract_proven
+        && spectral_center_proven;
     let verdict = if nonlinear_memory_proven {
         "LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN"
     } else if packet_summary.binary_hot_sections_fit_6m && benchmark.top_score > 0 {
@@ -683,6 +767,8 @@ pub(crate) fn build_linux_residual_proof_report(
         benchmark,
         eval,
         economics,
+        semantic_atom_contract: semantic_atom_contract.clone(),
+        spectral_center: spectral_center.clone(),
         claim_boundary: LinuxResidualProofClaimBoundary {
             binary_schema_residual_memory_loaded: true,
             actual_binary_schema_residual_memory: true,
@@ -691,6 +777,14 @@ pub(crate) fn build_linux_residual_proof_report(
             beats_direct_fixed64,
             linux_domain_eval_passed,
             false_positive_rate_zero,
+            semantic_atom_contract_proven,
+            semantic_atom_gate_required: true,
+            spectral_center_proven,
+            spectral_center_gate_required: true,
+            center_gap_positive: spectral_center.gates.center_gap_positive,
+            near_miss_rejected_by_center: spectral_center.gates.wrong_center_rejected
+                && spectral_center.gates.role_swap_center_collapse,
+            route_relation_ablation_positive: spectral_center.gates.route_relation_modes_causal,
             binary_hot_sections_fit_6m,
             nonlinear_memory_proven,
             linux_profile_nonlinear_memory_proven: nonlinear_memory_proven,
@@ -704,6 +798,8 @@ pub(crate) fn build_linux_residual_proof_report(
                 vec![
                     "linux_schema_residual_eval_missing_or_failed",
                     "schema_reuse_or_residual_saving_too_weak",
+                    "linux_semantic_atom_contract_missing_or_failed",
+                    "linux_spectral_center_gate_missing_or_failed",
                     "exposure_layer_ready",
                     "broad_chat_llm_ready",
                 ]
@@ -735,6 +831,9 @@ pub(crate) fn load_linux_residual_decoded_packet(
         let Some(relation) = label(&packet.labels, u32::from(schema.relation_id)) else {
             continue;
         };
+        let subject_role = semantic_role_label(schema.subject_role_id);
+        let object_role = semantic_role_label(schema.object_role_id);
+        let evidence_kind = evidence_kind_label(schema.evidence_kind_id);
         let Some(subject) = label(&packet.labels, residual.subject_id) else {
             continue;
         };
@@ -744,9 +843,12 @@ pub(crate) fn load_linux_residual_decoded_packet(
         facts.push(LinuxResidualDecodedFact {
             route: route.to_string(),
             subject: subject.to_string(),
+            subject_role: subject_role.to_string(),
             relation: relation.to_string(),
             object: object.to_string(),
+            object_role: object_role.to_string(),
             polarity: polarity_label(schema.polarity_id),
+            evidence_kind: evidence_kind.to_string(),
             confidence: residual.confidence,
             memory_kind: "residual",
         });
@@ -764,12 +866,17 @@ pub(crate) fn load_linux_residual_decoded_packet(
         let Some(object) = label(&packet.labels, fallback.object_id) else {
             continue;
         };
+        let (subject_role_id, object_role_id, evidence_kind_id) =
+            unpack_role_evidence(fallback.role_evidence_pack);
         facts.push(LinuxResidualDecodedFact {
             route: route.to_string(),
             subject: subject.to_string(),
+            subject_role: semantic_role_label(subject_role_id).to_string(),
             relation: relation.to_string(),
             object: object.to_string(),
+            object_role: semantic_role_label(object_role_id).to_string(),
             polarity: polarity_label(fallback.polarity_id),
+            evidence_kind: evidence_kind_label(evidence_kind_id).to_string(),
             confidence: fallback.confidence,
             memory_kind: "fallback",
         });
@@ -797,6 +904,139 @@ pub(crate) fn load_linux_residual_decoded_packet(
     })
 }
 
+fn build_linux_semantic_atom_contract_report(
+    summary: &LinuxResidualDecodedSummary,
+    facts: &[LinuxResidualDecodedFact],
+) -> LinuxSemanticAtomContractReport {
+    let mut subject_roles = BTreeMap::<String, usize>::new();
+    let mut object_roles = BTreeMap::<String, usize>::new();
+    let mut evidence_kinds = BTreeMap::<String, usize>::new();
+    let mut role_complete = 0usize;
+    let mut max_surface_text_bytes = 0usize;
+    let mut residual_fact_count = 0usize;
+    let mut fallback_fact_count = 0usize;
+
+    for fact in facts {
+        if fact.memory_kind == "residual" {
+            residual_fact_count += 1;
+        } else if fact.memory_kind == "fallback" {
+            fallback_fact_count += 1;
+        }
+        let complete = !fact.route.is_empty()
+            && !fact.relation.is_empty()
+            && !fact.subject_role.is_empty()
+            && !fact.object_role.is_empty()
+            && !fact.polarity.is_empty()
+            && !fact.evidence_kind.is_empty();
+        if complete {
+            role_complete += 1;
+        }
+        *subject_roles.entry(fact.subject_role.clone()).or_insert(0) += 1;
+        *object_roles.entry(fact.object_role.clone()).or_insert(0) += 1;
+        *evidence_kinds
+            .entry(fact.evidence_kind.clone())
+            .or_insert(0) += 1;
+        max_surface_text_bytes = max_surface_text_bytes
+            .max(fact.subject.len())
+            .max(fact.object.len())
+            .max(fact.relation.len())
+            .max(fact.route.len());
+    }
+
+    let fixed_hot_records = summary.schema_record_count > 0
+        && summary.residual_record_count > 0
+        && summary.binary_hot_sections_bytes
+            == summary.schema_record_count * SCHEMA_RECORD_BYTES
+                + summary.residual_record_count * RESIDUAL_RECORD_BYTES
+                + summary.fallback_record_count * FALLBACK_RECORD_BYTES;
+    let metrics = LinuxSemanticAtomMetrics {
+        decoded_fact_count: facts.len(),
+        role_complete_fact_count: role_complete,
+        role_complete_rate: ratio(role_complete, facts.len()),
+        residual_fact_count,
+        fallback_fact_count,
+        distinct_subject_roles: subject_roles.len(),
+        distinct_object_roles: object_roles.len(),
+        distinct_evidence_kinds: evidence_kinds.len(),
+        max_surface_text_bytes,
+        hot_mass_depends_on_surface_length: false,
+    };
+    let gates = LinuxSemanticAtomGates {
+        fixed_hot_records,
+        required_channels_present: facts.len() == role_complete && !facts.is_empty(),
+        role_channels_present: !subject_roles.is_empty() && !object_roles.is_empty(),
+        evidence_kind_present: !evidence_kinds.is_empty(),
+        surface_text_length_not_mass: !metrics.hot_mass_depends_on_surface_length,
+        cold_labels_are_not_hot_mass: summary.cold_label_table_bytes > 0,
+        semantic_atom_contract_proven: false,
+    };
+    let semantic_atom_contract_proven = gates.fixed_hot_records
+        && gates.required_channels_present
+        && gates.role_channels_present
+        && gates.evidence_kind_present
+        && gates.surface_text_length_not_mass
+        && gates.cold_labels_are_not_hot_mass;
+    let gates = LinuxSemanticAtomGates {
+        semantic_atom_contract_proven,
+        ..gates
+    };
+    let verdict = if semantic_atom_contract_proven {
+        "LINUX_ROLE_COMPLETE_SEMANTIC_ATOMS_PROVEN"
+    } else {
+        "LINUX_ROLE_COMPLETE_SEMANTIC_ATOMS_BLOCKED"
+    };
+
+    LinuxSemanticAtomContractReport {
+        mode: "llmwave-big-linux-semantic-atom-contract",
+        version: LINUX_RESIDUAL_MEMORY_VERSION,
+        verdict,
+        required_channels: vec![
+            "route",
+            "relation",
+            "subject_role",
+            "object_role",
+            "polarity",
+            "evidence_kind",
+        ],
+        hot_record_policy: LinuxSemanticAtomHotRecordPolicy {
+            schema_record_bytes: SCHEMA_RECORD_BYTES,
+            residual_record_bytes: RESIDUAL_RECORD_BYTES,
+            fallback_record_bytes: FALLBACK_RECORD_BYTES,
+            schema_center_channels: vec![
+                "route",
+                "relation",
+                "subject_role",
+                "object_role",
+                "polarity",
+                "evidence_kind",
+            ],
+            residual_filler_channels: vec!["subject", "object", "confidence", "evidence_hash"],
+            fallback_packed_channels: vec![
+                "route",
+                "subject",
+                "relation",
+                "object",
+                "subject_role",
+                "object_role",
+                "polarity",
+                "evidence_kind",
+            ],
+            surface_text_length_is_not_mass: true,
+            cold_labels_excluded_from_hot_mass: true,
+            fixed_hot_record_width: true,
+        },
+        metrics,
+        gates,
+        claim_boundary: LinuxSemanticAtomClaimBoundary {
+            role_complete_semantic_atoms_proven: semantic_atom_contract_proven,
+            nonlinear_memory_proven_by_itself: false,
+            broad_chat_llm_ready: false,
+            safe_claim: "Linux `.lrf` hot memory stores fixed-size role-complete semantic atoms: text length stays in cold labels, while route/relation/roles/polarity/evidence-kind define schema mass. This is a Linux-profile storage contract, not broad LLM readiness.",
+            blocked_claims: vec!["broad_chat_llm_ready", "global_nonlinear_memory_proven"],
+        },
+    }
+}
+
 fn compile_schema_residual_records(
     facts: &[LinuxAtlasFact],
     promotion_threshold: usize,
@@ -808,10 +1048,15 @@ fn compile_schema_residual_records(
 ) {
     let mut stats = BTreeMap::<SchemaKey, (usize, usize)>::new();
     for fact in facts {
+        let (subject_role, object_role) = semantic_roles_for_fact(fact);
+        let evidence_kind = semantic_evidence_kind(fact);
         let key = SchemaKey {
             route: fact.route.clone(),
             relation: fact.relation.clone(),
+            subject_role: subject_role.to_string(),
+            object_role: object_role.to_string(),
             polarity: fact.polarity.clone(),
+            evidence_kind: evidence_kind.to_string(),
         };
         let entry = stats.entry(key).or_insert((0, 0));
         entry.0 += 1;
@@ -820,32 +1065,37 @@ fn compile_schema_residual_records(
 
     let mut schemas = Vec::new();
     let mut schema_indices = BTreeMap::<SchemaKey, u32>::new();
-    for (key, (count, confidence_sum)) in &stats {
+    for (key, (count, _confidence_sum)) in &stats {
         if *count < promotion_threshold {
             continue;
         }
         let index = schemas.len().min(u32::MAX as usize) as u32;
         schema_indices.insert(key.clone(), index);
-        let mean_confidence = (confidence_sum / count).min(u8::MAX as usize) as u8;
         schemas.push(LinuxSchemaRecord32 {
             schema_hash: schema_hash(key),
             route_hash: hash64(&key.route),
             relation_hash: hash64(&key.relation),
             route_id: labels.intern(&key.route).min(u16::MAX as u32) as u16,
             relation_id: labels.intern(&key.relation).min(u16::MAX as u32) as u16,
+            subject_role_id: semantic_role_id(&key.subject_role),
+            object_role_id: semantic_role_id(&key.object_role),
             polarity_id: polarity_id(&key.polarity),
-            mean_confidence,
-            fact_count_bucket: (*count).min(u16::MAX as usize) as u16,
+            evidence_kind_id: evidence_kind_id(&key.evidence_kind),
         });
     }
 
     let mut residuals = Vec::new();
     let mut fallbacks = Vec::new();
     for fact in facts {
+        let (subject_role, object_role) = semantic_roles_for_fact(fact);
+        let evidence_kind = semantic_evidence_kind(fact);
         let key = SchemaKey {
             route: fact.route.clone(),
             relation: fact.relation.clone(),
+            subject_role: subject_role.to_string(),
+            object_role: object_role.to_string(),
             polarity: fact.polarity.clone(),
+            evidence_kind: evidence_kind.to_string(),
         };
         if let Some(schema_index) = schema_indices.get(&key).copied() {
             residuals.push(LinuxResidualRecord32 {
@@ -856,12 +1106,18 @@ fn compile_schema_residual_records(
                 object_id: labels.intern(&fact.object),
                 confidence: fact.confidence,
                 evidence_hash16: hash16(&format!(
-                    "{}:{}:{}",
-                    fact.evidence.source_kind, fact.evidence.path, fact.evidence.line
+                    "{}:{}:{}:{}",
+                    evidence_kind,
+                    fact.evidence.source_kind,
+                    fact.evidence.path,
+                    fact.evidence.line
                 )),
                 flags: 0,
             });
         } else {
+            let subject_role_id = semantic_role_id(subject_role);
+            let object_role_id = semantic_role_id(object_role);
+            let evidence_kind_id = evidence_kind_id(evidence_kind);
             fallbacks.push(LinuxFallbackRecord64 {
                 fact_hash: hash64(&fact.fact_id),
                 route_hash: hash64(&fact.route),
@@ -874,10 +1130,17 @@ fn compile_schema_residual_records(
                 object_id: labels.intern(&fact.object),
                 confidence: fact.confidence,
                 polarity_id: polarity_id(&fact.polarity),
-                reserved_u16: 0,
+                role_evidence_pack: pack_role_evidence(
+                    subject_role_id,
+                    object_role_id,
+                    evidence_kind_id,
+                ),
                 evidence_hash: hash32(&format!(
-                    "{}:{}:{}",
-                    fact.evidence.source_kind, fact.evidence.path, fact.evidence.line
+                    "{}:{}:{}:{}",
+                    evidence_kind,
+                    fact.evidence.source_kind,
+                    fact.evidence.path,
+                    fact.evidence.line
                 )),
             });
         }
@@ -900,7 +1163,7 @@ fn packet_summary(
         + fallback_count * FALLBACK_RECORD_BYTES;
     let direct_fixed_baseline_bytes = represented_fact_count * DIRECT_FIXED_RECORD_BYTES;
     LinuxResidualPacketSummary {
-        format: "lrf-v1-schema32-residual32-fallback64-plus-cold-label-table",
+        format: "lrf-v2-role-complete-schema32-residual32-fallback64-plus-cold-label-table",
         header_bytes: LRF_HEADER_BYTES,
         schema_record_bytes: SCHEMA_RECORD_BYTES,
         residual_record_bytes: RESIDUAL_RECORD_BYTES,
@@ -976,7 +1239,7 @@ fn economics_summary(
     let residual_saving_bytes =
         direct_fixed_baseline_bytes as isize - binary_hot_sections_bytes as isize;
     LinuxResidualEconomics {
-        schema_key: "route+relation+polarity",
+        schema_key: "route+relation+subject_role+object_role+polarity+evidence_kind",
         promotion_threshold,
         promoted_schema_count: schema_count,
         residual_fact_count: residual_count,
@@ -996,9 +1259,10 @@ fn economics_summary(
         },
         binary_schema_residual_written: written,
         notes: vec![
-            "promoted schemas are stored once as SchemaRecord32",
-            "residual facts carry subject/object/evidence variation as ResidualRecord32",
-            "one-off facts stay as FallbackRecord64 to avoid false schema compression",
+            "promoted role-complete semantic atoms are stored once as SchemaRecord32",
+            "residual facts carry subject/object filler variation as ResidualRecord32",
+            "surface label length stays cold and does not increase semantic mass",
+            "one-off facts stay as FallbackRecord64 with packed role/evidence channels to avoid false schema compression",
         ],
     }
 }
@@ -1598,9 +1862,10 @@ fn write_schema_record(writer: &mut impl Write, record: &LinuxSchemaRecord32) ->
     write_u64(writer, record.relation_hash)?;
     write_u16(writer, record.route_id)?;
     write_u16(writer, record.relation_id)?;
+    write_u8(writer, record.subject_role_id)?;
+    write_u8(writer, record.object_role_id)?;
     write_u8(writer, record.polarity_id)?;
-    write_u8(writer, record.mean_confidence)?;
-    write_u16(writer, record.fact_count_bucket)?;
+    write_u8(writer, record.evidence_kind_id)?;
     Ok(())
 }
 
@@ -1628,7 +1893,7 @@ fn write_fallback_record(writer: &mut impl Write, record: &LinuxFallbackRecord64
     write_u32(writer, record.object_id)?;
     write_u8(writer, record.confidence)?;
     write_u8(writer, record.polarity_id)?;
-    write_u16(writer, record.reserved_u16)?;
+    write_u16(writer, record.role_evidence_pack)?;
     write_u32(writer, record.evidence_hash)?;
     Ok(())
 }
@@ -1818,9 +2083,10 @@ fn read_schema_record(cursor: &mut Cursor<&[u8]>) -> Result<LinuxSchemaRecord32>
         relation_hash: read_u64(cursor)?,
         route_id: read_u16(cursor)?,
         relation_id: read_u16(cursor)?,
+        subject_role_id: read_u8(cursor)?,
+        object_role_id: read_u8(cursor)?,
         polarity_id: read_u8(cursor)?,
-        mean_confidence: read_u8(cursor)?,
-        fact_count_bucket: read_u16(cursor)?,
+        evidence_kind_id: read_u8(cursor)?,
     })
 }
 
@@ -1850,7 +2116,7 @@ fn read_fallback_record(cursor: &mut Cursor<&[u8]>) -> Result<LinuxFallbackRecor
         object_id: read_u32(cursor)?,
         confidence: read_u8(cursor)?,
         polarity_id: read_u8(cursor)?,
-        reserved_u16: read_u16(cursor)?,
+        role_evidence_pack: read_u16(cursor)?,
         evidence_hash: read_u32(cursor)?,
     })
 }
@@ -1859,8 +2125,147 @@ fn label(labels: &[String], id: u32) -> Option<&str> {
     labels.get(id as usize).map(String::as_str)
 }
 
+fn semantic_roles_for_fact(fact: &LinuxAtlasFact) -> (&'static str, &'static str) {
+    let route = fact.route.to_ascii_lowercase();
+    let relation = fact.relation.to_ascii_lowercase();
+    if relation.contains("provided by package") {
+        ("command", "package")
+    } else if relation.contains("provides command") {
+        ("package", "command")
+    } else if relation.contains("provides binary") {
+        ("package", "binary")
+    } else if relation.contains("execstart") {
+        ("service", "executable")
+    } else if route.contains("boundary.package") || relation.contains("installed") {
+        ("package_state", "runtime_claim")
+    } else if route.contains("boundary.socket") {
+        ("runtime_signal", "exposure_claim")
+    } else if relation.contains("listens on") {
+        ("protocol", "socket_endpoint")
+    } else if relation.contains("allows port") {
+        ("firewall_policy", "network_port")
+    } else {
+        ("subject", "object")
+    }
+}
+
+fn semantic_evidence_kind(fact: &LinuxAtlasFact) -> &'static str {
+    let source = fact.evidence.source_kind.to_ascii_lowercase();
+    let extractor = fact.evidence.extractor.to_ascii_lowercase();
+    let path = fact.evidence.path.to_ascii_lowercase();
+    let layer = fact.layer.to_ascii_lowercase();
+    let domain = fact.domain.to_ascii_lowercase();
+    let route = fact.route.to_ascii_lowercase();
+    if source.contains("fixture") || extractor.contains("fixture") {
+        "fixture"
+    } else if layer.contains("runtime")
+        || domain.contains("runtime")
+        || route.contains("socket")
+        || route.contains("firewall")
+        || source.contains("snapshot")
+    {
+        "runtime_snapshot"
+    } else if route.contains("systemd") || source.contains("systemd") || path.contains("systemd") {
+        "systemd_unit"
+    } else if route.contains("apt")
+        || route.contains("package")
+        || domain.contains("package")
+        || source.contains("dpkg")
+        || source.contains("apt")
+    {
+        "package_metadata"
+    } else if path.contains("/man") || source.contains("man") || extractor.contains("man") {
+        "manual_page"
+    } else {
+        "evidence_anchor"
+    }
+}
+
+fn semantic_role_id(value: &str) -> u8 {
+    match value {
+        "package" => 1,
+        "command" => 2,
+        "binary" => 3,
+        "service" => 4,
+        "executable" => 5,
+        "package_state" => 6,
+        "runtime_claim" => 7,
+        "runtime_signal" => 8,
+        "exposure_claim" => 9,
+        "protocol" => 10,
+        "socket_endpoint" => 11,
+        "firewall_policy" => 12,
+        "network_port" => 13,
+        "subject" => 14,
+        "object" => 15,
+        _ => 0,
+    }
+}
+
+fn semantic_role_label(value: u8) -> &'static str {
+    match value {
+        1 => "package",
+        2 => "command",
+        3 => "binary",
+        4 => "service",
+        5 => "executable",
+        6 => "package_state",
+        7 => "runtime_claim",
+        8 => "runtime_signal",
+        9 => "exposure_claim",
+        10 => "protocol",
+        11 => "socket_endpoint",
+        12 => "firewall_policy",
+        13 => "network_port",
+        14 => "subject",
+        15 => "object",
+        _ => "unknown_role",
+    }
+}
+
+fn evidence_kind_id(value: &str) -> u8 {
+    match value {
+        "fixture" => 1,
+        "runtime_snapshot" => 2,
+        "systemd_unit" => 3,
+        "package_metadata" => 4,
+        "manual_page" => 5,
+        "evidence_anchor" => 6,
+        _ => 0,
+    }
+}
+
+fn evidence_kind_label(value: u8) -> &'static str {
+    match value {
+        1 => "fixture",
+        2 => "runtime_snapshot",
+        3 => "systemd_unit",
+        4 => "package_metadata",
+        5 => "manual_page",
+        6 => "evidence_anchor",
+        _ => "unknown_evidence",
+    }
+}
+
+fn pack_role_evidence(subject_role_id: u8, object_role_id: u8, evidence_kind_id: u8) -> u16 {
+    u16::from(subject_role_id & 0x3f)
+        | (u16::from(object_role_id & 0x3f) << 6)
+        | (u16::from(evidence_kind_id & 0x0f) << 12)
+}
+
+fn unpack_role_evidence(value: u16) -> (u8, u8, u8) {
+    (
+        (value & 0x003f) as u8,
+        ((value >> 6) & 0x003f) as u8,
+        ((value >> 12) & 0x000f) as u8,
+    )
+}
+
 fn schema_hash(key: &SchemaKey) -> u64 {
-    hash64(&format!("{}|{}|{}", key.route, key.relation, key.polarity))
+    hash64(&format!(
+        "{}|{}|{}|{}|{}|{}",
+        key.route, key.relation, key.subject_role, key.object_role, key.polarity, key.evidence_kind
+    ))
 }
 
 fn polarity_id(value: &str) -> u8 {
@@ -2050,6 +2455,19 @@ mod tests {
         assert_eq!(proof.verdict, "LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN");
         assert!(proof.claim_boundary.nonlinear_memory_proven);
         assert!(proof.claim_boundary.linux_profile_nonlinear_memory_proven);
+        assert!(proof.claim_boundary.semantic_atom_gate_required);
+        assert!(proof.claim_boundary.semantic_atom_contract_proven);
+        assert_eq!(
+            proof.semantic_atom_contract.verdict,
+            "LINUX_ROLE_COMPLETE_SEMANTIC_ATOMS_PROVEN"
+        );
+        assert!(
+            proof
+                .semantic_atom_contract
+                .hot_record_policy
+                .surface_text_length_is_not_mass
+        );
+        assert_eq!(proof.semantic_atom_contract.metrics.role_complete_rate, 1.0);
         assert!(!proof.claim_boundary.broad_chat_llm_ready);
         assert!(!proof.claim_boundary.exposure_layer_ready);
         assert!(
@@ -2059,6 +2477,14 @@ mod tests {
         );
         assert!(!proof.runtime_contract.json_used_in_hot_loop);
         assert_eq!(proof.eval.metrics.passed, proof.eval.metrics.total);
+        let decoded_path = PathBuf::from(&proof.residual_pack.path);
+        let decoded = load_linux_residual_decoded_packet(&decoded_path).unwrap();
+        assert!(decoded.facts.iter().any(|fact| {
+            fact.route == "linux.apt.command.package-command"
+                && fact.subject_role == "package"
+                && fact.object_role == "command"
+                && fact.evidence_kind == "fixture"
+        }));
         let _ = fs::remove_dir_all(root);
     }
 
