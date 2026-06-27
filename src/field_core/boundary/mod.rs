@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::field_core::{FieldAntiWaveLane, FieldLensOperation, FieldPassReport, FieldRecord};
 use crate::CORE_VERSION;
 
+mod center;
 mod decision;
 mod diff;
 mod energy;
@@ -16,6 +17,7 @@ mod records;
 mod refactors;
 mod util;
 
+use center::boundary_center;
 use decision::{boundary_decision, empty_components, score_component};
 use energy::{boundary_energy, boundary_owner_gravity};
 use facts::{
@@ -340,6 +342,7 @@ pub(crate) fn boundary_report(
     let field_record_bridge = BoundaryFieldRecordBridge::from_facts(&facts, &field_records);
     let owner_gravity = boundary_owner_gravity(&facts);
     let boundary_energy = boundary_energy(&facts, &decision, &owner_gravity);
+    let boundary_center = boundary_center(&facts, &owner_gravity, &boundary_energy);
     let field_admission = boundary_field_pass_admission(
         &facts,
         &decision,
@@ -370,6 +373,7 @@ pub(crate) fn boundary_report(
         "boundary_field_engine": field_engine,
         "owner_gravity": owner_gravity,
         "boundary_energy": boundary_energy,
+        "boundary_center": boundary_center,
         "read_as": "NANDA Boundary Economics: NO EVIDENCE => NO CUT. Split/merge decisions require route, owner, state, API, runtime, and test evidence."
     }))
 }
@@ -568,6 +572,15 @@ mod tests {
             report["boundary_field_pass"]["field_pass"]["verdict"],
             "PASS"
         );
+        assert_eq!(report["boundary_center"]["read_only"], true);
+        assert_eq!(
+            report["boundary_center"]["decision_affects_safe_to_edit"],
+            false
+        );
+        assert_eq!(
+            report["boundary_center"]["verdict_hint"],
+            "CENTER_STABLE_SAFE_LOCAL_EDIT"
+        );
         assert_eq!(
             report["field_equivalence"]["field_not_more_permissive"],
             true
@@ -606,6 +619,16 @@ mod tests {
         assert_eq!(
             report["boundary_field_pass"]["field_pass"]["verdict"],
             "VETO"
+        );
+        assert_eq!(
+            report["boundary_center"]["verdict_hint"],
+            "CENTER_FOREIGN_PULL_REVIEW"
+        );
+        assert!(
+            report["boundary_center"]["foreign_route_mass"]
+                .as_f64()
+                .unwrap_or(0.0)
+                > 0.0
         );
         assert_eq!(
             report["field_equivalence"]["field_not_more_permissive"],
@@ -649,6 +672,11 @@ mod tests {
         assert_eq!(
             report["boundary_field_pass"]["field_pass"]["coherence_state"],
             "FIELD_THIN"
+        );
+        assert_eq!(report["boundary_center"]["read_only"], true);
+        assert_eq!(
+            report["boundary_center"]["decision_affects_safe_to_edit"],
+            false
         );
         assert_eq!(
             report["field_equivalence"]["field_not_more_permissive"],
