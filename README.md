@@ -871,6 +871,16 @@ ask blocked while stale, hot rebuilt, learned answer read from
 bash/systemctl routes stay preserved. Its ready verdict is
 `LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM`.
 
+Learning writes also pass a safety contract before any overlay append. Secret-like
+feedback is refused before parsing and reports only a redacted prompt plus hash.
+The requested route must belong to a registered ChatCore domain, and the selected
+overlay must be allowed by that domain scope. Unknown routes and foreign overlays
+are rejected without writing. Duplicate feedback is a no-op. Conflicting feedback
+is written only as a `WATCH_TRACE` quarantine record that is not projected into
+the hot readout. The scratch eval exposes these checks under `safety`: duplicate
+no-write, conflict quarantine, unknown-route rejection, wrong-overlay rejection,
+secret refusal, poison quarantine, and `raw_secret_written=false`.
+
 `linux-exposure-run` is the first Linux exposure reasoning layer over that
 schema/residual memory. It reconstructs the `.lrf` facts for explanation, then
 separates package facts, local listeners, external bind scope, firewall allow

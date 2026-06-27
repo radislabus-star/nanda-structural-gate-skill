@@ -229,11 +229,11 @@ run_chatcore_build_suite() {
 }
 
 run_chatcore_learn_suite() {
-  run_rust_baseline
   [[ -f "$root/.nanda/linux-active/linux-active-65k.lrf" ]] || return 0
 
   chat_core_learn_json="$("$llmwave_big" linux-chat-core-learn-eval --memory-root "$root/.nanda/linux-active" --reset-scratch --format json)"
   jq -e '.verdict == "LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM" and .learning_loop.before_blocked == true and .learning_loop.overlay_written == true and .learning_loop.cache_marked_stale == true and .learning_loop.ask_blocked_while_stale == true and .learning_loop.rebuild_required == true and .learning_loop.hot_rebuilt == true and .learning_loop.answer_from_hot == true and .learning_loop.target_query_improved == true and .learning_loop.anti_center_replay_observed == true and .learning_loop.unrelated_route_preserved == true and .learning_loop.false_positive_regressed == false' <<<"$chat_core_learn_json" >/dev/null
+  jq -e '.safety.duplicate_feedback_no_write == true and .safety.conflicting_feedback_quarantined == true and .safety.unknown_route_rejected == true and .safety.wrong_overlay_rejected == true and .safety.secret_feedback_refused == true and .safety.poison_feedback_quarantined == true and .safety.raw_secret_written == false' <<<"$chat_core_learn_json" >/dev/null
   jq -e '.claim_boundary.hot_cache_learns_directly == false and .claim_boundary.overlay_is_source_of_truth_for_learning == true and .claim_boundary.cache_rebuild_required_after_overlay_write == true and .claim_boundary.general_llm_ready == false and .claim_boundary.global_nonlinear_memory_proven == false' <<<"$chat_core_learn_json" >/dev/null
   jq -e '.after.readout_source == "compiled_chat_core_hot" and (.after.evidence_memory_kinds | index("learned_overlay")) and .anti_wave.state == "LEARNED_ANTI_WAVE_SUPPRESSED" and (.anti_wave.evidence_memory_kinds | index("learned_anti_wave")) and .regression.bash_preserved == true and .regression.systemctl_preserved == true and .regression.false_positive_regressed == false' <<<"$chat_core_learn_json" >/dev/null
 }
@@ -389,6 +389,7 @@ case "$test_local_suite" in
     ;;
   chatcore-learn)
     git -C "$root" diff --check
+    run_rust_baseline
     run_chatcore_learn_suite
     echo ok
     exit 0

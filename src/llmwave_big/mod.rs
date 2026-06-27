@@ -5058,8 +5058,22 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "hot_not_mutated_directly: {}",
                         report.learning_update.hot_not_mutated_directly
                     );
-                    println!("selected_overlay: {}", report.selected_overlay.overlay_id);
-                    println!("route: {}", report.learned_delta.route);
+                    println!(
+                        "selected_overlay: {}",
+                        report
+                            .selected_overlay
+                            .as_ref()
+                            .map(|overlay| overlay.overlay_id.as_str())
+                            .unwrap_or("none")
+                    );
+                    println!(
+                        "route: {}",
+                        report
+                            .learned_delta
+                            .as_ref()
+                            .map(|delta| delta.route.as_str())
+                            .unwrap_or("none")
+                    );
                 }
                 OutputFormat::Md => {
                     println!("# LLMWave Linux ChatCore Learn");
@@ -5077,8 +5091,22 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- hot mutated directly: `{}`",
                         !report.learning_update.hot_not_mutated_directly
                     );
-                    println!("- overlay: `{}`", report.selected_overlay.overlay_id);
-                    println!("- route: `{}`", report.learned_delta.route);
+                    println!(
+                        "- overlay: `{}`",
+                        report
+                            .selected_overlay
+                            .as_ref()
+                            .map(|overlay| overlay.overlay_id.as_str())
+                            .unwrap_or("none")
+                    );
+                    println!(
+                        "- route: `{}`",
+                        report
+                            .learned_delta
+                            .as_ref()
+                            .map(|delta| delta.route.as_str())
+                            .unwrap_or("none")
+                    );
                 }
             }
             Ok(EXIT_PASS)

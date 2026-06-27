@@ -1444,6 +1444,13 @@ answer behavior. Use `linux-chat-core-learn-eval` to verify the full scratch
 loop: before blocked, overlay written, stale gate, stale ask blocked, rebuild,
 learned answer from `compiled_chat_core_hot`, learned anti-wave replay, and
 unrelated bash/systemctl routes preserved.
+Before any append, learning must pass the ChatCore safety contract: refuse and
+redact secret-like feedback, require the route to exist in the domain registry,
+require the overlay to be allowed for that domain scope, treat duplicate feedback
+as a no-write, and quarantine conflicting feedback as a non-projected
+`WATCH_TRACE`. In `linux-chat-core-learn-eval`, require `.safety` to show
+duplicate no-write, conflict quarantine, unknown-route rejection, wrong-overlay
+rejection, secret refusal, poison quarantine, and `raw_secret_written=false`.
 These commands expand the Linux-profile reasoning/chat proof surface, but they
 still do not unlock general LLM, open-domain chat, scanner, or exploit claims.
 Use `nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json`

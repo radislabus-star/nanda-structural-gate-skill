@@ -596,6 +596,12 @@ target answer lifted from `compiled_chat_core_hot`, learned anti-wave replayed,
 bash/systemctl preserved, and no false-positive regression. Its ready verdict
 remains Linux-profile scoped:
 `LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM`.
+The writer now enforces the learning safety contract before appending: secret-like
+feedback is refused/redacted, routes must be known in the ChatCore domain
+registry, overlays must match the domain scope, duplicates do not write, and
+conflicting feedback becomes a non-projected `WATCH_TRACE` quarantine record. The
+learn-eval JSON exposes those checks in `.safety` and keeps
+`raw_secret_written=false`.
 `linux-heldout-suite-build` adds a stricter profile suite: exact facts,
 near-name collisions, shortcut controls, and endpoint-scope checks. Use
 `linux-heldout-eval-run` before trusting the profile on noisy Linux facts.
