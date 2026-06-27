@@ -1,0 +1,154 @@
+{
+  "profile_id": "linux-chat-core",
+  "source_memory": {
+    "residual_pack": ".nanda/linux-active/linux-active-65k.lrf",
+    "source_of_truth": true
+  },
+  "overlays": [
+    {
+      "overlay_id": "dialogue",
+      "overlay_kind": "dialogue-learning",
+      "path": ".nanda/linux-active/linux-chat-profile.lwm",
+      "domain_scope": [
+        "packages",
+        "systemd",
+        "dns",
+        "exposure"
+      ],
+      "required_for_profile_ready": false,
+      "source_of_truth": true,
+      "write_policy": "append_overlay_then_recompile_cache"
+    },
+    {
+      "overlay_id": "centers",
+      "overlay_kind": "dynamic-center-learning",
+      "path": ".nanda/linux-active/linux-center-learning.lwm",
+      "domain_scope": [
+        "packages",
+        "systemd",
+        "dns",
+        "exposure",
+        "vpn"
+      ],
+      "required_for_profile_ready": false,
+      "source_of_truth": true,
+      "write_policy": "append_overlay_then_recompile_cache"
+    },
+    {
+      "overlay_id": "vpn",
+      "overlay_kind": "domain-learning",
+      "path": ".nanda/linux-active/linux-chat-profile-vpn.lwm",
+      "domain_scope": [
+        "vpn"
+      ],
+      "required_for_profile_ready": false,
+      "source_of_truth": true,
+      "write_policy": "append_overlay_then_recompile_cache"
+    }
+  ],
+  "domains": [
+    {
+      "domain_id": "packages",
+      "routes": [
+        "linux.apt.command.provider",
+        "linux.package.file.owner"
+      ],
+      "negative_routes": [
+        "package_installed_does_not_prove_runtime_active"
+      ],
+      "overlay_ids": [
+        "dialogue",
+        "centers"
+      ],
+      "action_scope": "read_only_answer_support"
+    },
+    {
+      "domain_id": "systemd",
+      "routes": [
+        "linux.systemd.unit.exec",
+        "linux.systemd.unit.state"
+      ],
+      "negative_routes": [
+        "unit_file_does_not_prove_running_state"
+      ],
+      "overlay_ids": [
+        "dialogue",
+        "centers"
+      ],
+      "action_scope": "read_only_answer_support"
+    },
+    {
+      "domain_id": "dns",
+      "routes": [
+        "linux.resolver.config",
+        "linux.route.default"
+      ],
+      "negative_routes": [
+        "resolver_config_does_not_prove_external_reachability"
+      ],
+      "overlay_ids": [
+        "dialogue",
+        "centers"
+      ],
+      "action_scope": "read_only_answer_support"
+    },
+    {
+      "domain_id": "exposure",
+      "routes": [
+        "linux.exposure.socket",
+        "linux.firewall.boundary"
+      ],
+      "negative_routes": [
+        "listening_local_socket_does_not_prove_external_exposure"
+      ],
+      "overlay_ids": [
+        "dialogue",
+        "centers"
+      ],
+      "action_scope": "read_only_answer_support"
+    },
+    {
+      "domain_id": "vpn",
+      "routes": [
+        "linux.vpn.status",
+        "linux.vpn.enable",
+        "linux.vpn.disable"
+      ],
+      "negative_routes": [
+        "vpn_package_installed_does_not_prove_tunnel_active",
+        "vpn_action_requires_explicit_user_confirmation"
+      ],
+      "overlay_ids": [
+        "centers",
+        "vpn"
+      ],
+      "action_scope": "dry_run_plan_only_without_confirmation"
+    }
+  ],
+  "evals": [
+    {
+      "eval_id": "broad",
+      "path": ".nanda/linux-active/linux-broad-eval.json",
+      "required_for_chat_core_gate": true
+    },
+    {
+      "eval_id": "heldout",
+      "path": ".nanda/linux-active/linux-heldout-eval.json",
+      "required_for_chat_core_gate": true
+    }
+  ],
+  "cache": {
+    "hot_path": ".nanda/linux-active/cache/chat-core.hot",
+    "index_path": ".nanda/linux-active/cache/chat-core.index.json",
+    "manifest_path": ".nanda/linux-active/cache/chat-core.manifest.json",
+    "cache_is_source_of_truth": false,
+    "stale_requires_recompile": true
+  },
+  "invariants": {
+    "cache_is_not_memory": true,
+    "cache_must_match_source_hashes": true,
+    "eval_uses_scratch_overlays": true,
+    "stale_cache_blocks_answer_authority": true,
+    "domains_are_registry_entries_not_top_level_gates": true
+  }
+}

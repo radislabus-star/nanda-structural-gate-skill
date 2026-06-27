@@ -22,10 +22,12 @@ use super::linux_residual_memory::{
 };
 
 pub(crate) const LINUX_CHAT_CORE_VERSION: &str = "llmwave-big-v-next-linux-chat-core";
+pub(crate) const DEFAULT_LINUX_CHAT_CORE_PROFILE: &str = "examples/linux-chat-core.profile.json";
 const HOT_MAGIC: &[u8] = b"LLMWCHATCORE1\n";
 
 #[derive(Clone)]
 pub(crate) struct LinuxChatCoreBuildConfig {
+    pub profile: PathBuf,
     pub residual_pack: PathBuf,
     pub dialogue_overlay: PathBuf,
     pub centers_overlay: PathBuf,
@@ -38,6 +40,7 @@ pub(crate) struct LinuxChatCoreBuildConfig {
 
 #[derive(Clone)]
 pub(crate) struct LinuxChatCoreGateConfig {
+    pub profile: PathBuf,
     pub residual_pack: PathBuf,
     pub dialogue_overlay: PathBuf,
     pub centers_overlay: PathBuf,
@@ -63,6 +66,16 @@ pub(crate) struct LinuxChatCoreAskConfig {
     pub manifest: Option<PathBuf>,
     pub max_facts: usize,
     pub out: Option<PathBuf>,
+}
+
+struct ChatCoreSpecOverrides<'a> {
+    residual_pack: &'a Path,
+    dialogue_overlay: &'a Path,
+    centers_overlay: &'a Path,
+    vpn_overlay: &'a Path,
+    broad_eval: &'a Option<PathBuf>,
+    heldout_eval: &'a Option<PathBuf>,
+    cache_dir: &'a Path,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -214,6 +227,7 @@ pub(crate) struct LinuxChatCoreBuildReport {
     pub manifest: LinuxChatCoreCacheManifest,
     pub source_status: LinuxChatCoreSourceStatus,
     pub cache: LinuxChatCoreCompiledCache,
+    pub token_economics: LinuxChatCoreCacheTokenEconomics,
     pub claim_boundary: LinuxChatCoreClaimBoundary,
 }
 
@@ -228,6 +242,7 @@ pub(crate) struct LinuxChatCoreGateReport {
     pub source_status: LinuxChatCoreSourceStatus,
     pub profile_gate: Option<LinuxProfileClaimGateReport>,
     pub chat_core: LinuxChatCoreAuthority,
+    pub token_economics: LinuxChatCoreCacheTokenEconomics,
     pub claim_boundary: LinuxChatCoreClaimBoundary,
 }
 
@@ -239,7 +254,37 @@ pub(crate) struct LinuxChatCoreAskReport {
     pub text: String,
     pub cache_status: LinuxChatCoreCacheStatus,
     pub grounded_packet: LinuxChatCoreGroundedPacket,
+    pub token_economics: LinuxChatCoreAskTokenEconomics,
     pub claim_boundary: LinuxChatCoreClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreCacheTokenEconomics {
+    pub estimate_method: &'static str,
+    pub source_artifacts_bytes: u64,
+    pub source_artifacts_estimated_tokens: u64,
+    pub cache_hot_bytes: u64,
+    pub cache_index_bytes: u64,
+    pub cache_total_bytes: u64,
+    pub cache_estimated_tokens: u64,
+    pub cache_vs_source_bytes_ratio: f32,
+    pub note: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreAskTokenEconomics {
+    pub estimate_method: &'static str,
+    pub source_artifacts_bytes: u64,
+    pub source_artifacts_estimated_tokens: u64,
+    pub cache_index_bytes: u64,
+    pub cache_index_estimated_tokens: u64,
+    pub grounded_packet_bytes: u64,
+    pub grounded_packet_estimated_tokens: u64,
+    pub estimated_tokens_saved_vs_source: u64,
+    pub estimated_tokens_saved_vs_cache_index: u64,
+    pub source_to_packet_reduction_ratio: f32,
+    pub cache_index_to_packet_reduction_ratio: f32,
+    pub note: &'static str,
 }
 
 #[derive(Serialize, Clone)]
@@ -320,17 +365,20 @@ pub(crate) struct LinuxChatCoreClaimBoundary {
 pub(crate) fn build_linux_chat_core_cache_report(
     config: LinuxChatCoreBuildConfig,
 ) -> Result<LinuxChatCoreBuildReport> {
-    let spec = default_spec(
-        &config.residual_pack,
-        &config.dialogue_overlay,
-        &config.centers_overlay,
-        &config.vpn_overlay,
-        &config.broad_eval,
-        &config.heldout_eval,
-        &config.cache_dir,
-    );
+    let overrides = ChatCoreSpecOverrides {
+        residual_pack: &config.residual_pack,
+        dialogue_overlay: &config.dialogue_overlay,
+        centers_overlay: &config.centers_overlay,
+        vpn_overlay: &config.vpn_overlay,
+        broad_eval: &config.broad_eval,
+        heldout_eval: &config.heldout_eval,
+        cache_dir: &config.cache_dir,
+    };
+    let spec = load_chat_core_spec(&config.profile, &overrides)?;
     let compiled = compile_chat_core_cache(&spec)?;
     let source_status = source_status(&compiled.manifest.source_artifacts);
+    let token_economics =
+        cache_token_economics(&compiled.manifest.source_artifacts, &compiled.manifest);
     let cache = compiled.cache;
     let manifest = compiled.manifest;
     let report = LinuxChatCoreBuildReport {
@@ -341,6 +389,7 @@ pub(crate) fn build_linux_chat_core_cache_report(
         manifest,
         source_status,
         cache,
+        token_economics,
         claim_boundary: claim_boundary(true, false, false),
     };
     write_json_if_requested(config.out.as_deref(), &report)?;
@@ -350,22 +399,25 @@ pub(crate) fn build_linux_chat_core_cache_report(
 pub(crate) fn build_linux_chat_core_gate_report(
     config: LinuxChatCoreGateConfig,
 ) -> Result<LinuxChatCoreGateReport> {
-    let spec = default_spec(
-        &config.residual_pack,
-        &config.dialogue_overlay,
-        &config.centers_overlay,
-        &config.vpn_overlay,
-        &config.broad_eval,
-        &config.heldout_eval,
-        &config.cache_dir,
-    );
-    if config.rebuild_cache || !manifest_path(&config).exists() {
+    let overrides = ChatCoreSpecOverrides {
+        residual_pack: &config.residual_pack,
+        dialogue_overlay: &config.dialogue_overlay,
+        centers_overlay: &config.centers_overlay,
+        vpn_overlay: &config.vpn_overlay,
+        broad_eval: &config.broad_eval,
+        heldout_eval: &config.heldout_eval,
+        cache_dir: &config.cache_dir,
+    };
+    let spec = load_chat_core_spec(&config.profile, &overrides)?;
+    if config.rebuild_cache {
         compile_chat_core_cache(&spec)?;
     }
     let manifest_path = manifest_path(&config);
     let cache_status = evaluate_cache(&spec, &manifest_path)?;
     let current_artifacts = source_artifacts(&spec)?;
     let source_status = source_status(&current_artifacts);
+    let token_economics =
+        cache_token_economics_from_manifest_path(&current_artifacts, &manifest_path)?;
     let profile_gate = if cache_status.cache_fresh {
         Some(build_linux_profile_claim_gate_report(
             LinuxProfileClaimGateConfig {
@@ -416,6 +468,7 @@ pub(crate) fn build_linux_chat_core_gate_report(
             cache_is_source_of_truth: false,
             compatibility_wrapper_for_linux_chat_profile_gate: true,
         },
+        token_economics,
         claim_boundary: claim_boundary(cache_status.cache_fresh, true, chat_core_ready),
     };
     write_json_if_requested(config.out.as_deref(), &report)?;
@@ -486,6 +539,7 @@ pub(crate) fn build_linux_chat_core_ask_report(
             compact_evidence: Vec::new(),
         },
     };
+    let token_economics = ask_token_economics(&manifest, &packet)?;
     let report = LinuxChatCoreAskReport {
         mode: "llmwave-big-linux-chat-core-ask",
         version: LINUX_CHAT_CORE_VERSION,
@@ -497,156 +551,73 @@ pub(crate) fn build_linux_chat_core_ask_report(
         text: config.text,
         cache_status: cache_status.clone(),
         grounded_packet: packet,
+        token_economics,
         claim_boundary: claim_boundary(cache_status.cache_fresh, true, false),
     };
     write_json_if_requested(config.out.as_deref(), &report)?;
     Ok(report)
 }
 
-fn default_spec(
-    residual_pack: &Path,
-    dialogue_overlay: &Path,
-    centers_overlay: &Path,
-    vpn_overlay: &Path,
-    broad_eval: &Option<PathBuf>,
-    heldout_eval: &Option<PathBuf>,
-    cache_dir: &Path,
-) -> LinuxChatCoreSpec {
-    let hot_path = cache_dir.join("chat-core.hot");
-    let index_path = cache_dir.join("chat-core.index.json");
-    let manifest_path = cache_dir.join("chat-core.manifest.json");
-    LinuxChatCoreSpec {
-        profile_id: "linux-chat-core".to_string(),
-        source_memory: LinuxChatCoreSourceMemorySpec {
-            residual_pack: path_string(residual_pack),
-            source_of_truth: true,
-        },
-        overlays: vec![
-            overlay(
-                "dialogue",
-                "dialogue-learning",
-                dialogue_overlay,
-                &["packages", "systemd", "dns", "exposure"],
-            ),
-            overlay(
-                "centers",
-                "dynamic-center-learning",
-                centers_overlay,
-                &["packages", "systemd", "dns", "exposure", "vpn"],
-            ),
-            overlay("vpn", "domain-learning", vpn_overlay, &["vpn"]),
-        ],
-        domains: default_domains(),
-        evals: vec![
-            LinuxChatCoreEvalSpec {
-                eval_id: "broad".to_string(),
-                path: broad_eval.as_ref().map(|p| path_string(p)),
-                required_for_chat_core_gate: true,
-            },
-            LinuxChatCoreEvalSpec {
-                eval_id: "heldout".to_string(),
-                path: heldout_eval.as_ref().map(|p| path_string(p)),
-                required_for_chat_core_gate: true,
-            },
-        ],
-        cache: LinuxChatCoreCacheSpec {
-            hot_path: path_string(&hot_path),
-            index_path: path_string(&index_path),
-            manifest_path: path_string(&manifest_path),
-            cache_is_source_of_truth: false,
-            stale_requires_recompile: true,
-        },
-        invariants: LinuxChatCoreInvariants {
-            cache_is_not_memory: true,
-            cache_must_match_source_hashes: true,
-            eval_uses_scratch_overlays: true,
-            stale_cache_blocks_answer_authority: true,
-            domains_are_registry_entries_not_top_level_gates: true,
-        },
+fn load_chat_core_spec(
+    profile: &Path,
+    overrides: &ChatCoreSpecOverrides<'_>,
+) -> Result<LinuxChatCoreSpec> {
+    let mut spec: LinuxChatCoreSpec = serde_json::from_slice(
+        &fs::read(profile).with_context(|| format!("read {}", profile.display()))?,
+    )
+    .with_context(|| format!("parse {}", profile.display()))?;
+
+    let hot_path = overrides.cache_dir.join("chat-core.hot");
+    let index_path = overrides.cache_dir.join("chat-core.index.json");
+    let manifest_path = overrides.cache_dir.join("chat-core.manifest.json");
+
+    spec.source_memory.residual_pack = path_string(overrides.residual_pack);
+    set_overlay_path(&mut spec, "dialogue", overrides.dialogue_overlay);
+    set_overlay_path(&mut spec, "centers", overrides.centers_overlay);
+    set_overlay_path(&mut spec, "vpn", overrides.vpn_overlay);
+    if let Some(path) = overrides.broad_eval {
+        set_eval_path(&mut spec, "broad", path, true);
+    }
+    if let Some(path) = overrides.heldout_eval {
+        set_eval_path(&mut spec, "heldout", path, true);
+    }
+    spec.cache.hot_path = path_string(&hot_path);
+    spec.cache.index_path = path_string(&index_path);
+    spec.cache.manifest_path = path_string(&manifest_path);
+    spec.cache.cache_is_source_of_truth = false;
+    spec.cache.stale_requires_recompile = true;
+    spec.invariants.cache_is_not_memory = true;
+    spec.invariants.cache_must_match_source_hashes = true;
+    spec.invariants.stale_cache_blocks_answer_authority = true;
+    Ok(spec)
+}
+
+fn set_overlay_path(spec: &mut LinuxChatCoreSpec, overlay_id: &str, path: &Path) {
+    if let Some(overlay) = spec
+        .overlays
+        .iter_mut()
+        .find(|overlay| overlay.overlay_id == overlay_id)
+    {
+        overlay.path = path_string(path);
     }
 }
 
-fn overlay(
-    overlay_id: &str,
-    overlay_kind: &str,
+fn set_eval_path(
+    spec: &mut LinuxChatCoreSpec,
+    eval_id: &str,
     path: &Path,
-    domain_scope: &[&str],
-) -> LinuxChatCoreOverlaySpec {
-    LinuxChatCoreOverlaySpec {
-        overlay_id: overlay_id.to_string(),
-        overlay_kind: overlay_kind.to_string(),
-        path: path_string(path),
-        domain_scope: domain_scope
-            .iter()
-            .map(|value| (*value).to_string())
-            .collect(),
-        required_for_profile_ready: false,
-        source_of_truth: true,
-        write_policy: "append_overlay_then_recompile_cache".to_string(),
+    required_for_chat_core_gate: bool,
+) {
+    if let Some(eval) = spec.evals.iter_mut().find(|eval| eval.eval_id == eval_id) {
+        eval.path = Some(path_string(path));
+        eval.required_for_chat_core_gate = required_for_chat_core_gate;
+    } else {
+        spec.evals.push(LinuxChatCoreEvalSpec {
+            eval_id: eval_id.to_string(),
+            path: Some(path_string(path)),
+            required_for_chat_core_gate,
+        });
     }
-}
-
-fn default_domains() -> Vec<LinuxChatCoreDomainSpec> {
-    vec![
-        LinuxChatCoreDomainSpec {
-            domain_id: "packages".to_string(),
-            routes: vec![
-                "linux.apt.command.provider".to_string(),
-                "linux.package.file.owner".to_string(),
-            ],
-            negative_routes: vec!["package_installed_does_not_prove_runtime_active".to_string()],
-            overlay_ids: vec!["dialogue".to_string(), "centers".to_string()],
-            action_scope: "read_only_answer_support".to_string(),
-        },
-        LinuxChatCoreDomainSpec {
-            domain_id: "systemd".to_string(),
-            routes: vec![
-                "linux.systemd.unit.exec".to_string(),
-                "linux.systemd.unit.state".to_string(),
-            ],
-            negative_routes: vec!["unit_file_does_not_prove_running_state".to_string()],
-            overlay_ids: vec!["dialogue".to_string(), "centers".to_string()],
-            action_scope: "read_only_answer_support".to_string(),
-        },
-        LinuxChatCoreDomainSpec {
-            domain_id: "dns".to_string(),
-            routes: vec![
-                "linux.resolver.config".to_string(),
-                "linux.route.default".to_string(),
-            ],
-            negative_routes: vec![
-                "resolver_config_does_not_prove_external_reachability".to_string()
-            ],
-            overlay_ids: vec!["dialogue".to_string(), "centers".to_string()],
-            action_scope: "read_only_answer_support".to_string(),
-        },
-        LinuxChatCoreDomainSpec {
-            domain_id: "exposure".to_string(),
-            routes: vec![
-                "linux.exposure.socket".to_string(),
-                "linux.firewall.boundary".to_string(),
-            ],
-            negative_routes: vec![
-                "listening_local_socket_does_not_prove_external_exposure".to_string()
-            ],
-            overlay_ids: vec!["dialogue".to_string(), "centers".to_string()],
-            action_scope: "read_only_answer_support".to_string(),
-        },
-        LinuxChatCoreDomainSpec {
-            domain_id: "vpn".to_string(),
-            routes: vec![
-                "linux.vpn.status".to_string(),
-                "linux.vpn.enable".to_string(),
-                "linux.vpn.disable".to_string(),
-            ],
-            negative_routes: vec![
-                "vpn_package_installed_does_not_prove_tunnel_active".to_string(),
-                "vpn_action_requires_explicit_user_confirmation".to_string(),
-            ],
-            overlay_ids: vec!["centers".to_string(), "vpn".to_string()],
-            action_scope: "dry_run_plan_only_without_confirmation".to_string(),
-        },
-    ]
 }
 
 struct CompiledChatCore {
@@ -1072,6 +1043,114 @@ fn source_status(artifacts: &[LinuxChatCoreArtifactDigest]) -> LinuxChatCoreSour
             .collect(),
         eval_artifacts_present,
         source_hash: combined_hash(artifacts.iter().map(|artifact| artifact.sha256.as_str())),
+    }
+}
+
+fn cache_token_economics(
+    artifacts: &[LinuxChatCoreArtifactDigest],
+    manifest: &LinuxChatCoreCacheManifest,
+) -> LinuxChatCoreCacheTokenEconomics {
+    let source_artifacts_bytes = artifacts.iter().map(|artifact| artifact.bytes).sum::<u64>();
+    let cache_total_bytes = manifest.hot_bytes + manifest.index_bytes;
+    LinuxChatCoreCacheTokenEconomics {
+        estimate_method: "ceil(bytes / 4), conservative tokenizer-free estimate",
+        source_artifacts_bytes,
+        source_artifacts_estimated_tokens: estimate_tokens_from_bytes(source_artifacts_bytes),
+        cache_hot_bytes: manifest.hot_bytes,
+        cache_index_bytes: manifest.index_bytes,
+        cache_total_bytes,
+        cache_estimated_tokens: estimate_tokens_from_bytes(cache_total_bytes),
+        cache_vs_source_bytes_ratio: ratio_f32(cache_total_bytes, source_artifacts_bytes),
+        note: "This estimates prompt/context scale only. It is not a model-specific BPE tokenizer count.",
+    }
+}
+
+fn cache_token_economics_from_manifest_path(
+    artifacts: &[LinuxChatCoreArtifactDigest],
+    manifest_path: &Path,
+) -> Result<LinuxChatCoreCacheTokenEconomics> {
+    if manifest_path.exists() {
+        let manifest: LinuxChatCoreCacheManifest = serde_json::from_slice(
+            &fs::read(manifest_path)
+                .with_context(|| format!("read {}", manifest_path.display()))?,
+        )
+        .with_context(|| format!("parse {}", manifest_path.display()))?;
+        Ok(cache_token_economics(artifacts, &manifest))
+    } else {
+        let source_artifacts_bytes = artifacts.iter().map(|artifact| artifact.bytes).sum::<u64>();
+        Ok(LinuxChatCoreCacheTokenEconomics {
+            estimate_method: "ceil(bytes / 4), conservative tokenizer-free estimate",
+            source_artifacts_bytes,
+            source_artifacts_estimated_tokens: estimate_tokens_from_bytes(source_artifacts_bytes),
+            cache_hot_bytes: 0,
+            cache_index_bytes: 0,
+            cache_total_bytes: 0,
+            cache_estimated_tokens: 0,
+            cache_vs_source_bytes_ratio: 0.0,
+            note:
+                "Cache manifest is missing; gate is read-only and does not build cache implicitly.",
+        })
+    }
+}
+
+fn ask_token_economics(
+    manifest_path: &Path,
+    packet: &LinuxChatCoreGroundedPacket,
+) -> Result<LinuxChatCoreAskTokenEconomics> {
+    let packet_bytes = serde_json::to_vec(packet)?.len() as u64;
+    if !manifest_path.exists() {
+        return Ok(LinuxChatCoreAskTokenEconomics {
+            estimate_method: "ceil(bytes / 4), conservative tokenizer-free estimate",
+            source_artifacts_bytes: 0,
+            source_artifacts_estimated_tokens: 0,
+            cache_index_bytes: 0,
+            cache_index_estimated_tokens: 0,
+            grounded_packet_bytes: packet_bytes,
+            grounded_packet_estimated_tokens: estimate_tokens_from_bytes(packet_bytes),
+            estimated_tokens_saved_vs_source: 0,
+            estimated_tokens_saved_vs_cache_index: 0,
+            source_to_packet_reduction_ratio: 0.0,
+            cache_index_to_packet_reduction_ratio: 0.0,
+            note: "Cache manifest is missing; savings cannot be estimated from source artifacts.",
+        });
+    }
+    let manifest: LinuxChatCoreCacheManifest = serde_json::from_slice(
+        &fs::read(manifest_path).with_context(|| format!("read {}", manifest_path.display()))?,
+    )
+    .with_context(|| format!("parse {}", manifest_path.display()))?;
+    let source_artifacts_bytes = manifest
+        .source_artifacts
+        .iter()
+        .map(|artifact| artifact.bytes)
+        .sum::<u64>();
+    let source_tokens = estimate_tokens_from_bytes(source_artifacts_bytes);
+    let cache_index_tokens = estimate_tokens_from_bytes(manifest.index_bytes);
+    let packet_tokens = estimate_tokens_from_bytes(packet_bytes);
+    Ok(LinuxChatCoreAskTokenEconomics {
+        estimate_method: "ceil(bytes / 4), conservative tokenizer-free estimate",
+        source_artifacts_bytes,
+        source_artifacts_estimated_tokens: source_tokens,
+        cache_index_bytes: manifest.index_bytes,
+        cache_index_estimated_tokens: cache_index_tokens,
+        grounded_packet_bytes: packet_bytes,
+        grounded_packet_estimated_tokens: packet_tokens,
+        estimated_tokens_saved_vs_source: source_tokens.saturating_sub(packet_tokens),
+        estimated_tokens_saved_vs_cache_index: cache_index_tokens.saturating_sub(packet_tokens),
+        source_to_packet_reduction_ratio: ratio_f32(source_artifacts_bytes, packet_bytes),
+        cache_index_to_packet_reduction_ratio: ratio_f32(manifest.index_bytes, packet_bytes),
+        note: "Savings estimate compares sending the full source/cache-index context to sending only the grounded packet. It is not a model-specific BPE tokenizer count.",
+    })
+}
+
+fn estimate_tokens_from_bytes(bytes: u64) -> u64 {
+    bytes.div_ceil(4)
+}
+
+fn ratio_f32(numerator: u64, denominator: u64) -> f32 {
+    if denominator == 0 {
+        0.0
+    } else {
+        (numerator as f64 / denominator as f64) as f32
     }
 }
 

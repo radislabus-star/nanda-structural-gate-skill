@@ -802,7 +802,8 @@ and proves `spectral_center.verdict = LINUX_SPECTRAL_CENTER_PROVEN`. It is still
 not broad chat readiness and not exposure reasoning.
 
 `linux-chat-core-build` and `linux-chat-core-gate` are the unified Linux
-ChatCore memory/cache layer. ChatCore treats `.lrf v2` plus `.lwm` overlays
+ChatCore memory/cache layer. ChatCore loads
+`examples/linux-chat-core.profile.json`, treats `.lrf v2` plus `.lwm` overlays
 as source memory, then compiles a fast cache view:
 
 ```text
@@ -818,19 +819,24 @@ as source memory, then compiles a fast cache view:
 The manifest stores hashes for source memory, overlays, profile evals, domain
 registry, and compiler version. The cache is not the source of truth. If any
 source artifact changes, `linux-chat-core-gate` returns stale and blocks answer
-authority until the cache is rebuilt. The old `linux-chat-profile-gate` remains
-a compatibility gate; the preferred Linux-profile entrypoint is now:
+authority until the cache is rebuilt. The gate is read-only by default: missing
+cache returns stale instead of implicitly building cache. Use
+`linux-chat-core-build` or explicit `linux-chat-core-gate --rebuild-cache` to
+write cache artifacts. The old `linux-chat-profile-gate` remains a
+compatibility gate; the preferred Linux-profile entrypoint is now:
 
 ```bash
-nanda-llmwave-big linux-chat-core-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --cache-dir .nanda/linux-active/cache --format json
-nanda-llmwave-big linux-chat-core-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --center-learning-script examples/linux-center-learning.script --cache-dir .nanda/linux-active/cache --max-facts 4 --format json
+nanda-llmwave-big linux-chat-core-build --profile examples/linux-chat-core.profile.json --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --cache-dir .nanda/linux-active/cache --format json
+nanda-llmwave-big linux-chat-core-gate --profile examples/linux-chat-core.profile.json --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --center-learning-script examples/linux-center-learning.script --cache-dir .nanda/linux-active/cache --max-facts 4 --format json
 nanda-llmwave-big linux-chat-core-ask --text "which package provides command bash" --cache-dir .nanda/linux-active/cache --format json
 ```
 
 `linux-chat-core-ask` is the intended compact packet surface for Codex/LLM use:
 it refuses stale cache, reads the compiled cache-index readout projection, and
 returns intent, route priors, answer state, compact evidence, and anti-wave
-hits. Treat
+hits. Inspect `token_economics` to estimate how many prompt tokens the compact
+packet saves versus sending the source artifacts or the whole cache index. The
+estimate is `ceil(bytes / 4)`, not an exact model tokenizer count. Treat
 `LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as Linux-profile cache
 readiness only: it is not open-domain chat, not a general LLM, and not global
 nonlinear-memory proof.

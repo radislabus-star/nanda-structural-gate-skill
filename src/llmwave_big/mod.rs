@@ -1785,6 +1785,11 @@ struct LlmwaveBigLinuxProfileClaimGateArgs {
 #[derive(Parser)]
 struct LlmwaveBigLinuxChatCoreBuildArgs {
     #[arg(
+        long = "profile",
+        default_value = linux_chat_core::DEFAULT_LINUX_CHAT_CORE_PROFILE
+    )]
+    profile: PathBuf,
+    #[arg(
         long = "residual-pack",
         default_value = ".nanda/linux-active/linux-active-65k.lrf"
     )]
@@ -1818,6 +1823,11 @@ struct LlmwaveBigLinuxChatCoreBuildArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigLinuxChatCoreGateArgs {
+    #[arg(
+        long = "profile",
+        default_value = linux_chat_core::DEFAULT_LINUX_CHAT_CORE_PROFILE
+    )]
+    profile: PathBuf,
     #[arg(
         long = "residual-pack",
         default_value = ".nanda/linux-active/linux-active-65k.lrf"
@@ -4563,6 +4573,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::LinuxChatCoreBuild(args) => {
             let report = linux_chat_core::build_linux_chat_core_cache_report(
                 linux_chat_core::LinuxChatCoreBuildConfig {
+                    profile: args.profile,
                     residual_pack: args.residual_pack,
                     dialogue_overlay: args.dialogue_overlay,
                     centers_overlay: args.centers_overlay,
@@ -4585,6 +4596,14 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "cache_is_source_of_truth: {}",
                         report.claim_boundary.cache_is_source_of_truth
                     );
+                    println!(
+                        "source_estimated_tokens: {}",
+                        report.token_economics.source_artifacts_estimated_tokens
+                    );
+                    println!(
+                        "cache_estimated_tokens: {}",
+                        report.token_economics.cache_estimated_tokens
+                    );
                 }
                 OutputFormat::Md => {
                     println!("# LLMWave Linux ChatCore Build");
@@ -4605,6 +4624,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
         LlmwaveBigCommand::LinuxChatCoreGate(args) => {
             let report = linux_chat_core::build_linux_chat_core_gate_report(
                 linux_chat_core::LinuxChatCoreGateConfig {
+                    profile: args.profile,
                     residual_pack: args.residual_pack,
                     dialogue_overlay: args.dialogue_overlay,
                     centers_overlay: args.centers_overlay,
@@ -4630,6 +4650,14 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         report.chat_core.safe_to_answer_from_cache
                     );
                     println!("stale_reasons: {}", report.cache_status.stale_reasons.len());
+                    println!(
+                        "source_estimated_tokens: {}",
+                        report.token_economics.source_artifacts_estimated_tokens
+                    );
+                    println!(
+                        "cache_estimated_tokens: {}",
+                        report.token_economics.cache_estimated_tokens
+                    );
                 }
                 OutputFormat::Md => {
                     println!("# LLMWave Linux ChatCore Gate");
@@ -4670,6 +4698,14 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!("answer_allowed: {}", report.grounded_packet.answer_allowed);
                     println!("state: {}", report.grounded_packet.decision_state);
                     println!("answer: {}", report.grounded_packet.answer);
+                    println!(
+                        "grounded_packet_estimated_tokens: {}",
+                        report.token_economics.grounded_packet_estimated_tokens
+                    );
+                    println!(
+                        "estimated_tokens_saved_vs_source: {}",
+                        report.token_economics.estimated_tokens_saved_vs_source
+                    );
                 }
                 OutputFormat::Md => {
                     println!("# LLMWave Linux ChatCore Ask");
