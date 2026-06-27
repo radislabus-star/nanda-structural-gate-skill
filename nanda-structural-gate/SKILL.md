@@ -1394,6 +1394,29 @@ subgate cannot show target-query improvement, memory lift, anti-center replay,
 candidate quarantine, evidence-weighted admission, bad-feedback quarantine,
 drift-budget enforcement, no false-positive regression, no heldout regression,
 and unrelated-route preservation, do not promote the chat profile.
+Prefer `nanda-llmwave-big linux-chat-core-build` plus
+`nanda-llmwave-big linux-chat-core-gate` when the task is to use the Linux
+profile as Codex/LLM memory. ChatCore treats `.lrf` plus `.lwm` overlays as
+source memory and compiles a cache view:
+
+```bash
+nanda-llmwave-big linux-chat-core-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --cache-dir .nanda/linux-active/cache --format json
+nanda-llmwave-big linux-chat-core-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --center-learning-script examples/linux-center-learning.script --cache-dir .nanda/linux-active/cache --max-facts 4 --format json
+nanda-llmwave-big linux-chat-core-ask --text "which package provides command bash" --cache-dir .nanda/linux-active/cache --format json
+```
+
+Read ChatCore literally: cache is a compiled runtime view, not source memory.
+`chat-core.manifest.json` must match the current `.lrf`, overlays, eval
+artifacts, domain registry, and compiler version. If `cache_status.cache_fresh`
+is false, do not use the cache as answer support. `linux-chat-core-gate` runs
+the older Linux profile gate as a compatibility subgate on scratch `.lwm` eval
+files so it does not mutate source overlays. `linux-chat-core-ask` is the
+compact grounded-packet surface for Codex/LLM use: it reads the compiled
+cache-index readout projection, then returns intent, route priors, answer
+state, compact evidence, and anti-wave hits. Treat
+`LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as Linux-profile cache
+readiness only; general LLM, open-domain chat, scanner, and global nonlinear
+claims remain blocked.
 These commands expand the Linux-profile reasoning/chat proof surface, but they
 still do not unlock general LLM, open-domain chat, scanner, or exploit claims.
 Use `nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json`

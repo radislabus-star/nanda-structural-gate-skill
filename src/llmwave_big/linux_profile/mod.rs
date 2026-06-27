@@ -243,6 +243,7 @@ pub(crate) struct LinuxProfileClaimGateReport {
     pub mode: &'static str,
     pub version: &'static str,
     pub verdict: &'static str,
+    pub chat_core_compatibility: LinuxProfileChatCoreCompatibility,
     pub residual_pack: LinuxResidualDecodedSummary,
     pub memory_proof: LinuxProfileMemoryProofSummary,
     pub broad_eval: Option<LinuxBroadEvalMetrics>,
@@ -253,6 +254,15 @@ pub(crate) struct LinuxProfileClaimGateReport {
     pub requirements: LinuxProfileRequirements,
     pub chat_target: LinuxProfileChatTarget,
     pub claim_boundary: LinuxProfileBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxProfileChatCoreCompatibility {
+    pub compatibility_wrapper: bool,
+    pub preferred_gate: &'static str,
+    pub preferred_build: &'static str,
+    pub cache_is_source_of_truth: bool,
+    pub wrapper_preserves_profile_claim_boundary: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -443,6 +453,17 @@ pub(crate) fn build_linux_reason_report(config: LinuxReasonRunConfig) -> Result<
         &config.text,
         config.max_facts.max(1),
     ))
+}
+
+pub(crate) fn build_linux_reason_report_from_decoded_facts(
+    summary: LinuxResidualDecodedSummary,
+    facts: &[LinuxResidualDecodedFact],
+    text: &str,
+    max_facts: usize,
+) -> LinuxReasonReport {
+    let exposure =
+        build_linux_exposure_report_from_facts(summary.clone(), facts, None, max_facts.max(1));
+    build_linux_reason_from_parts(summary, facts, None, &exposure, text, max_facts.max(1))
 }
 
 fn build_linux_reason_from_parts(
@@ -803,6 +824,13 @@ pub(crate) fn build_linux_profile_claim_gate_report(
             "LINUX_PROFILE_BLOCKED_BY_MEMORY_PROOF"
         } else {
             "LINUX_PROFILE_BLOCKED_BY_EVAL"
+        },
+        chat_core_compatibility: LinuxProfileChatCoreCompatibility {
+            compatibility_wrapper: true,
+            preferred_gate: "nanda-llmwave-big linux-chat-core-gate",
+            preferred_build: "nanda-llmwave-big linux-chat-core-build",
+            cache_is_source_of_truth: false,
+            wrapper_preserves_profile_claim_boundary: true,
         },
         residual_pack: packet.summary,
         memory_proof,

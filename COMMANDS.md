@@ -166,9 +166,12 @@ cache claims closed.
 Inspect top-level `profile_claims` when the question is profile-scoped
 LLMWave progress: Linux `.lrf v2` memory can be proven by
 `linux-residual-proof`, and bounded Linux chat can be promoted by
-`linux-chat-profile-gate`, while top-level `nonlinear_memory_proven` and
-`global_nonlinear_memory_proven` stay false until independent multi-profile
-evidence exists.
+`linux-chat-profile-gate`. For actual Codex/LLM memory use, prefer
+`linux-chat-core-build` -> `linux-chat-core-gate` -> `linux-chat-core-ask`:
+ChatCore verifies the compiled cache against `.lrf` plus `.lwm` source memory
+before returning a compact grounded packet. Top-level
+`nonlinear_memory_proven` and `global_nonlinear_memory_proven` stay false until
+independent multi-profile evidence exists.
 
 Important profile boundary: plain `nanda-llmwave-big structural-capacity
 --format json` shows the default capacity profile. `nanda-skill-readiness`
@@ -287,6 +290,9 @@ nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/l
 nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json
 nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-heldout-suite.json --out .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --format json
 nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-center-learning-eval --center-learning-memory .nanda/linux-active/linux-center-learning.lwm --center-learning-script examples/linux-center-learning.script --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json
+nanda-llmwave-big linux-chat-core-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --cache-dir .nanda/linux-active/cache --format json
+nanda-llmwave-big linux-chat-core-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --center-learning-script examples/linux-center-learning.script --cache-dir .nanda/linux-active/cache --max-facts 4 --format json
+nanda-llmwave-big linux-chat-core-ask --text "which package provides command bash" --residual-pack .nanda/linux-active/linux-active-65k.lrf --dialogue-overlay .nanda/linux-active/linux-chat-profile.lwm --centers-overlay .nanda/linux-active/linux-center-learning.lwm --vpn-overlay .nanda/linux-active/linux-chat-profile-vpn.lwm --cache-dir .nanda/linux-active/cache --max-facts 4 --format json
 nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
 nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json
@@ -538,6 +544,26 @@ same command has the alias `linux-chat-profile-gate`. With `--heldout-eval`,
 `LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM`. That stronger target still
 means Linux-only bounded chat over `.lrf` plus `.lwm` wave/center learning; it
 does not unlock general LLM, open-domain chat, scanner, or exploit claims.
+`linux-chat-core-build` is the unified ChatCore cache compiler for the Linux
+profile. It treats `.lrf` plus `.lwm` overlays as the source of truth, decodes
+the `.lrf` into a compact route/relation index plus compiled readout facts, writes
+`cache/chat-core.hot`, `cache/chat-core.index.json`, and
+`cache/chat-core.manifest.json`, and records hashes for the residual packet,
+dialogue overlay, center overlay, VPN/domain overlay, profile evals, domain
+registry, and compiler version. The cache is a compiled runtime view, not
+memory authority.
+`linux-chat-core-gate` is the preferred umbrella gate before using that cache.
+It recomputes all source hashes, rejects stale cache, checks hot/index hashes,
+and runs the Linux profile gate on scratch `.lwm` files under the cache eval
+directory so the gate does not mutate source overlays. Treat
+`LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as profile-scoped ChatCore
+readiness only. If `.lrf`, any `.lwm` overlay, eval artifact, profile spec, or
+compiler version changes, the cache is stale and cannot grant answer authority.
+`linux-chat-core-ask` is the compact packet path for Codex/LLM use. It refuses
+stale cache, then reads the compiled cache index readout projection and returns
+the query intent, route priors, grounded answer state, compact evidence, and
+anti-wave hits. Use it as a small external memory packet, not as a replacement
+for the LLM and not as global nonlinear-memory proof.
 `linux-heldout-suite-build` adds a stricter profile suite: exact facts,
 near-name collisions, shortcut controls, and endpoint-scope checks. Use
 `linux-heldout-eval-run` before trusting the profile on noisy Linux facts.
