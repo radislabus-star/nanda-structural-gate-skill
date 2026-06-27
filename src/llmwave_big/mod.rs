@@ -4983,10 +4983,38 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     );
                     println!("packet_profile: {}", report.grounded_packet.packet_profile);
                     println!(
+                        "inferred_packet_profile: {}",
+                        report.grounded_packet.inferred_packet_profile
+                    );
+                    println!(
+                        "requested_packet_profile: {}",
+                        report
+                            .grounded_packet
+                            .requested_packet_profile
+                            .as_deref()
+                            .unwrap_or("none")
+                    );
+                    println!(
+                        "packet_profile_downgrade_blocked: {}",
+                        report.grounded_packet.packet_profile_downgrade_blocked
+                    );
+                    println!(
                         "packet_budget_tokens: {}",
                         report.grounded_packet.packet_budget_tokens
                     );
                     println!("packet_tokens: {}", report.grounded_packet.packet_tokens);
+                    println!(
+                        "packet_semantic_tokens: {}",
+                        report.grounded_packet.packet_semantic_tokens
+                    );
+                    println!(
+                        "packet_prompt_payload_tokens: {}",
+                        report.grounded_packet.packet_prompt_payload_tokens
+                    );
+                    println!(
+                        "packet_over_budget: {}",
+                        report.grounded_packet.packet_over_budget
+                    );
                     println!(
                         "packet_underfilled: {}",
                         report.grounded_packet.packet_underfilled
@@ -5030,9 +5058,26 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         report.grounded_packet.packet_profile
                     );
                     println!(
-                        "- packet tokens: `{}` / `{}`",
-                        report.grounded_packet.packet_tokens,
+                        "- inferred/requested profile: `{}` / `{}`",
+                        report.grounded_packet.inferred_packet_profile,
+                        report
+                            .grounded_packet
+                            .requested_packet_profile
+                            .as_deref()
+                            .unwrap_or("none")
+                    );
+                    println!(
+                        "- packet semantic tokens: `{}` / `{}`",
+                        report.grounded_packet.packet_semantic_tokens,
                         report.grounded_packet.packet_budget_tokens
+                    );
+                    println!(
+                        "- packet prompt payload tokens: `{}`",
+                        report.grounded_packet.packet_prompt_payload_tokens
+                    );
+                    println!(
+                        "- packet over budget: `{}`",
+                        report.grounded_packet.packet_over_budget
                     );
                     println!("- state: `{}`", report.grounded_packet.decision_state);
                     println!("- answer: {}", report.grounded_packet.answer);

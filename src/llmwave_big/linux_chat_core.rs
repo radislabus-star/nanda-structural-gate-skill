@@ -546,6 +546,8 @@ pub(crate) struct LinuxChatCoreAskTokenEconomics {
     pub grounded_packet_size_bytes: u64,
     pub grounded_packet_bytes: u64,
     pub grounded_packet_estimated_tokens: u64,
+    pub grounded_packet_prompt_payload_tokens: u64,
+    pub grounded_packet_semantic_tokens: u64,
     pub actual_answer_context_bytes: u64,
     pub actual_answer_context_estimated_tokens: u64,
     pub estimated_tokens_saved_vs_source: u64,
@@ -627,8 +629,19 @@ pub(crate) struct LinuxChatCoreGroundedPacket {
     pub intent: String,
     pub route_priors: Vec<String>,
     pub packet_profile: String,
+    pub inferred_packet_profile: String,
+    pub requested_packet_profile: Option<String>,
+    pub requested_packet_profile_unknown: bool,
+    pub packet_profile_override_accepted: bool,
+    pub packet_profile_downgrade_blocked: bool,
+    pub packet_profile_selection_reason: String,
+    pub requested_packet_budget_tokens: Option<u64>,
     pub packet_budget_tokens: u64,
     pub packet_tokens: u64,
+    pub packet_semantic_tokens: u64,
+    pub packet_prompt_payload_tokens: u64,
+    pub effective_min_packet_tokens: u64,
+    pub packet_over_budget: bool,
     pub packet_underfilled: bool,
     pub packet_truncated: bool,
     pub evidence_coverage: LinuxChatCoreEvidenceCoverage,
@@ -678,6 +691,13 @@ pub(crate) struct LinuxChatCoreGroundedEvidence {
 #[derive(Clone)]
 struct LinuxChatCorePacketProfileSpec {
     profile: String,
+    inferred_profile: String,
+    requested_profile: Option<String>,
+    requested_profile_unknown: bool,
+    override_accepted: bool,
+    downgrade_blocked: bool,
+    selection_reason: String,
+    requested_budget_tokens: Option<u64>,
     budget_tokens: u64,
     min_evidence: usize,
     max_evidence: usize,
@@ -927,9 +947,20 @@ pub(crate) fn build_linux_chat_core_ask_report(
                         answer: learned_anti_wave_answer(&learned_anti_wave_hits),
                         intent: query_wave.intent,
                         route_priors: query_wave.route_priors,
-                        packet_profile: packet_profile.profile,
+                        packet_profile: packet_profile.profile.clone(),
+                        inferred_packet_profile: packet_profile.inferred_profile.clone(),
+                        requested_packet_profile: packet_profile.requested_profile.clone(),
+                        requested_packet_profile_unknown: packet_profile.requested_profile_unknown,
+                        packet_profile_override_accepted: packet_profile.override_accepted,
+                        packet_profile_downgrade_blocked: packet_profile.downgrade_blocked,
+                        packet_profile_selection_reason: packet_profile.selection_reason.clone(),
+                        requested_packet_budget_tokens: packet_profile.requested_budget_tokens,
                         packet_budget_tokens: packet_profile.budget_tokens,
                         packet_tokens: 0,
+                        packet_semantic_tokens: 0,
+                        packet_prompt_payload_tokens: 0,
+                        effective_min_packet_tokens: 0,
+                        packet_over_budget: false,
                         packet_underfilled: selection.packet_underfilled,
                         packet_truncated: selection.packet_truncated,
                         evidence_coverage: selection.coverage,
@@ -959,11 +990,7 @@ pub(crate) fn build_linux_chat_core_ask_report(
                 &config.text,
                 &packet_profile,
             );
-            let underfilled_blocks_answer = selection.packet_underfilled
-                && matches!(
-                    packet_profile.profile.as_str(),
-                    "action_plan" | "troubleshooting" | "multi_route_conflict"
-                );
+            let underfilled_blocks_answer = selection.packet_underfilled;
             let decision_state = if underfilled_blocks_answer {
                 "PACKET_UNDERFILLED_NEEDS_MORE_CONTEXT".to_string()
             } else {
@@ -990,9 +1017,20 @@ pub(crate) fn build_linux_chat_core_ask_report(
                 answer,
                 intent: report.query_wave.intent,
                 route_priors: report.query_wave.route_priors,
-                packet_profile: packet_profile.profile,
+                packet_profile: packet_profile.profile.clone(),
+                inferred_packet_profile: packet_profile.inferred_profile.clone(),
+                requested_packet_profile: packet_profile.requested_profile.clone(),
+                requested_packet_profile_unknown: packet_profile.requested_profile_unknown,
+                packet_profile_override_accepted: packet_profile.override_accepted,
+                packet_profile_downgrade_blocked: packet_profile.downgrade_blocked,
+                packet_profile_selection_reason: packet_profile.selection_reason.clone(),
+                requested_packet_budget_tokens: packet_profile.requested_budget_tokens,
                 packet_budget_tokens: packet_profile.budget_tokens,
                 packet_tokens: 0,
+                packet_semantic_tokens: 0,
+                packet_prompt_payload_tokens: 0,
+                effective_min_packet_tokens: 0,
+                packet_over_budget: false,
                 packet_underfilled: selection.packet_underfilled,
                 packet_truncated: selection.packet_truncated,
                 evidence_coverage: selection.coverage,
@@ -1028,9 +1066,20 @@ pub(crate) fn build_linux_chat_core_ask_report(
             answer: "Cache is stale or missing; rebuild and gate ChatCore before using it as answer support.".to_string(),
             intent: "unknown".to_string(),
             route_priors: Vec::new(),
-            packet_profile: "uncertain".to_string(),
-            packet_budget_tokens: config.target_packet_tokens.unwrap_or(800),
+            packet_profile: packet_profile.profile.clone(),
+            inferred_packet_profile: packet_profile.inferred_profile.clone(),
+            requested_packet_profile: packet_profile.requested_profile.clone(),
+            requested_packet_profile_unknown: packet_profile.requested_profile_unknown,
+            packet_profile_override_accepted: packet_profile.override_accepted,
+            packet_profile_downgrade_blocked: packet_profile.downgrade_blocked,
+            packet_profile_selection_reason: packet_profile.selection_reason.clone(),
+            requested_packet_budget_tokens: packet_profile.requested_budget_tokens,
+            packet_budget_tokens: packet_profile.budget_tokens,
             packet_tokens: 0,
+            packet_semantic_tokens: 0,
+            packet_prompt_payload_tokens: 0,
+            effective_min_packet_tokens: 0,
+            packet_over_budget: false,
             packet_underfilled: false,
             packet_truncated: false,
             evidence_coverage: empty_evidence_coverage("stale_cache"),
@@ -2182,10 +2231,50 @@ fn packet_profile_spec(
     text: &str,
     query: &LinuxQueryWave,
 ) -> LinuxChatCorePacketProfileSpec {
-    let profile = requested_profile
-        .map(normalize_packet_profile)
+    let inferred_profile = infer_packet_profile(text, query);
+    let requested_profile_normalized = requested_profile.map(normalize_packet_profile);
+    let requested_profile_unknown = requested_profile_normalized
+        .as_deref()
+        .is_some_and(|profile| !packet_profile_known(profile));
+    let requested_profile_known = requested_profile_normalized
+        .as_ref()
         .filter(|profile| packet_profile_known(profile))
-        .unwrap_or_else(|| infer_packet_profile(text, query));
+        .cloned();
+    let (profile, override_accepted, downgrade_blocked, selection_reason) =
+        match requested_profile_known.as_deref() {
+            Some(requested)
+                if packet_profile_rank(requested) < packet_profile_rank(&inferred_profile) =>
+            {
+                (
+                    inferred_profile.clone(),
+                    false,
+                    true,
+                    "requested_profile_would_downgrade_inferred_risk".to_string(),
+                )
+            }
+            Some(requested) => (
+                requested.to_string(),
+                requested != inferred_profile,
+                false,
+                if requested == inferred_profile {
+                    "requested_profile_matches_inferred_profile".to_string()
+                } else {
+                    "requested_profile_is_stricter_than_inferred_profile".to_string()
+                },
+            ),
+            None if requested_profile_unknown => (
+                inferred_profile.clone(),
+                false,
+                false,
+                "unknown_requested_profile_ignored".to_string(),
+            ),
+            None => (
+                inferred_profile.clone(),
+                false,
+                false,
+                "inferred_profile_used".to_string(),
+            ),
+        };
     let (default_budget, min_evidence, max_evidence) = match profile.as_str() {
         "exact_fact" => (300, 1, 3),
         "action_plan" => (800, 3, 8),
@@ -2196,6 +2285,13 @@ fn packet_profile_spec(
     };
     LinuxChatCorePacketProfileSpec {
         profile,
+        inferred_profile,
+        requested_profile: requested_profile_normalized,
+        requested_profile_unknown,
+        override_accepted,
+        downgrade_blocked,
+        selection_reason,
+        requested_budget_tokens: requested_budget,
         budget_tokens: requested_budget.unwrap_or(default_budget).max(64),
         min_evidence,
         max_evidence,
@@ -2216,6 +2312,18 @@ fn packet_profile_known(profile: &str) -> bool {
             | "safety_refusal"
             | "uncertain"
     )
+}
+
+fn packet_profile_rank(profile: &str) -> u8 {
+    match profile {
+        "exact_fact" => 1,
+        "uncertain" => 1,
+        "action_plan" => 2,
+        "troubleshooting" => 3,
+        "multi_route_conflict" => 4,
+        "safety_refusal" => 5,
+        _ => 0,
+    }
 }
 
 fn infer_packet_profile(text: &str, query: &LinuxQueryWave) -> String {
@@ -2730,7 +2838,18 @@ fn empty_evidence_coverage(answer_policy: &str) -> LinuxChatCoreEvidenceCoverage
 }
 
 fn finalize_packet_tokens(mut packet: LinuxChatCoreGroundedPacket) -> LinuxChatCoreGroundedPacket {
-    packet.packet_tokens = packet_payload_tokens(&packet);
+    let semantic_tokens = packet_payload_tokens(&packet);
+    packet.packet_semantic_tokens = semantic_tokens;
+    packet.packet_tokens = semantic_tokens;
+    packet.effective_min_packet_tokens = semantic_tokens;
+    packet.packet_over_budget = packet
+        .requested_packet_budget_tokens
+        .is_some_and(|requested| requested < semantic_tokens);
+    if semantic_tokens > packet.packet_budget_tokens {
+        packet.packet_budget_tokens = semantic_tokens;
+    }
+    packet.packet_prompt_payload_tokens = packet_prompt_payload_tokens(&packet);
+    packet.packet_prompt_payload_tokens = packet_prompt_payload_tokens(&packet);
     packet
 }
 
@@ -2763,6 +2882,12 @@ fn packet_payload_tokens(packet: &LinuxChatCoreGroundedPacket) -> u64 {
             .sum::<usize>();
     bytes += 128;
     estimate_tokens_from_bytes(bytes as u64)
+}
+
+fn packet_prompt_payload_tokens(packet: &LinuxChatCoreGroundedPacket) -> u64 {
+    serde_json::to_vec(packet)
+        .map(|bytes| estimate_tokens_from_bytes(bytes.len() as u64))
+        .unwrap_or_else(|_| packet.packet_semantic_tokens)
 }
 
 #[cfg(test)]
@@ -4001,6 +4126,8 @@ fn ask_token_economics(
             grounded_packet_size_bytes: packet_bytes,
             grounded_packet_bytes: packet_bytes,
             grounded_packet_estimated_tokens: estimate_tokens_from_bytes(packet_bytes),
+            grounded_packet_prompt_payload_tokens: estimate_tokens_from_bytes(packet_bytes),
+            grounded_packet_semantic_tokens: packet.packet_semantic_tokens,
             actual_answer_context_bytes: packet_bytes,
             actual_answer_context_estimated_tokens: estimate_tokens_from_bytes(packet_bytes),
             estimated_tokens_saved_vs_source: 0,
@@ -4034,6 +4161,8 @@ fn ask_token_economics(
         grounded_packet_size_bytes: packet_bytes,
         grounded_packet_bytes: packet_bytes,
         grounded_packet_estimated_tokens: packet_tokens,
+        grounded_packet_prompt_payload_tokens: packet_tokens,
+        grounded_packet_semantic_tokens: packet.packet_semantic_tokens,
         actual_answer_context_bytes: packet_bytes,
         actual_answer_context_estimated_tokens: packet_tokens,
         estimated_tokens_saved_vs_source: source_tokens.saturating_sub(packet_tokens),
@@ -4477,6 +4606,61 @@ mod tests {
         assert_eq!(
             packet_profile_spec(None, None, "show vpn private key", &safety_query).profile,
             "safety_refusal"
+        );
+    }
+
+    #[test]
+    fn chat_core_packet_profile_override_cannot_downgrade_inferred_risk() {
+        let troubleshooting_query = build_linux_query_wave_report(LinuxQueryWaveConfig {
+            text: "VPN is up but DNS does not work".to_string(),
+        })
+        .query_wave;
+        let downgraded = packet_profile_spec(
+            Some("exact_fact"),
+            None,
+            "VPN is up but DNS does not work",
+            &troubleshooting_query,
+        );
+        assert_eq!(downgraded.inferred_profile, "troubleshooting");
+        assert_eq!(downgraded.requested_profile.as_deref(), Some("exact_fact"));
+        assert_eq!(downgraded.profile, "troubleshooting");
+        assert!(downgraded.downgrade_blocked);
+        assert!(!downgraded.override_accepted);
+
+        let stricter = packet_profile_spec(
+            Some("safety_refusal"),
+            None,
+            "VPN is up but DNS does not work",
+            &troubleshooting_query,
+        );
+        assert_eq!(stricter.inferred_profile, "troubleshooting");
+        assert_eq!(stricter.profile, "safety_refusal");
+        assert!(stricter.override_accepted);
+        assert!(!stricter.downgrade_blocked);
+    }
+
+    #[test]
+    fn chat_core_unknown_packet_profile_is_reported_and_ignored() {
+        let exact_query = build_linux_query_wave_report(LinuxQueryWaveConfig {
+            text: "which package provides command bash".to_string(),
+        })
+        .query_wave;
+        let profile = packet_profile_spec(
+            Some("garbage_profile"),
+            None,
+            "which package provides command bash",
+            &exact_query,
+        );
+        assert_eq!(profile.inferred_profile, "exact_fact");
+        assert_eq!(
+            profile.requested_profile.as_deref(),
+            Some("garbage_profile")
+        );
+        assert!(profile.requested_profile_unknown);
+        assert_eq!(profile.profile, "exact_fact");
+        assert_eq!(
+            profile.selection_reason,
+            "unknown_requested_profile_ignored"
         );
     }
 

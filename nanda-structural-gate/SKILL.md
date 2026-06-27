@@ -1431,16 +1431,27 @@ answer state, selected domain suites, structured `evidence[]`, legacy
 `cache_is_runtime_index_not_prompt_payload=true` as a hard interpretation rule:
 the hot cache is a runtime readout, not prompt context; use only the grounded
 packet as the small external memory payload.
-Grounded packet budgets are adaptive. `--target-packet-tokens` is a ceiling, not
-a quota; padding is forbidden. Do not ask ChatCore to fill a prompt budget with
-extra prose. Inspect `grounded_packet.packet_profile`, `packet_tokens`,
-`packet_underfilled`, `packet_truncated`, `selected_evidence_count`,
-`available_evidence_count`, `selected_anti_wave_count`, `missing_evidence`,
-`ranking_policy`, `no_padding`, and `budget_is_ceiling_not_quota`. Profiles are
-`exact_fact`, `action_plan`, `troubleshooting`, `multi_route_conflict`,
-`safety_refusal`, and `uncertain`. Exact facts should stay small. Action,
-troubleshooting, and conflict packets may be larger only when evidence supports
-them; if required evidence is missing, treat
+Grounded packet budgets are adaptive. `--packet-profile` is a hint, not
+authority: ChatCore always computes `inferred_packet_profile`, and a requested
+profile cannot downgrade inferred risk. If a caller tries to force
+`exact_fact` on a troubleshooting/safety query, treat
+`packet_profile_downgrade_blocked=true` as the important signal and follow the
+final `packet_profile`. Unknown requested profiles are reported with
+`requested_packet_profile_unknown=true` and ignored. `--target-packet-tokens` is
+a ceiling, not a quota; padding is forbidden. Do not ask ChatCore to fill a
+prompt budget with extra prose. If a caller requests fewer tokens than the
+minimal grounded payload, inspect `packet_over_budget`,
+`requested_packet_budget_tokens`, and `effective_min_packet_tokens`. Inspect
+`grounded_packet.packet_profile`, `packet_semantic_tokens`,
+`packet_prompt_payload_tokens`, `packet_underfilled`, `packet_truncated`,
+`selected_evidence_count`, `available_evidence_count`,
+`selected_anti_wave_count`, `missing_evidence`, `ranking_policy`, `no_padding`,
+and `budget_is_ceiling_not_quota`. `packet_tokens` is a legacy alias for
+`packet_semantic_tokens`; prefer the explicit names. Profiles are `exact_fact`,
+`action_plan`, `troubleshooting`, `multi_route_conflict`, `safety_refusal`, and
+`uncertain`. Exact facts should stay small. Action, troubleshooting, safety, and
+conflict packets may be larger only when evidence supports them; if required
+evidence is missing, treat
 `PACKET_UNDERFILLED_NEEDS_MORE_CONTEXT` as review/no-answer authority, not as a
 short answer. Every `evidence[]` item must preserve route, subject, relation,
 object, subject_role, object_role, polarity, evidence_kind, memory_kind, and

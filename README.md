@@ -848,17 +848,26 @@ and anti-wave hits. `chat-core.index.json` is not answer authority and may be
 deleted without blocking `ask` if the binary `.hot` and source hashes still
 match. `ask` rechecks the source paths passed on the CLI against the manifest;
 an override mismatch returns stale instead of answering from an old cache.
-Grounded packets are adaptive and evidence-driven. `--target-packet-tokens` is
-a ceiling, not a quota; padding is forbidden. Exact facts should stay tiny,
-while action/troubleshooting/conflict prompts may receive larger route evidence
-only when the cache actually has useful facts. `grounded_packet.packet_profile`
-is one of `exact_fact`, `action_plan`, `troubleshooting`,
-`multi_route_conflict`, `safety_refusal`, or `uncertain`. Inspect
-`packet_tokens`, `packet_underfilled`, `packet_truncated`,
-`selected_evidence_count`, `available_evidence_count`, `selected_anti_wave_count`,
-`missing_evidence`, `ranking_policy`, `no_padding`, and
-`budget_is_ceiling_not_quota`. A packet that lacks required action,
-troubleshooting, or conflict evidence returns
+Grounded packets are adaptive and evidence-driven. `--packet-profile` is only a
+hint: ChatCore always computes `inferred_packet_profile`, and a requested profile
+cannot downgrade inferred risk or complexity. If the request tries to turn a
+troubleshooting/safety query into `exact_fact`, inspect
+`packet_profile_downgrade_blocked=true` and the final `packet_profile`.
+`--target-packet-tokens` is a ceiling, not a quota; padding is forbidden. Exact
+facts should stay tiny, while action/troubleshooting/conflict prompts may
+receive larger route evidence only when the cache actually has useful facts.
+If a caller asks for fewer tokens than the minimal grounded payload, ChatCore
+reports `packet_over_budget=true`, `requested_packet_budget_tokens`, and
+`effective_min_packet_tokens` instead of silently pretending the ceiling was met.
+`grounded_packet.packet_profile` is one of `exact_fact`, `action_plan`,
+`troubleshooting`, `multi_route_conflict`, `safety_refusal`, or `uncertain`.
+Inspect `packet_semantic_tokens`, `packet_prompt_payload_tokens`,
+`packet_underfilled`, `packet_truncated`, `selected_evidence_count`,
+`available_evidence_count`, `selected_anti_wave_count`, `missing_evidence`,
+`ranking_policy`, `no_padding`, and `budget_is_ceiling_not_quota`. `packet_tokens`
+is kept as a legacy alias for `packet_semantic_tokens`; use the explicit names in
+new tooling. A packet that lacks required action, troubleshooting, safety, or
+conflict evidence returns
 `PACKET_UNDERFILLED_NEEDS_MORE_CONTEXT` instead of inventing a full answer.
 Every evidence fact preserves route, subject/object, subject_role/object_role,
 polarity, evidence_kind, memory_kind, and confidence. Anti-wave evidence is
