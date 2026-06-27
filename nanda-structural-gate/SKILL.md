@@ -943,6 +943,11 @@ Use `nanda-llmwave-big readiness-ladder --format json` to inspect the readiness
 level, and `nanda-llmwave-big claim-gate --claim llm-ready --format json` or
 `--claim nonlinear-memory` before making public claims. Treat blocked claim
 gates as WATCH.
+For LLMWave field migration, inspect `readiness-ladder.llmwave_migration`.
+`LLMWAVE_FIELD_MIGRATION_READY_NOT_GENERAL_LLM` means the current LLMWave path
+is organized around the shared field core and local admission gates. It does
+not open broad chat, global nonlinear-memory, or hardware PMU cache-residency
+claims; those stay blocked until their dedicated gates pass.
 Use `nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json`
 when the question is whether the packed hot runtime can scan the full 65,536
 record active field. Inspect `active_65k.runtime_contract.full_active_scan`,

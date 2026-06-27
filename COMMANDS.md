@@ -165,6 +165,11 @@ nanda-llmwave-big claim-gate --claim llm-ready --format json
 nanda-llmwave-big demo-domain --format json
 ```
 
+`readiness-ladder` includes `llmwave_migration`. A verdict of
+`LLMWAVE_FIELD_MIGRATION_READY_NOT_GENERAL_LLM` means the internal LLMWave
+field migration is ready for the current structural/runtime gates, while
+`broad_chat_llm_ready=false` and `nonlinear_memory_proven=false` remain closed.
+
 Expected boundary today:
 
 ```text

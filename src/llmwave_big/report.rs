@@ -778,6 +778,7 @@ pub(crate) fn print_readiness_ladder_report(
             println!("mode: {}", report.mode);
             println!("state: {}", report.current_state);
             println!("current_level: {}", report.current_level);
+            println!("llmwave_migration: {}", report.llmwave_migration.verdict);
             println!(
                 "broad_chat_llm_ready: {}",
                 report.claim_boundary.broad_chat_llm_ready
@@ -791,6 +792,10 @@ pub(crate) fn print_readiness_ladder_report(
             println!("# LLMWave Readiness Ladder\n");
             println!("- state: `{}`", report.current_state);
             println!("- current level: `{}`", report.current_level);
+            println!(
+                "- LLMWave migration: `{}`",
+                report.llmwave_migration.verdict
+            );
             println!(
                 "- broad chat LLM ready: `{}`",
                 report.claim_boundary.broad_chat_llm_ready

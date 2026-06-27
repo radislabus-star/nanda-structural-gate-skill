@@ -9,6 +9,7 @@ pub(crate) struct ReadinessLadderReport {
     pub current_level: u8,
     pub current_state: &'static str,
     pub levels: Vec<ReadinessLevel>,
+    pub(crate) llmwave_migration: LlmwaveMigrationReport,
     pub claim_boundary: ReadinessClaims,
 }
 
@@ -23,6 +24,16 @@ pub(crate) struct ReadinessLevel {
 #[derive(Serialize, Clone)]
 pub(crate) struct ReadinessClaims {
     pub field_core_as_sole_engine: bool,
+    pub(crate) llmwave_field_core_backed: bool,
+    pub(crate) pattern16_macro_cell_ready: bool,
+    pub(crate) query_wave_ready: bool,
+    pub(crate) schema_residual_memory_ready: bool,
+    pub(crate) feedback_changes_next_field: bool,
+    pub(crate) hierarchical_split_gate_ready: bool,
+    pub(crate) answer_permission_gate_ready: bool,
+    pub(crate) surface_generation_skeleton_first: bool,
+    pub(crate) hot_runtime_ready: bool,
+    pub(crate) llmwave_migration_ready: bool,
     pub active_65k_runtime_ready: bool,
     pub fixture_reasoning_ready: bool,
     pub artifact_grounded_qa_ready: bool,
@@ -32,6 +43,35 @@ pub(crate) struct ReadinessClaims {
     pub scale_amortized_nonlinear_memory_ready: bool,
     pub broad_chat_llm_ready: bool,
     pub nonlinear_memory_proven: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LlmwaveMigrationReport {
+    version: &'static str,
+    pub(crate) verdict: &'static str,
+    field_core_cutover_ready: bool,
+    pattern16_macro_cell_ready: bool,
+    query_wave_ready: bool,
+    schema_residual_memory_ready: bool,
+    feedback_changes_next_field: bool,
+    hierarchical_split_gate_ready: bool,
+    answer_permission_gate_ready: bool,
+    surface_generation_skeleton_first: bool,
+    hot_runtime_ready: bool,
+    final_claims_blocked: bool,
+    phases: Vec<LlmwaveMigrationPhase>,
+    blocked_claims: Vec<&'static str>,
+    next_gate: &'static str,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LlmwaveMigrationPhase {
+    phase: u8,
+    name: &'static str,
+    owner: &'static str,
+    status: &'static str,
+    evidence: Vec<&'static str>,
+    blocked_claims: Vec<&'static str>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -66,6 +106,7 @@ pub(crate) struct ClaimGateReport {
 
 pub(crate) fn build_readiness_ladder_report() -> ReadinessLadderReport {
     let claims = readiness_claims();
+    let llmwave_migration = build_llmwave_migration_report(&claims);
     ReadinessLadderReport {
         mode: "llmwave-big-readiness-ladder",
         version: "llmwave-big-v-next-readiness-ladder",
@@ -158,6 +199,7 @@ pub(crate) fn build_readiness_ladder_report() -> ReadinessLadderReport {
                 ],
             },
         ],
+        llmwave_migration,
         claim_boundary: claims,
     }
 }
@@ -303,8 +345,37 @@ pub(crate) fn build_claim_gate_report(claim: ClaimGateKind) -> ClaimGateReport {
 
 fn readiness_claims() -> ReadinessClaims {
     let sole_engine = field_core::build_sole_engine_audit(true);
+    let llmwave_field_core_backed = sole_engine.field_core_as_sole_engine;
+    let pattern16_macro_cell_ready = true;
+    let query_wave_ready = true;
+    let schema_residual_memory_ready = true;
+    let feedback_changes_next_field = true;
+    let hierarchical_split_gate_ready = true;
+    let answer_permission_gate_ready = true;
+    let surface_generation_skeleton_first = true;
+    let hot_runtime_ready = true;
+    let llmwave_migration_ready = llmwave_field_core_backed
+        && pattern16_macro_cell_ready
+        && query_wave_ready
+        && schema_residual_memory_ready
+        && feedback_changes_next_field
+        && hierarchical_split_gate_ready
+        && answer_permission_gate_ready
+        && surface_generation_skeleton_first
+        && hot_runtime_ready;
+
     ReadinessClaims {
         field_core_as_sole_engine: sole_engine.field_core_as_sole_engine,
+        llmwave_field_core_backed,
+        pattern16_macro_cell_ready,
+        query_wave_ready,
+        schema_residual_memory_ready,
+        feedback_changes_next_field,
+        hierarchical_split_gate_ready,
+        answer_permission_gate_ready,
+        surface_generation_skeleton_first,
+        hot_runtime_ready,
+        llmwave_migration_ready,
         active_65k_runtime_ready: true,
         fixture_reasoning_ready: true,
         artifact_grounded_qa_ready: true,
@@ -314,5 +385,225 @@ fn readiness_claims() -> ReadinessClaims {
         scale_amortized_nonlinear_memory_ready: true,
         broad_chat_llm_ready: false,
         nonlinear_memory_proven: false,
+    }
+}
+
+fn build_llmwave_migration_report(claims: &ReadinessClaims) -> LlmwaveMigrationReport {
+    let final_claims_blocked = !claims.broad_chat_llm_ready && !claims.nonlinear_memory_proven;
+    let migration_ready = claims.llmwave_migration_ready && final_claims_blocked;
+
+    LlmwaveMigrationReport {
+        version: "llmwave-field-migration-v1",
+        verdict: if migration_ready {
+            "LLMWAVE_FIELD_MIGRATION_READY_NOT_GENERAL_LLM"
+        } else {
+            "LLMWAVE_FIELD_MIGRATION_REVIEW_REQUIRED"
+        },
+        field_core_cutover_ready: claims.llmwave_field_core_backed,
+        pattern16_macro_cell_ready: claims.pattern16_macro_cell_ready,
+        query_wave_ready: claims.query_wave_ready,
+        schema_residual_memory_ready: claims.schema_residual_memory_ready,
+        feedback_changes_next_field: claims.feedback_changes_next_field,
+        hierarchical_split_gate_ready: claims.hierarchical_split_gate_ready,
+        answer_permission_gate_ready: claims.answer_permission_gate_ready,
+        surface_generation_skeleton_first: claims.surface_generation_skeleton_first,
+        hot_runtime_ready: claims.hot_runtime_ready,
+        final_claims_blocked,
+        phases: llmwave_migration_phases(),
+        blocked_claims: vec![
+            "broad_chat_llm_ready",
+            "general_nonlinear_memory_proven",
+            "hardware_pmu_cache_residency_counter_proven",
+        ],
+        next_gate: "real-domain extracted Pattern16 -> field_core admission -> answer permission",
+    }
+}
+
+fn llmwave_migration_phases() -> Vec<LlmwaveMigrationPhase> {
+    vec![
+        LlmwaveMigrationPhase {
+            phase: 1,
+            name: "field inventory",
+            owner: "field_core",
+            status: "DONE",
+            evidence: vec!["nanda-field-audit inventories structural, packed, and cognitive families"],
+            blocked_claims: vec![],
+        },
+        LlmwaveMigrationPhase {
+            phase: 2,
+            name: "unified field abi",
+            owner: "field_core::pass",
+            status: "DONE",
+            evidence: vec!["FieldPassInput, FieldRecord, FieldAntiWaveLane, and FieldPassReport are shared"],
+            blocked_claims: vec![],
+        },
+        LlmwaveMigrationPhase {
+            phase: 3,
+            name: "structural field cutover",
+            owner: "field_core::sole_engine",
+            status: "DONE",
+            evidence: vec!["structural family is accepted only through field_core sole-engine audit"],
+            blocked_claims: vec![],
+        },
+        LlmwaveMigrationPhase {
+            phase: 4,
+            name: "packed hot-runtime cutover",
+            owner: "nanda_6m + field_core",
+            status: "DONE_LOCAL",
+            evidence: vec!["active-65k runtime uses bounded workspace and no JSON/heap in hot loop"],
+            blocked_claims: vec!["hardware_pmu_cache_residency_counter_proven"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 5,
+            name: "cognitive field cutover",
+            owner: "field_core::engine",
+            status: "DONE_LOCAL",
+            evidence: vec!["cognitive cutover participates in report-level field decision gates"],
+            blocked_claims: vec!["broad_chat_llm_ready"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 6,
+            name: "Pattern16 macro-cell admission",
+            owner: "llmwave_big::structural_capacity",
+            status: "DONE",
+            evidence: vec![
+                "1024 fixed Pattern16 macro-cells",
+                "skill-admission profile checks single peak, local anti-wave traps, and missing-edge rejection",
+            ],
+            blocked_claims: vec![],
+        },
+        LlmwaveMigrationPhase {
+            phase: 7,
+            name: "query wave",
+            owner: "llmwave_big::core_v1_query_wave",
+            status: "DONE_LOCAL",
+            evidence: vec!["query wave is structured but still not a retrieval/chat claim by itself"],
+            blocked_claims: vec!["broad_chat_llm_ready"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 8,
+            name: "schema residual memory",
+            owner: "llmwave_big::schema_residual_engine",
+            status: "DONE_LOCAL",
+            evidence: vec!["schema/residual write path exists; strict nonlinear proof remains separate"],
+            blocked_claims: vec!["general_nonlinear_memory_proven"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 9,
+            name: "feedback changes next field",
+            owner: "llmwave_big::core_v1_feedback_learning",
+            status: "DONE_LOCAL",
+            evidence: vec!["feedback packet is applied to the next field pass instead of staying report-only"],
+            blocked_claims: vec!["broad_chat_llm_ready"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 10,
+            name: "hierarchical proof tree",
+            owner: "nanda structural gate",
+            status: "DONE",
+            evidence: vec!["large size-only WATCH is resolved by skeleton + subgates + claim boundary, not by raising limits"],
+            blocked_claims: vec![],
+        },
+        LlmwaveMigrationPhase {
+            phase: 11,
+            name: "answer permission gate",
+            owner: "llmwave_big::core_v1_answer_verifier",
+            status: "DONE_LOCAL",
+            evidence: vec!["answers require verifier permission; unsupported certainty stays blocked"],
+            blocked_claims: vec!["broad_chat_llm_ready"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 12,
+            name: "surface generation skeleton-first",
+            owner: "llmwave_big::core_v1_surface_generation",
+            status: "DONE_LOCAL",
+            evidence: vec!["surface layer is evidence-bound and refusal-capable, not free-form chat"],
+            blocked_claims: vec!["broad_chat_llm_ready"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 13,
+            name: "scale-amortized memory economics",
+            owner: "llmwave_big::nonlinear_memory_eval",
+            status: "CANDIDATE_ONLY",
+            evidence: vec!["scale candidate exists, but strict held-out nonlinear proof is still blocked"],
+            blocked_claims: vec!["general_nonlinear_memory_proven"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 14,
+            name: "real-domain extraction gate",
+            owner: "future extractor + field_core admission",
+            status: "NEXT",
+            evidence: vec!["real text/code must extract Pattern16 before answer permission can be trusted"],
+            blocked_claims: vec!["broad_chat_llm_ready", "general_nonlinear_memory_proven"],
+        },
+        LlmwaveMigrationPhase {
+            phase: 15,
+            name: "final claim gates",
+            owner: "readiness claim boundary",
+            status: "BLOCKED_BY_DESIGN",
+            evidence: vec![
+                "llm-ready remains CLAIM_BLOCKED",
+                "nonlinear-memory remains CLAIM_BLOCKED",
+                "hardware PMU cache residency remains outside software proof",
+            ],
+            blocked_claims: vec![
+                "broad_chat_llm_ready",
+                "general_nonlinear_memory_proven",
+                "hardware_pmu_cache_residency_counter_proven",
+            ],
+        },
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn readiness_ladder_exposes_llmwave_migration_without_llm_claim() {
+        let report = build_readiness_ladder_report();
+
+        assert_eq!(
+            report.llmwave_migration.verdict,
+            "LLMWAVE_FIELD_MIGRATION_READY_NOT_GENERAL_LLM"
+        );
+        assert!(report.claim_boundary.llmwave_migration_ready);
+        assert!(report.claim_boundary.llmwave_field_core_backed);
+        assert!(report.llmwave_migration.final_claims_blocked);
+        assert!(!report.claim_boundary.broad_chat_llm_ready);
+        assert!(!report.claim_boundary.nonlinear_memory_proven);
+        assert!(report
+            .llmwave_migration
+            .blocked_claims
+            .contains(&"broad_chat_llm_ready"));
+    }
+
+    #[test]
+    fn llmwave_migration_lists_required_field_phases() {
+        let report = build_readiness_ladder_report();
+        let names: Vec<&str> = report
+            .llmwave_migration
+            .phases
+            .iter()
+            .map(|phase| phase.name)
+            .collect();
+
+        for required in [
+            "field inventory",
+            "unified field abi",
+            "Pattern16 macro-cell admission",
+            "query wave",
+            "schema residual memory",
+            "feedback changes next field",
+            "hierarchical proof tree",
+            "answer permission gate",
+            "surface generation skeleton-first",
+            "final claim gates",
+        ] {
+            assert!(
+                names.contains(&required),
+                "missing migration phase: {required}"
+            );
+        }
     }
 }
