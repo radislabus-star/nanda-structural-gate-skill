@@ -294,6 +294,7 @@ nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/lin
 nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-center-learning-eval --center-learning-memory .nanda/linux-active/linux-center-learning.lwm --center-learning-script examples/linux-center-learning.script --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
+nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --max-facts 4 --format json
 nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
 nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json
@@ -549,8 +550,8 @@ does not unlock general LLM, open-domain chat, scanner, or exploit claims.
 `linux-chat-core-build` is the unified ChatCore cache compiler for the Linux
 profile. The main interface is `--memory-root .nanda/linux-active`; explicit
 path flags are overrides. It treats `.lrf` plus `.lwm` overlays as the source of
-truth, decodes the `.lrf` into a binary runtime readout containing facts, routes,
-domains, and evidence records, writes `cache/chat-core.hot`,
+truth, decodes the `.lrf` into an interned packed binary runtime readout
+containing facts, routes, domains, and evidence records, writes `cache/chat-core.hot`,
 `cache/chat-core.index.json`, and `cache/chat-core.manifest.json`, and records
 hashes for the residual packet, dialogue overlay, center overlay, VPN/domain
 overlay, profile evals, domain registry, and compiler version.
@@ -558,16 +559,17 @@ overlay, profile evals, domain registry, and compiler version.
 `chat-core.hot` plus the manifest. The cache is a compiled runtime view, not
 memory authority. Inspect `token_economics`: token estimates use
 `ceil(bytes / 4)` and are comparison metrics, not exact model tokenizer counts.
-`linux-chat-core-gate` is the preferred umbrella gate before using that cache.
-It is read-only by default: it recomputes all source hashes, rejects missing or
-stale cache, checks the binary hot cache hash, and runs the Linux profile gate
-on scratch `.lwm` files under the cache eval directory so the gate does not
-mutate source overlays. A missing debug index does not remove answer authority
-when `.hot` and source hashes still match. It may write cache only with explicit
-`--rebuild-cache`. Treat
-`LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as profile-scoped ChatCore
-readiness only. If `.lrf`, any `.lwm` overlay, eval artifact, profile spec, or
-compiler version changes, the cache is stale and cannot grant answer authority.
+`linux-chat-core-gate` is the preferred fast authority gate before using that
+cache. It is read-only: it recomputes all source hashes, rejects missing or stale
+cache, checks the binary hot cache hash, and does not run the heavy Linux
+profile/eval gate. A missing debug index does not remove answer authority when
+`.hot` and source hashes still match. Treat
+`LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM` as cache-authority
+readiness only. Use `linux-chat-core-profile-gate` for the heavier broad/heldout
+profile/eval path; its ready verdict is
+`LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM`. If `.lrf`, any `.lwm`
+overlay, eval artifact, profile spec, or compiler version changes, the cache is
+stale and cannot grant answer authority.
 `linux-chat-core-ask` is the compact packet path for Codex/LLM use. It refuses
 stale cache, then reads `chat-core.hot` and returns the query intent, route
 priors, grounded answer state, structured `evidence[]`, legacy

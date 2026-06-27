@@ -3,6 +3,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 test_local_suite="${NANDA_TEST_LOCAL_SUITE:-changed}"
+test_local_since="${NANDA_TEST_LOCAL_SINCE:-}"
 case "${NANDA_TEST_LOCAL_MODE:-}" in
   fast)
     test_local_suite="changed"
@@ -41,16 +42,28 @@ while (($#)); do
     --suite=*)
       test_local_suite="${arg#--suite=}"
       ;;
+    --since)
+      shift
+      if (($# == 0)); then
+        echo "--since requires a git ref" >&2
+        exit 2
+      fi
+      test_local_since="$1"
+      ;;
+    --since=*)
+      test_local_since="${arg#--since=}"
+      ;;
     --help|-h)
       cat <<'EOF'
-Usage: scripts/test-local.sh [--suite changed|smoke|chatcore|chatcore-build|field|wrappers|full]
+Usage: scripts/test-local.sh [--suite changed|smoke|chatcore|chatcore-build|field|wrappers|full] [--since <git-ref>]
        scripts/test-local.sh [--fast|--full]
 
 Runs the local regression suite.
 
 Suites:
   changed    Default. Inspect git changed files and run only relevant route
-             checks. This is the mode to use after ordinary edits.
+             checks. With uncommitted changes it checks the worktree. With a
+             clean worktree it checks the last commit. Use --since to widen.
   smoke      Fast baseline: fmt, check, build, version, skill readiness,
              edge cases. No Linux ChatCore rebuild.
   chatcore   Fast Linux ChatCore ask/no-index/stale checks over existing `.hot`.
@@ -65,6 +78,7 @@ Environment:
   NANDA_TEST_LOCAL_FULL=1   Same as --full.
   NANDA_TEST_LOCAL_MODE=full|fast|changed|smoke|chatcore|chatcore-build|field|wrappers
   NANDA_TEST_LOCAL_SUITE=changed|smoke|chatcore|chatcore-build|field|wrappers|full
+  NANDA_TEST_LOCAL_SINCE=<git-ref>   Same as --since.
 EOF
       exit 0
       ;;
@@ -198,10 +212,10 @@ run_chatcore_build_suite() {
   [[ -f "$root/.nanda/linux-active/linux-active-65k.lrf" ]] || return 0
 
   chat_core_build_json="$("$llmwave_big" linux-chat-core-build --memory-root "$root/.nanda/linux-active" --format json)"
-  jq -e '.verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .cache.hot_readout_record_count > 0 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_build_json" >/dev/null
+  jq -e '.verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .cache.hot_format == "interned-packed-readout-v3" and .cache.hot_fits_6m_budget == true and .cache.hot_readout_record_count > 0 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_build_json" >/dev/null
 
   chat_core_gate_json="$("$llmwave_big" linux-chat-core-gate --memory-root "$root/.nanda/linux-active" --format json)"
-  jq -e '.verdict == "LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .chat_core.safe_to_answer_from_cache == true and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_gate_json" >/dev/null
+  jq -e '.verdict == "LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM" and .profile_gate == null and .cache_status.cache_fresh == true and .chat_core.safe_to_answer_from_cache == true and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_gate_json" >/dev/null
 
   run_chatcore_suite
 }
@@ -221,17 +235,39 @@ run_wrappers_suite() {
 
 run_changed_suite() {
   git -C "$root" diff --check
-  mapfile -t changed_paths < <(
+  local changed_source="worktree"
+  local uncommitted_paths
+  uncommitted_paths="$(
     {
       git -C "$root" diff --name-only --diff-filter=ACMRTUXB HEAD
       git -C "$root" ls-files --others --exclude-standard
     } | sed '/^$/d' | sort -u
-  )
+  )"
+  if [[ -n "$test_local_since" ]]; then
+    changed_source="since:$test_local_since"
+    mapfile -t changed_paths < <(
+      {
+        git -C "$root" diff --name-only --diff-filter=ACMRTUXB "$test_local_since" HEAD
+        printf '%s\n' "$uncommitted_paths"
+      } | sed '/^$/d' | sort -u
+    )
+  elif [[ -n "$uncommitted_paths" ]]; then
+    mapfile -t changed_paths < <(printf '%s\n' "$uncommitted_paths")
+  elif git -C "$root" rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+    changed_source="last-commit:HEAD~1..HEAD"
+    mapfile -t changed_paths < <(
+      git -C "$root" diff --name-only --diff-filter=ACMRTUXB HEAD~1 HEAD | sed '/^$/d' | sort -u
+    )
+  else
+    changed_source="none"
+    changed_paths=()
+  fi
 
   if ((${#changed_paths[@]} == 0)); then
-    echo ok
+    echo "ok (changed suite checked 0 paths; source=$changed_source; use --since <ref> or --full to widen)"
     exit 0
   fi
+  echo "changed suite: source=$changed_source paths=${#changed_paths[@]}"
 
   needs_rust=0
   needs_chatcore=0
@@ -788,16 +824,16 @@ test -s "$tmp_linux_chat_profile_vpn_memory"
 tmp_linux_chat_core_cache="$tmp_linux_chat/cache"
 tmp_linux_chat_core_missing_cache="$tmp_linux_chat/missing-cache"
 big_linux_chat_core_missing_gate_json="$("$llmwave_big" linux-chat-core-gate --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --broad-eval "$tmp_linux_profile_eval" --heldout-eval "$tmp_linux_heldout_eval" --cache-dir "$tmp_linux_chat_core_missing_cache" --max-facts 4 --format json)"
-jq -e '.mode == "llmwave-big-linux-chat-core-gate" and .verdict == "LINUX_CHAT_CORE_CACHE_STALE" and .cache_status.cache_fresh == false and (.cache_status.stale_reasons | index("cache_manifest_missing")) and .profile_gate == null and .chat_core.safe_to_use_cache == false and .chat_core.safe_to_answer_from_cache == false and .token_economics.cache_total_bytes == 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true' <<<"$big_linux_chat_core_missing_gate_json" >/dev/null
+jq -e '.mode == "llmwave-big-linux-chat-core-authority-gate" and .verdict == "LINUX_CHAT_CORE_CACHE_STALE" and .cache_status.cache_fresh == false and (.cache_status.stale_reasons | index("cache_manifest_missing")) and .profile_gate == null and .chat_core.safe_to_use_cache == false and .chat_core.safe_to_answer_from_cache == false and .token_economics.cache_total_bytes == 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true' <<<"$big_linux_chat_core_missing_gate_json" >/dev/null
 test ! -e "$tmp_linux_chat_core_missing_cache/chat-core.manifest.json"
 big_linux_chat_core_build_json="$("$llmwave_big" linux-chat-core-build --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --broad-eval "$tmp_linux_profile_eval" --heldout-eval "$tmp_linux_heldout_eval" --cache-dir "$tmp_linux_chat_core_cache" --format json)"
-jq -e '.mode == "llmwave-big-linux-chat-core-build" and .verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .manifest.profile_id == "linux-chat-core" and .manifest.cache_is_source_of_truth == false and .source_status.source_memory_loaded == true and .source_status.overlays_present == 3 and .cache.hot_readout_record_count == 8 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false and .token_economics.source_artifacts_estimated_tokens > 0 and .token_economics.cache_estimated_tokens > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_build_json" >/dev/null
+jq -e '.mode == "llmwave-big-linux-chat-core-build" and .verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .manifest.profile_id == "linux-chat-core" and .manifest.cache_is_source_of_truth == false and .source_status.source_memory_loaded == true and .source_status.overlays_present == 3 and .cache.hot_format == "interned-packed-readout-v3" and .cache.hot_fits_6m_budget == true and .cache.hot_readout_record_count == 8 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false and .token_economics.source_artifacts_estimated_tokens > 0 and .token_economics.cache_estimated_tokens > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_build_json" >/dev/null
 test -s "$tmp_linux_chat_core_cache/chat-core.hot"
 test -s "$tmp_linux_chat_core_cache/chat-core.index.json"
 test -s "$tmp_linux_chat_core_cache/chat-core.manifest.json"
 jq -e '.represented_fact_count == 8 and (.route_index | length) > 0 and (.readout_facts | length) == 8 and .cache_contract.hot_cache_has_no_authority_without_gate == true and .cache_contract.hot_cache_contains_binary_readout_records == true and .cache_contract.json_index_required_for_answer_authority == false' "$tmp_linux_chat_core_cache/chat-core.index.json" >/dev/null
 big_linux_chat_core_gate_json="$("$llmwave_big" linux-chat-core-gate --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --broad-eval "$tmp_linux_profile_eval" --heldout-eval "$tmp_linux_heldout_eval" --cache-dir "$tmp_linux_chat_core_cache" --max-facts 4 --format json)"
-jq -e '.mode == "llmwave-big-linux-chat-core-gate" and .cache_status.cache_fresh == true and .cache_status.cache_is_source_of_truth == false and .domain_runtime.json_index_used_for_domain_runtime == false and .chat_core.safe_to_use_cache == true and .chat_core.source_hash_matched == true and .chat_core.cache_is_source_of_truth == false and .chat_core.compatibility_wrapper_for_linux_chat_profile_gate == true and .claim_boundary.stale_cache_blocks_answer_authority == true and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_gate_json" >/dev/null
+jq -e '.mode == "llmwave-big-linux-chat-core-authority-gate" and .verdict == "LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM" and .profile_gate == null and .cache_status.cache_fresh == true and .cache_status.cache_is_source_of_truth == false and .domain_runtime.json_index_used_for_domain_runtime == false and .chat_core.safe_to_use_cache == true and .chat_core.source_hash_matched == true and .chat_core.cache_is_source_of_truth == false and .chat_core.compatibility_wrapper_for_linux_chat_profile_gate == false and .claim_boundary.stale_cache_blocks_answer_authority == true and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_gate_json" >/dev/null
 big_linux_chat_core_ask_json="$("$llmwave_big" linux-chat-core-ask --text "which package provides command bash" --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --cache-dir "$tmp_linux_chat_core_cache" --max-facts 4 --format json)"
 jq -e '.mode == "llmwave-big-linux-chat-core-ask" and .verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .grounded_packet.cache_fresh == true and .grounded_packet.answer_allowed == true and .grounded_packet.readout_source == "compiled_chat_core_hot" and (.grounded_packet.domain_suites | index("packages")) and .grounded_packet.cache_is_runtime_index_not_prompt_payload == true and .grounded_packet.decision_state == "ANSWER_GROUNDED" and (.grounded_packet.answer | ascii_downcase | contains("bash")) and (.grounded_packet.evidence[] | select((.route == "linux.apt.command.provider" or .route == "linux.apt.command.package-command") and .role == "provider" and .subject == "bash" and .object == "bash" and (.memory_kind | length > 0))) and (.grounded_packet.compact_evidence[] | contains("subject=bash")) and .domain_runtime.json_index_used_for_domain_runtime == false and .token_economics.grounded_packet_estimated_tokens > 0 and .token_economics.actual_answer_context_estimated_tokens == .token_economics.grounded_packet_estimated_tokens and .token_economics.estimated_tokens_saved_vs_source > 0 and .token_economics.estimated_tokens_saved_vs_cache_index > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true' <<<"$big_linux_chat_core_ask_json" >/dev/null
 big_linux_chat_core_ask_systemctl_json="$("$llmwave_big" linux-chat-core-ask --text "which package provides command systemctl" --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --cache-dir "$tmp_linux_chat_core_cache" --max-facts 4 --format json)"

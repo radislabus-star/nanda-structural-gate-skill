@@ -491,9 +491,12 @@ enum LlmwaveBigCommand {
     /// Compile `.lrf` + `.lwm` overlays into a unified Linux ChatCore cache.
     #[command(name = "linux-chat-core-build")]
     LinuxChatCoreBuild(LlmwaveBigLinuxChatCoreBuildArgs),
-    /// Gate the unified Linux ChatCore cache against source memory and profile evals.
+    /// Fast authority gate for the unified Linux ChatCore cache.
     #[command(name = "linux-chat-core-gate")]
     LinuxChatCoreGate(LlmwaveBigLinuxChatCoreGateArgs),
+    /// Heavy profile/eval gate for the unified Linux ChatCore cache.
+    #[command(name = "linux-chat-core-profile-gate")]
+    LinuxChatCoreProfileGate(LlmwaveBigLinuxChatCoreGateArgs),
     /// Return a compact grounded packet through the unified Linux ChatCore cache.
     #[command(name = "linux-chat-core-ask")]
     LinuxChatCoreAsk(LlmwaveBigLinuxChatCoreAskArgs),
@@ -4644,8 +4647,11 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                 OutputFormat::Text => {
                     println!("{}", report.verdict);
                     println!("profile_id: {}", report.spec.profile_id);
+                    println!("hot_format: {}", report.cache.hot_format);
                     println!("hot_path: {}", report.cache.hot_path);
                     println!("hot_bytes: {}", report.cache.hot_bytes);
+                    println!("hot_fits_6m_budget: {}", report.cache.hot_fits_6m_budget);
+                    println!("hot_bytes_per_fact: {:.2}", report.cache.hot_bytes_per_fact);
                     println!(
                         "hot_readout_record_count: {}",
                         report.cache.hot_readout_record_count
@@ -4684,8 +4690,17 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!();
                     println!("- verdict: `{}`", report.verdict);
                     println!("- profile: `{}`", report.spec.profile_id);
+                    println!("- hot format: `{}`", report.cache.hot_format);
                     println!("- hot cache: `{}`", report.cache.hot_path);
                     println!("- hot bytes: `{}`", report.cache.hot_bytes);
+                    println!(
+                        "- hot fits 6 MiB budget: `{}`",
+                        report.cache.hot_fits_6m_budget
+                    );
+                    println!(
+                        "- hot bytes per fact: `{:.2}`",
+                        report.cache.hot_bytes_per_fact
+                    );
                     println!(
                         "- hot readout records: `{}`",
                         report.cache.hot_readout_record_count
@@ -4772,6 +4787,77 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     println!(
                         "- debug index present: `{}`",
                         report.cache_status.index_present
+                    );
+                    println!(
+                        "- safe to answer from cache: `{}`",
+                        report.chat_core.safe_to_answer_from_cache
+                    );
+                    println!(
+                        "- stale reasons: `{}`",
+                        report.cache_status.stale_reasons.len()
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::LinuxChatCoreProfileGate(args) => {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: args.profile,
+                    residual_pack: args.residual_pack,
+                    dialogue_overlay: args.dialogue_overlay,
+                    centers_overlay: args.centers_overlay,
+                    vpn_overlay: args.vpn_overlay,
+                    broad_eval: args.broad_eval,
+                    heldout_eval: args.heldout_eval,
+                    cache_dir: args.cache_dir,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_profile_gate_report(
+                linux_chat_core::LinuxChatCoreGateConfig {
+                    profile: paths.profile,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    broad_eval: paths.broad_eval,
+                    heldout_eval: paths.heldout_eval,
+                    center_learning_script: args.center_learning_script,
+                    cache_dir: paths.cache_dir,
+                    manifest: args.manifest,
+                    rebuild_cache: args.rebuild_cache,
+                    max_facts: args.max_facts,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("cache_fresh: {}", report.cache_status.cache_fresh);
+                    println!("hot_present: {}", report.cache_status.hot_present);
+                    println!("debug_index_present: {}", report.cache_status.index_present);
+                    println!("safe_to_use_cache: {}", report.chat_core.safe_to_use_cache);
+                    println!(
+                        "safe_to_answer_from_cache: {}",
+                        report.chat_core.safe_to_answer_from_cache
+                    );
+                    println!(
+                        "profile_gate_ready: {}",
+                        report.chat_core.profile_gate_ready
+                    );
+                    println!("stale_reasons: {}", report.cache_status.stale_reasons.len());
+                }
+                OutputFormat::Md => {
+                    println!("# LLMWave Linux ChatCore Profile Gate");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- cache fresh: `{}`", report.cache_status.cache_fresh);
+                    println!("- hot present: `{}`", report.cache_status.hot_present);
+                    println!(
+                        "- profile gate ready: `{}`",
+                        report.chat_core.profile_gate_ready
                     );
                     println!(
                         "- safe to answer from cache: `{}`",

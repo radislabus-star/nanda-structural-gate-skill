@@ -22,10 +22,13 @@ use super::linux_residual_memory::{
     load_linux_residual_decoded_packet, LinuxResidualDecodedFact, LinuxResidualDecodedSummary,
 };
 
-pub(crate) const LINUX_CHAT_CORE_VERSION: &str = "llmwave-big-v-next-linux-chat-core-hot-v2";
+pub(crate) const LINUX_CHAT_CORE_VERSION: &str = "llmwave-big-v-next-linux-chat-core-hot-v3";
 pub(crate) const DEFAULT_LINUX_CHAT_CORE_PROFILE: &str = "examples/linux-chat-core.profile.json";
-const HOT_MAGIC: &[u8] = b"LLMWCHATCORE2\0";
-const HOT_FORMAT_VERSION: u32 = 2;
+const HOT_MAGIC: &[u8] = b"LLMWCHATCORE3\0";
+const HOT_FORMAT_VERSION: u32 = 3;
+const HOT_FORMAT: &str = "interned-packed-readout-v3";
+const HOT_TARGET_BYTES: u64 = 6 * 1024 * 1024;
+const PACKED_FACT_RECORD_BYTES: u64 = 37;
 
 #[derive(Clone)]
 pub(crate) struct LinuxChatCoreBuildConfig {
@@ -197,6 +200,25 @@ struct LinuxChatCoreHotCache {
     domains: Vec<LinuxChatCoreDomainSpec>,
 }
 
+struct LinuxChatCoreEncodedHotCache {
+    bytes: Vec<u8>,
+    stats: LinuxChatCoreHotStorageStats,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreHotStorageStats {
+    pub hot_format: &'static str,
+    pub hot_target_bytes: u64,
+    pub hot_fits_6m_budget: bool,
+    pub hot_bytes: u64,
+    pub interned_string_count: usize,
+    pub intern_table_bytes: u64,
+    pub packed_fact_record_count: usize,
+    pub packed_fact_record_bytes: u64,
+    pub bytes_per_fact: f32,
+    pub bytes_per_answerable_fact: f32,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct LinuxChatCoreFactPreview {
     pub route: String,
@@ -339,9 +361,12 @@ pub(crate) struct LinuxChatCoreSourceStatus {
 
 #[derive(Serialize, Clone)]
 pub(crate) struct LinuxChatCoreCompiledCache {
+    pub hot_format: &'static str,
     pub hot_path: String,
     pub hot_bytes: u64,
     pub hot_sha256: String,
+    pub hot_target_bytes: u64,
+    pub hot_fits_6m_budget: bool,
     pub index_path: String,
     pub index_bytes: u64,
     pub index_sha256: String,
@@ -350,6 +375,11 @@ pub(crate) struct LinuxChatCoreCompiledCache {
     pub hot_readout_record_count: usize,
     pub hot_route_record_count: usize,
     pub hot_domain_record_count: usize,
+    pub hot_interned_string_count: usize,
+    pub hot_intern_table_bytes: u64,
+    pub hot_packed_fact_record_bytes: u64,
+    pub hot_bytes_per_fact: f32,
+    pub hot_bytes_per_answerable_fact: f32,
     pub json_index_required_for_answer_authority: bool,
 }
 
@@ -460,6 +490,19 @@ pub(crate) fn build_linux_chat_core_cache_report(
 pub(crate) fn build_linux_chat_core_gate_report(
     config: LinuxChatCoreGateConfig,
 ) -> Result<LinuxChatCoreGateReport> {
+    build_linux_chat_core_gate_report_inner(config, false)
+}
+
+pub(crate) fn build_linux_chat_core_profile_gate_report(
+    config: LinuxChatCoreGateConfig,
+) -> Result<LinuxChatCoreGateReport> {
+    build_linux_chat_core_gate_report_inner(config, true)
+}
+
+fn build_linux_chat_core_gate_report_inner(
+    config: LinuxChatCoreGateConfig,
+    run_profile_gate: bool,
+) -> Result<LinuxChatCoreGateReport> {
     let overrides = ChatCoreSpecOverrides {
         residual_pack: &config.residual_pack,
         dialogue_overlay: &config.dialogue_overlay,
@@ -479,7 +522,7 @@ pub(crate) fn build_linux_chat_core_gate_report(
     let source_status = source_status(&current_artifacts);
     let token_economics =
         cache_token_economics_from_manifest_path(&current_artifacts, &manifest_path)?;
-    let profile_gate = if cache_status.cache_fresh {
+    let profile_gate = if run_profile_gate && cache_status.cache_fresh {
         Some(build_linux_profile_claim_gate_report(
             LinuxProfileClaimGateConfig {
                 residual_pack: config.residual_pack.clone(),
@@ -503,13 +546,25 @@ pub(crate) fn build_linux_chat_core_gate_report(
         .as_ref()
         .map(|gate| gate.chat_target.ready)
         .unwrap_or(false);
-    let chat_core_ready = cache_status.cache_fresh && profile_ready;
+    let chat_core_ready = if run_profile_gate {
+        cache_status.cache_fresh && profile_ready
+    } else {
+        cache_status.cache_fresh
+    };
     let domain_runtime = domain_runtime_report(&spec.domains);
     let report = LinuxChatCoreGateReport {
-        mode: "llmwave-big-linux-chat-core-gate",
+        mode: if run_profile_gate {
+            "llmwave-big-linux-chat-core-profile-gate"
+        } else {
+            "llmwave-big-linux-chat-core-authority-gate"
+        },
         version: LINUX_CHAT_CORE_VERSION,
         verdict: if chat_core_ready {
-            "LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM"
+            if run_profile_gate {
+                "LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM"
+            } else {
+                "LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM"
+            }
         } else if !cache_status.cache_fresh {
             "LINUX_CHAT_CORE_CACHE_STALE"
         } else {
@@ -525,11 +580,11 @@ pub(crate) fn build_linux_chat_core_gate_report(
             safe_to_use_cache: cache_status.cache_fresh,
             safe_to_answer_from_cache: chat_core_ready,
             compiled_runtime_cache_ready: cache_status.cache_fresh,
-            profile_gate_ready: profile_ready,
+            profile_gate_ready: run_profile_gate && profile_ready,
             source_hash_matched: cache_status.cache_fresh,
             stale_cache_blocks_answer_authority: true,
             cache_is_source_of_truth: false,
-            compatibility_wrapper_for_linux_chat_profile_gate: true,
+            compatibility_wrapper_for_linux_chat_profile_gate: run_profile_gate,
         },
         token_economics,
         claim_boundary: claim_boundary(cache_status.cache_fresh, true, chat_core_ready),
@@ -886,13 +941,13 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
         readout_facts,
         domains,
     };
-    let hot = encode_hot_cache(&hot_cache)?;
-    let hot_hash = hash_bytes(&hot);
+    let encoded_hot = encode_hot_cache(&hot_cache)?;
+    let hot_hash = hash_bytes(&encoded_hot.bytes);
     let index_hash = hash_bytes(&index_bytes);
     let hot_path = PathBuf::from(&spec.cache.hot_path);
     let index_path = PathBuf::from(&spec.cache.index_path);
     let manifest_path = PathBuf::from(&spec.cache.manifest_path);
-    write_bytes(&hot_path, &hot)?;
+    write_bytes(&hot_path, &encoded_hot.bytes)?;
     write_bytes(&index_path, &index_bytes)?;
     let manifest = LinuxChatCoreCacheManifest {
         mode: "llmwave-big-linux-chat-core-cache-manifest".to_string(),
@@ -905,7 +960,7 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
         domain_registry_hash,
         overlay_registry_hash,
         hot_path: path_string(&hot_path),
-        hot_bytes: hot.len() as u64,
+        hot_bytes: encoded_hot.bytes.len() as u64,
         hot_sha256: hot_hash,
         index_path: path_string(&index_path),
         index_bytes: index_bytes.len() as u64,
@@ -915,9 +970,12 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
     let manifest_bytes = serde_json::to_vec_pretty(&manifest)?;
     write_bytes(&manifest_path, &manifest_bytes)?;
     let cache = LinuxChatCoreCompiledCache {
+        hot_format: encoded_hot.stats.hot_format,
         hot_path: manifest.hot_path.clone(),
         hot_bytes: manifest.hot_bytes,
         hot_sha256: manifest.hot_sha256.clone(),
+        hot_target_bytes: encoded_hot.stats.hot_target_bytes,
+        hot_fits_6m_budget: encoded_hot.stats.hot_fits_6m_budget,
         index_path: manifest.index_path.clone(),
         index_bytes: manifest.index_bytes,
         index_sha256: manifest.index_sha256.clone(),
@@ -926,6 +984,11 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
         hot_readout_record_count: hot_cache.readout_facts.len(),
         hot_route_record_count: hot_cache.route_index.len(),
         hot_domain_record_count: hot_cache.domains.len(),
+        hot_interned_string_count: encoded_hot.stats.interned_string_count,
+        hot_intern_table_bytes: encoded_hot.stats.intern_table_bytes,
+        hot_packed_fact_record_bytes: encoded_hot.stats.packed_fact_record_bytes,
+        hot_bytes_per_fact: encoded_hot.stats.bytes_per_fact,
+        hot_bytes_per_answerable_fact: encoded_hot.stats.bytes_per_answerable_fact,
         json_index_required_for_answer_authority: false,
     };
     Ok(CompiledChatCore { manifest, cache })
@@ -1242,41 +1305,66 @@ fn stable_memory_kind(value: &str) -> &'static str {
     }
 }
 
-fn encode_hot_cache(cache: &LinuxChatCoreHotCache) -> Result<Vec<u8>> {
+fn encode_hot_cache(cache: &LinuxChatCoreHotCache) -> Result<LinuxChatCoreEncodedHotCache> {
+    let mut interner = HotStringInterner::default();
+    collect_hot_strings(cache, &mut interner)?;
+
     let mut bytes = Vec::new();
     bytes.extend_from_slice(HOT_MAGIC);
     write_u32(&mut bytes, HOT_FORMAT_VERSION);
-    encode_summary(&mut bytes, &cache.residual_summary)?;
+    let intern_table_start = bytes.len();
+    write_u64(&mut bytes, interner.values.len() as u64);
+    for value in &interner.values {
+        write_string(&mut bytes, value)?;
+    }
+    let intern_table_bytes = (bytes.len() - intern_table_start) as u64;
+
+    encode_summary(&mut bytes, &cache.residual_summary, &interner)?;
     write_u64(&mut bytes, cache.route_index.len() as u64);
     for route in &cache.route_index {
-        write_string(&mut bytes, &route.route)?;
+        write_string_id(&mut bytes, &interner, &route.route)?;
         write_u64(&mut bytes, route.fact_count as u64);
-        write_string_vec(&mut bytes, &route.relations)?;
-        write_string_vec(&mut bytes, &route.memory_kinds)?;
-        write_string_vec(&mut bytes, &route.polarities)?;
+        write_string_id_vec(&mut bytes, &interner, &route.relations)?;
+        write_string_id_vec(&mut bytes, &interner, &route.memory_kinds)?;
+        write_string_id_vec(&mut bytes, &interner, &route.polarities)?;
     }
     write_u64(&mut bytes, cache.domains.len() as u64);
     for domain in &cache.domains {
-        write_string(&mut bytes, &domain.domain_id)?;
-        write_string_vec(&mut bytes, &domain.routes)?;
-        write_string_vec(&mut bytes, &domain.negative_routes)?;
-        write_string_vec(&mut bytes, &domain.overlay_ids)?;
-        write_string(&mut bytes, &domain.action_scope)?;
+        write_string_id(&mut bytes, &interner, &domain.domain_id)?;
+        write_string_id_vec(&mut bytes, &interner, &domain.routes)?;
+        write_string_id_vec(&mut bytes, &interner, &domain.negative_routes)?;
+        write_string_id_vec(&mut bytes, &interner, &domain.overlay_ids)?;
+        write_string_id(&mut bytes, &interner, &domain.action_scope)?;
     }
     write_u64(&mut bytes, cache.readout_facts.len() as u64);
     for fact in &cache.readout_facts {
-        write_string(&mut bytes, &fact.route)?;
-        write_string(&mut bytes, &fact.subject)?;
-        write_string(&mut bytes, &fact.subject_role)?;
-        write_string(&mut bytes, &fact.relation)?;
-        write_string(&mut bytes, &fact.object)?;
-        write_string(&mut bytes, &fact.object_role)?;
-        write_string(&mut bytes, &fact.polarity)?;
-        write_string(&mut bytes, &fact.evidence_kind)?;
+        write_string_id(&mut bytes, &interner, &fact.route)?;
+        write_string_id(&mut bytes, &interner, &fact.subject)?;
+        write_string_id(&mut bytes, &interner, &fact.subject_role)?;
+        write_string_id(&mut bytes, &interner, &fact.relation)?;
+        write_string_id(&mut bytes, &interner, &fact.object)?;
+        write_string_id(&mut bytes, &interner, &fact.object_role)?;
+        write_string_id(&mut bytes, &interner, &fact.polarity)?;
+        write_string_id(&mut bytes, &interner, &fact.evidence_kind)?;
         write_u8(&mut bytes, fact.confidence);
-        write_string(&mut bytes, &fact.memory_kind)?;
+        write_string_id(&mut bytes, &interner, &fact.memory_kind)?;
     }
-    Ok(bytes)
+    let hot_bytes = bytes.len() as u64;
+    let packed_fact_record_count = cache.readout_facts.len();
+    let packed_fact_record_bytes = packed_fact_record_count as u64 * PACKED_FACT_RECORD_BYTES;
+    let stats = LinuxChatCoreHotStorageStats {
+        hot_format: HOT_FORMAT,
+        hot_target_bytes: HOT_TARGET_BYTES,
+        hot_fits_6m_budget: hot_bytes <= HOT_TARGET_BYTES,
+        hot_bytes,
+        interned_string_count: interner.values.len(),
+        intern_table_bytes,
+        packed_fact_record_count,
+        packed_fact_record_bytes,
+        bytes_per_fact: ratio_f32(hot_bytes, packed_fact_record_count as u64),
+        bytes_per_answerable_fact: ratio_f32(hot_bytes, packed_fact_record_count as u64),
+    };
+    Ok(LinuxChatCoreEncodedHotCache { bytes, stats })
 }
 
 fn load_hot_cache_from_manifest(manifest_path: &Path) -> Result<LinuxChatCoreHotCache> {
@@ -1302,43 +1390,49 @@ fn decode_hot_cache(bytes: &[u8]) -> Result<LinuxChatCoreHotCache> {
     if version != HOT_FORMAT_VERSION {
         anyhow::bail!("unsupported chat-core hot cache format: {version}");
     }
-    let residual_summary = decode_summary(bytes, &mut pos)?;
+    let string_count = read_len(bytes, &mut pos)?;
+    let mut strings = Vec::with_capacity(string_count);
+    for _ in 0..string_count {
+        strings.push(read_string(bytes, &mut pos)?);
+    }
+
+    let residual_summary = decode_summary(bytes, &mut pos, &strings)?;
     let route_count = read_len(bytes, &mut pos)?;
     let mut route_index = Vec::with_capacity(route_count);
     for _ in 0..route_count {
         route_index.push(LinuxChatCoreRouteIndexEntry {
-            route: read_string(bytes, &mut pos)?,
+            route: read_string_id(bytes, &mut pos, &strings)?,
             fact_count: read_usize(bytes, &mut pos)?,
-            relations: read_string_vec(bytes, &mut pos)?,
-            memory_kinds: read_string_vec(bytes, &mut pos)?,
-            polarities: read_string_vec(bytes, &mut pos)?,
+            relations: read_string_id_vec(bytes, &mut pos, &strings)?,
+            memory_kinds: read_string_id_vec(bytes, &mut pos, &strings)?,
+            polarities: read_string_id_vec(bytes, &mut pos, &strings)?,
         });
     }
     let domain_count = read_len(bytes, &mut pos)?;
     let mut domains = Vec::with_capacity(domain_count);
     for _ in 0..domain_count {
         domains.push(LinuxChatCoreDomainSpec {
-            domain_id: read_string(bytes, &mut pos)?,
-            routes: read_string_vec(bytes, &mut pos)?,
-            negative_routes: read_string_vec(bytes, &mut pos)?,
-            overlay_ids: read_string_vec(bytes, &mut pos)?,
-            action_scope: read_string(bytes, &mut pos)?,
+            domain_id: read_string_id(bytes, &mut pos, &strings)?,
+            routes: read_string_id_vec(bytes, &mut pos, &strings)?,
+            negative_routes: read_string_id_vec(bytes, &mut pos, &strings)?,
+            overlay_ids: read_string_id_vec(bytes, &mut pos, &strings)?,
+            action_scope: read_string_id(bytes, &mut pos, &strings)?,
         });
     }
     let fact_count = read_len(bytes, &mut pos)?;
     let mut readout_facts = Vec::with_capacity(fact_count);
     for _ in 0..fact_count {
         readout_facts.push(LinuxChatCoreFactPreview {
-            route: read_string(bytes, &mut pos)?,
-            subject: read_string(bytes, &mut pos)?,
-            subject_role: read_string(bytes, &mut pos)?,
-            relation: read_string(bytes, &mut pos)?,
-            object: read_string(bytes, &mut pos)?,
-            object_role: read_string(bytes, &mut pos)?,
-            polarity: read_string(bytes, &mut pos)?,
-            evidence_kind: read_string(bytes, &mut pos)?,
+            route: read_string_id(bytes, &mut pos, &strings)?,
+            subject: read_string_id(bytes, &mut pos, &strings)?,
+            subject_role: read_string_id(bytes, &mut pos, &strings)?,
+            relation: read_string_id(bytes, &mut pos, &strings)?,
+            object: read_string_id(bytes, &mut pos, &strings)?,
+            object_role: read_string_id(bytes, &mut pos, &strings)?,
+            polarity: read_string_id(bytes, &mut pos, &strings)?,
+            evidence_kind: read_string_id(bytes, &mut pos, &strings)?,
             confidence: read_u8(bytes, &mut pos)?,
-            memory_kind: read_string(bytes, &mut pos)?,
+            memory_kind: read_string_id(bytes, &mut pos, &strings)?,
         });
     }
     if pos != bytes.len() {
@@ -1352,8 +1446,79 @@ fn decode_hot_cache(bytes: &[u8]) -> Result<LinuxChatCoreHotCache> {
     })
 }
 
-fn encode_summary(bytes: &mut Vec<u8>, summary: &LinuxResidualDecodedSummary) -> Result<()> {
-    write_string(bytes, &summary.path)?;
+#[derive(Default)]
+struct HotStringInterner {
+    ids: BTreeMap<String, u32>,
+    values: Vec<String>,
+}
+
+impl HotStringInterner {
+    fn intern(&mut self, value: &str) -> Result<u32> {
+        if let Some(id) = self.ids.get(value) {
+            return Ok(*id);
+        }
+        let id: u32 = self.values.len().try_into()?;
+        self.values.push(value.to_string());
+        self.ids.insert(value.to_string(), id);
+        Ok(id)
+    }
+
+    fn id(&self, value: &str) -> Result<u32> {
+        self.ids
+            .get(value)
+            .copied()
+            .with_context(|| format!("chat-core hot string was not interned: {value}"))
+    }
+}
+
+fn collect_hot_strings(
+    cache: &LinuxChatCoreHotCache,
+    interner: &mut HotStringInterner,
+) -> Result<()> {
+    interner.intern(&cache.residual_summary.path)?;
+    for route in &cache.route_index {
+        interner.intern(&route.route)?;
+        for value in route
+            .relations
+            .iter()
+            .chain(route.memory_kinds.iter())
+            .chain(route.polarities.iter())
+        {
+            interner.intern(value)?;
+        }
+    }
+    for domain in &cache.domains {
+        interner.intern(&domain.domain_id)?;
+        for value in domain
+            .routes
+            .iter()
+            .chain(domain.negative_routes.iter())
+            .chain(domain.overlay_ids.iter())
+        {
+            interner.intern(value)?;
+        }
+        interner.intern(&domain.action_scope)?;
+    }
+    for fact in &cache.readout_facts {
+        interner.intern(&fact.route)?;
+        interner.intern(&fact.subject)?;
+        interner.intern(&fact.subject_role)?;
+        interner.intern(&fact.relation)?;
+        interner.intern(&fact.object)?;
+        interner.intern(&fact.object_role)?;
+        interner.intern(&fact.polarity)?;
+        interner.intern(&fact.evidence_kind)?;
+        interner.intern(&fact.memory_kind)?;
+    }
+    Ok(())
+}
+
+fn encode_summary(
+    bytes: &mut Vec<u8>,
+    summary: &LinuxResidualDecodedSummary,
+    interner: &HotStringInterner,
+) -> Result<()> {
+    write_string_id(bytes, interner, &summary.path)?;
     write_u64(bytes, summary.file_bytes as u64);
     write_u32(bytes, summary.wave_dim);
     write_u64(bytes, summary.represented_fact_count as u64);
@@ -1372,9 +1537,13 @@ fn encode_summary(bytes: &mut Vec<u8>, summary: &LinuxResidualDecodedSummary) ->
     Ok(())
 }
 
-fn decode_summary(bytes: &[u8], pos: &mut usize) -> Result<LinuxResidualDecodedSummary> {
+fn decode_summary(
+    bytes: &[u8],
+    pos: &mut usize,
+    strings: &[String],
+) -> Result<LinuxResidualDecodedSummary> {
     Ok(LinuxResidualDecodedSummary {
-        path: read_string(bytes, pos)?,
+        path: read_string_id(bytes, pos, strings)?,
         file_bytes: read_usize(bytes, pos)?,
         wave_dim: read_u32(bytes, pos)?,
         represented_fact_count: read_usize(bytes, pos)?,
@@ -1415,10 +1584,19 @@ fn write_string(bytes: &mut Vec<u8>, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_string_vec(bytes: &mut Vec<u8>, values: &[String]) -> Result<()> {
+fn write_string_id(bytes: &mut Vec<u8>, interner: &HotStringInterner, value: &str) -> Result<()> {
+    write_u32(bytes, interner.id(value)?);
+    Ok(())
+}
+
+fn write_string_id_vec(
+    bytes: &mut Vec<u8>,
+    interner: &HotStringInterner,
+    values: &[String],
+) -> Result<()> {
     write_u64(bytes, values.len() as u64);
     for value in values {
-        write_string(bytes, value)?;
+        write_string_id(bytes, interner, value)?;
     }
     Ok(())
 }
@@ -1476,11 +1654,19 @@ fn read_string(bytes: &[u8], pos: &mut usize) -> Result<String> {
         .to_string())
 }
 
-fn read_string_vec(bytes: &[u8], pos: &mut usize) -> Result<Vec<String>> {
+fn read_string_id(bytes: &[u8], pos: &mut usize, strings: &[String]) -> Result<String> {
+    let id = read_u32(bytes, pos)? as usize;
+    strings
+        .get(id)
+        .cloned()
+        .with_context(|| format!("chat-core hot string id out of range: {id}"))
+}
+
+fn read_string_id_vec(bytes: &[u8], pos: &mut usize, strings: &[String]) -> Result<Vec<String>> {
     let len = read_len(bytes, pos)?;
     let mut values = Vec::with_capacity(len);
     for _ in 0..len {
-        values.push(read_string(bytes, pos)?);
+        values.push(read_string_id(bytes, pos, strings)?);
     }
     Ok(values)
 }
@@ -1829,7 +2015,14 @@ mod tests {
                 action_scope: "read_only_answer_support".to_string(),
             }],
         };
-        let bytes = encode_hot_cache(&cache).unwrap();
+        let encoded = encode_hot_cache(&cache).unwrap();
+        assert_eq!(encoded.stats.hot_format, HOT_FORMAT);
+        assert_eq!(encoded.stats.packed_fact_record_count, 1);
+        assert_eq!(
+            encoded.stats.packed_fact_record_bytes,
+            PACKED_FACT_RECORD_BYTES
+        );
+        let bytes = encoded.bytes;
         assert!(bytes.starts_with(HOT_MAGIC));
         assert!(bytes.len() > 128);
         let decoded = decode_hot_cache(&bytes).unwrap();

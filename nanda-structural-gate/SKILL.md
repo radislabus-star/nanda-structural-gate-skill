@@ -1411,14 +1411,14 @@ Read ChatCore literally: cache is a compiled runtime view, not source memory.
 `chat-core.manifest.json` must match the current `.lrf`, overlays, eval
 artifacts, domain registry, and compiler version. If `cache_status.cache_fresh`
 is false, do not use the cache as answer support. `linux-chat-core-gate` is
-read-only by default: missing cache is `LINUX_CHAT_CORE_CACHE_STALE`, not an
-implicit build. It writes cache only with explicit `--rebuild-cache`; prefer
-`linux-chat-core-build` for normal rebuilds. `linux-chat-core-gate` runs the
-older Linux profile gate as a compatibility subgate on scratch `.lwm` eval files
-so it does not mutate source overlays. Inspect `token_economics` before claiming
-the cache saves context: estimates use `ceil(bytes / 4)` and compare compact
-grounded packets against source/runtime-cache size, not exact model tokenizer
-counts. `chat-core.hot` is the answer-authority binary runtime readout;
+read-only and fast: missing cache is `LINUX_CHAT_CORE_CACHE_STALE`, not an
+implicit build. It checks manifest/source/hot hashes and does not run heavy
+broad/profile evals. Use `linux-chat-core-build` for normal rebuilds. Use
+`linux-chat-core-profile-gate` only when the heavier Linux profile/eval gate is
+intentionally required. Inspect `token_economics` before claiming the cache
+saves context: estimates use `ceil(bytes / 4)` and compare compact grounded
+packets against source/runtime-cache size, not exact model tokenizer counts.
+`chat-core.hot` is the answer-authority interned packed binary runtime readout;
 `chat-core.index.json` is debug/explain only. A missing JSON index must not
 force `ask` back to source decoding when `.hot` and source hashes still match.
 `linux-chat-core-ask` is the compact grounded-packet surface for Codex/LLM use:
@@ -1429,9 +1429,11 @@ answer state, selected domain suites, structured `evidence[]`, legacy
 `cache_is_runtime_index_not_prompt_payload=true` as a hard interpretation rule:
 the hot cache is a runtime readout, not prompt context; use only the grounded
 packet as the small external memory payload. Treat
-`LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as Linux-profile cache
-readiness only; general LLM, open-domain chat, scanner, and global nonlinear
-claims remain blocked.
+`LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM` as cache-authority
+readiness only. Treat
+`LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM` as the heavier
+profile/eval readiness path. General LLM, open-domain chat, scanner, and global
+nonlinear claims remain blocked.
 These commands expand the Linux-profile reasoning/chat proof surface, but they
 still do not unlock general LLM, open-domain chat, scanner, or exploit claims.
 Use `nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json`

@@ -806,14 +806,14 @@ ChatCore memory/cache layer. The normal entrypoint is `--memory-root
 .nanda/linux-active`; explicit `--profile`, `--residual-pack`, `--*-overlay`,
 `--*-eval`, and `--cache-dir` flags are source overrides for tests or unusual
 layouts. ChatCore treats `.lrf v2` plus `.lwm` overlays as source memory, then
-compiles a binary hot cache view:
+compiles a packed binary hot cache view:
 
 ```text
 .nanda/linux-active/linux-active-65k.lrf
 .nanda/linux-active/linux-chat-profile.lwm
 .nanda/linux-active/linux-center-learning.lwm
 .nanda/linux-active/linux-chat-profile-vpn.lwm
-  -> .nanda/linux-active/cache/chat-core.hot         # binary runtime readout
+  -> .nanda/linux-active/cache/chat-core.hot         # interned packed runtime readout
   -> .nanda/linux-active/cache/chat-core.index.json  # debug/explain artifact
   -> .nanda/linux-active/cache/chat-core.manifest.json
 ```
@@ -821,16 +821,19 @@ compiles a binary hot cache view:
 The manifest stores hashes for source memory, overlays, profile evals, domain
 registry, and compiler version. The cache is not the source of truth. If any
 source artifact changes, `linux-chat-core-gate` returns stale and blocks answer
-authority until the cache is rebuilt. The gate is read-only by default: missing
-cache returns stale instead of implicitly building cache. Use
-`linux-chat-core-build` or explicit `linux-chat-core-gate --rebuild-cache` to
-write cache artifacts. The old `linux-chat-profile-gate` remains a
-compatibility gate; the preferred Linux-profile entrypoint is now:
+authority until the cache is rebuilt. The authority gate is read-only and fast:
+it checks manifest/source/hot hashes and does not run broad/profile evals. Use
+`linux-chat-core-build` to write cache artifacts. Use
+`linux-chat-core-profile-gate` only when the heavier Linux profile/eval gate is
+intentionally required. The old `linux-chat-profile-gate` remains a
+compatibility gate; the preferred Linux-profile cache entrypoint is:
 
 ```bash
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --format json
+# Optional heavy profile/eval path:
+nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
 ```
 
 `linux-chat-core-ask` is the intended compact packet surface for Codex/LLM use:
@@ -846,9 +849,11 @@ saves versus sending the source artifacts or the full runtime cache. The
 estimate is `ceil(bytes / 4)`, not an exact model tokenizer count. Read
 `cache_is_runtime_index_not_prompt_payload=true` literally: the hot cache is a
 runtime readout, not something to paste into prompt context. Treat
-`LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as Linux-profile cache
-readiness only: it is not open-domain chat, not a general LLM, and not global
-nonlinear-memory proof.
+`LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM` as cache-authority
+readiness only. Treat
+`LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM` as the heavier
+profile/eval readiness path. Neither is open-domain chat, a general LLM, or
+global nonlinear-memory proof.
 
 `linux-exposure-run` is the first Linux exposure reasoning layer over that
 schema/residual memory. It reconstructs the `.lrf` facts for explanation, then
@@ -2511,9 +2516,10 @@ local gates: PASS per pair
 Run local tests:
 
 ```bash
-scripts/test-local.sh                 # default: changed-file checks
+scripts/test-local.sh                 # changed-file checks; clean worktree checks last commit
+scripts/test-local.sh --since HEAD~1  # explicit changed range
 scripts/test-local.sh --suite chatcore # fast Linux ChatCore hot-cache readout
-scripts/test-local.sh --suite chatcore-build # slow rebuild + gate
+scripts/test-local.sh --suite chatcore-build # slow rebuild + fast authority gate
 scripts/benchmark-v0.sh
 scripts/test-edge-cases.sh
 ```
