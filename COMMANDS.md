@@ -497,12 +497,14 @@ Linux-profile dialogue learning only, not general LLM readiness and not a final
 nonlinear-memory proof.
 `linux-center-learn` is the dynamic center-learning loop over `.lrf v2`
 schema/residual memory. It writes and reloads a persistent `.lwm` center memory
-file, reinforces confirmed centers, writes correction residuals, creates
-anti-centers for rejected shortcuts, promotes repeated residual clusters,
-marks overloaded/conflicting centers as split-available, decays weak candidates,
-and protects verified centers from random drift. It must show before/after lift,
-anti-center replay, no false-positive regression, held-out preservation, and an
-unrelated route still grounded. Treat
+file, reinforces confirmed centers, sends corrections through quarantine /
+candidate centers, admits only sufficiently weighted repeated candidates into
+official residuals, creates anti-centers for rejected shortcuts, promotes
+repeated admitted residual clusters, marks overloaded/conflicting centers as
+split-available, decays weak candidates, and protects verified centers from
+random drift. It must show before/after lift, anti-center replay, bad-feedback
+quarantine, drift-budget enforcement, no false-positive regression, held-out
+preservation, and an unrelated route still grounded. Treat
 `LINUX_DYNAMIC_CENTER_LEARNING_READY_NOT_GENERAL_LLM` as Linux-profile dynamic
 learning only, not a global nonlinear-memory or general LLM claim.
 `linux-vpn-train` writes a safe local VPN training profile into persistent

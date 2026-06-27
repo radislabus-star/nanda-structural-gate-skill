@@ -848,10 +848,13 @@ global nonlinear-memory proof.
 `linux-center-learn` is the dynamic center-learning loop for the Linux profile.
 It starts from `.lrf v2` schema/residual memory, writes a persistent `.lwm`
 center memory file, reloads it, and proves a before/after change: confirmed
-feedback reinforces a schema center, corrections write residuals, reject
-feedback creates anti-centers, repeated residuals can promote a center,
+feedback reinforces a schema center, corrections first enter a quarantine /
+candidate-center lane, evidence-weighted admission writes residuals, rejected
+shortcuts create anti-centers, repeated admitted residuals can promote a center,
 conflicting centers can split, weak candidates decay, and verified centers are
-protected from random drift. Treat
+protected from random drift. Untrusted feedback against a verified center must
+stay quarantined behind the drift budget instead of moving the official center.
+Treat
 `LINUX_DYNAMIC_CENTER_LEARNING_READY_NOT_GENERAL_LLM` as Linux-profile dynamic
 learning only; it does not unlock general LLM or global nonlinear-memory claims.
 

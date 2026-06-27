@@ -1336,10 +1336,12 @@ dialogue feedback. Do not treat the transcript itself as memory; inspect the
 Use `nanda-llmwave-big linux-center-learn --residual-pack .nanda/linux-active/linux-active-65k.lrf --memory .nanda/linux-active/linux-center-learning.lwm --script examples/linux-center-learning.script --heldout-eval .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --reset-memory --format json`
 when the user asks whether Linux-profile memory can learn by moving centers, not
 just by appending a feedback log. The command must write and reload a persistent
-`.lwm` center memory file, reinforce confirmed schema centers, write correction
-residuals, create anti-centers for rejected shortcuts, promote repeated residual
-clusters, mark conflicting centers as split-available, decay weak candidates,
-protect verified centers, and show a real before/after lift. Treat
+`.lwm` center memory file, reinforce confirmed schema centers, send corrections
+through quarantine/candidate centers, admit only sufficiently weighted repeated
+candidates into official residuals, create anti-centers for rejected shortcuts,
+promote repeated admitted residual clusters, mark conflicting centers as
+split-available, decay weak candidates, protect verified centers from untrusted
+drift, and show a real before/after lift. Treat
 `LINUX_DYNAMIC_CENTER_LEARNING_READY_NOT_GENERAL_LLM` as Linux-profile dynamic
 learning only: it is not general LLM readiness and not global nonlinear-memory
 proof.
@@ -1389,8 +1391,9 @@ nonlinear-memory proof.
 Add `--run-center-learning-eval --center-learning-memory .nanda/linux-active/linux-center-learning.lwm --center-learning-script examples/linux-center-learning.script`
 when the profile claim must also prove dynamic center learning. If the center
 subgate cannot show target-query improvement, memory lift, anti-center replay,
-no false-positive regression, no heldout regression, and unrelated-route
-preservation, do not promote the chat profile.
+candidate quarantine, evidence-weighted admission, bad-feedback quarantine,
+drift-budget enforcement, no false-positive regression, no heldout regression,
+and unrelated-route preservation, do not promote the chat profile.
 These commands expand the Linux-profile reasoning/chat proof surface, but they
 still do not unlock general LLM, open-domain chat, scanner, or exploit claims.
 Use `nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json`

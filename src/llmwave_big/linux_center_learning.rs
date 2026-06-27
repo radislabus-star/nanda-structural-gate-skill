@@ -26,6 +26,8 @@ pub(crate) const LINUX_CENTER_LEARNING_VERSION: &str =
 const PROOF_GRADE_MIN_FACTS: usize = 65_536;
 const PROMOTION_THRESHOLD: usize = 2;
 const SPLIT_THRESHOLD: usize = 2;
+const CANDIDATE_ADMISSION_MIN_WEIGHT: u16 = 120;
+const TRUSTED_FEEDBACK_MIN_WEIGHT: u16 = 60;
 
 #[derive(Clone)]
 pub(crate) struct LinuxCenterLearnConfig {
@@ -59,6 +61,7 @@ pub(crate) struct DynamicCenterLearningReport {
     pub enabled: bool,
     pub operations: LinuxCenterLearningOperations,
     pub before_after: LinuxCenterBeforeAfterSummary,
+    pub safety: LinuxCenterLearningSafety,
     pub center_state: LinuxCenterStateSummary,
     pub updates: Vec<LinuxCenterLearningUpdate>,
 }
@@ -72,6 +75,21 @@ pub(crate) struct LinuxCenterLearningOperations {
     pub center_split_available: bool,
     pub weak_candidate_decay: bool,
     pub verified_center_protection: bool,
+    pub candidate_quarantine_write: bool,
+    pub candidate_center_admission: bool,
+    pub evidence_weighted_update: bool,
+    pub drift_budget_enforced: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxCenterLearningSafety {
+    pub candidate_quarantine_enabled: bool,
+    pub candidate_center_before_promotion: bool,
+    pub candidate_admission_observed: bool,
+    pub bad_feedback_quarantined: bool,
+    pub verified_center_drift_blocked: bool,
+    pub evidence_weighted_admission_observed: bool,
+    pub drift_budget_enforced: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -117,10 +135,15 @@ pub(crate) struct LinuxCenterStateSummary {
     pub verified_center_count: usize,
     pub residual_count: usize,
     pub anti_center_count: usize,
+    pub candidate_center_count: usize,
+    pub quarantine_record_count: usize,
     pub promoted_center_count: usize,
     pub split_candidate_count: usize,
     pub decayed_candidate_count: usize,
     pub protected_center_count: usize,
+    pub admitted_candidate_count: usize,
+    pub rejected_candidate_count: usize,
+    pub rejected_quarantine_count: usize,
     pub center_updates: usize,
     pub residual_writes: usize,
     pub anti_center_writes: usize,
@@ -159,10 +182,16 @@ struct LinuxDynamicCenterMemoryFile {
     center_record_count: usize,
     residual_record_count: usize,
     anti_center_record_count: usize,
+    candidate_center_record_count: usize,
+    quarantine_record_count: usize,
     weak_candidate_count: usize,
     centers: Vec<LinuxDynamicCenterRecord>,
     residuals: Vec<LinuxDynamicResidualRecord>,
     anti_centers: Vec<LinuxDynamicAntiCenterRecord>,
+    #[serde(default)]
+    candidate_centers: Vec<LinuxCandidateCenterRecord>,
+    #[serde(default)]
+    quarantine: Vec<LinuxQuarantineRecord>,
     weak_candidates: Vec<LinuxWeakCenterCandidate>,
     wave_deltas: Vec<PersistentWaveDeltaRecord>,
 }
@@ -204,6 +233,35 @@ struct LinuxDynamicAntiCenterRecord {
     object: String,
     strength: i32,
     reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LinuxCandidateCenterRecord {
+    center_id: u32,
+    route: String,
+    relation: String,
+    subject_role: String,
+    object_role: String,
+    polarity: String,
+    evidence_kind: String,
+    evidence_weight: u16,
+    supporting_records: usize,
+    admitted: bool,
+    rejected: bool,
+    reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LinuxQuarantineRecord {
+    center_id: u32,
+    query: String,
+    subject: String,
+    object: String,
+    evidence_kind: String,
+    evidence_weight: u16,
+    reason: String,
+    admitted: bool,
+    rejected: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -266,6 +324,7 @@ pub(crate) fn build_linux_center_learn_report(
     for op in &script {
         apply_learning_op(&mut memory, op, &mut updates);
     }
+    admit_candidate_centers(&mut memory, &mut updates);
     protect_verified_centers(&mut memory, &mut updates);
     promote_residual_clusters(&mut memory, &mut updates);
     split_conflicting_centers(&mut memory, &mut updates);
@@ -291,6 +350,7 @@ pub(crate) fn build_linux_center_learn_report(
     };
     let before_after_summary = before_after_summary(&before_after, &heldout_guard);
     let operations = operations(&memory, &before_after_summary);
+    let safety = safety(&memory, &operations);
     let center_state = center_state_summary(&memory, updates.len());
     let ready = operations.confirmed_center_reinforcement
         && operations.correction_residual_write
@@ -299,6 +359,10 @@ pub(crate) fn build_linux_center_learn_report(
         && operations.center_split_available
         && operations.weak_candidate_decay
         && operations.verified_center_protection
+        && operations.candidate_quarantine_write
+        && operations.candidate_center_admission
+        && operations.evidence_weighted_update
+        && operations.drift_budget_enforced
         && before_after_summary.target_query_improved
         && before_after_summary.memory_lift_observed
         && before_after_summary.anti_center_replay_observed
@@ -329,6 +393,7 @@ pub(crate) fn build_linux_center_learn_report(
             enabled: true,
             operations,
             before_after: before_after_summary,
+            safety,
             center_state,
             updates,
         },
@@ -343,7 +408,7 @@ pub(crate) fn build_linux_center_learn_report(
             general_llm_ready: false,
             global_nonlinear_memory_proven: false,
             broad_chat_llm_ready: false,
-            safe_claim: "Dynamic center learning updates Linux-profile centers, residuals, anti-centers, promotion/split/decay/protection state and proves a local before/after lift. It is not general LLM readiness or global nonlinear-memory proof.",
+            safe_claim: "Dynamic center learning updates Linux-profile centers through quarantine/candidate admission, residuals, anti-centers, promotion/split/decay/protection state and proves a local before/after lift. It is not general LLM readiness or global nonlinear-memory proof.",
             blocked_claims: vec![
                 "general_llm_ready",
                 "global_nonlinear_memory_proven",
@@ -465,10 +530,14 @@ fn empty_center_memory() -> LinuxDynamicCenterMemoryFile {
         center_record_count: 0,
         residual_record_count: 0,
         anti_center_record_count: 0,
+        candidate_center_record_count: 0,
+        quarantine_record_count: 0,
         weak_candidate_count: 0,
         centers: Vec::new(),
         residuals: Vec::new(),
         anti_centers: Vec::new(),
+        candidate_centers: Vec::new(),
+        quarantine: Vec::new(),
         weak_candidates: vec![LinuxWeakCenterCandidate {
             center_id: center_id_for(
                 "linux.candidate.weak",
@@ -492,6 +561,8 @@ fn refresh_counts(memory: &mut LinuxDynamicCenterMemoryFile) {
     memory.center_record_count = memory.centers.len();
     memory.residual_record_count = memory.residuals.len();
     memory.anti_center_record_count = memory.anti_centers.len();
+    memory.candidate_center_record_count = memory.candidate_centers.len();
+    memory.quarantine_record_count = memory.quarantine.len();
     memory.weak_candidate_count = memory.weak_candidates.len();
 }
 
@@ -551,6 +622,17 @@ fn builtin_script() -> Vec<LinuxCenterLearningOp> {
             object_role: "package".to_string(),
             polarity: "positive".to_string(),
             evidence_kind: "dialogue_feedback".to_string(),
+        }),
+        LinuxCenterLearningOp::Correct(LinuxCenterFactSpec {
+            query: "Which package provides command bash?".to_string(),
+            route: "linux.apt.command.provider".to_string(),
+            subject: "bash".to_string(),
+            subject_role: "command".to_string(),
+            relation: "provided by package".to_string(),
+            object: "not-bash".to_string(),
+            object_role: "package".to_string(),
+            polarity: "positive".to_string(),
+            evidence_kind: "unverified_feedback".to_string(),
         }),
         LinuxCenterLearningOp::Reject(LinuxCenterFactSpec {
             query: "Does listener mean external exposure?".to_string(),
@@ -626,31 +708,7 @@ fn apply_learning_op(
             ));
         }
         LinuxCenterLearningOp::Correct(spec) => {
-            let center_id = {
-                let center = ensure_center(memory, spec);
-                center.strength += 12;
-                center.residual_count += 1;
-                center.center_id
-            };
-            memory.residuals.push(LinuxDynamicResidualRecord {
-                center_id,
-                subject: spec.subject.clone(),
-                object: spec.object.clone(),
-                confidence: 96,
-                source: "correction_feedback".to_string(),
-                promoted: false,
-            });
-            memory.wave_deltas.push(delta_for(
-                spec,
-                DELTA_CORRECTION,
-                "correction residual write",
-            ));
-            updates.push(update(
-                "correct",
-                center_id,
-                spec,
-                "residual written and center moved",
-            ));
+            quarantine_correction(memory, spec, updates);
         }
         LinuxCenterLearningOp::Reject(spec) => {
             let center_id = {
@@ -672,6 +730,240 @@ fn apply_learning_op(
                 .push(delta_for(spec, DELTA_NEGATIVE, "reject anti-center write"));
             updates.push(update("reject", center_id, spec, "anti-center written"));
         }
+    }
+}
+
+fn quarantine_correction(
+    memory: &mut LinuxDynamicCenterMemoryFile,
+    spec: &LinuxCenterFactSpec,
+    updates: &mut Vec<LinuxCenterLearningUpdate>,
+) {
+    let center_id = center_id_for(
+        &spec.route,
+        &spec.relation,
+        &spec.subject_role,
+        &spec.object_role,
+        &spec.polarity,
+        &spec.evidence_kind,
+    );
+    let evidence_weight = evidence_weight(&spec.evidence_kind);
+    let drift_blocked = evidence_weight < TRUSTED_FEEDBACK_MIN_WEIGHT
+        && protected_center_shape_exists(memory, spec);
+    let reason = if drift_blocked {
+        "verified_center_drift_budget"
+    } else {
+        "candidate_before_promotion"
+    };
+
+    if let Some(candidate) = memory
+        .candidate_centers
+        .iter_mut()
+        .find(|candidate| candidate.center_id == center_id)
+    {
+        candidate.evidence_weight = candidate.evidence_weight.saturating_add(evidence_weight);
+        candidate.supporting_records += 1;
+        if drift_blocked {
+            candidate.reason = reason.to_string();
+        }
+    } else {
+        memory.candidate_centers.push(LinuxCandidateCenterRecord {
+            center_id,
+            route: spec.route.clone(),
+            relation: spec.relation.clone(),
+            subject_role: spec.subject_role.clone(),
+            object_role: spec.object_role.clone(),
+            polarity: spec.polarity.clone(),
+            evidence_kind: spec.evidence_kind.clone(),
+            evidence_weight,
+            supporting_records: 1,
+            admitted: false,
+            rejected: false,
+            reason: reason.to_string(),
+        });
+    }
+
+    memory.quarantine.push(LinuxQuarantineRecord {
+        center_id,
+        query: spec.query.clone(),
+        subject: spec.subject.clone(),
+        object: spec.object.clone(),
+        evidence_kind: spec.evidence_kind.clone(),
+        evidence_weight,
+        reason: reason.to_string(),
+        admitted: false,
+        rejected: false,
+    });
+    updates.push(update("quarantine", center_id, spec, reason));
+}
+
+fn admit_candidate_centers(
+    memory: &mut LinuxDynamicCenterMemoryFile,
+    updates: &mut Vec<LinuxCenterLearningUpdate>,
+) {
+    let candidates = memory.candidate_centers.clone();
+    for candidate in candidates {
+        if candidate.admitted || candidate.rejected {
+            continue;
+        }
+        let drift_blocked = memory.quarantine.iter().any(|record| {
+            record.center_id == candidate.center_id
+                && record.reason == "verified_center_drift_budget"
+        });
+        if drift_blocked {
+            mark_candidate_rejected(memory, candidate.center_id);
+            updates.push(LinuxCenterLearningUpdate {
+                operation: "drift_block".to_string(),
+                center_id: candidate.center_id,
+                route: candidate.route.clone(),
+                subject: "candidate_center".to_string(),
+                relation: "blocked_by_drift_budget".to_string(),
+                object: candidate.relation.clone(),
+                effect: "untrusted feedback quarantined; verified center not moved".to_string(),
+            });
+            continue;
+        }
+        if candidate.supporting_records < PROMOTION_THRESHOLD
+            || candidate.evidence_weight < CANDIDATE_ADMISSION_MIN_WEIGHT
+        {
+            continue;
+        }
+
+        let center_id = ensure_center_from_candidate(memory, &candidate);
+        if let Some(center) = memory
+            .centers
+            .iter_mut()
+            .find(|center| center.center_id == center_id)
+        {
+            center.strength += i32::from(candidate.evidence_weight / 4);
+            center.residual_count += candidate.supporting_records;
+        }
+
+        let mut admitted_specs = Vec::new();
+        for record in memory
+            .quarantine
+            .iter_mut()
+            .filter(|record| record.center_id == candidate.center_id && !record.rejected)
+        {
+            record.admitted = true;
+            admitted_specs.push(LinuxCenterFactSpec {
+                query: record.query.clone(),
+                route: candidate.route.clone(),
+                subject: record.subject.clone(),
+                subject_role: candidate.subject_role.clone(),
+                relation: candidate.relation.clone(),
+                object: record.object.clone(),
+                object_role: candidate.object_role.clone(),
+                polarity: candidate.polarity.clone(),
+                evidence_kind: candidate.evidence_kind.clone(),
+            });
+            memory.residuals.push(LinuxDynamicResidualRecord {
+                center_id,
+                subject: record.subject.clone(),
+                object: record.object.clone(),
+                confidence: record.evidence_weight.min(99) as u8,
+                source: "candidate_admitted_correction".to_string(),
+                promoted: false,
+            });
+        }
+        for spec in &admitted_specs {
+            memory.wave_deltas.push(delta_for(
+                spec,
+                DELTA_CORRECTION,
+                "candidate center admitted after evidence-weighted quarantine",
+            ));
+        }
+        if let Some(candidate_record) = memory
+            .candidate_centers
+            .iter_mut()
+            .find(|record| record.center_id == candidate.center_id)
+        {
+            candidate_record.admitted = true;
+            candidate_record.reason = "evidence_weighted_admission".to_string();
+        }
+        updates.push(LinuxCenterLearningUpdate {
+            operation: "admit_candidate".to_string(),
+            center_id,
+            route: candidate.route.clone(),
+            subject: "candidate_center".to_string(),
+            relation: "admitted".to_string(),
+            object: candidate.relation.clone(),
+            effect: "candidate center passed evidence-weighted admission and wrote residuals"
+                .to_string(),
+        });
+    }
+}
+
+fn ensure_center_from_candidate(
+    memory: &mut LinuxDynamicCenterMemoryFile,
+    candidate: &LinuxCandidateCenterRecord,
+) -> u32 {
+    if memory
+        .centers
+        .iter()
+        .any(|center| center.center_id == candidate.center_id)
+    {
+        return candidate.center_id;
+    }
+    memory.centers.push(LinuxDynamicCenterRecord {
+        center_id: candidate.center_id,
+        route: candidate.route.clone(),
+        relation: candidate.relation.clone(),
+        subject_role: candidate.subject_role.clone(),
+        object_role: candidate.object_role.clone(),
+        polarity: candidate.polarity.clone(),
+        evidence_kind: candidate.evidence_kind.clone(),
+        strength: 8,
+        verified: false,
+        protected: false,
+        drift: 0,
+        residual_count: 0,
+        anti_count: 0,
+        promoted: false,
+        split_candidate: false,
+    });
+    candidate.center_id
+}
+
+fn mark_candidate_rejected(memory: &mut LinuxDynamicCenterMemoryFile, center_id: u32) {
+    if let Some(candidate) = memory
+        .candidate_centers
+        .iter_mut()
+        .find(|candidate| candidate.center_id == center_id)
+    {
+        candidate.rejected = true;
+    }
+    for record in memory
+        .quarantine
+        .iter_mut()
+        .filter(|record| record.center_id == center_id)
+    {
+        record.rejected = true;
+    }
+}
+
+fn protected_center_shape_exists(
+    memory: &LinuxDynamicCenterMemoryFile,
+    spec: &LinuxCenterFactSpec,
+) -> bool {
+    memory.centers.iter().any(|center| {
+        center.protected
+            && center.route == spec.route
+            && center.relation == spec.relation
+            && center.subject_role == spec.subject_role
+            && center.object_role == spec.object_role
+            && center.polarity == spec.polarity
+    })
+}
+
+fn evidence_weight(evidence_kind: &str) -> u16 {
+    match evidence_kind {
+        "package_metadata" => 100,
+        "runtime_snapshot" => 90,
+        "dialogue_feedback" => 70,
+        "operator_confirmation" => 70,
+        "unverified_feedback" => 20,
+        "weak_hint" => 10,
+        _ => 40,
     }
 }
 
@@ -983,7 +1275,7 @@ fn operations(
     LinuxCenterLearningOperations {
         confirmed_center_reinforcement: memory.centers.iter().any(|center| center.verified),
         correction_residual_write: memory.residuals.iter().any(|residual| {
-            residual.source == "correction_feedback" && residual.subject == "foocmd"
+            residual.source == "candidate_admitted_correction" && residual.subject == "foocmd"
         }),
         reject_anti_center_write: !memory.anti_centers.is_empty(),
         residual_cluster_promotion: memory.centers.iter().any(|center| center.promoted),
@@ -994,6 +1286,39 @@ fn operations(
             .any(|candidate| candidate.decayed),
         verified_center_protection: memory.centers.iter().any(|center| center.protected)
             && summary.memory_lift_observed,
+        candidate_quarantine_write: !memory.quarantine.is_empty(),
+        candidate_center_admission: memory
+            .candidate_centers
+            .iter()
+            .any(|candidate| candidate.admitted),
+        evidence_weighted_update: memory.candidate_centers.iter().any(|candidate| {
+            candidate.admitted && candidate.evidence_weight >= CANDIDATE_ADMISSION_MIN_WEIGHT
+        }),
+        drift_budget_enforced: memory
+            .quarantine
+            .iter()
+            .any(|record| record.rejected && record.reason == "verified_center_drift_budget"),
+    }
+}
+
+fn safety(
+    memory: &LinuxDynamicCenterMemoryFile,
+    operations: &LinuxCenterLearningOperations,
+) -> LinuxCenterLearningSafety {
+    LinuxCenterLearningSafety {
+        candidate_quarantine_enabled: operations.candidate_quarantine_write,
+        candidate_center_before_promotion: memory
+            .candidate_centers
+            .iter()
+            .any(|candidate| candidate.supporting_records > 0),
+        candidate_admission_observed: operations.candidate_center_admission,
+        bad_feedback_quarantined: memory
+            .quarantine
+            .iter()
+            .any(|record| record.evidence_kind == "unverified_feedback" && record.rejected),
+        verified_center_drift_blocked: operations.drift_budget_enforced,
+        evidence_weighted_admission_observed: operations.evidence_weighted_update,
+        drift_budget_enforced: operations.drift_budget_enforced,
     }
 }
 
@@ -1026,19 +1351,44 @@ fn center_state_summary(
         .iter()
         .filter(|center| center.protected)
         .count();
+    let admitted_candidate_count = memory
+        .candidate_centers
+        .iter()
+        .filter(|candidate| candidate.admitted)
+        .count();
+    let rejected_candidate_count = memory
+        .candidate_centers
+        .iter()
+        .filter(|candidate| candidate.rejected)
+        .count();
+    let rejected_quarantine_count = memory
+        .quarantine
+        .iter()
+        .filter(|record| record.rejected)
+        .count();
+    let drift_blocked_count = memory
+        .quarantine
+        .iter()
+        .filter(|record| record.rejected && record.reason == "verified_center_drift_budget")
+        .count();
     LinuxCenterStateSummary {
         center_count: memory.centers.len(),
         verified_center_count,
         residual_count: memory.residuals.len(),
         anti_center_count: memory.anti_centers.len(),
+        candidate_center_count: memory.candidate_centers.len(),
+        quarantine_record_count: memory.quarantine.len(),
         promoted_center_count,
         split_candidate_count,
         decayed_candidate_count,
         protected_center_count,
+        admitted_candidate_count,
+        rejected_candidate_count,
+        rejected_quarantine_count,
         center_updates,
         residual_writes: memory.residuals.len(),
         anti_center_writes: memory.anti_centers.len(),
-        drift_blocked_count: protected_center_count,
+        drift_blocked_count,
     }
 }
 
@@ -1275,6 +1625,56 @@ mod tests {
                 .dynamic_center_learning
                 .operations
                 .verified_center_protection
+        );
+        assert!(
+            report
+                .dynamic_center_learning
+                .operations
+                .candidate_quarantine_write
+        );
+        assert!(
+            report
+                .dynamic_center_learning
+                .operations
+                .candidate_center_admission
+        );
+        assert!(
+            report
+                .dynamic_center_learning
+                .operations
+                .evidence_weighted_update
+        );
+        assert!(
+            report
+                .dynamic_center_learning
+                .operations
+                .drift_budget_enforced
+        );
+        assert!(
+            report
+                .dynamic_center_learning
+                .safety
+                .bad_feedback_quarantined
+        );
+        assert!(
+            report
+                .dynamic_center_learning
+                .safety
+                .verified_center_drift_blocked
+        );
+        assert_eq!(
+            report
+                .dynamic_center_learning
+                .center_state
+                .admitted_candidate_count,
+            1
+        );
+        assert_eq!(
+            report
+                .dynamic_center_learning
+                .center_state
+                .rejected_candidate_count,
+            1
         );
         assert!(
             report

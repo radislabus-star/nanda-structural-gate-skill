@@ -2,5 +2,6 @@
 confirm | Which package provides command bash? | bash | linux.apt.command.provider | provided by package | bash | command | package | positive | package_metadata
 correct | Which package provides command foocmd? | foocmd | linux.apt.command.provider | provided by package | foopkg | command | package | positive | dialogue_feedback
 correct | Which package provides command barcmd? | barcmd | linux.apt.command.provider | provided by package | barpkg | command | package | positive | dialogue_feedback
+correct | Which package provides command bash? | bash | linux.apt.command.provider | provided by package | not-bash | command | package | positive | unverified_feedback
 reject | Does listener mean external exposure? | listener | linux.boundary.socket | does not prove | external_exposure | runtime_state | exposure_claim | negative | dialogue_feedback
 reject | Does local service mean public vulnerability? | local_service | linux.boundary.socket | does not prove | public_vulnerability | runtime_state | exposure_claim | negative | dialogue_feedback

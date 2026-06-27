@@ -337,6 +337,11 @@ pub(crate) struct LinuxProfileCenterLearningSummary {
     pub verdict: String,
     pub memory_path: String,
     pub dynamic_learning_ready: bool,
+    pub candidate_quarantine_write: bool,
+    pub candidate_center_admission: bool,
+    pub drift_budget_enforced: bool,
+    pub bad_feedback_quarantined: bool,
+    pub verified_center_drift_blocked: bool,
     pub target_query_improved: bool,
     pub memory_lift_observed: bool,
     pub anti_center_replay_observed: bool,
@@ -874,6 +879,26 @@ fn center_learning_summary(report: &LinuxCenterLearnReport) -> LinuxProfileCente
         verdict: report.verdict.to_string(),
         memory_path: report.memory_path.clone(),
         dynamic_learning_ready: center_learning_ready(report),
+        candidate_quarantine_write: report
+            .dynamic_center_learning
+            .operations
+            .candidate_quarantine_write,
+        candidate_center_admission: report
+            .dynamic_center_learning
+            .operations
+            .candidate_center_admission,
+        drift_budget_enforced: report
+            .dynamic_center_learning
+            .operations
+            .drift_budget_enforced,
+        bad_feedback_quarantined: report
+            .dynamic_center_learning
+            .safety
+            .bad_feedback_quarantined,
+        verified_center_drift_blocked: report
+            .dynamic_center_learning
+            .safety
+            .verified_center_drift_blocked,
         target_query_improved: report
             .dynamic_center_learning
             .before_after
