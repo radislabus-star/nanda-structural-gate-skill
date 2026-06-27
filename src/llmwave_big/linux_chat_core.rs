@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 
 use super::linux_profile::{
     build_linux_profile_claim_gate_report, build_linux_reason_report_from_decoded_facts,
-    LinuxProfileClaimGateConfig, LinuxProfileClaimGateReport,
+    LinuxEvidenceStep, LinuxProfileClaimGateConfig, LinuxProfileClaimGateReport, LinuxReasonReport,
 };
 use super::linux_residual_memory::{
     load_linux_residual_decoded_packet, LinuxResidualDecodedFact, LinuxResidualDecodedSummary,
@@ -268,22 +268,29 @@ pub(crate) struct LinuxChatCoreCacheTokenEconomics {
     pub cache_total_bytes: u64,
     pub cache_estimated_tokens: u64,
     pub cache_vs_source_bytes_ratio: f32,
+    pub cache_is_runtime_index_not_prompt_payload: bool,
     pub note: &'static str,
 }
 
 #[derive(Serialize, Clone)]
 pub(crate) struct LinuxChatCoreAskTokenEconomics {
     pub estimate_method: &'static str,
+    pub source_artifacts_size_bytes: u64,
     pub source_artifacts_bytes: u64,
     pub source_artifacts_estimated_tokens: u64,
+    pub full_cache_index_size_bytes: u64,
     pub cache_index_bytes: u64,
     pub cache_index_estimated_tokens: u64,
+    pub grounded_packet_size_bytes: u64,
     pub grounded_packet_bytes: u64,
     pub grounded_packet_estimated_tokens: u64,
+    pub actual_answer_context_bytes: u64,
+    pub actual_answer_context_estimated_tokens: u64,
     pub estimated_tokens_saved_vs_source: u64,
     pub estimated_tokens_saved_vs_cache_index: u64,
     pub source_to_packet_reduction_ratio: f32,
     pub cache_index_to_packet_reduction_ratio: f32,
+    pub cache_is_runtime_index_not_prompt_payload: bool,
     pub note: &'static str,
 }
 
@@ -339,13 +346,27 @@ pub(crate) struct LinuxChatCoreGroundedPacket {
     pub cache_fresh: bool,
     pub answer_allowed: bool,
     pub readout_source: String,
+    pub cache_is_runtime_index_not_prompt_payload: bool,
     pub decision_state: String,
     pub answer: String,
     pub intent: String,
     pub route_priors: Vec<String>,
     pub evidence_count: usize,
     pub anti_wave_hits: Vec<String>,
+    pub evidence: Vec<LinuxChatCoreGroundedEvidence>,
     pub compact_evidence: Vec<String>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreGroundedEvidence {
+    pub route: String,
+    pub role: String,
+    pub subject: String,
+    pub relation: String,
+    pub object: String,
+    pub polarity: String,
+    pub memory_kind: String,
+    pub confidence: u8,
 }
 
 #[derive(Serialize, Clone)]
@@ -353,6 +374,7 @@ pub(crate) struct LinuxChatCoreClaimBoundary {
     pub linux_chat_core_cache_ready: bool,
     pub compiled_cache_matches_source_memory: bool,
     pub cache_is_source_of_truth: bool,
+    pub cache_is_runtime_index_not_prompt_payload: bool,
     pub source_memory_required_for_authority: bool,
     pub stale_cache_blocks_answer_authority: bool,
     pub profile_scoped_chat_core_ready: bool,
@@ -478,17 +500,11 @@ pub(crate) fn build_linux_chat_core_gate_report(
 pub(crate) fn build_linux_chat_core_ask_report(
     config: LinuxChatCoreAskConfig,
 ) -> Result<LinuxChatCoreAskReport> {
-    let _source_overlay_args_preserved_for_cli_symmetry = (
-        &config.residual_pack,
-        &config.dialogue_overlay,
-        &config.centers_overlay,
-        &config.vpn_overlay,
-    );
     let manifest = config
         .manifest
         .clone()
         .unwrap_or_else(|| config.cache_dir.join("chat-core.manifest.json"));
-    let cache_status = evaluate_cache_from_manifest(&manifest)?;
+    let cache_status = evaluate_cache_from_manifest_for_ask(&manifest, &config)?;
     let reason = if cache_status.cache_fresh {
         let cache_index = load_cache_index_from_manifest(&manifest)?;
         let facts = cache_index
@@ -506,36 +522,47 @@ pub(crate) fn build_linux_chat_core_ask_report(
         None
     };
     let packet = match reason {
-        Some(report) => LinuxChatCoreGroundedPacket {
-            cache_fresh: true,
-            answer_allowed: report.decision.answer_allowed,
-            readout_source: "compiled_chat_core_index".to_string(),
-            decision_state: report.decision.state,
-            answer: report.decision.answer,
-            intent: report.query_wave.intent,
-            route_priors: report.query_wave.route_priors,
-            evidence_count: report.evidence_chain.len(),
-            anti_wave_hits: report
-                .anti_wave_hits
-                .iter()
-                .map(|hit| format!("{} -> {}:{}", hit.shortcut, hit.replacement_peak, hit.reason))
-                .collect(),
-            compact_evidence: report
-                .evidence_chain
-                .iter()
-                .map(|step| format!("{} | {} | {}", step.route, step.relation, step.object))
-                .collect(),
-        },
+        Some(report) => {
+            let packet_evidence = selected_packet_evidence(&report);
+            LinuxChatCoreGroundedPacket {
+                cache_fresh: true,
+                answer_allowed: report.decision.answer_allowed,
+                readout_source: "compiled_chat_core_index".to_string(),
+                cache_is_runtime_index_not_prompt_payload: true,
+                decision_state: report.decision.state,
+                answer: report.decision.answer,
+                intent: report.query_wave.intent,
+                route_priors: report.query_wave.route_priors,
+                evidence_count: packet_evidence.len(),
+                anti_wave_hits: report
+                    .anti_wave_hits
+                    .iter()
+                    .map(|hit| {
+                        format!("{} -> {}:{}", hit.shortcut, hit.replacement_peak, hit.reason)
+                    })
+                    .collect(),
+                evidence: packet_evidence
+                    .iter()
+                    .map(LinuxChatCoreGroundedEvidence::from)
+                    .collect(),
+                compact_evidence: packet_evidence
+                    .iter()
+                    .map(compact_evidence_step)
+                    .collect(),
+            }
+        }
         None => LinuxChatCoreGroundedPacket {
             cache_fresh: false,
             answer_allowed: false,
             readout_source: "none_cache_stale".to_string(),
+            cache_is_runtime_index_not_prompt_payload: true,
             decision_state: "CACHE_STALE_NO_AUTHORITY".to_string(),
             answer: "Cache is stale or missing; rebuild and gate ChatCore before using it as answer support.".to_string(),
             intent: "unknown".to_string(),
             route_priors: Vec::new(),
             evidence_count: 0,
             anti_wave_hits: cache_status.stale_reasons.clone(),
+            evidence: Vec::new(),
             compact_evidence: Vec::new(),
         },
     };
@@ -556,6 +583,67 @@ pub(crate) fn build_linux_chat_core_ask_report(
     };
     write_json_if_requested(config.out.as_deref(), &report)?;
     Ok(report)
+}
+
+fn selected_packet_evidence(report: &LinuxReasonReport) -> Vec<LinuxEvidenceStep> {
+    if report.query_wave.intent != "command_provider" || !report.decision.answer_allowed {
+        return report.evidence_chain.clone();
+    }
+    for anchor in &report.query_wave.anchors {
+        let anchor = anchor.to_ascii_lowercase();
+        let exact = report
+            .evidence_chain
+            .iter()
+            .filter(|step| command_provider_step_matches_anchor(step, &anchor))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !exact.is_empty() {
+            return exact;
+        }
+    }
+    report.evidence_chain.iter().take(1).cloned().collect()
+}
+
+fn command_provider_step_matches_anchor(step: &LinuxEvidenceStep, anchor: &str) -> bool {
+    let subject = step.subject.to_ascii_lowercase();
+    let object = step.object.to_ascii_lowercase();
+    match step.route.as_str() {
+        "linux.apt.command.provider" => subject == anchor,
+        "linux.apt.command.package-command" => object == anchor,
+        "linux.package.binary" => {
+            object == anchor || object.rsplit('/').next().is_some_and(|name| name == anchor)
+        }
+        _ => false,
+    }
+}
+
+fn compact_evidence_step(step: &LinuxEvidenceStep) -> String {
+    format!(
+        "{} | role={} | subject={} | relation={} | object={} | polarity={} | memory={} | confidence={}",
+        step.route,
+        step.role,
+        step.subject,
+        step.relation,
+        step.object,
+        step.polarity,
+        step.memory_kind,
+        step.confidence
+    )
+}
+
+impl From<&LinuxEvidenceStep> for LinuxChatCoreGroundedEvidence {
+    fn from(step: &LinuxEvidenceStep) -> Self {
+        Self {
+            route: step.route.clone(),
+            role: step.role.clone(),
+            subject: step.subject.clone(),
+            relation: step.relation.clone(),
+            object: step.object.clone(),
+            polarity: step.polarity.clone(),
+            memory_kind: step.memory_kind.clone(),
+            confidence: step.confidence,
+        }
+    }
 }
 
 fn load_chat_core_spec(
@@ -892,6 +980,71 @@ fn evaluate_cache_from_manifest(manifest_path: &Path) -> Result<LinuxChatCoreCac
     })
 }
 
+fn evaluate_cache_from_manifest_for_ask(
+    manifest_path: &Path,
+    config: &LinuxChatCoreAskConfig,
+) -> Result<LinuxChatCoreCacheStatus> {
+    let mut status = evaluate_cache_from_manifest(manifest_path)?;
+    if !manifest_path.exists() {
+        return Ok(status);
+    }
+    let manifest: LinuxChatCoreCacheManifest = serde_json::from_slice(
+        &fs::read(manifest_path).with_context(|| format!("read {}", manifest_path.display()))?,
+    )
+    .with_context(|| format!("parse {}", manifest_path.display()))?;
+    let overrides = [
+        ("base-lrf", config.residual_pack.as_path()),
+        ("dialogue", config.dialogue_overlay.as_path()),
+        ("centers", config.centers_overlay.as_path()),
+        ("vpn", config.vpn_overlay.as_path()),
+    ];
+    let mut ask_artifacts = Vec::new();
+    let mut source_path_changed = false;
+    for expected in &manifest.source_artifacts {
+        if let Some((_, override_path)) = overrides
+            .iter()
+            .find(|(artifact_id, _)| *artifact_id == expected.artifact_id)
+        {
+            if path_string(override_path) != expected.path {
+                source_path_changed = true;
+            }
+            ask_artifacts.push(artifact(
+                &expected.artifact_id,
+                &expected.kind,
+                override_path,
+                expected.required,
+            )?);
+        } else {
+            ask_artifacts.push(artifact(
+                &expected.artifact_id,
+                &expected.kind,
+                Path::new(&expected.path),
+                expected.required,
+            )?);
+        }
+    }
+    let ask_source_hash = combined_hash(
+        ask_artifacts
+            .iter()
+            .map(|artifact| artifact.sha256.as_str()),
+    );
+    status.current_source_hash = ask_source_hash;
+    if status.current_source_hash != status.manifest_source_hash {
+        push_unique_stale_reason(&mut status.stale_reasons, "source_memory_hash_changed");
+    }
+    if source_path_changed {
+        push_unique_stale_reason(&mut status.stale_reasons, "source_memory_path_changed");
+    }
+    status.cache_fresh = status.stale_reasons.is_empty();
+    Ok(status)
+}
+
+fn push_unique_stale_reason(reasons: &mut Vec<String>, reason: &str) {
+    if !reasons.iter().any(|existing| existing == reason) {
+        reasons.push(reason.to_string());
+    }
+}
+
 fn source_artifacts(spec: &LinuxChatCoreSpec) -> Result<Vec<LinuxChatCoreArtifactDigest>> {
     let mut artifacts = vec![artifact(
         "base-lrf",
@@ -1061,7 +1214,8 @@ fn cache_token_economics(
         cache_total_bytes,
         cache_estimated_tokens: estimate_tokens_from_bytes(cache_total_bytes),
         cache_vs_source_bytes_ratio: ratio_f32(cache_total_bytes, source_artifacts_bytes),
-        note: "This estimates prompt/context scale only. It is not a model-specific BPE tokenizer count.",
+        cache_is_runtime_index_not_prompt_payload: true,
+        note: "This estimates prompt/context scale only. The full cache index is a runtime readout, not a prompt payload. It is not a model-specific BPE tokenizer count.",
     }
 }
 
@@ -1087,6 +1241,7 @@ fn cache_token_economics_from_manifest_path(
             cache_total_bytes: 0,
             cache_estimated_tokens: 0,
             cache_vs_source_bytes_ratio: 0.0,
+            cache_is_runtime_index_not_prompt_payload: true,
             note:
                 "Cache manifest is missing; gate is read-only and does not build cache implicitly.",
         })
@@ -1101,16 +1256,22 @@ fn ask_token_economics(
     if !manifest_path.exists() {
         return Ok(LinuxChatCoreAskTokenEconomics {
             estimate_method: "ceil(bytes / 4), conservative tokenizer-free estimate",
+            source_artifacts_size_bytes: 0,
             source_artifacts_bytes: 0,
             source_artifacts_estimated_tokens: 0,
+            full_cache_index_size_bytes: 0,
             cache_index_bytes: 0,
             cache_index_estimated_tokens: 0,
+            grounded_packet_size_bytes: packet_bytes,
             grounded_packet_bytes: packet_bytes,
             grounded_packet_estimated_tokens: estimate_tokens_from_bytes(packet_bytes),
+            actual_answer_context_bytes: packet_bytes,
+            actual_answer_context_estimated_tokens: estimate_tokens_from_bytes(packet_bytes),
             estimated_tokens_saved_vs_source: 0,
             estimated_tokens_saved_vs_cache_index: 0,
             source_to_packet_reduction_ratio: 0.0,
             cache_index_to_packet_reduction_ratio: 0.0,
+            cache_is_runtime_index_not_prompt_payload: true,
             note: "Cache manifest is missing; savings cannot be estimated from source artifacts.",
         });
     }
@@ -1128,17 +1289,23 @@ fn ask_token_economics(
     let packet_tokens = estimate_tokens_from_bytes(packet_bytes);
     Ok(LinuxChatCoreAskTokenEconomics {
         estimate_method: "ceil(bytes / 4), conservative tokenizer-free estimate",
+        source_artifacts_size_bytes: source_artifacts_bytes,
         source_artifacts_bytes,
         source_artifacts_estimated_tokens: source_tokens,
+        full_cache_index_size_bytes: manifest.index_bytes,
         cache_index_bytes: manifest.index_bytes,
         cache_index_estimated_tokens: cache_index_tokens,
+        grounded_packet_size_bytes: packet_bytes,
         grounded_packet_bytes: packet_bytes,
         grounded_packet_estimated_tokens: packet_tokens,
+        actual_answer_context_bytes: packet_bytes,
+        actual_answer_context_estimated_tokens: packet_tokens,
         estimated_tokens_saved_vs_source: source_tokens.saturating_sub(packet_tokens),
         estimated_tokens_saved_vs_cache_index: cache_index_tokens.saturating_sub(packet_tokens),
         source_to_packet_reduction_ratio: ratio_f32(source_artifacts_bytes, packet_bytes),
         cache_index_to_packet_reduction_ratio: ratio_f32(manifest.index_bytes, packet_bytes),
-        note: "Savings estimate compares sending the full source/cache-index context to sending only the grounded packet. It is not a model-specific BPE tokenizer count.",
+        cache_is_runtime_index_not_prompt_payload: true,
+        note: "Savings estimate compares sending the full source/cache-index context to sending only the grounded packet. The cache index is a runtime readout, not a prompt payload. This is not a model-specific BPE tokenizer count.",
     })
 }
 
@@ -1187,11 +1354,12 @@ fn claim_boundary(
     profile_ready: bool,
 ) -> LinuxChatCoreClaimBoundary {
     LinuxChatCoreClaimBoundary {
-        linux_chat_core_cache_ready: cache_ready,
-        compiled_cache_matches_source_memory: cache_ready && gate_checked,
-        cache_is_source_of_truth: false,
-        source_memory_required_for_authority: true,
-        stale_cache_blocks_answer_authority: true,
+            linux_chat_core_cache_ready: cache_ready,
+            compiled_cache_matches_source_memory: cache_ready && gate_checked,
+            cache_is_source_of_truth: false,
+            cache_is_runtime_index_not_prompt_payload: true,
+            source_memory_required_for_authority: true,
+            stale_cache_blocks_answer_authority: true,
         profile_scoped_chat_core_ready: profile_ready,
         general_llm_ready: false,
         global_nonlinear_memory_proven: false,
@@ -1266,6 +1434,178 @@ fn now_unix_seconds() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chat_core_compact_evidence_keeps_subject_and_object() {
+        let step = LinuxEvidenceStep {
+            role: "provider".to_string(),
+            route: "linux.apt.command.package-command".to_string(),
+            subject: "bash".to_string(),
+            relation: "provides command".to_string(),
+            object: "bash".to_string(),
+            polarity: "positive".to_string(),
+            memory_kind: "residual".to_string(),
+            confidence: 99,
+        };
+        let compact = compact_evidence_step(&step);
+        assert!(compact.contains("subject=bash"));
+        assert!(compact.contains("object=bash"));
+        assert!(compact.contains("role=provider"));
+        assert!(compact.contains("confidence=99"));
+        let structured = LinuxChatCoreGroundedEvidence::from(&step);
+        assert_eq!(structured.route, "linux.apt.command.package-command");
+        assert_eq!(structured.role, "provider");
+        assert_eq!(structured.subject, "bash");
+        assert_eq!(structured.object, "bash");
+        assert_eq!(structured.memory_kind, "residual");
+    }
+
+    #[test]
+    fn chat_core_command_provider_evidence_matches_exact_anchor() {
+        let bash = LinuxEvidenceStep {
+            role: "provider".to_string(),
+            route: "linux.apt.command.package-command".to_string(),
+            subject: "bash".to_string(),
+            relation: "provides command".to_string(),
+            object: "bash".to_string(),
+            polarity: "positive".to_string(),
+            memory_kind: "residual".to_string(),
+            confidence: 82,
+        };
+        let bashbug = LinuxEvidenceStep {
+            object: "bashbug".to_string(),
+            ..bash.clone()
+        };
+        let systemctl = LinuxEvidenceStep {
+            role: "provider".to_string(),
+            route: "linux.package.binary".to_string(),
+            subject: "systemd".to_string(),
+            relation: "provides binary".to_string(),
+            object: "/usr/bin/systemctl".to_string(),
+            polarity: "positive".to_string(),
+            memory_kind: "residual".to_string(),
+            confidence: 82,
+        };
+        assert!(command_provider_step_matches_anchor(&bash, "bash"));
+        assert!(!command_provider_step_matches_anchor(&bashbug, "bash"));
+        assert!(command_provider_step_matches_anchor(
+            &systemctl,
+            "systemctl"
+        ));
+    }
+
+    #[test]
+    fn chat_core_ask_blocks_every_source_override_mismatch() {
+        for artifact_id in ["base-lrf", "dialogue", "centers", "vpn"] {
+            assert_ask_blocks_source_override_mismatch(artifact_id);
+        }
+    }
+
+    fn assert_ask_blocks_source_override_mismatch(mutated_artifact_id: &str) {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!(
+            "nanda-chat-core-ask-stale-{mutated_artifact_id}-{nonce}-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let lrf = dir.join("base.lrf");
+        let lrf_mutated = dir.join("base-mutated.lrf");
+        let dialogue = dir.join("dialogue.lwm");
+        let dialogue_mutated = dir.join("dialogue-mutated.lwm");
+        let centers = dir.join("centers.lwm");
+        let centers_mutated = dir.join("centers-mutated.lwm");
+        let vpn = dir.join("vpn.lwm");
+        let vpn_mutated = dir.join("vpn-mutated.lwm");
+        fs::write(&lrf, b"fake-lrf").unwrap();
+        fs::write(&lrf_mutated, b"fake-lrf changed").unwrap();
+        fs::write(&dialogue, b"dialogue").unwrap();
+        fs::write(&dialogue_mutated, b"dialogue changed").unwrap();
+        fs::write(&centers, b"centers").unwrap();
+        fs::write(&centers_mutated, b"centers changed").unwrap();
+        fs::write(&vpn, b"vpn").unwrap();
+        fs::write(&vpn_mutated, b"vpn changed").unwrap();
+        let manifest = dir.join("chat-core.manifest.json");
+        let hot = dir.join("chat-core.hot");
+        let index = dir.join("chat-core.index.json");
+        fs::write(&hot, b"hot").unwrap();
+        fs::write(&index, b"index").unwrap();
+        let artifacts = vec![
+            artifact("base-lrf", "residual-pack", &lrf, true).unwrap(),
+            artifact("dialogue", "dialogue-learning", &dialogue, false).unwrap(),
+            artifact("centers", "dynamic-center-learning", &centers, false).unwrap(),
+            artifact("vpn", "domain-learning", &vpn, false).unwrap(),
+        ];
+        let manifest_file = LinuxChatCoreCacheManifest {
+            mode: "llmwave-big-linux-chat-core-cache-manifest".to_string(),
+            version: LINUX_CHAT_CORE_VERSION.to_string(),
+            profile_id: "linux-chat-core".to_string(),
+            created_unix_seconds: now_unix_seconds(),
+            compiler_version: LINUX_CHAT_CORE_VERSION.to_string(),
+            spec_hash: "unit-test-spec".to_string(),
+            source_artifacts: artifacts,
+            domain_registry_hash: "unit-test-domains".to_string(),
+            overlay_registry_hash: "unit-test-overlays".to_string(),
+            hot_path: path_string(&hot),
+            hot_bytes: 3,
+            hot_sha256: hash_file(&hot).unwrap(),
+            index_path: path_string(&index),
+            index_bytes: 5,
+            index_sha256: hash_file(&index).unwrap(),
+            cache_is_source_of_truth: false,
+        };
+        fs::write(
+            &manifest,
+            serde_json::to_vec_pretty(&manifest_file).unwrap(),
+        )
+        .unwrap();
+        let residual_pack = if mutated_artifact_id == "base-lrf" {
+            lrf_mutated
+        } else {
+            lrf
+        };
+        let dialogue_overlay = if mutated_artifact_id == "dialogue" {
+            dialogue_mutated
+        } else {
+            dialogue
+        };
+        let centers_overlay = if mutated_artifact_id == "centers" {
+            centers_mutated
+        } else {
+            centers
+        };
+        let vpn_overlay = if mutated_artifact_id == "vpn" {
+            vpn_mutated
+        } else {
+            vpn
+        };
+        let report = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+            text: "which package provides command bash".to_string(),
+            residual_pack,
+            dialogue_overlay,
+            centers_overlay,
+            vpn_overlay,
+            cache_dir: dir.clone(),
+            manifest: Some(manifest),
+            max_facts: 4,
+            out: None,
+        })
+        .unwrap();
+        assert_eq!(report.verdict, "LINUX_CHAT_CORE_CACHE_STALE");
+        assert!(!report.cache_status.cache_fresh);
+        assert!(!report.grounded_packet.answer_allowed);
+        assert!(report
+            .cache_status
+            .stale_reasons
+            .contains(&"source_memory_hash_changed".to_string()));
+        assert!(report
+            .cache_status
+            .stale_reasons
+            .contains(&"source_memory_path_changed".to_string()));
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn chat_core_cache_detects_stale_overlay() {

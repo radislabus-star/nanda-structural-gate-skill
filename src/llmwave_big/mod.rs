@@ -4604,6 +4604,12 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "cache_estimated_tokens: {}",
                         report.token_economics.cache_estimated_tokens
                     );
+                    println!(
+                        "cache_is_runtime_index_not_prompt_payload: {}",
+                        report
+                            .token_economics
+                            .cache_is_runtime_index_not_prompt_payload
+                    );
                 }
                 OutputFormat::Md => {
                     println!("# LLMWave Linux ChatCore Build");
@@ -4658,6 +4664,12 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "cache_estimated_tokens: {}",
                         report.token_economics.cache_estimated_tokens
                     );
+                    println!(
+                        "cache_is_runtime_index_not_prompt_payload: {}",
+                        report
+                            .token_economics
+                            .cache_is_runtime_index_not_prompt_payload
+                    );
                 }
                 OutputFormat::Md => {
                     println!("# LLMWave Linux ChatCore Gate");
@@ -4703,8 +4715,20 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         report.token_economics.grounded_packet_estimated_tokens
                     );
                     println!(
+                        "actual_answer_context_estimated_tokens: {}",
+                        report
+                            .token_economics
+                            .actual_answer_context_estimated_tokens
+                    );
+                    println!(
                         "estimated_tokens_saved_vs_source: {}",
                         report.token_economics.estimated_tokens_saved_vs_source
+                    );
+                    println!(
+                        "cache_is_runtime_index_not_prompt_payload: {}",
+                        report
+                            .token_economics
+                            .cache_is_runtime_index_not_prompt_payload
                     );
                 }
                 OutputFormat::Md => {

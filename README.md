@@ -833,10 +833,15 @@ nanda-llmwave-big linux-chat-core-ask --text "which package provides command bas
 
 `linux-chat-core-ask` is the intended compact packet surface for Codex/LLM use:
 it refuses stale cache, reads the compiled cache-index readout projection, and
-returns intent, route priors, answer state, compact evidence, and anti-wave
-hits. Inspect `token_economics` to estimate how many prompt tokens the compact
-packet saves versus sending the source artifacts or the whole cache index. The
-estimate is `ceil(bytes / 4)`, not an exact model tokenizer count. Treat
+returns intent, route priors, answer state, structured `evidence[]`, legacy
+`compact_evidence`, and anti-wave hits. `ask` rechecks the source paths passed
+on the CLI against the manifest; an override mismatch returns stale instead of
+answering from an old cache. Inspect `token_economics` to estimate how many
+prompt tokens the compact packet saves versus sending the source artifacts or
+the whole cache index. The estimate is `ceil(bytes / 4)`, not an exact model
+tokenizer count. Read `cache_is_runtime_index_not_prompt_payload=true`
+literally: the index is a runtime readout, not something to paste into prompt
+context. Treat
 `LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as Linux-profile cache
 readiness only: it is not open-domain chat, not a general LLM, and not global
 nonlinear-memory proof.

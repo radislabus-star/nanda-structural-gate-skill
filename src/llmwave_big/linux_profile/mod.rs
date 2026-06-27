@@ -1177,6 +1177,7 @@ fn route_contract(
             vec![
                 "linux.apt.command.provider",
                 "linux.apt.command.package-command",
+                "linux.package.binary",
             ],
             vec!["linux.apt.command.provider"],
             vec![],
@@ -1333,6 +1334,7 @@ fn build_evidence_chain(
             &[
                 "linux.apt.command.provider",
                 "linux.apt.command.package-command",
+                "linux.package.binary",
             ],
             &query.anchors,
             max_facts,
@@ -1621,6 +1623,29 @@ fn decide_linux_answer(
                         "ANSWER_GROUNDED",
                         true,
                         format!("Command {} is provided by package {}.", fact.object, fact.subject),
+                    )
+                })
+            })
+            .or_else(|| {
+                first_route(evidence, "linux.package.binary").map(|fact| {
+                    let command = query
+                        .anchors
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| {
+                            fact.object
+                                .rsplit('/')
+                                .next()
+                                .unwrap_or(&fact.object)
+                                .to_string()
+                        });
+                    answer(
+                        "ANSWER_GROUNDED",
+                        true,
+                        format!(
+                            "Command {} is provided by installed package {}.",
+                            command, fact.subject
+                        ),
                     )
                 })
             })
@@ -2284,6 +2309,54 @@ mod tests {
             .query_wave
             .forbidden_shortcuts
             .contains(&"listener_implies_external_exposure".to_string()));
+    }
+
+    #[test]
+    fn linux_reason_command_provider_accepts_binary_owner_fallback() {
+        let summary = LinuxResidualDecodedSummary {
+            path: "unit.lrf".to_string(),
+            file_bytes: 64,
+            wave_dim: 256,
+            represented_fact_count: 1,
+            schema_record_count: 1,
+            residual_record_count: 1,
+            fallback_record_count: 0,
+            route_count: 1,
+            corpus_hash64: 7,
+            promotion_threshold: 2,
+            binary_hot_sections_bytes: 64,
+            direct_fixed_baseline_bytes: 64,
+            cold_label_count: 0,
+            cold_label_table_bytes: 0,
+            binary_hot_sections_fit_6m: true,
+            beats_direct_fixed64: true,
+        };
+        let facts = vec![LinuxResidualDecodedFact {
+            route: "linux.package.binary".to_string(),
+            subject: "systemd".to_string(),
+            subject_role: "package".to_string(),
+            relation: "provides binary".to_string(),
+            object: "/usr/bin/systemctl".to_string(),
+            object_role: "binary".to_string(),
+            polarity: "positive",
+            evidence_kind: "dpkg-query".to_string(),
+            confidence: 95,
+            memory_kind: "residual",
+        }];
+        let report = build_linux_reason_report_from_decoded_facts(
+            summary,
+            &facts,
+            "which package provides command systemctl",
+            4,
+        );
+        assert_eq!(report.query_wave.intent, "command_provider");
+        assert_eq!(report.decision.state, "ANSWER_GROUNDED");
+        assert!(report.decision.answer_allowed);
+        assert!(report.decision.answer.contains("systemd"));
+        assert!(report
+            .evidence_chain
+            .iter()
+            .any(|step| step.route == "linux.package.binary"));
     }
 
     #[test]

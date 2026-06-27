@@ -565,11 +565,15 @@ readiness only. If `.lrf`, any `.lwm` overlay, eval artifact, profile spec, or
 compiler version changes, the cache is stale and cannot grant answer authority.
 `linux-chat-core-ask` is the compact packet path for Codex/LLM use. It refuses
 stale cache, then reads the compiled cache index readout projection and returns
-the query intent, route priors, grounded answer state, compact evidence, and
-anti-wave hits. Inspect `token_economics` to see estimated prompt tokens saved
-versus sending the source artifacts or the whole cache index. Use it as a small
-external memory packet, not as a replacement for the LLM and not as global
-nonlinear-memory proof.
+the query intent, route priors, grounded answer state, structured `evidence[]`,
+legacy `compact_evidence`, and anti-wave hits. `ask` checks CLI source
+overrides against the manifest before answering; stale or mismatched source
+memory blocks answer authority. Inspect `token_economics` to see estimated
+prompt tokens saved versus sending the source artifacts or the whole cache
+index. `cache_is_runtime_index_not_prompt_payload=true` means the full cache
+index is a runtime readout, not prompt context. Use the grounded packet as a
+small external memory packet, not as a replacement for the LLM and not as
+global nonlinear-memory proof.
 `linux-heldout-suite-build` adds a stricter profile suite: exact facts,
 near-name collisions, shortcut controls, and endpoint-scope checks. Use
 `linux-heldout-eval-run` before trusting the profile on noisy Linux facts.

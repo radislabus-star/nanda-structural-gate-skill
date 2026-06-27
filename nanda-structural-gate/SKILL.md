@@ -1418,9 +1418,13 @@ so it does not mutate source overlays. Inspect `token_economics` before claiming
 the cache saves context: estimates use `ceil(bytes / 4)` and compare compact
 grounded packets against source/cache-index size, not exact model tokenizer
 counts. `linux-chat-core-ask` is the
-compact grounded-packet surface for Codex/LLM use: it reads the compiled
-cache-index readout projection, then returns intent, route priors, answer
-state, compact evidence, and anti-wave hits. Treat
+compact grounded-packet surface for Codex/LLM use: it refuses stale source
+overrides, reads the compiled cache-index readout projection, then returns
+intent, route priors, answer state, structured `evidence[]`, legacy
+`compact_evidence`, and anti-wave hits. Treat
+`cache_is_runtime_index_not_prompt_payload=true` as a hard interpretation rule:
+the full cache index is a runtime readout, not prompt context; use only the
+grounded packet as the small external memory payload. Treat
 `LLMWAVE_LINUX_CHAT_CORE_READY_NOT_GENERAL_LLM` as Linux-profile cache
 readiness only; general LLM, open-domain chat, scanner, and global nonlinear
 claims remain blocked.
