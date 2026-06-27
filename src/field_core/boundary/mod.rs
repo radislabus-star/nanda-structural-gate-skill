@@ -578,6 +578,22 @@ mod tests {
             false
         );
         assert_eq!(
+            report["boundary_center"]["center_contract"]["version"],
+            "field-center-contract-v1"
+        );
+        assert_eq!(
+            report["boundary_center"]["center_contract"]["center_kind"],
+            "boundary"
+        );
+        assert_eq!(
+            report["boundary_center"]["center_contract"]["read_only"],
+            true
+        );
+        assert_eq!(
+            report["boundary_center"]["center_contract"]["decision_affects_authority"],
+            false
+        );
+        assert_eq!(
             report["boundary_center"]["verdict_hint"],
             "CENTER_STABLE_SAFE_LOCAL_EDIT"
         );

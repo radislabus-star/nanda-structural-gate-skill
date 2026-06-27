@@ -535,6 +535,9 @@ center, center gap, foreign-route mass, cross-owner mass, runtime risk mass,
 public API mass, adapter leak mass, and test-anchor mass. It is read-only
 diagnostics only; `decision_affects_safe_to_edit=false` means it must not
 weaken `WATCH`, `VETO`, or `field_equivalence.field_not_more_permissive=false`.
+The nested `boundary_center.center_contract.version =
+field-center-contract-v1` is the shared center contract also used by memory
+spectral centers.
 Use
 repo-wide mode only to find possible split pressure. If repo-wide mode sees
 foreign route pressure but the boundary score is not strong enough for an
@@ -1281,8 +1284,9 @@ channels, and `surface_text_length_is_not_mass`. Inspect
 separation from the best wrong center, `average_role_swap_gap` measures
 role-swap near-miss collapse when subject/object roles are evaluable, and
 `route_relation_ablation_drop` measures whether route/relation modes are
-causal for separation. It is not broad chat readiness and not exposure
-reasoning.
+causal for separation. `spectral_center.center_contract.version =
+field-center-contract-v1` is the shared read-only center contract; it is not an
+authority override. It is not broad chat readiness and not exposure reasoning.
 Use `nanda-llmwave-big linux-atlas-projection --atlas-dir .nanda/linux-atlas --hot-pack .nanda/linux-active/linux-active-65k.laf --residual-pack .nanda/linux-active/linux-active-65k.lrf --format json`
 to run the Phase 18 Atlas-to-6MB cognitive projection gate. It audits the cold
 Atlas by metadata/manifest, runs `.laf` cache proof and `.lrf` schema/residual

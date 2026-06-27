@@ -784,7 +784,9 @@ admission layer to pass. The semantic atom layer verifies fixed hot record
 width, required route/relation/role/polarity/evidence channels, and
 `surface_text_length_is_not_mass`. The spectral layer computes role-complete
 schema centers, wrong-center separation, role-swap near-miss collapse,
-route/relation ablation drop, and fallback-outlier preservation. Treat
+route/relation ablation drop, and fallback-outlier preservation. It also emits
+`spectral_center.center_contract.version = field-center-contract-v1`, the same
+read-only center language used by Boundary Economics. Treat
 `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear-memory proof:
 the active Linux field is genuinely written and retrieved through binary
 schema/residual memory, fits the 6 MiB hot budget, saves bytes versus fixed64,
@@ -1439,7 +1441,9 @@ center, first-vs-second `center_gap`, owner gap, and masses for foreign routes,
 cross-owner calls, runtime risk, public API, adapter leak, tests, and boundary
 tax. Read it as an explanation of where the change is structurally pulled, not
 as permission to edit: `decision_affects_safe_to_edit=false`, so `WATCH` and
-`VETO` are not weakened by a pretty center. Use repo-wide mode to find
+`VETO` are not weakened by a pretty center. The nested
+`boundary_center.center_contract.version = field-center-contract-v1` is the
+shared center contract also used by memory spectral centers. Use repo-wide mode to find
 possible split pressure only; if
 repo-wide mode sees foreign route pressure but the score is not strong enough
 for an autonomous split, it returns `WATCH` and asks for a route-scoped pass.

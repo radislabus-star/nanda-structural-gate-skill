@@ -1,6 +1,8 @@
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+use crate::field_core::{FieldCenterContract, FieldCenterContractInput};
+
 use super::{BoundaryEnergy, BoundaryFacts, BoundaryOwnerGravity};
 
 #[derive(Debug, Clone, Serialize)]
@@ -8,6 +10,7 @@ pub(super) struct BoundaryCenter {
     version: &'static str,
     read_only: bool,
     decision_affects_safe_to_edit: bool,
+    center_contract: FieldCenterContract,
     route_center: Option<String>,
     route_center_strength: f64,
     second_route_center: Option<String>,
@@ -139,11 +142,29 @@ pub(super) fn boundary_center(
         center_gap,
         owner_center_gap,
     });
+    let center_contract = FieldCenterContract::read_only(FieldCenterContractInput {
+        center_kind: "boundary",
+        primary_center: route_center.clone(),
+        center_strength: route_center_strength,
+        center_gap,
+        foreign_mass: foreign_route_mass.max(cross_owner_mass),
+        near_miss_rejected: foreign_route_mass == 0.0
+            && cross_owner_mass < 0.15
+            && !owner_gravity.owner_conflict,
+        ablation_drop: 0.0,
+        safe_claim: "Boundary center is read-only edit topology evidence. It may explain route/owner pull, but it cannot weaken WATCH, VETO, field equivalence, or safe_to_edit gates.",
+        blocked_claims: vec![
+            "safe_to_edit_permission",
+            "boundary_verdict_override",
+            "field_equivalence_override",
+        ],
+    });
 
     BoundaryCenter {
         version: "boundary-center-v1-read-only",
         read_only: true,
         decision_affects_safe_to_edit: false,
+        center_contract,
         route_center,
         route_center_strength,
         second_route_center,

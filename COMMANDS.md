@@ -69,7 +69,9 @@ shared `field_core` records for downstream field checks. It also includes
 center-of-mass diagnostic over route/owner/test/runtime/API/foreign evidence.
 Use `boundary_center.center_gap`, `owner_center_gap`, and `verdict_hint` to see
 whether the change has one clear structural center or is split across owners or
-routes. It never changes `safe_to_edit`; `WATCH` and `VETO` remain binding. The
+routes. It includes `boundary_center.center_contract.version =
+field-center-contract-v1`, the shared read-only center language used by memory
+spectral centers. It never changes `safe_to_edit`; `WATCH` and `VETO` remain binding. The
 selected agent verdict is
 `boundary_field_engine.selected_verdict`: the field candidate can be stricter
 than typed Boundary Economics, but `field_equivalence.field_not_more_permissive`
@@ -438,7 +440,8 @@ center admission layer plus `semantic_atom_contract` to pass. Inspect
 `semantic_atom_contract`: it reports fixed hot record width, required role/evidence
 channels, and `surface_text_length_is_not_mass`. Inspect `spectral_center`: it
 reports schema center separation, wrong-center rejection, role-swap near-miss
-collapse, route/relation ablation drop, and fallback preservation.
+collapse, route/relation ablation drop, fallback preservation, and
+`center_contract.version = field-center-contract-v1`.
 Treat `LINUX_SCHEMA_RESIDUAL_MEMORY_PROVEN` as a Linux-profile nonlinear memory
 proof: real binary schema/residual storage beats fixed64 bytes, preserves the
 Linux-domain eval, passes `LINUX_ROLE_COMPLETE_SEMANTIC_ATOMS_PROVEN`, and passes

@@ -11,6 +11,8 @@ use anyhow::Result;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use crate::field_core::{FieldCenterContract, FieldCenterContractInput};
+
 use super::linux_residual_memory::{
     load_linux_residual_decoded_packet, LinuxResidualDecodedFact, LinuxResidualDecodedSummary,
 };
@@ -32,6 +34,7 @@ pub(crate) struct LinuxSpectralCenterReport {
     pub spectral_model: LinuxSpectralModel,
     pub metrics: LinuxSpectralCenterMetrics,
     pub gates: LinuxSpectralCenterGates,
+    pub center_contract: FieldCenterContract,
     pub claim_boundary: LinuxSpectralClaimBoundary,
 }
 
@@ -200,6 +203,21 @@ pub(crate) fn build_linux_spectral_center_report_from_parts(
     } else {
         "LINUX_SPECTRAL_CENTER_BLOCKED"
     };
+    let center_contract = FieldCenterContract::read_only(FieldCenterContractInput {
+        center_kind: "memory",
+        primary_center: Some("linux-schema-residual-spectrum".to_string()),
+        center_strength: metrics.average_center_correct,
+        center_gap: metrics.average_center_gap,
+        foreign_mass: metrics.average_best_wrong_center,
+        near_miss_rejected: gates.wrong_center_rejected && gates.role_swap_center_collapse,
+        ablation_drop: metrics.route_relation_ablation_drop,
+        safe_claim: "Memory center is profile evidence for `.lrf` schema/residual separation. It can strengthen linux-residual-proof only through explicit gates; it is not broad chat readiness.",
+        blocked_claims: vec![
+            "broad_chat_llm_ready",
+            "global_nonlinear_memory_proven",
+            "authority_without_eval_gate",
+        ],
+    });
 
     LinuxSpectralCenterReport {
         mode: "llmwave-big-linux-spectral-center",
@@ -224,6 +242,7 @@ pub(crate) fn build_linux_spectral_center_report_from_parts(
         },
         metrics,
         gates,
+        center_contract,
         claim_boundary: LinuxSpectralClaimBoundary {
             spectral_center_metric_present: true,
             schema_center_is_profile_evidence: true,
@@ -478,6 +497,12 @@ mod tests {
         assert!(report.metrics.average_center_gap > 0.05);
         assert!(report.metrics.average_role_swap_gap > 0.05);
         assert_eq!(report.metrics.false_center_accept_rate, 0.0);
+        assert_eq!(report.center_contract.version, "field-center-contract-v1");
+        assert_eq!(report.center_contract.center_kind, "memory");
+        assert!(report.center_contract.read_only);
+        assert!(!report.center_contract.decision_affects_authority);
+        assert!(report.center_contract.near_miss_rejected);
+        assert!(report.center_contract.ablation_drop > 0.0);
     }
 
     fn fact(
