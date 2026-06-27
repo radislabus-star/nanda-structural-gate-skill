@@ -56,6 +56,7 @@ field_report="$root/nanda-structural-gate/scripts/nanda-field-report"
 field_audit="$root/nanda-structural-gate/scripts/nanda-field-audit"
 field_equivalence="$root/nanda-structural-gate/scripts/nanda-field-equivalence"
 field_cutover="$root/nanda-structural-gate/scripts/nanda-field-cutover"
+field_plate="$root/nanda-structural-gate/scripts/nanda-field-plate"
 
 cargo fmt --check --manifest-path "$root/Cargo.toml"
 cargo check --manifest-path "$root/Cargo.toml" >/dev/null
@@ -2163,6 +2164,19 @@ bench6m_active65k_discovery_json="$("$bench6m" --mode active-65k-discovery --act
 jq -e '.benchmarks.active_65k_discovery.mode == "active-65k-discovery" and .benchmarks.active_65k_discovery.active_records == 65536 and .benchmarks.active_65k_discovery.records_scanned_per_iteration == 65536 and .benchmarks.active_65k_discovery.proof_records_scanned == 0' <<<"$bench6m_active65k_discovery_json" >/dev/null
 jq -e '.benchmarks.active_65k_discovery.authority.state == "PROOF_REQUIRED" and .benchmarks.active_65k_discovery.authority.safe_to_answer == false and .benchmarks.active_65k_discovery.authority.candidate_without_proof_can_answer == false and .benchmarks.active_65k_discovery.authority.candidate_without_proof_can_write_memory == false' <<<"$bench6m_active65k_discovery_json" >/dev/null
 jq -e '.benchmarks.active_65k_discovery.claim_boundary.interactive_discovery_ready == true and .benchmarks.active_65k_discovery.claim_boundary.answer_authority_ready == false and .benchmarks.active_65k_discovery.claim_boundary.proof_required == true and .benchmarks.active_65k_discovery.claim_boundary.full_proof_not_cut == true' <<<"$bench6m_active65k_discovery_json" >/dev/null
+field_plate_dir="$(mktemp -d)"
+field_plate_path="$field_plate_dir/active65k.plate.json"
+field_plate_svg="$field_plate_dir/active65k.svg"
+"$field_plate" --help | grep -q "Usage: nanda field-plate"
+field_plate_build_json="$("$field_plate" build --out "$field_plate_path" --format json)"
+jq -e '.mode == "field-plate-build" and .verdict == "FIELD_PLATE_BUILT" and .safe_to_use_kernel == true and .plate.records == 65536 and .plate.wave_dim == 1024 and .plate.claim_boundary.visual_render_is_not_authority == true' <<<"$field_plate_build_json" >/dev/null
+test -s "$field_plate_path"
+field_plate_check_json="$("$field_plate" check --plate "$field_plate_path" --format json)"
+jq -e '.mode == "field-plate-check" and .comparison.verdict == "FIELD_PLATE_MATCH" and .comparison.safe_to_use_kernel == true and .comparison.exact_match == true and (.comparison.mismatches | length) == 0' <<<"$field_plate_check_json" >/dev/null
+field_plate_render_json="$("$field_plate" render --plate "$field_plate_path" --out "$field_plate_svg" --format json)"
+jq -e '.mode == "field-plate-render" and .verdict == "FIELD_PLATE_RENDERED" and .visual_render_is_not_authority == true' <<<"$field_plate_render_json" >/dev/null
+test -s "$field_plate_svg"
+grep -q "NANDA Field Plate" "$field_plate_svg"
 bench6m_lane_json="$("$bench6m" --mode lane --lane-iterations 1000 --format json)"
 jq -e '.benchmarks.replay == null and .benchmarks.projection == null' <<<"$bench6m_lane_json" >/dev/null
 jq -e '.benchmarks.lane_application.iterations == 1000 and .benchmarks.lane_application.ops_per_second > 0' <<<"$bench6m_lane_json" >/dev/null

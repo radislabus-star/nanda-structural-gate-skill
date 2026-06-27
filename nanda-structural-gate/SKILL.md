@@ -110,6 +110,9 @@ scripts/nanda-field-equivalence --structural-from search-result.json --packed-fr
 scripts/nanda-field-audit --format json
 scripts/nanda-field-cutover --suite structural-standard --format json
 scripts/nanda-field-cutover --structural-case focused-search.json --structural-case contested-search.json --format json
+scripts/nanda-field-plate build --out .nanda/field-plates/active65k.plate.json --format json
+scripts/nanda-field-plate check --plate .nanda/field-plates/active65k.plate.json --format json
+scripts/nanda-field-plate render --plate .nanda/field-plates/active65k.plate.json --out .nanda/field-plates/active65k.svg --format json
 scripts/nanda-profile-guards . --iterations 50 --format json
 scripts/nanda-release-gate .nanda/route-atlas.json
 scripts/nanda-skill-readiness --format json
@@ -880,6 +883,14 @@ should point to `field_core::readout::FieldReadoutResult` and
 `field_core::readout::FieldLocalPathResult`. If those owners drift back into
 structural search/report code, treat it as a unified-field regression rather
 than a harmless reporting difference.
+Use `nanda-field-plate build` before risky projection-kernel optimization to
+record a golden active-65k interference snapshot. Use
+`nanda-field-plate check` after the optimization and require
+`FIELD_PLATE_MATCH`; any `FIELD_PLATE_VETO` means the optimized kernel changed
+the field shape and must not be promoted. Use `nanda-field-plate render` only
+for human inspection of the SVG heatmap. The SVG is not authority; the JSON
+`field_signature`, dot hash, route/group accumulator hashes, and proof hash are
+the gate.
 v181-v190 add `nanda-llmwave-big l2`: L2 Word Field ownership, active surface
 slice, prefix wave, candidate cache, L3 bias into L2, anti-wave suppression,
 L2/L3 sync policy, multilingual surface banks, L2 eval metrics, and

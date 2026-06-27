@@ -110,6 +110,9 @@ nanda-field-equivalence \
   --cognitive-from llmwave-big-result.json \
   --format json
 nanda-field-cutover --suite structural-standard --format json
+nanda-field-plate build --out .nanda/field-plates/active65k.plate.json --format json
+nanda-field-plate check --plate .nanda/field-plates/active65k.plate.json --format json
+nanda-field-plate render --plate .nanda/field-plates/active65k.plate.json --out .nanda/field-plates/active65k.svg --format json
 nanda-skill-readiness --format json
 ```
 
@@ -863,6 +866,9 @@ nanda-llmwave-big train README.md CHANGELOG.md LLMWAVE_BIG_ROADMAP.md src exampl
 nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json
 nanda-bench6m --mode active-65k-discovery --active-65k-iterations 1 --format json
 nanda-bench6m --mode dot-kernel --projection-iterations 1 --triads 65536 --format json
+nanda-field-plate build --out .nanda/field-plates/active65k.plate.json --format json
+nanda-field-plate check --plate .nanda/field-plates/active65k.plate.json --format json
+nanda-field-plate render --plate .nanda/field-plates/active65k.plate.json --out .nanda/field-plates/active65k.svg --format json
 nanda-bench6m --mode active-core --support-build-iterations 1000 --format json
 nanda-bench6m --mode write-density --support-build-iterations 1000 --format json
 nanda-bench6m --mode consolidate --support-build-iterations 1000 --format json

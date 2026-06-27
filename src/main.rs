@@ -18,6 +18,7 @@ mod eval;
 mod feedback;
 mod field_adapters;
 mod field_core;
+mod field_plate;
 mod focus;
 mod focus_cache;
 mod io;
@@ -132,6 +133,7 @@ enum Command {
     FieldAudit(field_adapters::FieldAuditArgs),
     FieldEquivalence(field_adapters::FieldEquivalenceArgs),
     FieldCutover(field_adapters::FieldCutoverArgs),
+    FieldPlate(field_plate::FieldPlateArgs),
     Report(ReportArgs),
     SelfCheck,
     Bench6m(bench6m::Bench6mArgs),
@@ -1301,6 +1303,7 @@ fn run() -> Result<u8> {
         Command::FieldAudit(args) => field_adapters::field_audit_cmd(args),
         Command::FieldEquivalence(args) => field_adapters::field_equivalence_cmd(args),
         Command::FieldCutover(args) => field_adapters::field_cutover_cmd(args),
+        Command::FieldPlate(args) => field_plate::cmd(args),
         Command::Report(args) => report_cmd(args),
         Command::SelfCheck => self_check(),
         Command::Bench6m(args) => bench6m::cmd(args),
