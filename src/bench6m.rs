@@ -34,6 +34,8 @@ pub(super) struct Bench6mArgs {
 enum Bench6mMode {
     Replay,
     Projection,
+    #[value(name = "dot-kernel")]
+    DotKernel,
     Lane,
     LaneSweep,
     AlignedLaneSweep,
@@ -59,6 +61,7 @@ enum Bench6mMode {
 pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     let include_replay = matches!(args.mode, Bench6mMode::Replay | Bench6mMode::All);
     let include_projection = matches!(args.mode, Bench6mMode::Projection | Bench6mMode::All);
+    let include_dot_kernel = matches!(args.mode, Bench6mMode::DotKernel | Bench6mMode::All);
     let include_lane = matches!(args.mode, Bench6mMode::Lane | Bench6mMode::All);
     let include_lane_sweep = matches!(args.mode, Bench6mMode::LaneSweep | Bench6mMode::All);
     let include_aligned_lane_sweep =
@@ -100,6 +103,14 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
     };
     let projection = if include_projection {
         Some(bench6m_projection(
+            args.projection_iterations,
+            args.triads.clamp(1, nanda_6m::TRIAD_CAPACITY),
+        ))
+    } else {
+        None
+    };
+    let dot_kernel = if include_dot_kernel {
+        Some(bench6m_dot_kernel(
             args.projection_iterations,
             args.triads.clamp(1, nanda_6m::TRIAD_CAPACITY),
         ))
@@ -253,6 +264,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
         "benchmarks": {
             "replay": replay,
             "projection": projection,
+            "dot_kernel": dot_kernel,
             "lane_application": lane_application,
             "lane_sweep": lane_sweep,
             "aligned_lane_sweep": aligned_lane_sweep,
@@ -291,6 +303,7 @@ pub(super) fn cmd(args: Bench6mArgs) -> Result<u8> {
         "interpretation": {
             "replay": "Pure typed replay firewall; no JSON, no file IO, no process spawn.",
             "projection": "Packed 1024-dimensional projection plus centroid scoring over an in-memory triad window.",
+            "dot_kernel": "Pure classic 1024-step packed triad dot projection over an in-memory triad window; no 64-bit block projection, no candidate narrowing.",
             "lane_application": "Packed suppress-anti-support lane compilation/application over typed support fields.",
             "lane_sweep": "Batch packed suppress-anti-support lane sweep over typed support fields and compiled lane arena.",
             "aligned_lane_sweep": "Fast batch lane sweep for pre-aligned field/lane windows with no arena search.",
@@ -489,6 +502,9 @@ fn bench6m_active65k(iterations: u64) -> Value {
         "proof": {
             "fields_built": last.proof.fields_built,
             "lanes_compiled": last.proof.lanes_compiled,
+            "records_scanned": last.proof.records_scanned,
+            "dot_records_scored": last.proof.dot_records_scored,
+            "dot_records_skipped": last.proof.records_scanned.saturating_sub(last.proof.dot_records_scored),
             "route_considered": last.proof.route_summary.considered,
             "route_support": last.proof.route_summary.support_count,
             "route_anti": last.proof.route_summary.anti_count,
@@ -1173,6 +1189,46 @@ fn bench6m_projection(iterations: u64, triad_count: usize) -> Value {
     out
 }
 
+fn bench6m_dot_kernel(iterations: u64, triad_count: usize) -> Value {
+    let iterations = iterations.max(1);
+    let triads = bench6m_triads(triad_count);
+    let query_len = triads.len().clamp(1, 8);
+    let query = nanda_6m::project_triads(&triads[..query_len]);
+    let mut checksum: u64 = 0;
+    let start = Instant::now();
+    for _ in 0..iterations {
+        for triad in triads.iter().copied() {
+            let dot =
+                nanda_6m::score_packed_triad_projection_dot(black_box(&query), black_box(&triad));
+            checksum = checksum
+                .wrapping_add(dot as u64)
+                .wrapping_add(u64::from(triad.route_id) << 7)
+                .wrapping_add(u64::from(triad.group_id) << 17);
+        }
+    }
+    let elapsed = start.elapsed();
+    let total_records = (triads.len() as u64).saturating_mul(iterations);
+    let total_ns = elapsed.as_nanos() as f64;
+    let ns_per_op = total_ns / iterations as f64;
+    let ns_per_record = total_ns / total_records.max(1) as f64;
+    json!({
+        "kernel": "score_packed_triad_projection_dot",
+        "projection": "classic-1024-exact",
+        "block_projection": false,
+        "candidate_narrowing": false,
+        "iterations": iterations,
+        "triads_in_window": triads.len(),
+        "query_triads": query_len,
+        "records_scored_total": total_records,
+        "elapsed_ns": elapsed.as_nanos(),
+        "ns_per_op": ns_per_op,
+        "ns_per_record": ns_per_record,
+        "ops_per_second": 1_000_000_000.0 / ns_per_op.max(0.000001),
+        "records_per_second": total_records as f64 / elapsed.as_secs_f64().max(1e-9),
+        "checksum": checksum
+    })
+}
+
 fn bench6m_support_fields(count: usize) -> Vec<nanda_6m::PackedSupportField> {
     (0..count)
         .map(|idx| {
@@ -1339,6 +1395,17 @@ fn print_bench6m_text(out: &Value) {
             projection["triads_in_window"].as_u64().unwrap_or(0),
             projection["ns_per_op"].as_f64().unwrap_or(0.0),
             projection["ops_per_second"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["dot_kernel"].is_null() {
+        let dot = &out["benchmarks"]["dot_kernel"];
+        println!(
+            "dot-kernel: {} iters / {} triads / {:.2} ns/op / {:.2} ns/record / {:.0} records/s",
+            dot["iterations"].as_u64().unwrap_or(0),
+            dot["triads_in_window"].as_u64().unwrap_or(0),
+            dot["ns_per_op"].as_f64().unwrap_or(0.0),
+            dot["ns_per_record"].as_f64().unwrap_or(0.0),
+            dot["records_per_second"].as_f64().unwrap_or(0.0)
         );
     }
     if !out["benchmarks"]["lane_application"].is_null() {
@@ -1515,6 +1582,16 @@ fn print_bench6m_md(out: &Value) {
             projection["iterations"].as_u64().unwrap_or(0),
             projection["triads_in_window"].as_u64().unwrap_or(0),
             projection["ns_per_op"].as_f64().unwrap_or(0.0)
+        );
+    }
+    if !out["benchmarks"]["dot_kernel"].is_null() {
+        let dot = &out["benchmarks"]["dot_kernel"];
+        println!(
+            "- dot-kernel: `{}` iterations, `{}` triads, `{:.2}` ns/op, `{:.2}` ns/record",
+            dot["iterations"].as_u64().unwrap_or(0),
+            dot["triads_in_window"].as_u64().unwrap_or(0),
+            dot["ns_per_op"].as_f64().unwrap_or(0.0),
+            dot["ns_per_record"].as_f64().unwrap_or(0.0)
         );
     }
     if !out["benchmarks"]["lane_application"].is_null() {

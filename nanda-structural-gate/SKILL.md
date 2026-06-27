@@ -125,6 +125,7 @@ scripts/nanda-pack6m .nanda/index.json --input-format json --field-engine candid
 scripts/nanda-pack6m .nanda/index.json --input-format json --field-engine cutover
 scripts/nanda-bench6m --replay-iterations 1000000 --projection-iterations 10000
 scripts/nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json
+scripts/nanda-bench6m --mode dot-kernel --projection-iterations 1 --triads 65536 --format json
 scripts/nanda-bench6m --mode density --support-build-iterations 1000 --triads 65536 --format json
 scripts/nanda-cache build .nanda/index.json --input-format json --query "declaration requires protocols" --out-dir .nanda/cache
 scripts/nanda-cache list .nanda/cache
@@ -569,8 +570,11 @@ support-map. `PACKED_LANE_FOCUSED_CANDIDATE` means the lane-adjusted field is
 ready for typed hot-loop use, but it still keeps `safe_to_answer=false`.
 Use `nanda-bench6m` when you need hot-core speed rather than wrapper timing.
 It excludes process startup, JSON parsing, dictionary packing, file I/O, and
-report serialization. It measures `nanda_6m::evaluate_replay` and the
-in-memory packed projection/centroid scoring path.
+report serialization. It measures `nanda_6m::evaluate_replay`, the
+in-memory packed projection/centroid scoring path, and `--mode dot-kernel`
+for the exact classic 1024-step triad projection cost. `dot-kernel` is a
+measurement surface only: it must not introduce 64-bit block projection,
+candidate narrowing, or answer authority.
 Use `nanda-search` when the task is retrieval, not verification: indexed
 `triads` are memory, same-packet `candidate_triads` or `--query-file` are the
 partial query, and the output is a ranked set of interference peaks with
@@ -818,9 +822,15 @@ Use `nanda-bench6m --mode active-65k --active-65k-iterations 1 --format json`
 when the question is whether the packed hot runtime can scan the full 65,536
 record active field. Inspect `active_65k.runtime_contract.full_active_scan`,
 `streaming_discovery`, `proof_rescan`, `workspace_bounded`, and
-`no_per_record_score_arrays`. `claim-gate --claim active-65k-runtime` allows
+`no_per_record_score_arrays`. Inspect `active_65k.proof.dot_records_scored`
+and `dot_records_skipped` to confirm proof still rescans all records while
+avoiding unnecessary expensive 1024-dot calculations outside the winning
+route/group. `claim-gate --claim active-65k-runtime` allows
 only the local runtime claim; it still keeps broad chat readiness, global
 nonlinear-memory proof, and hardware cache-residency proof closed.
+Use `nanda-bench6m --mode dot-kernel --projection-iterations 1 --triads 65536 --format json`
+when the question is the pure 1024-wave dot-kernel cost over the full active
+record window, without active-field accumulation or proof/report overhead.
 Use `nanda-bench6m --mode active-65k-discovery --active-65k-iterations 1 --format json`
 only for fast interactive peak discovery. It must report
 `active_65k_discovery.authority.state=PROOF_REQUIRED`,

@@ -756,15 +756,15 @@ pub struct PackedHotCycle {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PackedActiveAccumulator {
-    pub id: u16,
-    pub considered: u32,
-    pub support_count: u32,
-    pub anti_count: u32,
     pub positive_dot: i64,
     pub negative_dot: i64,
     pub net_dot: i64,
-    pub top_record: u16,
     pub top_dot: i64,
+    pub considered: u32,
+    pub support_count: u32,
+    pub anti_count: u32,
+    pub id: u16,
+    pub top_record: u16,
 }
 
 #[repr(C)]
@@ -840,6 +840,7 @@ pub struct PackedActive65kDiscovery {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PackedActive65kProof {
     pub records_scanned: u32,
+    pub dot_records_scored: u32,
     pub route_summary: PackedSupportSummary,
     pub group_summary: PackedSupportSummary,
     pub fields_built: u16,
@@ -1312,6 +1313,13 @@ pub fn apply_suppress_anti_lane(
 
 pub fn compile_and_apply_suppress_anti_lane(field: PackedSupportField) -> PackedLaneApplication {
     apply_suppress_anti_lane(field, compile_suppress_anti_lane(field))
+}
+
+pub(crate) fn score_packed_triad_projection_dot(
+    query: &PackedWave1024,
+    triad: &PackedTriad32,
+) -> i64 {
+    score_triad_projection_dot(query, triad)
 }
 
 pub fn evaluate_packed_peak_decision(
@@ -1911,12 +1919,17 @@ fn run_active65k_proof_rescan(
     let mut group_support = 0u16;
     let mut group_anti = 0u16;
     let mut records_scanned = 0u32;
+    let mut dot_records_scored = 0u32;
     let mut checksum = 0u64;
     for (index, triad) in memory.iter().copied().enumerate() {
         records_scanned = records_scanned.saturating_add(1);
         let mut proof_dot = None;
         if route_id != 0 && triad.route_id == route_id {
-            let dot = *proof_dot.get_or_insert_with(|| score_triad_projection_dot(query, &triad));
+            if proof_dot.is_none() {
+                proof_dot = Some(score_triad_projection_dot(query, &triad));
+                dot_records_scored = dot_records_scored.saturating_add(1);
+            }
+            let dot = proof_dot.unwrap_or(0);
             accumulate_support_field_with_dot(
                 &mut fields_out[0],
                 dot,
@@ -1927,7 +1940,11 @@ fn run_active65k_proof_rescan(
             );
         }
         if group_id != 0 && triad.group_id == group_id {
-            let dot = *proof_dot.get_or_insert_with(|| score_triad_projection_dot(query, &triad));
+            if proof_dot.is_none() {
+                proof_dot = Some(score_triad_projection_dot(query, &triad));
+                dot_records_scored = dot_records_scored.saturating_add(1);
+            }
+            let dot = proof_dot.unwrap_or(0);
             accumulate_support_field_with_dot(
                 &mut fields_out[1],
                 dot,
@@ -1948,6 +1965,7 @@ fn run_active65k_proof_rescan(
         compile_and_apply_aligned_suppress_anti_lane_sweep(&fields_out[..lane_count], lanes_out);
     PackedActive65kProof {
         records_scanned,
+        dot_records_scored,
         route_summary: PackedSupportSummary {
             field: fields_out[0],
             considered: route_considered,
@@ -2479,6 +2497,7 @@ mod tests {
         let layout = arena.layout();
         assert_eq!(layout.active_records, ACTIVE_FIELD_RECORDS);
         assert_eq!(layout.allocated_bytes, packed_active65k_workspace_bytes());
+        assert!(core::mem::size_of::<PackedActiveAccumulator>() <= 48);
         assert!(layout.allocated_bytes <= WORKSPACE_BYTES);
         assert!(layout.all_cacheline_aligned);
 
@@ -2488,6 +2507,8 @@ mod tests {
         assert_eq!(run.usage.state, PackedActive65kState::Ready);
         assert_eq!(run.discovery.records_scanned as usize, ACTIVE_FIELD_RECORDS);
         assert_eq!(run.proof.records_scanned as usize, ACTIVE_FIELD_RECORDS);
+        assert!(run.proof.dot_records_scored > 0);
+        assert!(run.proof.dot_records_scored < run.proof.records_scanned);
         assert_eq!(run.proof.fields_built as usize, ACTIVE65K_PROOF_FIELDS);
         assert_eq!(run.proof.lanes_compiled as usize, ACTIVE65K_PROOF_FIELDS);
         assert!(run.usage.full_active_scan);

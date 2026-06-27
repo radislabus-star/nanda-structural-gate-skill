@@ -154,6 +154,45 @@ pub fn score_triad_projection_with_query_energy(
 fn projection_signed_query_sum(query: &PackedWave1024, triad: &PackedTriad32) -> i64 {
     let mut state = projection_seed(triad);
     let mut signed_query_sum: i64 = 0;
+
+    let values = &query.values;
+    let mut index = 0usize;
+    macro_rules! projection_step {
+        () => {{
+            state = mix64(state);
+            let query_value = i64::from(values[index]);
+            if (state & 1) == 0 {
+                signed_query_sum -= query_value;
+            } else {
+                signed_query_sum += query_value;
+            }
+            index += 1;
+        }};
+    }
+
+    while index + 8 <= WAVE_DIM {
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+        projection_step!();
+    }
+    while index < WAVE_DIM {
+        projection_step!();
+    }
+    signed_query_sum
+}
+
+#[cfg(test)]
+fn projection_signed_query_sum_scalar_reference(
+    query: &PackedWave1024,
+    triad: &PackedTriad32,
+) -> i64 {
+    let mut state = projection_seed(triad);
+    let mut signed_query_sum: i64 = 0;
     for &query_value in &query.values {
         state = mix64(state);
         let query_value = i64::from(query_value);
@@ -193,4 +232,69 @@ fn mix64(mut value: u64) -> u64 {
     value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
     value ^ (value >> 31)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::nanda_6m::PackedTriadInput;
+
+    #[test]
+    fn unrolled_signed_projection_matches_scalar_reference() {
+        let triads = [
+            PackedTriad32::new(PackedTriadInput {
+                subject_id: 1,
+                object_id: 2,
+                evidence_ref: 3,
+                wave_seed: 4,
+                relation_id: 5,
+                route_id: 6,
+                group_id: 7,
+                role_pack: 0x0201,
+                flags: 1,
+                lane_hint: 0,
+                check: 8,
+                confidence: 230,
+                polarity: 0,
+            }),
+            PackedTriad32::new(PackedTriadInput {
+                subject_id: 11,
+                object_id: 23,
+                evidence_ref: 37,
+                wave_seed: 0x6500_0001,
+                relation_id: 13,
+                route_id: 17,
+                group_id: 19,
+                role_pack: 0x1002,
+                flags: 3,
+                lane_hint: 5,
+                check: 0x55aa,
+                confidence: 197,
+                polarity: 1,
+            }),
+            PackedTriad32::new(PackedTriadInput {
+                subject_id: 101,
+                object_id: 202,
+                evidence_ref: 303,
+                wave_seed: 0x9e37_0042,
+                relation_id: 29,
+                route_id: 31,
+                group_id: 37,
+                role_pack: 0x0f0f,
+                flags: 9,
+                lane_hint: 11,
+                check: 0x1234,
+                confidence: 255,
+                polarity: 0,
+            }),
+        ];
+        let query = PackedWave1024::from_triads(&triads);
+
+        for triad in triads {
+            assert_eq!(
+                projection_signed_query_sum(&query, &triad),
+                projection_signed_query_sum_scalar_reference(&query, &triad)
+            );
+        }
+    }
 }
