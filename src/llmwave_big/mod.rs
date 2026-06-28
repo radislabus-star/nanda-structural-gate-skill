@@ -1884,6 +1884,8 @@ struct LlmwaveBigChatCoreAskArgs {
     text: String,
     #[arg(long = "manifest")]
     manifest: Option<PathBuf>,
+    #[arg(long = "no-auto-rebuild", default_value_t = false)]
+    no_auto_rebuild: bool,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
     #[arg(long = "packet-profile")]
@@ -4896,6 +4898,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             );
             let report = linux_chat_core::build_linux_chat_core_ask_report(
                 linux_chat_core::LinuxChatCoreAskConfig {
+                    profile: paths.profile,
                     text: args.text,
                     residual_pack: paths.residual_pack,
                     dialogue_overlay: paths.dialogue_overlay,
@@ -4903,6 +4906,7 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     vpn_overlay: paths.vpn_overlay,
                     cache_dir: paths.cache_dir,
                     manifest: args.manifest,
+                    auto_rebuild: !args.no_auto_rebuild,
                     max_facts: args.max_facts,
                     packet_profile: args.packet_profile,
                     target_packet_tokens: args.target_packet_tokens,

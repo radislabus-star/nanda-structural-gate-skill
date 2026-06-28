@@ -571,29 +571,32 @@ hashes are part of cache freshness. They must not be hardcoded as Rust branches.
 `chat-core.hot` plus the manifest. The cache is a compiled runtime view, not
 memory authority. Inspect `token_economics`: token estimates use
 `ceil(bytes / 4)` and are comparison metrics, not exact model tokenizer counts.
-`chat-core-gate` is the preferred fast authority gate before using that cache.
-It is read-only: it recomputes all source hashes, rejects missing or stale
-cache, checks the binary hot cache hash, and does not run the heavy Linux
-profile/eval gate. A missing debug index does not remove answer authority when
-`.hot` and source hashes still match. Treat
+`chat-core-ask` is the normal working path. It checks cache freshness,
+automatically rebuilds stale or missing compiled cache artifacts from the requested `.lrf + .lwm + profile` paths,
+then answers from `compiled_chat_core_hot`. `chat-core-gate` is the read-only fast
+authority gate for diagnostics and CI: it recomputes all source hashes, rejects
+missing or stale cache, checks the binary hot cache hash, and does not run the
+heavy Linux profile/eval gate. A missing debug index does not remove answer
+authority when `.hot` and source hashes still match. Treat
 `LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM` as cache-authority
 readiness only. Use `chat-core-profile-gate` for the heavier broad/heldout
 profile/eval path; its ready verdict is
 `LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM`. If `.lrf`, any `.lwm`
-overlay, eval artifact, profile spec, or compiler version changes, the cache is
-stale and cannot grant answer authority.
-`chat-core-ask` is the compact packet path for Codex/LLM use. It refuses
-stale cache, then reads `chat-core.hot` and returns the query intent, route
-priors, grounded answer state, structured `evidence[]`, legacy
-`compact_evidence`, selected domain suites, and anti-wave hits. `ask` reports
+overlay, eval artifact, profile spec, or compiler version changes, `gate`
+reports stale; `ask` rebuilds first from the requested source paths.
+`chat-core-ask` is the compact packet path for Codex/LLM use. It rebuilds stale cache from the requested source paths, then reads `chat-core.hot` and
+returns the query intent, route priors, grounded answer state, structured
+`evidence[]`, legacy `compact_evidence`, selected domain suites, and anti-wave
+hits. `ask` reports
 `readout_source="compiled_chat_core_hot"` when it uses the binary cache. `ask`
-checks CLI source overrides against the manifest before answering; stale or
-mismatched source memory blocks answer authority. Inspect `token_economics` to
-see estimated prompt tokens saved versus sending the source artifacts or the
-full runtime cache. `cache_is_runtime_index_not_prompt_payload=true` means the
-hot cache is a runtime readout, not prompt context. Use the grounded packet as a
-small external memory packet, not as a replacement for the LLM and not as
-global nonlinear-memory proof.
+treats CLI source overrides as the requested memory and rebuilds before
+answering when the cache does not match. Use `--no-auto-rebuild` or explicit
+`--manifest` only when a test needs strict stale output. Inspect `token_economics` to see estimated prompt tokens
+saved versus sending the source artifacts or the full runtime cache.
+`cache_is_runtime_index_not_prompt_payload=true` means the hot cache is a
+runtime readout, not prompt context. Use the grounded packet as a small external
+memory packet, not as a replacement for the LLM and not as global nonlinear-
+memory proof.
 `ask` now builds adaptive grounded packets. `--packet-profile` is a hint, not
 authority: the query wave still sets `inferred_packet_profile`, and a requested
 profile cannot downgrade inferred risk. If a caller requests `exact_fact` for a

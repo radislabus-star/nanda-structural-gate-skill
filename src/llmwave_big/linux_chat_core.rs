@@ -75,6 +75,7 @@ pub(crate) struct LinuxChatCoreGateConfig {
 
 #[derive(Clone)]
 pub(crate) struct LinuxChatCoreAskConfig {
+    pub profile: PathBuf,
     pub text: String,
     pub residual_pack: PathBuf,
     pub dialogue_overlay: PathBuf,
@@ -82,6 +83,7 @@ pub(crate) struct LinuxChatCoreAskConfig {
     pub vpn_overlay: PathBuf,
     pub cache_dir: PathBuf,
     pub manifest: Option<PathBuf>,
+    pub auto_rebuild: bool,
     pub max_facts: usize,
     pub packet_profile: Option<String>,
     pub target_packet_tokens: Option<u64>,
@@ -918,7 +920,21 @@ pub(crate) fn build_linux_chat_core_ask_report(
         .manifest
         .clone()
         .unwrap_or_else(|| config.cache_dir.join("chat-core.manifest.json"));
-    let cache_status = evaluate_cache_from_manifest_for_ask(&manifest, &config)?;
+    let mut cache_status = evaluate_cache_from_manifest_for_ask(&manifest, &config)?;
+    if config.auto_rebuild && config.manifest.is_none() && !cache_status.cache_fresh {
+        let overrides = ChatCoreSpecOverrides {
+            residual_pack: &config.residual_pack,
+            dialogue_overlay: &config.dialogue_overlay,
+            centers_overlay: &config.centers_overlay,
+            vpn_overlay: &config.vpn_overlay,
+            broad_eval: &None,
+            heldout_eval: &None,
+            cache_dir: &config.cache_dir,
+        };
+        let spec = load_chat_core_spec(&config.profile, &overrides)?;
+        compile_chat_core_cache(&spec)?;
+        cache_status = evaluate_cache_from_manifest_for_ask(&manifest, &config)?;
+    }
     let hot_cache = if cache_status.cache_fresh {
         Some(load_hot_cache_from_manifest(&manifest)?)
     } else {
@@ -1504,6 +1520,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
 
     let target_query = "which package provides command foocmd";
     let before = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        profile: config.profile.clone(),
         text: target_query.to_string(),
         residual_pack: config.residual_pack.clone(),
         dialogue_overlay: dialogue_overlay.clone(),
@@ -1511,6 +1528,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         vpn_overlay: vpn_overlay.clone(),
         cache_dir: scratch_cache.clone(),
         manifest: None,
+        auto_rebuild: true,
         max_facts: config.max_facts.max(1),
         packet_profile: None,
         target_packet_tokens: None,
@@ -1532,6 +1550,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         out: None,
     })?;
     let stale_after_learn = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        profile: config.profile.clone(),
         text: target_query.to_string(),
         residual_pack: config.residual_pack.clone(),
         dialogue_overlay: dialogue_overlay.clone(),
@@ -1539,6 +1558,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         vpn_overlay: vpn_overlay.clone(),
         cache_dir: scratch_cache.clone(),
         manifest: None,
+        auto_rebuild: false,
         max_facts: config.max_facts.max(1),
         packet_profile: None,
         target_packet_tokens: None,
@@ -1548,6 +1568,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
     compile_chat_core_cache(&spec)?;
     let hot_hash_after_rebuild = hash_file(&PathBuf::from(&spec.cache.hot_path))?;
     let after = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        profile: config.profile.clone(),
         text: target_query.to_string(),
         residual_pack: config.residual_pack.clone(),
         dialogue_overlay: dialogue_overlay.clone(),
@@ -1555,6 +1576,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         vpn_overlay: vpn_overlay.clone(),
         cache_dir: scratch_cache.clone(),
         manifest: None,
+        auto_rebuild: true,
         max_facts: config.max_facts.max(1),
         packet_profile: None,
         target_packet_tokens: None,
@@ -1652,6 +1674,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
     })?;
     compile_chat_core_cache(&spec)?;
     let after_conflict = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        profile: config.profile.clone(),
         text: target_query.to_string(),
         residual_pack: config.residual_pack.clone(),
         dialogue_overlay: dialogue_overlay.clone(),
@@ -1659,12 +1682,14 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         vpn_overlay: vpn_overlay.clone(),
         cache_dir: scratch_cache.clone(),
         manifest: None,
+        auto_rebuild: true,
         max_facts: config.max_facts.max(1),
         packet_profile: None,
         target_packet_tokens: None,
         out: None,
     })?;
     let bash = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        profile: config.profile.clone(),
         text: "which package provides command bash".to_string(),
         residual_pack: config.residual_pack.clone(),
         dialogue_overlay: dialogue_overlay.clone(),
@@ -1672,12 +1697,14 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         vpn_overlay: vpn_overlay.clone(),
         cache_dir: scratch_cache.clone(),
         manifest: None,
+        auto_rebuild: true,
         max_facts: config.max_facts.max(1),
         packet_profile: None,
         target_packet_tokens: None,
         out: None,
     })?;
     let systemctl = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        profile: config.profile.clone(),
         text: "which package provides command systemctl".to_string(),
         residual_pack: config.residual_pack.clone(),
         dialogue_overlay: dialogue_overlay.clone(),
@@ -1685,12 +1712,14 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         vpn_overlay: vpn_overlay.clone(),
         cache_dir: scratch_cache.clone(),
         manifest: None,
+        auto_rebuild: true,
         max_facts: config.max_facts.max(1),
         packet_profile: None,
         target_packet_tokens: None,
         out: None,
     })?;
     let anti_wave = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+        profile: config.profile.clone(),
         text: "does package installed prove vpn running".to_string(),
         residual_pack: config.residual_pack.clone(),
         dialogue_overlay,
@@ -1698,6 +1727,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         vpn_overlay,
         cache_dir: scratch_cache.clone(),
         manifest: None,
+        auto_rebuild: true,
         max_facts: config.max_facts.max(1),
         packet_profile: None,
         target_packet_tokens: None,
@@ -5228,6 +5258,7 @@ mod tests {
             vpn
         };
         let report = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
+            profile: dir.join("profile.json"),
             text: "which package provides command bash".to_string(),
             residual_pack,
             dialogue_overlay,
@@ -5235,6 +5266,7 @@ mod tests {
             vpn_overlay,
             cache_dir: dir.clone(),
             manifest: Some(manifest),
+            auto_rebuild: false,
             max_facts: 4,
             packet_profile: None,
             target_packet_tokens: None,

@@ -825,13 +825,13 @@ then compiles a packed binary hot cache view:
 The manifest stores hashes for source memory, overlays, profile evals, domain
 registry, DomainPack files, domain proposal registries, safety policy, packet
 policy, and compiler version.
-The cache is not the source of truth. If any source artifact changes,
-`chat-core-gate` returns stale and blocks answer authority until the cache is
-rebuilt. The authority gate is read-only and fast: it checks
-manifest/source/hot hashes and does not run broad/profile evals. Use
-`chat-core-build` to write cache artifacts. Use `chat-core-profile-gate` only
-when the heavier Linux profile/eval gate is intentionally required. The
-Linux-profile cache entrypoint is:
+The cache is not the source of truth. `chat-core-ask` is the normal working
+entrypoint: it checks freshness, automatically rebuilds stale or missing
+compiled cache artifacts from the requested `.lrf + .lwm + profile` paths,
+then answers from `compiled_chat_core_hot`. Use `chat-core-gate` as
+a read-only authority check, `chat-core-build` for explicit rebuilds, and
+`chat-core-profile-gate` only when the heavier Linux profile/eval gate is
+intentionally required. The Linux-profile cache entrypoint is:
 
 ```bash
 nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
@@ -858,13 +858,16 @@ discipline should mean adding a profile/DomainPack artifact, not adding a new
 Rust engine branch.
 
 `chat-core-ask` is the intended compact packet surface for Codex/LLM use:
-it refuses stale cache, reads `chat-core.hot` directly, reports
+it rebuilds stale/missing compiled cache artifacts from the requested source paths, reads
+`chat-core.hot` directly, reports
 `readout_source="compiled_chat_core_hot"`, and returns intent, route priors,
 answer state, structured `evidence[]`, legacy `compact_evidence`, domain suites,
 and anti-wave hits. `chat-core.index.json` is not answer authority and may be
 deleted without blocking `ask` if the binary `.hot` and source hashes still
-match. `ask` rechecks the source paths passed on the CLI against the manifest;
-an override mismatch returns stale instead of answering from an old cache.
+match. `ask` rechecks the source paths passed on the CLI against the manifest:
+source paths passed on the CLI define the requested memory. If the cache does
+not match them, `ask` rebuilds before answering. Use `--no-auto-rebuild` or an
+explicit `--manifest` only for strict diagnostics.
 Grounded packets are adaptive and evidence-driven. `--packet-profile` is only a
 hint: ChatCore always computes `inferred_packet_profile`, and a requested profile
 cannot downgrade inferred risk or complexity. If the request tries to turn a

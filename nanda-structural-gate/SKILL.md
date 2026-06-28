@@ -1415,13 +1415,14 @@ nanda-llmwave-big chat-core-learn-eval --profile examples/linux-chat-core.profil
 Read ChatCore literally: cache is a compiled runtime view, not source memory.
 `chat-core.manifest.json` must match the current `.lrf`, overlays, eval
 artifacts, domain registry, DomainPack hashes, domain proposal registry hashes,
-safety policy, packet policy, and compiler version. If
-`cache_status.cache_fresh` is false, do not use the cache as answer support.
-`chat-core-gate` is read-only and fast: missing cache is
-`LINUX_CHAT_CORE_CACHE_STALE`, not an
-implicit build. It checks manifest/source/hot hashes and does not run heavy
-broad/profile evals. Use `chat-core-build` for normal rebuilds. Use
-`chat-core-profile-gate` only when the heavier Linux profile/eval gate is
+safety policy, packet policy, and compiler version. For normal work, call
+`chat-core-ask`: it checks freshness, rebuilds stale or missing compiled cache
+artifacts from the requested source paths, then answers from
+`compiled_chat_core_hot`. `chat-core-gate` is read-only and fast diagnostics:
+missing cache is `LINUX_CHAT_CORE_CACHE_STALE`, not an implicit build. It checks
+manifest/source/hot hashes and does not run heavy broad/profile evals. Use
+`chat-core-build` for explicit rebuilds. Use `chat-core-profile-gate` only when
+the heavier Linux profile/eval gate is
 intentionally required. Inspect `token_economics` before claiming the cache
 saves context: estimates use `ceil(bytes / 4)` and compare compact grounded
 packets against source/runtime-cache size, not exact model tokenizer counts.
@@ -1429,13 +1430,15 @@ packets against source/runtime-cache size, not exact model tokenizer counts.
 `chat-core.index.json` is debug/explain only. A missing JSON index must not
 force `ask` back to source decoding when `.hot` and source hashes still match.
 `chat-core-ask` is the compact grounded-packet surface for Codex/LLM use:
-it refuses stale source overrides, reads `chat-core.hot`, reports
+it rebuilds stale cache from the requested source paths, reads
+`chat-core.hot`, reports
 `readout_source="compiled_chat_core_hot"`, then returns intent, route priors,
 answer state, selected domain suites, structured `evidence[]`, legacy
 `compact_evidence`, and anti-wave hits. Treat
 `cache_is_runtime_index_not_prompt_payload=true` as a hard interpretation rule:
 the hot cache is a runtime readout, not prompt context; use only the grounded
-packet as the small external memory payload.
+packet as the small external memory payload. Use `--no-auto-rebuild` only for
+strict stale diagnostics.
 If no connected DomainPack supports the inferred domain/intent, `ask` must
 return `DOMAIN_UNSUPPORTED`, `answer_allowed=false`,
 `selected_evidence_count=0`, `readout_source="none_domain_unsupported"`, and
