@@ -55,7 +55,7 @@ while (($#)); do
       ;;
     --help|-h)
       cat <<'EOF'
-Usage: scripts/test-local.sh [--suite changed|smoke|chatcore|chatcore-learn|chatcore-build|field|wrappers|full] [--since <git-ref>]
+Usage: scripts/test-local.sh [--suite changed|smoke|chatcore|chatcore-learn|chatcore-build|llm-cache|field|wrappers|full] [--since <git-ref>]
        scripts/test-local.sh [--fast|--full]
 
 Runs the local regression suite.
@@ -72,6 +72,8 @@ Suites:
              -> answer lift -> anti-wave -> unrelated route preserved.
   chatcore-build
              Heavy Linux ChatCore rebuild + gate + fast ChatCore checks.
+  llm-cache  Shared response-cache gateway: miss calls provider command once,
+             repeat hit skips provider and counts saved tokens.
   field      Heavy field-core sole-engine audit only.
   wrappers   CLI wrapper/help smoke only.
   full       Legacy full release/audit sweep across the historical LLMWave
@@ -79,8 +81,8 @@ Suites:
 
 Environment:
   NANDA_TEST_LOCAL_FULL=1   Same as --full.
-  NANDA_TEST_LOCAL_MODE=full|fast|changed|smoke|chatcore|chatcore-learn|chatcore-build|field|wrappers
-  NANDA_TEST_LOCAL_SUITE=changed|smoke|chatcore|chatcore-learn|chatcore-build|field|wrappers|full
+  NANDA_TEST_LOCAL_MODE=full|fast|changed|smoke|chatcore|chatcore-learn|chatcore-build|llm-cache|field|wrappers
+  NANDA_TEST_LOCAL_SUITE=changed|smoke|chatcore|chatcore-learn|chatcore-build|llm-cache|field|wrappers|full
   NANDA_TEST_LOCAL_SINCE=<git-ref>   Same as --since.
 EOF
       exit 0
@@ -93,7 +95,7 @@ EOF
   shift
 done
 case "$test_local_suite" in
-  changed|smoke|chatcore|chatcore-learn|chatcore-build|field|wrappers|full) ;;
+  changed|smoke|chatcore|chatcore-learn|chatcore-build|llm-cache|field|wrappers|full) ;;
   *)
     echo "unknown test-local suite: $test_local_suite" >&2
     exit 2
@@ -125,6 +127,7 @@ llmwave="$root/nanda-structural-gate/scripts/nanda-llmwave"
 llmwave_eval="$root/nanda-structural-gate/scripts/nanda-llmwave-eval"
 llmwave_memory="$root/nanda-structural-gate/scripts/nanda-llmwave-memory"
 llmwave_big="$root/nanda-structural-gate/scripts/nanda-llmwave-big"
+llm_cache="$root/nanda-structural-gate/scripts/nanda-llm-cache"
 demo="$root/nanda-structural-gate/scripts/nanda-demo"
 cache="$root/nanda-structural-gate/scripts/nanda-cache"
 focus="$root/nanda-structural-gate/scripts/nanda-focus"
@@ -323,6 +326,32 @@ run_wrappers_suite() {
   "$guard_diff" --help | grep -q "Usage:"
 }
 
+run_llm_cache_suite() {
+  python3 -m py_compile "$llm_cache"
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "$tmp_dir"' RETURN
+  cache_path="$tmp_dir/llm-response-cache.sqlite3"
+  calls_file="$tmp_dir/provider-calls.txt"
+  provider_cmd='printf x >> "$NANDA_PROVIDER_CALLS_FILE"; printf "cached answer for %s\n" "$NANDA_LLM_CACHE_TEXT"'
+
+  first_json="$(NANDA_PROVIDER_CALLS_FILE="$calls_file" "$llm_cache" ask --cache-path "$cache_path" --domain linux --profile cache-test --model fake-provider --text "which package provides command bash" --provider-cmd "$provider_cmd" --input-tokens 1000 --output-tokens 200 --format json)"
+  jq -e '.verdict == "LLM_RESPONSE_CACHE_MISS_PROVIDER_CALLED_AND_STORED" and .hit == false and .provider_called == true and .stored == true and .input_tokens == 1000 and .output_tokens == 200' <<<"$first_json" >/dev/null
+  test "$(wc -c <"$calls_file")" = "1"
+
+  second_json="$(NANDA_PROVIDER_CALLS_FILE="$calls_file" "$llm_cache" ask --cache-path "$cache_path" --domain linux --profile cache-test --model fake-provider --text "which package provides command bash" --provider-cmd "$provider_cmd" --format json)"
+  jq -e '.verdict == "LLM_RESPONSE_CACHE_HIT" and .hit == true and .provider_called == false and .saved_input_tokens == 1000 and .saved_output_tokens == 200 and .saved_total_tokens == 1200 and (.answer | contains("cached answer")) and .claim_boundary.cache_hit_skips_provider_call == true' <<<"$second_json" >/dev/null
+  test "$(wc -c <"$calls_file")" = "1"
+
+  similar_json="$("$llm_cache" lookup --cache-path "$cache_path" --domain linux --profile cache-test --model fake-provider --text "which package provides bash command" --similarity-threshold 0.70 --format json)"
+  jq -e '.verdict == "LLM_RESPONSE_CACHE_HIT" and .hit == true and .provider_called == false and (.match_kind == "similarity" or .match_kind == "exact") and .saved_total_tokens == 1200' <<<"$similar_json" >/dev/null
+
+  secret_json="$("$llm_cache" store --cache-path "$cache_path" --domain linux --profile cache-test --model fake-provider --text "token=sk-secretvalue000000000000000000" --answer "nope" --format json || true)"
+  jq -e '.verdict == "LLM_RESPONSE_CACHE_STORE_REFUSED_SECRET" and .stored == false and .reason == "secret_like_prompt_or_answer"' <<<"$secret_json" >/dev/null
+
+  metrics_json="$("$llm_cache" metrics --cache-path "$cache_path" --format json)"
+  jq -e '.verdict == "LLM_RESPONSE_CACHE_METRICS_READY" and .entries_total == 1 and .provider_calls == 1 and .skipped_provider_calls >= 2 and .saved_input_tokens >= 2000 and .saved_output_tokens >= 400 and .claim_boundary.response_cache_is_source_of_truth == false' <<<"$metrics_json" >/dev/null
+}
+
 run_changed_suite() {
   git -C "$root" diff --check
   local changed_source="worktree"
@@ -362,6 +391,7 @@ run_changed_suite() {
   needs_rust=0
   needs_chatcore=0
   needs_chatcore_learn=0
+  needs_llm_cache=0
   needs_field=0
   needs_wrappers=0
   needs_edges=0
@@ -376,6 +406,11 @@ run_changed_suite() {
     case "$path" in
       src/llmwave_big/linux_chat_core.rs|src/llmwave_big/chat_core/*|src/llmwave_big/mod.rs|examples/linux-chat-core.profile.json|examples/domain-packs/*|README.md|COMMANDS.md|nanda-structural-gate/SKILL.md)
         needs_chatcore=1
+        ;;
+    esac
+    case "$path" in
+      nanda-structural-gate/scripts/nanda-llm-cache|scripts/install-local.sh|scripts/test-local.sh|README.md|COMMANDS.md|nanda-structural-gate/SKILL.md)
+        needs_llm_cache=1
         ;;
     esac
     case "$path" in
@@ -424,6 +459,9 @@ run_changed_suite() {
   if ((needs_chatcore_learn)); then
     run_chatcore_learn_suite
   fi
+  if ((needs_llm_cache)); then
+    run_llm_cache_suite
+  fi
   if ((needs_field)); then
     run_field_suite
   fi
@@ -463,6 +501,12 @@ case "$test_local_suite" in
     git -C "$root" diff --check
     run_rust_baseline
     run_chatcore_learn_suite
+    echo ok
+    exit 0
+    ;;
+  llm-cache)
+    git -C "$root" diff --check
+    run_llm_cache_suite
     echo ok
     exit 0
     ;;

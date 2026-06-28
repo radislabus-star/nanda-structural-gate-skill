@@ -611,6 +611,21 @@ prompt or answer. Use `chat-core-metrics --memory-root .nanda/linux-active
 `estimated_tokens_saved_vs_source_total`, average packet size, and profile/state
 counts. The usage log is observability only and cannot grant answer, learning,
 cache, or domain authority.
+`nanda-llm-cache` is the separate shared response-cache gateway for real
+cross-window savings on external/provider LLM calls:
+
+```bash
+nanda-llm-cache ask --domain physics --profile material-layer --model provider-model-name --text "what is wind_setup_compact_active?" --provider-cmd 'your-provider-command-reading-$NANDA_LLM_CACHE_TEXT' --format json
+nanda-llm-cache lookup --domain physics --profile material-layer --model provider-model-name --text "what is wind_setup_compact_active?" --format json
+nanda-llm-cache metrics --format json
+```
+
+On a hit, it returns the cached answer and does not run `--provider-cmd`, so
+`skipped_provider_calls` and saved token counters are real avoided LLM calls.
+It stores raw prompt/answer text in `~/.cache/nanda/llm-response-cache.sqlite3`
+because it is a response cache; secret-like prompts or answers are refused.
+This cache is not ChatCore source memory, not grounded evidence, and not answer
+authority.
 `ask` now builds adaptive grounded packets. `--packet-profile` is a hint, not
 authority: the query wave still sets `inferred_packet_profile`, and a requested
 profile cannot downgrade inferred risk. If a caller requests `exact_fact` for a

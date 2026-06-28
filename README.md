@@ -892,6 +892,30 @@ not store the raw prompt or answer. Use `chat-core-metrics --memory-root
 counts, and rates. The usage log is observability only: it is not source memory,
 does not affect answer authority, and does not prove general LLM/global
 nonlinear claims.
+
+For real cross-window token savings, use the shared response cache before an
+external/provider LLM call:
+
+```bash
+nanda-llm-cache ask \
+  --domain physics \
+  --profile material-layer \
+  --model provider-model-name \
+  --text "what is wind_setup_compact_active?" \
+  --provider-cmd 'your-provider-command-reading-$NANDA_LLM_CACHE_TEXT' \
+  --format json
+
+nanda-llm-cache metrics --format json
+```
+
+`nanda-llm-cache` is different from ChatCore. ChatCore returns grounded packets
+from a runtime readout. `nanda-llm-cache` stores provider answers in a shared
+SQLite cache at `~/.cache/nanda/llm-response-cache.sqlite3`. On a cache hit it
+does not call the provider command, so the skipped call is the real saving. It
+tracks `skipped_provider_calls`, `saved_input_tokens`, `saved_output_tokens`,
+and `saved_total_tokens`. It stores raw prompt/answer text by design so it can
+return the answer; secret-like prompt or answer text is refused. Treat this as
+an optional local response cache, not source memory or answer authority.
 Grounded packets are adaptive and evidence-driven. `--packet-profile` is only a
 hint: ChatCore always computes `inferred_packet_profile`, and a requested profile
 cannot downgrade inferred risk or complexity. If the request tries to turn a

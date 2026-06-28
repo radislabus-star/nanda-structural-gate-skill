@@ -1449,6 +1449,20 @@ cumulative `requests_total`, `answers_allowed_total`, `underfilled_total`,
 profile/state counts. Treat metrics as observability only: usage logs are not
 source memory, do not grant answer authority, and do not prove general
 LLM/global nonlinear readiness.
+For actual cross-window savings on repeated external/provider LLM calls, use
+`nanda-llm-cache` before calling the provider:
+
+```bash
+nanda-llm-cache ask --domain physics --profile material-layer --model provider-model-name --text "question" --provider-cmd 'your-provider-command-reading-$NANDA_LLM_CACHE_TEXT' --format json
+nanda-llm-cache metrics --format json
+```
+
+On a hit it returns the cached answer and skips `--provider-cmd`; this is real
+token saving because no provider LLM call happens. On a miss it calls only the
+explicit provider command and stores the answer for future windows. This is a
+shared local response cache at `~/.cache/nanda/llm-response-cache.sqlite3`, not
+ChatCore source memory and not answer authority. It stores raw prompt/answer
+text so it can return answers; secret-like prompts or answers are refused.
 If no connected DomainPack supports the inferred domain/intent, `ask` must
 return `DOMAIN_UNSUPPORTED`, `answer_allowed=false`,
 `selected_evidence_count=0`, `readout_source="none_domain_unsupported"`, and
