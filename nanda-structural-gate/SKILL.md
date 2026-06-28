@@ -1444,12 +1444,18 @@ return `DOMAIN_UNSUPPORTED`, `answer_allowed=false`,
 `selected_evidence_count=0`, `readout_source="none_domain_unsupported"`, and
 proposal-only candidate routes. Do not let an unsupported physics/customs/code
 prompt fall back to Linux just because it contains words such as `external`,
-`socket`, or `firewall`. Use `chat-core-domain-proposal` for read-only builder
-hints. Candidate facts in that report are not memory, cannot grant answer
-authority, must not write `.lwm`, and must not rebuild `.hot`. If adding a new
-discipline requires editing Rust engine logic, the refactor failed; add a
-profile/DomainPack instead. Proposal hints are data-driven too: put future
-builder suggestions in profile `domain_proposals` registries such as
+`socket`, or `firewall`. Use `chat-core-domain-proposal --profile ... --memory-root
+...` for read-only builder hints; use `chat-core-domain-build --out draft.json`
+to save a candidate DomainPack draft and `chat-core-domain-gate --draft
+draft.json` to re-check it. A draft may create structure, but it must keep
+`maturity=candidate`, `authority_level=proposal_only`, `answer_allowed=false`,
+`learn_allowed=false`, `cache_build_allowed=false`,
+`overlay_write_allowed=false`, and `cache_mutation_allowed=false`. Candidate
+facts in that report are not memory, cannot grant answer authority, must not
+write `.lwm`, and must not rebuild `.hot`. If adding a new discipline requires
+editing Rust engine logic, the refactor failed; add a profile/DomainPack
+instead. Proposal hints are data-driven too: put future builder suggestions in
+profile `domain_proposals` registries such as
 `examples/domain-packs/proposal-seeds.json`, and treat their manifest hashes as
 part of cache authority.
 Grounded packet budgets are adaptive. `--packet-profile` is a hint, not

@@ -294,7 +294,9 @@ nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/l
 nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json
 nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-heldout-suite.json --out .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --format json
 nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-center-learning-eval --center-learning-memory .nanda/linux-active/linux-center-learning.lwm --center-learning-script examples/linux-center-learning.script --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json
-nanda-llmwave-big chat-core-domain-proposal --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json
+nanda-llmwave-big chat-core-domain-proposal --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json
+nanda-llmwave-big chat-core-domain-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "what is wind_setup_compact_active in gravity-saturation-checks?" --out /tmp/physics-domain-draft.json --format json
+nanda-llmwave-big chat-core-domain-gate --draft /tmp/physics-domain-draft.json --format json
 nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-profile-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
@@ -552,8 +554,9 @@ same command has the alias `linux-chat-profile-gate`. With `--heldout-eval`,
 `LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM`. That stronger target still
 means Linux-only bounded chat over `.lrf` plus `.lwm` wave/center learning; it
 does not unlock general LLM, open-domain chat, scanner, or exploit claims.
-`chat-core-build`, `chat-core-gate`, `chat-core-ask`, `chat-core-learn`, and
-`chat-core-domain-proposal` are the generic ChatCore profile commands. Linux is
+`chat-core-build`, `chat-core-gate`, `chat-core-ask`, `chat-core-learn`,
+`chat-core-domain-proposal`, `chat-core-domain-build`, and
+`chat-core-domain-gate` are the generic ChatCore profile commands. Linux is
 the first connected data-driven `DomainPack`, selected by
 `--profile examples/linux-chat-core.profile.json`. There is no separate Linux
 ChatCore public command path. The main interface is `--memory-root
@@ -621,9 +624,14 @@ If no connected DomainPack supports a query, `ask` must return
 `DOMAIN_UNSUPPORTED`, `answer_allowed=false`, `selected_evidence_count=0`,
 `readout_source="none_domain_unsupported"`, and proposal-only candidate routes.
 It must not fall back to Linux because a prompt happens to contain words like
-`external`, `firewall`, or `socket`. Use `chat-core-domain-proposal --text ...`
-for read-only builder hints; proposal candidate facts are not memory, do not
-write overlays, do not rebuild cache, and do not grant answer authority.
+`external`, `firewall`, or `socket`. Use `chat-core-domain-proposal --profile
+... --memory-root ... --text ...` for read-only builder hints. The proposal now
+includes a `domain_pack_draft` with maturity and authority rights plus a
+`draft_gate` with collision, genericity, boundary, evidence, anti-wave, and eval
+checks. Use `chat-core-domain-build --out draft.json` to save the draft and
+`chat-core-domain-gate --draft draft.json` to re-check it. Candidate facts are
+not memory, do not write overlays, do not rebuild cache, and do not grant answer
+authority. Automatic structure is allowed; automatic authority is not.
 `chat-core-learn` appends explicit feedback to a source `.lwm` overlay:
 accepted facts become learned overlay records, and rejected shortcuts become
 learned anti-wave records. It never writes query text or answer packets as facts

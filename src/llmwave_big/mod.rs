@@ -510,6 +510,12 @@ enum LlmwaveBigCommand {
     /// Read-only proposal for text that is not covered by connected DomainPacks.
     #[command(name = "chat-core-domain-proposal")]
     ChatCoreDomainProposal(LlmwaveBigChatCoreDomainProposalArgs),
+    /// Build a candidate DomainPack draft without answer/cache authority.
+    #[command(name = "chat-core-domain-build")]
+    ChatCoreDomainBuild(LlmwaveBigChatCoreDomainBuildArgs),
+    /// Gate a candidate DomainPack draft without granting authority.
+    #[command(name = "chat-core-domain-gate")]
+    ChatCoreDomainGate(LlmwaveBigChatCoreDomainGateArgs),
     /// Build a Linux-profile held-out eval suite with near-collision controls.
     #[command(name = "linux-heldout-suite-build")]
     LinuxHeldoutSuiteBuild(LlmwaveBigLinuxHeldoutSuiteBuildArgs),
@@ -1964,8 +1970,59 @@ struct LlmwaveBigChatCoreLearnEvalArgs {
 
 #[derive(Parser)]
 struct LlmwaveBigChatCoreDomainProposalArgs {
+    #[arg(
+        long = "profile",
+        default_value = "examples/linux-chat-core.profile.json"
+    )]
+    profile: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
     #[arg(long = "text")]
     text: String,
+    #[arg(long = "context-file")]
+    context_file: Option<PathBuf>,
+    #[arg(long = "proposal-registry")]
+    proposal_registry: Vec<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigChatCoreDomainBuildArgs {
+    #[arg(
+        long = "profile",
+        default_value = "examples/linux-chat-core.profile.json"
+    )]
+    profile: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "text")]
+    text: String,
+    #[arg(long = "context-file")]
+    context_file: Option<PathBuf>,
+    #[arg(long = "proposal-registry")]
+    proposal_registry: Vec<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigChatCoreDomainGateArgs {
+    #[arg(
+        long = "profile",
+        default_value = "examples/linux-chat-core.profile.json"
+    )]
+    profile: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "draft")]
+    draft: Option<PathBuf>,
+    #[arg(long = "text")]
+    text: Option<String>,
     #[arg(long = "context-file")]
     context_file: Option<PathBuf>,
     #[arg(long = "proposal-registry")]
@@ -5076,6 +5133,8 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
             let report =
                 chat_core::build_domain_proposal_report(chat_core::ChatCoreDomainProposalConfig {
                     text: args.text,
+                    profile: Some(args.profile),
+                    memory_root: args.memory_root,
                     context_file: args.context_file,
                     proposal_registries: args.proposal_registry,
                     out: args.out,
@@ -5100,6 +5159,82 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         "- suggested domain: `{}`",
                         report.suggested_domain_id.as_deref().unwrap_or("unknown")
                     );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatCoreDomainBuild(args) => {
+            let report =
+                chat_core::build_domain_builder_report(chat_core::ChatCoreDomainProposalConfig {
+                    text: args.text,
+                    profile: Some(args.profile),
+                    memory_root: args.memory_root,
+                    context_file: args.context_file,
+                    proposal_registries: args.proposal_registry,
+                    out: args.out,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("decision_state: {}", report.decision_state);
+                    println!(
+                        "suggested_domain_id: {}",
+                        report.suggested_domain_id.as_deref().unwrap_or("unknown")
+                    );
+                    println!(
+                        "draft_gate: {}",
+                        report
+                            .draft_gate
+                            .as_ref()
+                            .map(|gate| gate.verdict.as_str())
+                            .unwrap_or("missing")
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# ChatCore Domain Build");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- decision: `{}`", report.decision_state);
+                    println!(
+                        "- suggested domain: `{}`",
+                        report.suggested_domain_id.as_deref().unwrap_or("unknown")
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatCoreDomainGate(args) => {
+            let report = chat_core::build_domain_gate_report(
+                chat_core::ChatCoreDomainProposalConfig {
+                    text: args.text.unwrap_or_else(|| "domain draft".to_string()),
+                    profile: Some(args.profile),
+                    memory_root: args.memory_root,
+                    context_file: args.context_file,
+                    proposal_registries: args.proposal_registry,
+                    out: None,
+                },
+                args.draft,
+            )?;
+            if let Some(path) = args.out {
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::write(&path, serde_json::to_vec_pretty(&report)?)?;
+            }
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("decision_state: {}", report.decision_state);
+                    println!("safe_to_answer: {}", report.safe_to_answer);
+                    println!("overlay_written: {}", report.overlay_written);
+                }
+                OutputFormat::Md => {
+                    println!("# ChatCore Domain Gate");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- safe to answer: `{}`", report.safe_to_answer);
                 }
             }
             Ok(EXIT_PASS)

@@ -84,7 +84,7 @@ pub(crate) struct DomainSupportReport {
     pub action_for_builder: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub(crate) struct DomainProposalFact {
     pub subject: String,
     pub relation: String,

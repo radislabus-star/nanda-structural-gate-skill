@@ -8,5 +8,8 @@ pub(crate) use domain_pack::{
     ChatCoreDomainProposalSeed, DomainPackArtifactDigest, DomainSupportReport,
     DomainSupportVerdict,
 };
-pub(crate) use proposal::{build_domain_proposal_report, ChatCoreDomainProposalConfig};
+pub(crate) use proposal::{
+    build_domain_builder_report, build_domain_gate_report, build_domain_proposal_report,
+    ChatCoreDomainProposalConfig,
+};
 pub(crate) use safety::scan_feedback_slots;

@@ -851,11 +851,19 @@ and candidate routes only as a proposal. Proposal hints come from
 `domain_proposals` registry files such as
 `examples/domain-packs/proposal-seeds.json`, not from hardcoded Rust domain
 branches. Use
-`nanda-llmwave-big chat-core-domain-proposal --text "..." --format json` for a
-read-only builder proposal; it does not write `.lwm`, does not rebuild `.hot`,
-and does not grant answer authority. Adding physics, customs, or another
-discipline should mean adding a profile/DomainPack artifact, not adding a new
-Rust engine branch.
+`nanda-llmwave-big chat-core-domain-proposal --profile ... --memory-root ...
+--text "..." --format json` for a read-only builder proposal. It includes a
+candidate `domain_pack_draft` and `draft_gate`, but it does not write `.lwm`,
+does not rebuild `.hot`, and does not grant answer authority. Save a draft with
+`chat-core-domain-build --out draft.json`, then re-check it with
+`chat-core-domain-gate --draft draft.json`. Drafts have
+`maturity="candidate"`, `authority_level="proposal_only"`,
+`answer_allowed=false`, `learn_allowed=false`, `cache_build_allowed=false`,
+`overlay_write_allowed=false`, and `cache_mutation_allowed=false`. Automatic
+DomainPack creation may create structure only; gate review is required before
+any authority can be promoted. Adding physics, customs, or another discipline
+should mean adding a profile/DomainPack artifact, not adding a new Rust engine
+branch.
 
 `chat-core-ask` is the intended compact packet surface for Codex/LLM use:
 it rebuilds stale/missing compiled cache artifacts from the requested source paths, reads
