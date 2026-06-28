@@ -1396,9 +1396,10 @@ drift-budget enforcement, no false-positive regression, no heldout regression,
 and unrelated-route preservation, do not promote the chat profile.
 Prefer generic `nanda-llmwave-big chat-core-*` commands when the task is to use
 ChatCore as Codex/LLM memory. Linux is the first data-driven `DomainPack`, not
-the engine. The `linux-chat-core-*` commands remain compatibility wrappers for
-the Linux profile. The normal Linux interface is `--memory-root
-.nanda/linux-active`; explicit source flags are overrides. ChatCore treats
+the engine. There is no separate Linux ChatCore public command path; select the
+Linux profile with `--profile examples/linux-chat-core.profile.json`. The normal
+Linux interface is `--memory-root .nanda/linux-active`; explicit source flags
+are overrides. ChatCore treats
 `.lrf` plus `.lwm` overlays plus DomainPack files as source memory, and compiles
 a binary hot cache view:
 
@@ -1408,11 +1409,7 @@ nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json
 nanda-llmwave-big chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
 nanda-llmwave-big chat-core-learn --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
 nanda-llmwave-big chat-core-domain-proposal --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json
-nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
-nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
-nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active --reset-scratch --format json
+nanda-llmwave-big chat-core-learn-eval --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --reset-scratch --format json
 ```
 
 Read ChatCore literally: cache is a compiled runtime view, not source memory.
@@ -1420,18 +1417,18 @@ Read ChatCore literally: cache is a compiled runtime view, not source memory.
 artifacts, domain registry, DomainPack hashes, domain proposal registry hashes,
 safety policy, packet policy, and compiler version. If
 `cache_status.cache_fresh` is false, do not use the cache as answer support.
-`linux-chat-core-gate` is
-read-only and fast: missing cache is `LINUX_CHAT_CORE_CACHE_STALE`, not an
+`chat-core-gate` is read-only and fast: missing cache is
+`LINUX_CHAT_CORE_CACHE_STALE`, not an
 implicit build. It checks manifest/source/hot hashes and does not run heavy
-broad/profile evals. Use `linux-chat-core-build` for normal rebuilds. Use
-`linux-chat-core-profile-gate` only when the heavier Linux profile/eval gate is
+broad/profile evals. Use `chat-core-build` for normal rebuilds. Use
+`chat-core-profile-gate` only when the heavier Linux profile/eval gate is
 intentionally required. Inspect `token_economics` before claiming the cache
 saves context: estimates use `ceil(bytes / 4)` and compare compact grounded
 packets against source/runtime-cache size, not exact model tokenizer counts.
 `chat-core.hot` is the answer-authority interned packed binary runtime readout;
 `chat-core.index.json` is debug/explain only. A missing JSON index must not
 force `ask` back to source decoding when `.hot` and source hashes still match.
-`linux-chat-core-ask` is the compact grounded-packet surface for Codex/LLM use:
+`chat-core-ask` is the compact grounded-packet surface for Codex/LLM use:
 it refuses stale source overrides, reads `chat-core.hot`, reports
 `readout_source="compiled_chat_core_hot"`, then returns intent, route priors,
 answer state, selected domain suites, structured `evidence[]`, legacy
@@ -1483,11 +1480,11 @@ readiness only. Treat
 `LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM` as the heavier
 profile/eval readiness path. General LLM, open-domain chat, scanner, and global
 nonlinear claims remain blocked.
-For learning, use `linux-chat-core-learn`: feedback writes only to a `.lwm`
+For learning, use `chat-core-learn`: feedback writes only to a `.lwm`
 source overlay and must make cache authority stale. Do not write query text or
 answer packets as facts. Do not mutate `chat-core.hot` directly. Rebuild with
-`linux-chat-core-build`, then ask again; only a fresh rebuilt `.hot` may change
-answer behavior. Use `linux-chat-core-learn-eval` to verify the full scratch
+`chat-core-build`, then ask again; only a fresh rebuilt `.hot` may change
+answer behavior. Use `chat-core-learn-eval` to verify the full scratch
 loop: before blocked, overlay written, stale gate, stale ask blocked, rebuild,
 learned answer from `compiled_chat_core_hot`, learned anti-wave replay, and
 unrelated bash/systemctl routes preserved.
@@ -1500,7 +1497,7 @@ return `DOMAIN_UNSUPPORTED`, `overlay_written=false`, and
 `safe_to_learn_without_profile=false`. The detector is slot-aware:
 route-like identifiers are not JWTs by default, long technical snake_case
 identifiers are review/quarantine signals rather than hard secret refusals, and
-real secret markers still hard block. In `linux-chat-core-learn-eval`, require
+real secret markers still hard block. In `chat-core-learn-eval`, require
 `.safety` to show
 duplicate no-write, conflict quarantine, unknown-route rejection, wrong-overlay
 rejection, secret refusal, poison quarantine, and `raw_secret_written=false`.

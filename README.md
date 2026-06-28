@@ -803,11 +803,12 @@ not broad chat readiness and not exposure reasoning.
 
 `chat-core-build`, `chat-core-gate`, `chat-core-ask`, and `chat-core-learn` are
 the generic ChatCore profile entrypoints. Linux is the first connected
-`DomainPack`, not the engine itself. The compatibility wrappers
-`linux-chat-core-*` call the same profile-scoped path for the Linux profile.
-The normal Linux entrypoint is `--memory-root .nanda/linux-active`; explicit
-`--profile`, `--residual-pack`, `--*-overlay`, `--*-eval`, and `--cache-dir`
-flags are source overrides for tests or unusual layouts. ChatCore treats
+`DomainPack`, not the engine itself. There is no separate Linux ChatCore public
+command path; select Linux by passing the Linux profile. The normal Linux
+entrypoint is `--profile examples/linux-chat-core.profile.json --memory-root
+.nanda/linux-active`; explicit `--residual-pack`, `--*-overlay`, `--*-eval`,
+and `--cache-dir` flags are source overrides for tests or unusual layouts.
+ChatCore treats
 `.lrf v2` plus `.lwm` overlays plus data-driven DomainPacks as source memory,
 then compiles a packed binary hot cache view:
 
@@ -825,28 +826,21 @@ The manifest stores hashes for source memory, overlays, profile evals, domain
 registry, DomainPack files, domain proposal registries, safety policy, packet
 policy, and compiler version.
 The cache is not the source of truth. If any source artifact changes,
-`chat-core-gate` / `linux-chat-core-gate` returns stale and blocks answer
-authority until the cache is rebuilt. The authority gate is read-only and fast:
-it checks manifest/source/hot hashes and does not run broad/profile evals. Use
-`linux-chat-core-build` to write cache artifacts. Use
-`linux-chat-core-profile-gate` only when the heavier Linux profile/eval gate is
-intentionally required. The old `linux-chat-profile-gate` remains a
-compatibility gate; the preferred Linux-profile cache entrypoint is:
+`chat-core-gate` returns stale and blocks answer authority until the cache is
+rebuilt. The authority gate is read-only and fast: it checks
+manifest/source/hot hashes and does not run broad/profile evals. Use
+`chat-core-build` to write cache artifacts. Use `chat-core-profile-gate` only
+when the heavier Linux profile/eval gate is intentionally required. The
+Linux-profile cache entrypoint is:
 
 ```bash
 nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
 nanda-llmwave-big chat-core-learn --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
-nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
-nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
-nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command foocmd" --format json
-nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active --reset-scratch --format json
+nanda-llmwave-big chat-core-learn-eval --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --reset-scratch --format json
 # Optional heavy profile/eval path:
-nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
+nanda-llmwave-big chat-core-profile-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 ```
 
 If no connected DomainPack supports the inferred domain/intent, ChatCore must
@@ -863,7 +857,7 @@ and does not grant answer authority. Adding physics, customs, or another
 discipline should mean adding a profile/DomainPack artifact, not adding a new
 Rust engine branch.
 
-`linux-chat-core-ask` is the intended compact packet surface for Codex/LLM use:
+`chat-core-ask` is the intended compact packet surface for Codex/LLM use:
 it refuses stale cache, reads `chat-core.hot` directly, reports
 `readout_source="compiled_chat_core_hot"`, and returns intent, route priors,
 answer state, structured `evidence[]`, legacy `compact_evidence`, domain suites,
@@ -906,12 +900,12 @@ readiness only. Treat
 profile/eval readiness path. Neither is open-domain chat, a general LLM, or
 global nonlinear-memory proof.
 
-`linux-chat-core-learn` is the unified ChatCore feedback writer. It appends an
+`chat-core-learn` is the unified ChatCore feedback writer. It appends an
 explicit accepted fact or rejected shortcut to a `.lwm` source overlay; it does
 not write the query text as a fact, does not write the answer packet as a fact,
 and never mutates `chat-core.hot` directly. After a learning write, the authority
-gate and `ask` must return stale until `linux-chat-core-build` recompiles
-`.lrf + .lwm` into a fresh `.hot`. `linux-chat-core-learn-eval` proves the
+gate and `ask` must return stale until `chat-core-build` recompiles
+`.lrf + .lwm` into a fresh `.hot`. `chat-core-learn-eval` proves the
 scratch loop: target query blocked before learning, overlay written, cache stale,
 ask blocked while stale, hot rebuilt, learned answer read from
 `compiled_chat_core_hot`, learned anti-wave suppresses a shortcut, and unrelated

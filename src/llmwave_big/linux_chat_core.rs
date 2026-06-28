@@ -641,7 +641,7 @@ pub(crate) struct LinuxChatCoreAuthority {
     pub source_hash_matched: bool,
     pub stale_cache_blocks_answer_authority: bool,
     pub cache_is_source_of_truth: bool,
-    pub compatibility_wrapper_for_linux_chat_profile_gate: bool,
+    pub profile_gate_embedded: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -790,7 +790,7 @@ pub(crate) fn build_linux_chat_core_cache_report(
     let manifest = compiled.manifest;
     let domain_runtime = domain_runtime_report(&spec.domains);
     let report = LinuxChatCoreBuildReport {
-        mode: "llmwave-big-linux-chat-core-build",
+        mode: "llmwave-big-chat-core-build",
         version: LINUX_CHAT_CORE_VERSION,
         verdict: "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM",
         spec,
@@ -872,9 +872,9 @@ fn build_linux_chat_core_gate_report_inner(
     let domain_runtime = domain_runtime_report(&spec.domains);
     let report = LinuxChatCoreGateReport {
         mode: if run_profile_gate {
-            "llmwave-big-linux-chat-core-profile-gate"
+            "llmwave-big-chat-core-profile-gate"
         } else {
-            "llmwave-big-linux-chat-core-authority-gate"
+            "llmwave-big-chat-core-authority-gate"
         },
         version: LINUX_CHAT_CORE_VERSION,
         verdict: if chat_core_ready {
@@ -902,7 +902,7 @@ fn build_linux_chat_core_gate_report_inner(
             source_hash_matched: cache_status.cache_fresh,
             stale_cache_blocks_answer_authority: true,
             cache_is_source_of_truth: false,
-            compatibility_wrapper_for_linux_chat_profile_gate: run_profile_gate,
+            profile_gate_embedded: run_profile_gate,
         },
         token_economics,
         claim_boundary: claim_boundary(cache_status.cache_fresh, true, chat_core_ready),
@@ -1204,7 +1204,7 @@ fn build_chat_core_ask_report_with_packet(
 ) -> Result<LinuxChatCoreAskReport> {
     let token_economics = ask_token_economics(&manifest, &packet)?;
     let report = LinuxChatCoreAskReport {
-        mode: "llmwave-big-linux-chat-core-ask",
+        mode: "llmwave-big-chat-core-ask",
         version: LINUX_CHAT_CORE_VERSION,
         verdict: if packet.decision_state == "DOMAIN_UNSUPPORTED" {
             "DOMAIN_UNSUPPORTED"
@@ -1250,7 +1250,7 @@ pub(crate) fn build_linux_chat_core_learn_report(
         let hot_hash_after = optional_hash_file(&hot_path)?;
         let base_lrf_hash_after = optional_hash_file(&base_lrf_path)?;
         let report = LinuxChatCoreLearnReport {
-            mode: "llmwave-big-linux-chat-core-learn",
+            mode: "llmwave-big-chat-core-learn",
             version: LINUX_CHAT_CORE_VERSION,
             verdict: "LLMWAVE_CHAT_CORE_LEARNING_WRITE_REJECTED",
             decision_state: "SECRET_FEEDBACK_REFUSED".to_string(),
@@ -1316,7 +1316,7 @@ pub(crate) fn build_linux_chat_core_learn_report(
         let base_lrf_hash_after = optional_hash_file(&base_lrf_path)?;
         let duplicate_feedback = admission.duplicate_feedback;
         let report = LinuxChatCoreLearnReport {
-            mode: "llmwave-big-linux-chat-core-learn",
+            mode: "llmwave-big-chat-core-learn",
             version: LINUX_CHAT_CORE_VERSION,
             verdict: if admission.duplicate_feedback {
                 "LLMWAVE_CHAT_CORE_DUPLICATE_FEEDBACK_NO_WRITE"
@@ -1410,7 +1410,7 @@ pub(crate) fn build_linux_chat_core_learn_report(
             reason == "source_memory_hash_changed" || reason == "cache_manifest_missing"
         });
     let report = LinuxChatCoreLearnReport {
-        mode: "llmwave-big-linux-chat-core-learn",
+        mode: "llmwave-big-chat-core-learn",
         version: LINUX_CHAT_CORE_VERSION,
         verdict: if admission.quarantined {
             "LLMWAVE_CHAT_CORE_FEEDBACK_QUARANTINED_CACHE_STALE"
@@ -1819,7 +1819,7 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         && safety.poison_feedback_quarantined
         && !safety.raw_secret_written;
     let report = LinuxChatCoreLearnEvalReport {
-        mode: "llmwave-big-linux-chat-core-learn-eval",
+        mode: "llmwave-big-chat-core-learn-eval",
         version: LINUX_CHAT_CORE_VERSION,
         verdict: if ready {
             "LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM"
@@ -3484,7 +3484,7 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
     write_bytes(&hot_path, &encoded_hot.bytes)?;
     write_bytes(&index_path, &index_bytes)?;
     let manifest = LinuxChatCoreCacheManifest {
-        mode: "llmwave-big-linux-chat-core-cache-manifest".to_string(),
+        mode: "llmwave-big-chat-core-cache-manifest".to_string(),
         version: LINUX_CHAT_CORE_VERSION.to_string(),
         profile_id: spec.profile_id.clone(),
         created_unix_seconds: now_unix_seconds(),
@@ -5181,7 +5181,7 @@ mod tests {
             artifact("vpn", "domain-learning", &vpn, false).unwrap(),
         ];
         let manifest_file = LinuxChatCoreCacheManifest {
-            mode: "llmwave-big-linux-chat-core-cache-manifest".to_string(),
+            mode: "llmwave-big-chat-core-cache-manifest".to_string(),
             version: LINUX_CHAT_CORE_VERSION.to_string(),
             profile_id: "linux-chat-core".to_string(),
             created_unix_seconds: now_unix_seconds(),
@@ -5283,7 +5283,7 @@ mod tests {
             artifact("vpn", "domain-learning", &vpn, false).unwrap(),
         ];
         let manifest_file = LinuxChatCoreCacheManifest {
-            mode: "llmwave-big-linux-chat-core-cache-manifest".to_string(),
+            mode: "llmwave-big-chat-core-cache-manifest".to_string(),
             version: LINUX_CHAT_CORE_VERSION.to_string(),
             profile_id: "linux-chat-core".to_string(),
             created_unix_seconds: now_unix_seconds(),

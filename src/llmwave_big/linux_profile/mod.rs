@@ -243,7 +243,7 @@ pub(crate) struct LinuxProfileClaimGateReport {
     pub mode: &'static str,
     pub version: &'static str,
     pub verdict: &'static str,
-    pub chat_core_compatibility: LinuxProfileChatCoreCompatibility,
+    pub chat_core_path: LinuxProfileChatCorePath,
     pub residual_pack: LinuxResidualDecodedSummary,
     pub memory_proof: LinuxProfileMemoryProofSummary,
     pub broad_eval: Option<LinuxBroadEvalMetrics>,
@@ -257,12 +257,12 @@ pub(crate) struct LinuxProfileClaimGateReport {
 }
 
 #[derive(Serialize, Clone)]
-pub(crate) struct LinuxProfileChatCoreCompatibility {
-    pub compatibility_wrapper: bool,
+pub(crate) struct LinuxProfileChatCorePath {
+    pub generic_chat_core_preferred: bool,
     pub preferred_gate: &'static str,
     pub preferred_build: &'static str,
     pub cache_is_source_of_truth: bool,
-    pub wrapper_preserves_profile_claim_boundary: bool,
+    pub profile_claim_boundary_preserved: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -825,12 +825,12 @@ pub(crate) fn build_linux_profile_claim_gate_report(
         } else {
             "LINUX_PROFILE_BLOCKED_BY_EVAL"
         },
-        chat_core_compatibility: LinuxProfileChatCoreCompatibility {
-            compatibility_wrapper: true,
-            preferred_gate: "nanda-llmwave-big linux-chat-core-gate",
-            preferred_build: "nanda-llmwave-big linux-chat-core-build",
+        chat_core_path: LinuxProfileChatCorePath {
+            generic_chat_core_preferred: true,
+            preferred_gate: "nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json",
+            preferred_build: "nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json",
             cache_is_source_of_truth: false,
-            wrapper_preserves_profile_claim_boundary: true,
+            profile_claim_boundary_preserved: true,
         },
         residual_pack: packet.summary,
         memory_proof,

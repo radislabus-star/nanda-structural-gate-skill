@@ -167,7 +167,7 @@ Inspect top-level `profile_claims` when the question is profile-scoped
 LLMWave progress: Linux `.lrf v2` memory can be proven by
 `linux-residual-proof`, and bounded Linux chat can be promoted by
 `linux-chat-profile-gate`. For actual Codex/LLM memory use, prefer
-`linux-chat-core-build` -> `linux-chat-core-gate` -> `linux-chat-core-ask`:
+`chat-core-build --profile examples/linux-chat-core.profile.json` -> `chat-core-gate --profile examples/linux-chat-core.profile.json` -> `chat-core-ask --profile examples/linux-chat-core.profile.json`:
 ChatCore resolves the Linux profile from `--memory-root .nanda/linux-active`,
 verifies the compiled binary hot cache against `.lrf` plus `.lwm` source
 memory, and reports token economics before returning a compact grounded packet.
@@ -292,17 +292,13 @@ nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/l
 nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json
 nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-heldout-suite.json --out .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --format json
 nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-center-learning-eval --center-learning-memory .nanda/linux-active/linux-center-learning.lwm --center-learning-script examples/linux-center-learning.script --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json
+nanda-llmwave-big chat-core-domain-proposal --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json
 nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
+nanda-llmwave-big chat-core-profile-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "which package provides command bash" --max-facts 4 --target-packet-tokens 300 --format json
 nanda-llmwave-big chat-core-learn --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
-nanda-llmwave-big chat-core-domain-proposal --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json
-nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
-nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --max-facts 4 --target-packet-tokens 300 --format json
-nanda-llmwave-big linux-chat-core-learn --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
-nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active --reset-scratch --format json
+nanda-llmwave-big chat-core-learn-eval --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --reset-scratch --format json
 nanda-llmwave-big linux-feedback-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --decision reject --out .nanda/linux-active/linux-feedback.json --format json
 nanda-llmwave-big linux-feedback-apply --residual-pack .nanda/linux-active/linux-active-65k.lrf --feedback .nanda/linux-active/linux-feedback.json --text "Is this machine externally exposed?" --max-facts 4 --format json
 nanda-llmwave-big linux-decision-search --residual-pack .nanda/linux-active/linux-active-65k.lrf --text "Is this machine externally exposed?" --max-facts 4 --format json
@@ -556,10 +552,11 @@ means Linux-only bounded chat over `.lrf` plus `.lwm` wave/center learning; it
 does not unlock general LLM, open-domain chat, scanner, or exploit claims.
 `chat-core-build`, `chat-core-gate`, `chat-core-ask`, `chat-core-learn`, and
 `chat-core-domain-proposal` are the generic ChatCore profile commands. Linux is
-the first connected data-driven `DomainPack`; `linux-chat-core-*` commands are
-compatibility wrappers for the Linux profile. `linux-chat-core-build` is the
-Linux wrapper around the generic cache compiler. The main interface is
-`--memory-root .nanda/linux-active`; explicit path flags are overrides. It treats
+the first connected data-driven `DomainPack`, selected by
+`--profile examples/linux-chat-core.profile.json`. There is no separate Linux
+ChatCore public command path. The main interface is `--memory-root
+.nanda/linux-active`; explicit path flags are overrides. `chat-core-build`
+treats
 `.lrf` plus `.lwm` overlays plus DomainPack files as the source of truth, decodes
 the `.lrf` into an interned packed binary runtime readout containing facts,
 routes, domains, DomainPacks, and evidence records, writes
@@ -574,18 +571,18 @@ hashes are part of cache freshness. They must not be hardcoded as Rust branches.
 `chat-core.hot` plus the manifest. The cache is a compiled runtime view, not
 memory authority. Inspect `token_economics`: token estimates use
 `ceil(bytes / 4)` and are comparison metrics, not exact model tokenizer counts.
-`linux-chat-core-gate` is the preferred fast authority gate before using that
-cache. It is read-only: it recomputes all source hashes, rejects missing or stale
+`chat-core-gate` is the preferred fast authority gate before using that cache.
+It is read-only: it recomputes all source hashes, rejects missing or stale
 cache, checks the binary hot cache hash, and does not run the heavy Linux
 profile/eval gate. A missing debug index does not remove answer authority when
 `.hot` and source hashes still match. Treat
 `LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM` as cache-authority
-readiness only. Use `linux-chat-core-profile-gate` for the heavier broad/heldout
+readiness only. Use `chat-core-profile-gate` for the heavier broad/heldout
 profile/eval path; its ready verdict is
 `LLMWAVE_LINUX_CHAT_CORE_PROFILE_READY_NOT_GENERAL_LLM`. If `.lrf`, any `.lwm`
 overlay, eval artifact, profile spec, or compiler version changes, the cache is
 stale and cannot grant answer authority.
-`linux-chat-core-ask` is the compact packet path for Codex/LLM use. It refuses
+`chat-core-ask` is the compact packet path for Codex/LLM use. It refuses
 stale cache, then reads `chat-core.hot` and returns the query intent, route
 priors, grounded answer state, structured `evidence[]`, legacy
 `compact_evidence`, selected domain suites, and anti-wave hits. `ask` reports
@@ -622,13 +619,13 @@ It must not fall back to Linux because a prompt happens to contain words like
 `external`, `firewall`, or `socket`. Use `chat-core-domain-proposal --text ...`
 for read-only builder hints; proposal candidate facts are not memory, do not
 write overlays, do not rebuild cache, and do not grant answer authority.
-`linux-chat-core-learn` appends explicit feedback to a source `.lwm` overlay:
+`chat-core-learn` appends explicit feedback to a source `.lwm` overlay:
 accepted facts become learned overlay records, and rejected shortcuts become
 learned anti-wave records. It never writes query text or answer packets as facts
 and never mutates `chat-core.hot` directly. The write policy is
 `append_overlay_then_recompile_cache`: after the overlay changes, the authority
-gate and `ask` must report stale until `linux-chat-core-build` rebuilds the hot
-cache. `linux-chat-core-learn-eval` runs a scratch proof of that loop: before
+gate and `ask` must report stale until `chat-core-build` rebuilds the hot
+cache. `chat-core-learn-eval` runs a scratch proof of that loop: before
 blocked, overlay written, cache stale, ask blocked while stale, hot rebuilt,
 target answer lifted from `compiled_chat_core_hot`, learned anti-wave replayed,
 bash/systemctl preserved, and no false-positive regression. Its ready verdict

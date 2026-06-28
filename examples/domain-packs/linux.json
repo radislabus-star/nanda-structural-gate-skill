@@ -99,7 +99,7 @@
     "secret_markers_hard_block": true
   },
   "eval_suites": [
-    "linux-chat-core",
-    "linux-chat-core-learn"
+    "chat-core",
+    "chat-core-learn"
   ]
 }
