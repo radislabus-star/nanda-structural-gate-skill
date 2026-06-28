@@ -1,0 +1,53 @@
+{
+  "seeds": [
+    {
+      "domain_id": "physics_material_layer",
+      "intent_anchors": [
+        "gravity",
+        "material layer",
+        "earth surface",
+        "wind setup",
+        "saturation",
+        "residual mode",
+        "dominant band",
+        "external station"
+      ],
+      "candidate_routes": [
+        "physics.material_layer.status",
+        "physics.material_layer.dominant_band",
+        "physics.earth_surface.mode_observation",
+        "physics.water_layer.residual_mode"
+      ]
+    },
+    {
+      "domain_id": "customs",
+      "intent_anchors": [
+        "customs",
+        "invoice",
+        "hs code",
+        "tn ved",
+        "тн вэд"
+      ],
+      "candidate_routes": [
+        "customs.document.obligation",
+        "customs.tariff.classification",
+        "customs.route.evidence"
+      ]
+    },
+    {
+      "domain_id": "code_review",
+      "intent_anchors": [
+        "diff",
+        "function",
+        "rust",
+        "code review",
+        ".rs"
+      ],
+      "candidate_routes": [
+        "code.owner.route",
+        "code.diff.boundary",
+        "code.test.evidence"
+      ]
+    }
+  ]
+}

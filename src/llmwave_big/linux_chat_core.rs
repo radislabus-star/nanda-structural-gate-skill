@@ -13,6 +13,13 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use super::chat_core::domain_pack::{route_supported_by_domain_packs, select_domain_support};
+use super::chat_core::{
+    domain_pack_digests, domain_proposal_seed_digests, legacy_domain_pack_from_routes,
+    load_domain_packs, load_domain_proposal_seeds, scan_feedback_slots, ChatCoreDomainPackSpec,
+    ChatCoreDomainProposalSeed, DomainPackArtifactDigest, DomainSupportReport,
+    DomainSupportVerdict,
+};
 use super::linux_profile::{
     build_linux_profile_claim_gate_report, build_linux_query_wave_report,
     build_linux_reason_report_from_decoded_facts, LinuxEvidenceStep, LinuxProfileClaimGateConfig,
@@ -27,12 +34,11 @@ use super::persistent_wave_memory::{
     DELTA_WATCH_TRACE,
 };
 
-pub(crate) const LINUX_CHAT_CORE_VERSION: &str =
-    "llmwave-big-v-next-linux-chat-core-hot-v3-learning-loop";
+pub(crate) const LINUX_CHAT_CORE_VERSION: &str = "llmwave-big-v-next-chat-core-domainpack-hot-v5";
 pub(crate) const DEFAULT_LINUX_CHAT_CORE_PROFILE: &str = "examples/linux-chat-core.profile.json";
-const HOT_MAGIC: &[u8] = b"LLMWCHATCORE3\0";
-const HOT_FORMAT_VERSION: u32 = 3;
-const HOT_FORMAT: &str = "interned-packed-readout-v3";
+const HOT_MAGIC: &[u8] = b"LLMWCHATCORE5\0";
+const HOT_FORMAT_VERSION: u32 = 5;
+const HOT_FORMAT: &str = "interned-packed-readout-v5-domainpack-proposals";
 const HOT_TARGET_BYTES: u64 = 6 * 1024 * 1024;
 const PACKED_FACT_RECORD_BYTES: u64 = 37;
 const PACKET_RANKING_POLICY: &str = "exact_anchor > required_route > route_prior > domain_route > anti_wave_boundary > learned_memory > confidence; budget_is_ceiling_not_quota; no_padding";
@@ -122,8 +128,14 @@ struct ChatCoreSpecOverrides<'a> {
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct LinuxChatCoreSpec {
     pub profile_id: String,
+    #[serde(default)]
+    pub engine: Option<String>,
     pub source_memory: LinuxChatCoreSourceMemorySpec,
     pub overlays: Vec<LinuxChatCoreOverlaySpec>,
+    #[serde(default)]
+    pub domain_packs: Vec<String>,
+    #[serde(default)]
+    pub domain_proposals: Vec<String>,
     pub domains: Vec<LinuxChatCoreDomainSpec>,
     pub evals: Vec<LinuxChatCoreEvalSpec>,
     pub cache: LinuxChatCoreCacheSpec,
@@ -202,7 +214,15 @@ pub(crate) struct LinuxChatCoreCacheManifest {
     pub spec_hash: String,
     pub source_artifacts: Vec<LinuxChatCoreArtifactDigest>,
     pub domain_registry_hash: String,
+    #[serde(default)]
+    pub domain_pack_hashes: Vec<DomainPackArtifactDigest>,
+    #[serde(default)]
+    pub domain_proposal_hashes: Vec<DomainPackArtifactDigest>,
     pub overlay_registry_hash: String,
+    #[serde(default)]
+    pub safety_policy_hash: String,
+    #[serde(default)]
+    pub packet_policy_hash: String,
     pub hot_path: String,
     pub hot_bytes: u64,
     pub hot_sha256: String,
@@ -223,6 +243,8 @@ pub(crate) struct LinuxChatCoreCacheIndex {
     pub route_index: Vec<LinuxChatCoreRouteIndexEntry>,
     pub readout_facts: Vec<LinuxChatCoreFactPreview>,
     pub domains: Vec<LinuxChatCoreDomainSpec>,
+    pub domain_packs: Vec<ChatCoreDomainPackSpec>,
+    pub domain_proposals: Vec<ChatCoreDomainProposalSeed>,
     pub overlays: Vec<LinuxChatCoreOverlaySpec>,
     pub source_artifacts: Vec<LinuxChatCoreArtifactDigest>,
     pub cache_contract: LinuxChatCoreCacheContract,
@@ -234,6 +256,8 @@ struct LinuxChatCoreHotCache {
     route_index: Vec<LinuxChatCoreRouteIndexEntry>,
     readout_facts: Vec<LinuxChatCoreFactPreview>,
     domains: Vec<LinuxChatCoreDomainSpec>,
+    domain_packs: Vec<ChatCoreDomainPackSpec>,
+    domain_proposals: Vec<ChatCoreDomainProposalSeed>,
 }
 
 struct LinuxChatCoreEncodedHotCache {
@@ -353,6 +377,9 @@ pub(crate) struct LinuxChatCoreLearnReport {
     pub mode: &'static str,
     pub version: &'static str,
     pub verdict: &'static str,
+    pub decision_state: String,
+    pub safe_to_learn_without_profile: bool,
+    pub action_for_builder: Option<String>,
     pub selected_overlay: Option<LinuxChatCoreSelectedOverlay>,
     pub learned_delta: Option<LinuxChatCoreLearnedDelta>,
     pub overlay_summary: Option<PersistentWaveMemorySummary>,
@@ -628,6 +655,15 @@ pub(crate) struct LinuxChatCoreGroundedPacket {
     pub answer: String,
     pub intent: String,
     pub route_priors: Vec<String>,
+    pub domain_supported: bool,
+    pub domain_decision_state: String,
+    pub selected_domain_pack: Option<String>,
+    pub supported_domains: Vec<String>,
+    pub suggested_domain: Option<String>,
+    pub safe_to_learn_without_profile: bool,
+    pub action_for_builder: Option<String>,
+    pub candidate_routes: Vec<String>,
+    pub candidate_facts: Vec<super::chat_core::domain_pack::DomainProposalFact>,
     pub packet_profile: String,
     pub inferred_packet_profile: String,
     pub requested_packet_profile: Option<String>,
@@ -905,6 +941,30 @@ pub(crate) fn build_linux_chat_core_ask_report(
         .as_ref()
         .map(|cache| select_domain_suites(&cache.domains, &query_wave))
         .unwrap_or_default();
+    let domain_support = hot_cache.as_ref().map(|cache| {
+        select_domain_support(
+            &domain_packs_from_cache(cache),
+            &cache.domain_proposals,
+            &config.text,
+            &query_route_set(&query_wave),
+            Some(&config.text),
+        )
+    });
+    if let Some(support) = &domain_support {
+        if support.verdict == DomainSupportVerdict::Unsupported {
+            return build_chat_core_ask_report_with_packet(
+                config,
+                manifest,
+                cache_status,
+                domain_runtime,
+                finalize_packet_tokens(unsupported_domain_packet(
+                    support,
+                    &query_wave,
+                    &packet_profile,
+                )),
+            );
+        }
+    }
     let reason = if let Some(cache) = &hot_cache {
         let facts = hot_facts_for_query(cache, &query_wave, &active_domain_suites);
         Some(build_linux_reason_report_from_decoded_facts(
@@ -947,6 +1007,15 @@ pub(crate) fn build_linux_chat_core_ask_report(
                         answer: learned_anti_wave_answer(&learned_anti_wave_hits),
                         intent: query_wave.intent,
                         route_priors: query_wave.route_priors,
+                        domain_supported: true,
+                        domain_decision_state: domain_support_state(&domain_support),
+                        selected_domain_pack: selected_domain_pack(&domain_support),
+                        supported_domains: supported_domains(&domain_support),
+                        suggested_domain: None,
+                        safe_to_learn_without_profile: true,
+                        action_for_builder: Some("USE_CONNECTED_DOMAIN_PACK".to_string()),
+                        candidate_routes: Vec::new(),
+                        candidate_facts: Vec::new(),
                         packet_profile: packet_profile.profile.clone(),
                         inferred_packet_profile: packet_profile.inferred_profile.clone(),
                         requested_packet_profile: packet_profile.requested_profile.clone(),
@@ -1017,6 +1086,15 @@ pub(crate) fn build_linux_chat_core_ask_report(
                 answer,
                 intent: report.query_wave.intent,
                 route_priors: report.query_wave.route_priors,
+                domain_supported: true,
+                domain_decision_state: domain_support_state(&domain_support),
+                selected_domain_pack: selected_domain_pack(&domain_support),
+                supported_domains: supported_domains(&domain_support),
+                suggested_domain: None,
+                safe_to_learn_without_profile: true,
+                action_for_builder: Some("USE_CONNECTED_DOMAIN_PACK".to_string()),
+                candidate_routes: Vec::new(),
+                candidate_facts: Vec::new(),
                 packet_profile: packet_profile.profile.clone(),
                 inferred_packet_profile: packet_profile.inferred_profile.clone(),
                 requested_packet_profile: packet_profile.requested_profile.clone(),
@@ -1066,6 +1144,15 @@ pub(crate) fn build_linux_chat_core_ask_report(
             answer: "Cache is stale or missing; rebuild and gate ChatCore before using it as answer support.".to_string(),
             intent: "unknown".to_string(),
             route_priors: Vec::new(),
+            domain_supported: false,
+            domain_decision_state: "DOMAIN_NOT_CHECKED_CACHE_STALE".to_string(),
+            selected_domain_pack: None,
+            supported_domains: Vec::new(),
+            suggested_domain: None,
+            safe_to_learn_without_profile: false,
+            action_for_builder: Some("REBUILD_AND_GATE_CHAT_CORE".to_string()),
+            candidate_routes: Vec::new(),
+            candidate_facts: Vec::new(),
             packet_profile: packet_profile.profile.clone(),
             inferred_packet_profile: packet_profile.inferred_profile.clone(),
             requested_packet_profile: packet_profile.requested_profile.clone(),
@@ -1119,7 +1206,9 @@ fn build_chat_core_ask_report_with_packet(
     let report = LinuxChatCoreAskReport {
         mode: "llmwave-big-linux-chat-core-ask",
         version: LINUX_CHAT_CORE_VERSION,
-        verdict: if packet.cache_fresh {
+        verdict: if packet.decision_state == "DOMAIN_UNSUPPORTED" {
+            "DOMAIN_UNSUPPORTED"
+        } else if packet.cache_fresh {
             "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM"
         } else {
             "LINUX_CHAT_CORE_CACHE_STALE"
@@ -1164,6 +1253,9 @@ pub(crate) fn build_linux_chat_core_learn_report(
             mode: "llmwave-big-linux-chat-core-learn",
             version: LINUX_CHAT_CORE_VERSION,
             verdict: "LLMWAVE_CHAT_CORE_LEARNING_WRITE_REJECTED",
+            decision_state: "SECRET_FEEDBACK_REFUSED".to_string(),
+            safe_to_learn_without_profile: false,
+            action_for_builder: Some("REMOVE_SECRET_OR_REDACT_FEEDBACK".to_string()),
             selected_overlay: None,
             learned_delta: None,
             overlay_summary: None,
@@ -1228,9 +1320,22 @@ pub(crate) fn build_linux_chat_core_learn_report(
             version: LINUX_CHAT_CORE_VERSION,
             verdict: if admission.duplicate_feedback {
                 "LLMWAVE_CHAT_CORE_DUPLICATE_FEEDBACK_NO_WRITE"
+            } else if admission.unknown_route_rejected {
+                "DOMAIN_UNSUPPORTED"
             } else {
                 "LLMWAVE_CHAT_CORE_LEARNING_WRITE_REJECTED"
             },
+            decision_state: if admission.unknown_route_rejected {
+                "DOMAIN_UNSUPPORTED".to_string()
+            } else if admission.duplicate_feedback {
+                "DUPLICATE_FEEDBACK_NO_WRITE".to_string()
+            } else {
+                "LEARNING_WRITE_REJECTED".to_string()
+            },
+            safe_to_learn_without_profile: false,
+            action_for_builder: admission
+                .unknown_route_rejected
+                .then(|| "CREATE_DOMAIN_PROFILE_OR_APPROVE_DOMAIN".to_string()),
             selected_overlay: Some(selected_overlay_report(selected_overlay)),
             learned_delta: None,
             overlay_summary: None,
@@ -1314,6 +1419,13 @@ pub(crate) fn build_linux_chat_core_learn_report(
         } else {
             "LLMWAVE_CHAT_CORE_OVERLAY_WRITTEN_CACHE_REBUILD_REQUIRED"
         },
+        decision_state: if admission.quarantined {
+            "FEEDBACK_QUARANTINED".to_string()
+        } else {
+            "OVERLAY_WRITTEN_CACHE_STALE".to_string()
+        },
+        safe_to_learn_without_profile: false,
+        action_for_builder: None,
         selected_overlay: Some(selected_overlay_report(selected_overlay)),
         learned_delta: Some(LinuxChatCoreLearnedDelta {
             delta_state: record.delta_state,
@@ -1752,7 +1864,8 @@ fn chat_core_raw_feedback<'a>(accept: Option<&'a str>, reject: Option<&'a str>) 
 }
 
 fn sanitize_feedback(raw: &str) -> LinuxChatCoreFeedbackSafety {
-    let (secret_detected, detector_reasons) = detect_secret_like(raw);
+    let scan = scan_feedback_slots(raw);
+    let secret_detected = scan.secret_detected;
     let source_prompt_hash = hash_bytes(raw.as_bytes());
     let redacted_source_prompt = if secret_detected {
         format!("[REDACTED_SECRET_FEEDBACK sha256={source_prompt_hash}]")
@@ -1765,59 +1878,8 @@ fn sanitize_feedback(raw: &str) -> LinuxChatCoreFeedbackSafety {
         redacted_source_prompt,
         source_prompt_hash,
         raw_secret_written: false,
-        detector_reasons,
+        detector_reasons: scan.reasons,
     }
-}
-
-fn detect_secret_like(raw: &str) -> (bool, Vec<String>) {
-    let lower = raw.to_ascii_lowercase();
-    let mut reasons = Vec::new();
-    for marker in [
-        "-----begin",
-        "private key",
-        "token=",
-        "access_token",
-        "api_key",
-        "apikey",
-        "secret=",
-        "client_secret",
-        "password=",
-        "passwd=",
-        "authorization:",
-        "bearer ",
-        "sk-",
-        "ghp_",
-        "github_pat_",
-        "xoxb-",
-        "xoxp-",
-        "akia",
-    ] {
-        if lower.contains(marker) {
-            reasons.push(format!("secret_marker:{marker}"));
-        }
-    }
-    if raw.split('.').filter(|part| part.len() > 10).count() >= 3 {
-        reasons.push("jwt_like_token".to_string());
-    }
-    if raw
-        .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_' && ch != '-' && ch != '+')
-        .any(|part| part.len() >= 48 && high_entropyish(part))
-    {
-        reasons.push("long_high_entropy_token".to_string());
-    }
-    (!reasons.is_empty(), reasons)
-}
-
-fn high_entropyish(value: &str) -> bool {
-    let has_upper = value.bytes().any(|byte| byte.is_ascii_uppercase());
-    let has_lower = value.bytes().any(|byte| byte.is_ascii_lowercase());
-    let has_digit = value.bytes().any(|byte| byte.is_ascii_digit());
-    let has_symbol = value.contains(['_', '-', '+']);
-    [has_upper, has_lower, has_digit, has_symbol]
-        .into_iter()
-        .filter(|present| *present)
-        .count()
-        >= 3
 }
 
 fn selected_overlay_report(overlay: &LinuxChatCoreOverlaySpec) -> LinuxChatCoreSelectedOverlay {
@@ -1864,6 +1926,7 @@ fn validate_learning_admission(
     overlay: &LinuxChatCoreOverlaySpec,
 ) -> LinuxChatCoreLearningAdmission {
     let mut reasons = Vec::new();
+    let domain_packs = domain_packs_for_spec(spec).unwrap_or_default();
     let matching_domains = spec
         .domains
         .iter()
@@ -1884,9 +1947,14 @@ fn validate_learning_admission(
                 .find(|domain| domain.domain_id == domain_id)
         })
         .or_else(|| matching_domains.first().copied());
-    let route_known = selected_domain.is_some();
+    let route_supported_by_pack =
+        route_supported_by_domain_packs(&domain_packs, &request.route, None);
+    let route_known = selected_domain.is_some() && route_supported_by_pack;
     if !route_known {
         reasons.push("unknown_route_rejected".to_string());
+    }
+    if selected_domain.is_some() && !route_supported_by_pack {
+        reasons.push("domain_pack_route_unsupported".to_string());
     }
     if requested_domain.is_some() && selected_domain.is_none() {
         reasons.push("domain_route_mismatch".to_string());
@@ -3041,6 +3109,103 @@ fn query_route_set(query: &LinuxQueryWave) -> BTreeSet<String> {
         .collect()
 }
 
+fn domain_packs_from_cache(cache: &LinuxChatCoreHotCache) -> Vec<ChatCoreDomainPackSpec> {
+    if !cache.domain_packs.is_empty() {
+        return cache.domain_packs.clone();
+    }
+    cache
+        .domains
+        .iter()
+        .map(|domain| {
+            legacy_domain_pack_from_routes(
+                &domain.domain_id,
+                domain.routes.clone(),
+                domain.negative_routes.clone(),
+                domain.overlay_ids.clone(),
+                &domain.action_scope,
+            )
+        })
+        .collect()
+}
+
+fn unsupported_domain_packet(
+    support: &DomainSupportReport,
+    query: &LinuxQueryWave,
+    packet_profile: &LinuxChatCorePacketProfileSpec,
+) -> LinuxChatCoreGroundedPacket {
+    LinuxChatCoreGroundedPacket {
+        cache_fresh: true,
+        answer_allowed: false,
+        readout_source: "none_domain_unsupported".to_string(),
+        cache_is_runtime_index_not_prompt_payload: true,
+        domain_suites: Vec::new(),
+        decision_state: "DOMAIN_UNSUPPORTED".to_string(),
+        answer: "Connected ChatCore DomainPacks do not support this query; create or approve a domain profile before using cache answer authority.".to_string(),
+        intent: query.intent.clone(),
+        route_priors: query.route_priors.clone(),
+        domain_supported: false,
+        domain_decision_state: support.decision_state.clone(),
+        selected_domain_pack: None,
+        supported_domains: support.supported_domains.clone(),
+        suggested_domain: support.suggested_domain.clone(),
+        safe_to_learn_without_profile: false,
+        action_for_builder: Some(support.action_for_builder.clone()),
+        candidate_routes: support.candidate_routes.clone(),
+        candidate_facts: support.candidate_facts.clone(),
+        packet_profile: packet_profile.profile.clone(),
+        inferred_packet_profile: packet_profile.inferred_profile.clone(),
+        requested_packet_profile: packet_profile.requested_profile.clone(),
+        requested_packet_profile_unknown: packet_profile.requested_profile_unknown,
+        packet_profile_override_accepted: packet_profile.override_accepted,
+        packet_profile_downgrade_blocked: packet_profile.downgrade_blocked,
+        packet_profile_selection_reason: packet_profile.selection_reason.clone(),
+        requested_packet_budget_tokens: packet_profile.requested_budget_tokens,
+        packet_budget_tokens: packet_profile.budget_tokens,
+        packet_tokens: 0,
+        packet_semantic_tokens: 0,
+        packet_prompt_payload_tokens: 0,
+        effective_min_packet_tokens: 0,
+        packet_over_budget: false,
+        packet_underfilled: true,
+        packet_truncated: false,
+        evidence_coverage: empty_evidence_coverage("domain_unsupported"),
+        selected_evidence_count: 0,
+        available_evidence_count: 0,
+        omitted_evidence_count: 0,
+        selected_anti_wave_count: 0,
+        missing_evidence: vec!["domain_profile_required".to_string()],
+        ranking_policy: PACKET_RANKING_POLICY,
+        no_padding: true,
+        budget_is_ceiling_not_quota: true,
+        truncation_reason: None,
+        omitted_routes: Vec::new(),
+        evidence_count: 0,
+        anti_wave_hits: Vec::new(),
+        evidence: Vec::new(),
+        compact_evidence: Vec::new(),
+    }
+}
+
+fn domain_support_state(support: &Option<DomainSupportReport>) -> String {
+    support
+        .as_ref()
+        .map(|support| support.decision_state.clone())
+        .unwrap_or_else(|| "DOMAIN_NOT_CHECKED".to_string())
+}
+
+fn selected_domain_pack(support: &Option<DomainSupportReport>) -> Option<String> {
+    support
+        .as_ref()
+        .and_then(|support| support.selected_domain_pack.clone())
+}
+
+fn supported_domains(support: &Option<DomainSupportReport>) -> Vec<String> {
+    support
+        .as_ref()
+        .map(|support| support.supported_domains.clone())
+        .unwrap_or_default()
+}
+
 fn hot_facts_for_query(
     cache: &LinuxChatCoreHotCache,
     query: &LinuxQueryWave,
@@ -3123,6 +3288,19 @@ fn load_chat_core_spec(
         &fs::read(profile).with_context(|| format!("read {}", profile.display()))?,
     )
     .with_context(|| format!("parse {}", profile.display()))?;
+    let profile_dir = profile.parent().unwrap_or_else(|| Path::new("."));
+    for pack_path in &mut spec.domain_packs {
+        let path = PathBuf::from(&pack_path);
+        if !path.is_absolute() {
+            *pack_path = path_string(&profile_dir.join(path));
+        }
+    }
+    for registry_path in &mut spec.domain_proposals {
+        let path = PathBuf::from(&registry_path);
+        if !path.is_absolute() {
+            *registry_path = path_string(&profile_dir.join(path));
+        }
+    }
 
     let hot_path = overrides.cache_dir.join("chat-core.hot");
     let index_path = overrides.cache_dir.join("chat-core.index.json");
@@ -3147,6 +3325,52 @@ fn load_chat_core_spec(
     spec.invariants.cache_must_match_source_hashes = true;
     spec.invariants.stale_cache_blocks_answer_authority = true;
     Ok(spec)
+}
+
+fn domain_packs_for_spec(spec: &LinuxChatCoreSpec) -> Result<Vec<ChatCoreDomainPackSpec>> {
+    if !spec.domain_packs.is_empty() {
+        let (packs, _) = load_domain_packs(&spec.domain_packs, Path::new("."))?;
+        return Ok(packs);
+    }
+    Ok(spec
+        .domains
+        .iter()
+        .map(|domain| {
+            legacy_domain_pack_from_routes(
+                &domain.domain_id,
+                domain.routes.clone(),
+                domain.negative_routes.clone(),
+                domain.overlay_ids.clone(),
+                &domain.action_scope,
+            )
+        })
+        .collect())
+}
+
+fn domain_pack_artifacts_for_spec(
+    spec: &LinuxChatCoreSpec,
+) -> Result<Vec<DomainPackArtifactDigest>> {
+    if spec.domain_packs.is_empty() {
+        return Ok(Vec::new());
+    }
+    domain_pack_digests(&spec.domain_packs, Path::new("."))
+}
+
+fn domain_proposals_for_spec(spec: &LinuxChatCoreSpec) -> Result<Vec<ChatCoreDomainProposalSeed>> {
+    if spec.domain_proposals.is_empty() {
+        return Ok(Vec::new());
+    }
+    let (seeds, _) = load_domain_proposal_seeds(&spec.domain_proposals, Path::new("."))?;
+    Ok(seeds)
+}
+
+fn domain_proposal_artifacts_for_spec(
+    spec: &LinuxChatCoreSpec,
+) -> Result<Vec<DomainPackArtifactDigest>> {
+    if spec.domain_proposals.is_empty() {
+        return Ok(Vec::new());
+    }
+    domain_proposal_seed_digests(&spec.domain_proposals, Path::new("."))
 }
 
 fn set_overlay_path(spec: &mut LinuxChatCoreSpec, overlay_id: &str, path: &Path) {
@@ -3189,9 +3413,31 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
     let mut active_facts = decoded_packet.facts.clone();
     active_facts.extend(load_overlay_facts(&spec.overlays)?);
     let route_index = route_index(&active_facts);
-    let domain_registry_hash = hash_json(&spec.domains)?;
+    let domain_packs = domain_packs_for_spec(spec)?;
+    let domain_proposals = domain_proposals_for_spec(spec)?;
+    let domain_pack_hashes = domain_pack_artifacts_for_spec(spec)?;
+    let domain_proposal_hashes = domain_proposal_artifacts_for_spec(spec)?;
+    let domain_registry_hash = hash_json(&(domain_packs.clone(), domain_proposals.clone()))?;
     let overlay_registry_hash = hash_json(&spec.overlays)?;
     let spec_hash = hash_json(spec)?;
+    let safety_policy_hash = hash_json(
+        &domain_packs
+            .iter()
+            .map(|pack| (&pack.domain_id, &pack.safety_policy))
+            .collect::<Vec<_>>(),
+    )?;
+    let packet_policy_hash = hash_json(
+        &domain_packs
+            .iter()
+            .map(|pack| {
+                (
+                    &pack.domain_id,
+                    &pack.packet_profiles,
+                    &pack.evidence_policy,
+                )
+            })
+            .collect::<Vec<_>>(),
+    )?;
     let readout_facts = active_facts
         .iter()
         .map(LinuxChatCoreFactPreview::from_decoded_fact)
@@ -3207,6 +3453,8 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
         route_index: route_index.clone(),
         readout_facts: readout_facts.clone(),
         domains: domains.clone(),
+        domain_packs: domain_packs.clone(),
+        domain_proposals: domain_proposals.clone(),
         overlays: spec.overlays.clone(),
         source_artifacts: source_artifacts.clone(),
         cache_contract: LinuxChatCoreCacheContract {
@@ -3224,6 +3472,8 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
         route_index,
         readout_facts,
         domains,
+        domain_packs,
+        domain_proposals,
     };
     let encoded_hot = encode_hot_cache(&hot_cache)?;
     let hot_hash = hash_bytes(&encoded_hot.bytes);
@@ -3242,7 +3492,11 @@ fn compile_chat_core_cache(spec: &LinuxChatCoreSpec) -> Result<CompiledChatCore>
         spec_hash,
         source_artifacts,
         domain_registry_hash,
+        domain_pack_hashes,
+        domain_proposal_hashes,
         overlay_registry_hash,
+        safety_policy_hash,
+        packet_policy_hash,
         hot_path: path_string(&hot_path),
         hot_bytes: encoded_hot.bytes.len() as u64,
         hot_sha256: hot_hash,
@@ -3321,6 +3575,41 @@ fn evaluate_cache(
     }
     if manifest.spec_hash != hash_json(spec)? {
         stale_reasons.push("profile_spec_changed".to_string());
+    }
+    let current_domain_packs = domain_packs_for_spec(spec)?;
+    let current_domain_proposals = domain_proposals_for_spec(spec)?;
+    if manifest.domain_registry_hash
+        != hash_json(&(current_domain_packs.clone(), current_domain_proposals))?
+    {
+        stale_reasons.push("domain_registry_hash_changed".to_string());
+    }
+    let current_safety_policy_hash = hash_json(
+        &current_domain_packs
+            .iter()
+            .map(|pack| (&pack.domain_id, &pack.safety_policy))
+            .collect::<Vec<_>>(),
+    )?;
+    if !manifest.safety_policy_hash.is_empty()
+        && manifest.safety_policy_hash != current_safety_policy_hash
+    {
+        stale_reasons.push("safety_policy_hash_changed".to_string());
+    }
+    let current_packet_policy_hash = hash_json(
+        &current_domain_packs
+            .iter()
+            .map(|pack| {
+                (
+                    &pack.domain_id,
+                    &pack.packet_profiles,
+                    &pack.evidence_policy,
+                )
+            })
+            .collect::<Vec<_>>(),
+    )?;
+    if !manifest.packet_policy_hash.is_empty()
+        && manifest.packet_policy_hash != current_packet_policy_hash
+    {
+        stale_reasons.push("packet_policy_hash_changed".to_string());
     }
     if current_source_hash != manifest_source_hash {
         stale_reasons.push("source_memory_hash_changed".to_string());
@@ -3507,6 +3796,28 @@ fn source_artifacts(spec: &LinuxChatCoreSpec) -> Result<Vec<LinuxChatCoreArtifac
             )?);
         }
     }
+    for pack in domain_pack_artifacts_for_spec(spec)? {
+        artifacts.push(LinuxChatCoreArtifactDigest {
+            artifact_id: format!("domain-pack:{}", pack.domain_id),
+            kind: "domain-pack".to_string(),
+            path: pack.path,
+            required: pack.required,
+            present: pack.present,
+            bytes: pack.bytes,
+            sha256: pack.sha256,
+        });
+    }
+    for registry in domain_proposal_artifacts_for_spec(spec)? {
+        artifacts.push(LinuxChatCoreArtifactDigest {
+            artifact_id: format!("domain-proposal-registry:{}", registry.domain_id),
+            kind: "domain-proposal-registry".to_string(),
+            path: registry.path,
+            required: registry.required,
+            present: registry.present,
+            bytes: registry.bytes,
+            sha256: registry.sha256,
+        });
+    }
     Ok(artifacts)
 }
 
@@ -3690,6 +4001,24 @@ fn encode_hot_cache(cache: &LinuxChatCoreHotCache) -> Result<LinuxChatCoreEncode
         write_string_id_vec(&mut bytes, &interner, &domain.overlay_ids)?;
         write_string_id(&mut bytes, &interner, &domain.action_scope)?;
     }
+    write_u64(&mut bytes, cache.domain_packs.len() as u64);
+    for pack in &cache.domain_packs {
+        write_string_id(&mut bytes, &interner, &pack.domain_id)?;
+        write_string_id_vec(&mut bytes, &interner, &pack.route_prefixes)?;
+        write_string_id_vec(&mut bytes, &interner, &pack.routes)?;
+        write_string_id_vec(&mut bytes, &interner, &pack.negative_routes)?;
+        write_string_id_vec(&mut bytes, &interner, &pack.slots)?;
+        write_string_id_vec(&mut bytes, &interner, &pack.intent_anchors)?;
+        write_string_id_vec(&mut bytes, &interner, &pack.packet_profiles)?;
+        write_string_id_vec(&mut bytes, &interner, &pack.overlay_ids)?;
+        write_string_id(&mut bytes, &interner, &pack.action_scope)?;
+    }
+    write_u64(&mut bytes, cache.domain_proposals.len() as u64);
+    for seed in &cache.domain_proposals {
+        write_string_id(&mut bytes, &interner, &seed.domain_id)?;
+        write_string_id_vec(&mut bytes, &interner, &seed.intent_anchors)?;
+        write_string_id_vec(&mut bytes, &interner, &seed.candidate_routes)?;
+    }
     write_u64(&mut bytes, cache.readout_facts.len() as u64);
     for fact in &cache.readout_facts {
         write_string_id(&mut bytes, &interner, &fact.route)?;
@@ -3773,6 +4102,34 @@ fn decode_hot_cache(bytes: &[u8]) -> Result<LinuxChatCoreHotCache> {
             action_scope: read_string_id(bytes, &mut pos, &strings)?,
         });
     }
+    let domain_pack_count = read_len(bytes, &mut pos)?;
+    let mut domain_packs = Vec::with_capacity(domain_pack_count);
+    for _ in 0..domain_pack_count {
+        domain_packs.push(ChatCoreDomainPackSpec {
+            domain_id: read_string_id(bytes, &mut pos, &strings)?,
+            route_prefixes: read_string_id_vec(bytes, &mut pos, &strings)?,
+            routes: read_string_id_vec(bytes, &mut pos, &strings)?,
+            negative_routes: read_string_id_vec(bytes, &mut pos, &strings)?,
+            slots: read_string_id_vec(bytes, &mut pos, &strings)?,
+            intent_anchors: read_string_id_vec(bytes, &mut pos, &strings)?,
+            packet_profiles: read_string_id_vec(bytes, &mut pos, &strings)?,
+            overlay_ids: read_string_id_vec(bytes, &mut pos, &strings)?,
+            action_scope: read_string_id(bytes, &mut pos, &strings)?,
+            evidence_policy: serde_json::Value::Null,
+            learning_policy: serde_json::Value::Null,
+            safety_policy: serde_json::Value::Null,
+            eval_suites: Vec::new(),
+        });
+    }
+    let domain_proposal_count = read_len(bytes, &mut pos)?;
+    let mut domain_proposals = Vec::with_capacity(domain_proposal_count);
+    for _ in 0..domain_proposal_count {
+        domain_proposals.push(ChatCoreDomainProposalSeed {
+            domain_id: read_string_id(bytes, &mut pos, &strings)?,
+            intent_anchors: read_string_id_vec(bytes, &mut pos, &strings)?,
+            candidate_routes: read_string_id_vec(bytes, &mut pos, &strings)?,
+        });
+    }
     let fact_count = read_len(bytes, &mut pos)?;
     let mut readout_facts = Vec::with_capacity(fact_count);
     for _ in 0..fact_count {
@@ -3797,6 +4154,8 @@ fn decode_hot_cache(bytes: &[u8]) -> Result<LinuxChatCoreHotCache> {
         route_index,
         readout_facts,
         domains,
+        domain_packs,
+        domain_proposals,
     })
 }
 
@@ -3852,6 +4211,32 @@ fn collect_hot_strings(
             interner.intern(value)?;
         }
         interner.intern(&domain.action_scope)?;
+    }
+    for pack in &cache.domain_packs {
+        interner.intern(&pack.domain_id)?;
+        for value in pack
+            .route_prefixes
+            .iter()
+            .chain(pack.routes.iter())
+            .chain(pack.negative_routes.iter())
+            .chain(pack.slots.iter())
+            .chain(pack.intent_anchors.iter())
+            .chain(pack.packet_profiles.iter())
+            .chain(pack.overlay_ids.iter())
+        {
+            interner.intern(value)?;
+        }
+        interner.intern(&pack.action_scope)?;
+    }
+    for seed in &cache.domain_proposals {
+        interner.intern(&seed.domain_id)?;
+        for value in seed
+            .intent_anchors
+            .iter()
+            .chain(seed.candidate_routes.iter())
+        {
+            interner.intern(value)?;
+        }
     }
     for fact in &cache.readout_facts {
         interner.intern(&fact.route)?;
@@ -4460,6 +4845,14 @@ mod tests {
                 overlay_ids: vec!["dialogue".to_string()],
                 action_scope: "read_only_answer_support".to_string(),
             }],
+            domain_packs: vec![legacy_domain_pack_from_routes(
+                "packages",
+                vec!["linux.apt.command.package-command".to_string()],
+                Vec::<String>::new(),
+                vec!["dialogue".to_string()],
+                "read_only_answer_support",
+            )],
+            domain_proposals: Vec::new(),
         };
         let encoded = encode_hot_cache(&cache).unwrap();
         assert_eq!(encoded.stats.hot_format, HOT_FORMAT);
@@ -4475,6 +4868,7 @@ mod tests {
         assert_eq!(decoded.readout_facts.len(), 1);
         assert_eq!(decoded.route_index.len(), 1);
         assert_eq!(decoded.domains.len(), 1);
+        assert_eq!(decoded.domain_packs.len(), 1);
         assert_eq!(decoded.readout_facts[0].subject, "bash");
         assert_eq!(decoded.readout_facts[0].object, "bash");
     }
@@ -4795,7 +5189,11 @@ mod tests {
             spec_hash: "unit-test-spec".to_string(),
             source_artifacts: artifacts,
             domain_registry_hash: "unit-test-domains".to_string(),
+            domain_pack_hashes: Vec::new(),
+            domain_proposal_hashes: Vec::new(),
             overlay_registry_hash: "unit-test-overlays".to_string(),
+            safety_policy_hash: "unit-test-safety".to_string(),
+            packet_policy_hash: "unit-test-packet".to_string(),
             hot_path: path_string(&hot),
             hot_bytes: 3,
             hot_sha256: hash_file(&hot).unwrap(),
@@ -4893,7 +5291,11 @@ mod tests {
             spec_hash: "unit-test-spec".to_string(),
             source_artifacts: artifacts,
             domain_registry_hash: "unit-test-domains".to_string(),
+            domain_pack_hashes: Vec::new(),
+            domain_proposal_hashes: Vec::new(),
             overlay_registry_hash: "unit-test-overlays".to_string(),
+            safety_policy_hash: "unit-test-safety".to_string(),
+            packet_policy_hash: "unit-test-packet".to_string(),
             hot_path: path_string(&hot),
             hot_bytes: 3,
             hot_sha256: hash_file(&hot).unwrap(),
@@ -5078,6 +5480,8 @@ mod tests {
             route_index: Vec::new(),
             readout_facts: vec![fallback_negative, learned_negative],
             domains: Vec::new(),
+            domain_packs: Vec::new(),
+            domain_proposals: Vec::new(),
         };
         let query = LinuxQueryWave {
             intent: "boundary_rejection".to_string(),

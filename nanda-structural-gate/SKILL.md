@@ -1394,14 +1394,20 @@ subgate cannot show target-query improvement, memory lift, anti-center replay,
 candidate quarantine, evidence-weighted admission, bad-feedback quarantine,
 drift-budget enforcement, no false-positive regression, no heldout regression,
 and unrelated-route preservation, do not promote the chat profile.
-Prefer `nanda-llmwave-big linux-chat-core-build` plus
-`nanda-llmwave-big linux-chat-core-gate` when the task is to use the Linux
-profile as Codex/LLM memory. The normal interface is `--memory-root
+Prefer generic `nanda-llmwave-big chat-core-*` commands when the task is to use
+ChatCore as Codex/LLM memory. Linux is the first data-driven `DomainPack`, not
+the engine. The `linux-chat-core-*` commands remain compatibility wrappers for
+the Linux profile. The normal Linux interface is `--memory-root
 .nanda/linux-active`; explicit source flags are overrides. ChatCore treats
-`.lrf` plus `.lwm` overlays as source memory, and compiles a binary hot cache
-view:
+`.lrf` plus `.lwm` overlays plus DomainPack files as source memory, and compiles
+a binary hot cache view:
 
 ```bash
+nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
+nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
+nanda-llmwave-big chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
+nanda-llmwave-big chat-core-learn --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
+nanda-llmwave-big chat-core-domain-proposal --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
@@ -1411,8 +1417,10 @@ nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active -
 
 Read ChatCore literally: cache is a compiled runtime view, not source memory.
 `chat-core.manifest.json` must match the current `.lrf`, overlays, eval
-artifacts, domain registry, and compiler version. If `cache_status.cache_fresh`
-is false, do not use the cache as answer support. `linux-chat-core-gate` is
+artifacts, domain registry, DomainPack hashes, domain proposal registry hashes,
+safety policy, packet policy, and compiler version. If
+`cache_status.cache_fresh` is false, do not use the cache as answer support.
+`linux-chat-core-gate` is
 read-only and fast: missing cache is `LINUX_CHAT_CORE_CACHE_STALE`, not an
 implicit build. It checks manifest/source/hot hashes and does not run heavy
 broad/profile evals. Use `linux-chat-core-build` for normal rebuilds. Use
@@ -1431,6 +1439,19 @@ answer state, selected domain suites, structured `evidence[]`, legacy
 `cache_is_runtime_index_not_prompt_payload=true` as a hard interpretation rule:
 the hot cache is a runtime readout, not prompt context; use only the grounded
 packet as the small external memory payload.
+If no connected DomainPack supports the inferred domain/intent, `ask` must
+return `DOMAIN_UNSUPPORTED`, `answer_allowed=false`,
+`selected_evidence_count=0`, `readout_source="none_domain_unsupported"`, and
+proposal-only candidate routes. Do not let an unsupported physics/customs/code
+prompt fall back to Linux just because it contains words such as `external`,
+`socket`, or `firewall`. Use `chat-core-domain-proposal` for read-only builder
+hints. Candidate facts in that report are not memory, cannot grant answer
+authority, must not write `.lwm`, and must not rebuild `.hot`. If adding a new
+discipline requires editing Rust engine logic, the refactor failed; add a
+profile/DomainPack instead. Proposal hints are data-driven too: put future
+builder suggestions in profile `domain_proposals` registries such as
+`examples/domain-packs/proposal-seeds.json`, and treat their manifest hashes as
+part of cache authority.
 Grounded packet budgets are adaptive. `--packet-profile` is a hint, not
 authority: ChatCore always computes `inferred_packet_profile`, and a requested
 profile cannot downgrade inferred risk. If a caller tries to force
@@ -1471,10 +1492,16 @@ loop: before blocked, overlay written, stale gate, stale ask blocked, rebuild,
 learned answer from `compiled_chat_core_hot`, learned anti-wave replay, and
 unrelated bash/systemctl routes preserved.
 Before any append, learning must pass the ChatCore safety contract: refuse and
-redact secret-like feedback, require the route to exist in the domain registry,
-require the overlay to be allowed for that domain scope, treat duplicate feedback
-as a no-write, and quarantine conflicting feedback as a non-projected
-`WATCH_TRACE`. In `linux-chat-core-learn-eval`, require `.safety` to show
+redact secret-like feedback, require the route to exist in the domain registry
+and connected DomainPack, require the overlay to be allowed for that domain
+scope, treat duplicate feedback as a no-write, and quarantine conflicting
+feedback as a non-projected `WATCH_TRACE`. Unsupported-domain learning must
+return `DOMAIN_UNSUPPORTED`, `overlay_written=false`, and
+`safe_to_learn_without_profile=false`. The detector is slot-aware:
+route-like identifiers are not JWTs by default, long technical snake_case
+identifiers are review/quarantine signals rather than hard secret refusals, and
+real secret markers still hard block. In `linux-chat-core-learn-eval`, require
+`.safety` to show
 duplicate no-write, conflict quarantine, unknown-route rejection, wrong-overlay
 rejection, secret refusal, poison quarantine, and `raw_secret_written=false`.
 These commands expand the Linux-profile reasoning/chat proof surface, but they

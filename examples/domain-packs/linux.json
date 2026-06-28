@@ -1,0 +1,105 @@
+{
+  "domain_id": "linux",
+  "route_prefixes": [
+    "linux."
+  ],
+  "routes": [
+    "linux.apt.command.provider",
+    "linux.apt.command.package-command",
+    "linux.package.binary",
+    "linux.package.file.owner",
+    "linux.systemd.exec",
+    "linux.systemd.unit.exec",
+    "linux.systemd.unit.state",
+    "linux.resolver.config",
+    "linux.route.default",
+    "linux.socket.runtime",
+    "linux.firewall.runtime",
+    "linux.exposure.socket",
+    "linux.firewall.boundary",
+    "linux.boundary.socket",
+    "linux.vpn.status",
+    "linux.vpn.enable",
+    "linux.vpn.disable",
+    "linux.vpn.wireguard.local_setup",
+    "linux.vpn.status.local_check",
+    "linux.vpn.dns_route.local_setup",
+    "linux.vpn.trusttunnel.local_safety",
+    "linux.vpn.secret.boundary"
+  ],
+  "negative_routes": [
+    "package_installed_does_not_prove_runtime_active",
+    "unit_file_does_not_prove_running_state",
+    "resolver_config_does_not_prove_external_reachability",
+    "listening_local_socket_does_not_prove_external_exposure",
+    "vpn_package_installed_does_not_prove_tunnel_active",
+    "vpn_action_requires_explicit_user_confirmation"
+  ],
+  "slots": [
+    "route",
+    "relation",
+    "subject_role",
+    "object_role",
+    "polarity",
+    "evidence_kind",
+    "subject",
+    "object"
+  ],
+  "intent_anchors": [
+    "linux",
+    "package",
+    "command",
+    "binary",
+    "apt",
+    "dpkg",
+    "systemd",
+    "service",
+    "unit",
+    "systemctl",
+    "dns",
+    "resolver",
+    "resolvectl",
+    "route",
+    "vpn",
+    "wireguard",
+    "wg-quick",
+    "networkmanager",
+    "tunnel",
+    "firewall",
+    "socket",
+    "nftables",
+    "iptables",
+    "private key"
+  ],
+  "packet_profiles": [
+    "exact_fact",
+    "action_plan",
+    "troubleshooting",
+    "multi_route_conflict",
+    "safety_refusal",
+    "uncertain"
+  ],
+  "overlay_ids": [
+    "dialogue",
+    "centers",
+    "vpn"
+  ],
+  "action_scope": "linux_profile_grounded_cache_only",
+  "evidence_policy": {
+    "no_linux_fallback_for_unknown_domains": true,
+    "selected_evidence_count_zero_when_unsupported": true
+  },
+  "learning_policy": {
+    "unsupported_domain_write_allowed": false,
+    "write_policy": "append_overlay_then_recompile_cache"
+  },
+  "safety_policy": {
+    "slot_aware_secret_detector": true,
+    "route_like_identifiers_are_not_jwt": true,
+    "secret_markers_hard_block": true
+  },
+  "eval_suites": [
+    "linux-chat-core",
+    "linux-chat-core-learn"
+  ]
+}

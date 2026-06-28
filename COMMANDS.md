@@ -292,6 +292,11 @@ nanda-llmwave-big linux-profile-claim-gate --residual-pack .nanda/linux-active/l
 nanda-llmwave-big linux-heldout-suite-build --residual-pack .nanda/linux-active/linux-active-65k.lrf --cases 100 --out .nanda/linux-active/linux-heldout-suite.json --format json
 nanda-llmwave-big linux-heldout-eval-run --residual-pack .nanda/linux-active/linux-active-65k.lrf --suite .nanda/linux-active/linux-heldout-suite.json --out .nanda/linux-active/linux-heldout-eval.json --max-facts 4 --format json
 nanda-llmwave-big linux-chat-profile-gate --residual-pack .nanda/linux-active/linux-active-65k.lrf --broad-eval .nanda/linux-active/linux-broad-eval.json --heldout-eval .nanda/linux-active/linux-heldout-eval.json --run-chat-learning-eval --chat-learning-memory .nanda/linux-active/linux-chat-profile.lwm --run-center-learning-eval --center-learning-memory .nanda/linux-active/linux-center-learning.lwm --center-learning-script examples/linux-center-learning.script --run-vpn-training-eval --vpn-memory .nanda/linux-active/linux-chat-profile-vpn.lwm --max-facts 4 --format json
+nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
+nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
+nanda-llmwave-big chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "which package provides command bash" --max-facts 4 --target-packet-tokens 300 --format json
+nanda-llmwave-big chat-core-learn --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
+nanda-llmwave-big chat-core-domain-proposal --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
@@ -549,14 +554,22 @@ same command has the alias `linux-chat-profile-gate`. With `--heldout-eval`,
 `LLMWAVE_LINUX_CHAT_PROFILE_READY_NOT_GENERAL_LLM`. That stronger target still
 means Linux-only bounded chat over `.lrf` plus `.lwm` wave/center learning; it
 does not unlock general LLM, open-domain chat, scanner, or exploit claims.
-`linux-chat-core-build` is the unified ChatCore cache compiler for the Linux
-profile. The main interface is `--memory-root .nanda/linux-active`; explicit
-path flags are overrides. It treats `.lrf` plus `.lwm` overlays as the source of
-truth, decodes the `.lrf` into an interned packed binary runtime readout
-containing facts, routes, domains, and evidence records, writes `cache/chat-core.hot`,
-`cache/chat-core.index.json`, and `cache/chat-core.manifest.json`, and records
-hashes for the residual packet, dialogue overlay, center overlay, VPN/domain
-overlay, profile evals, domain registry, and compiler version.
+`chat-core-build`, `chat-core-gate`, `chat-core-ask`, `chat-core-learn`, and
+`chat-core-domain-proposal` are the generic ChatCore profile commands. Linux is
+the first connected data-driven `DomainPack`; `linux-chat-core-*` commands are
+compatibility wrappers for the Linux profile. `linux-chat-core-build` is the
+Linux wrapper around the generic cache compiler. The main interface is
+`--memory-root .nanda/linux-active`; explicit path flags are overrides. It treats
+`.lrf` plus `.lwm` overlays plus DomainPack files as the source of truth, decodes
+the `.lrf` into an interned packed binary runtime readout containing facts,
+routes, domains, DomainPacks, and evidence records, writes
+`cache/chat-core.hot`, `cache/chat-core.index.json`, and
+`cache/chat-core.manifest.json`, and records hashes for the residual packet,
+dialogue overlay, center overlay, VPN/domain overlay, profile evals, domain
+registry, DomainPack files, safety policy, packet policy, and compiler version.
+Domain proposal hints are data too: profile `domain_proposals` entries point to
+registry files such as `examples/domain-packs/proposal-seeds.json`, and their
+hashes are part of cache freshness. They must not be hardcoded as Rust branches.
 `chat-core.index.json` is a debug/explain artifact; answer authority comes from
 `chat-core.hot` plus the manifest. The cache is a compiled runtime view, not
 memory authority. Inspect `token_economics`: token estimates use
@@ -602,6 +615,13 @@ the cache lacks runtime/action/conflict proof. Check `packet_semantic_tokens`,
 `budget_is_ceiling_not_quota=true`. `packet_tokens` is a compatibility alias for
 `packet_semantic_tokens`. Anti-wave evidence must survive safety and
 route-boundary packets; stale cache still blocks ask before packet selection.
+If no connected DomainPack supports a query, `ask` must return
+`DOMAIN_UNSUPPORTED`, `answer_allowed=false`, `selected_evidence_count=0`,
+`readout_source="none_domain_unsupported"`, and proposal-only candidate routes.
+It must not fall back to Linux because a prompt happens to contain words like
+`external`, `firewall`, or `socket`. Use `chat-core-domain-proposal --text ...`
+for read-only builder hints; proposal candidate facts are not memory, do not
+write overlays, do not rebuild cache, and do not grant answer authority.
 `linux-chat-core-learn` appends explicit feedback to a source `.lwm` overlay:
 accepted facts become learned overlay records, and rejected shortcuts become
 learned anti-wave records. It never writes query text or answer packets as facts
@@ -616,10 +636,15 @@ remains Linux-profile scoped:
 `LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM`.
 The writer now enforces the learning safety contract before appending: secret-like
 feedback is refused/redacted, routes must be known in the ChatCore domain
-registry, overlays must match the domain scope, duplicates do not write, and
-conflicting feedback becomes a non-projected `WATCH_TRACE` quarantine record. The
-learn-eval JSON exposes those checks in `.safety` and keeps
-`raw_secret_written=false`.
+registry and connected DomainPack, overlays must match the domain scope,
+duplicates do not write, and conflicting feedback becomes a non-projected
+`WATCH_TRACE` quarantine record. Unsupported domains return
+`DOMAIN_UNSUPPORTED`, `overlay_written=false`, and
+`safe_to_learn_without_profile=false`. The secret detector is slot-aware:
+route-like identifiers are not JWTs by default, long technical snake_case
+identifiers are review/quarantine signals rather than hard refusals, and real
+secret markers still hard block. The learn-eval JSON exposes those checks in
+`.safety` and keeps `raw_secret_written=false`.
 `linux-heldout-suite-build` adds a stricter profile suite: exact facts,
 near-name collisions, shortcut controls, and endpoint-scope checks. Use
 `linux-heldout-eval-run` before trusting the profile on noisy Linux facts.

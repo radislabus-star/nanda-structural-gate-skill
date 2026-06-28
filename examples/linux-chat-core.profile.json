@@ -1,5 +1,6 @@
 {
   "profile_id": "linux-chat-core",
+  "engine": "chat-core-v1",
   "source_memory": {
     "residual_pack": ".nanda/linux-active/linux-active-65k.lrf",
     "source_of_truth": true
@@ -45,6 +46,12 @@
       "source_of_truth": true,
       "write_policy": "append_overlay_then_recompile_cache"
     }
+  ],
+  "domain_packs": [
+    "domain-packs/linux.json"
+  ],
+  "domain_proposals": [
+    "domain-packs/proposal-seeds.json"
   ],
   "domains": [
     {

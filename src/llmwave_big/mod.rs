@@ -9,6 +9,7 @@ pub mod active_core;
 pub mod answer_surface;
 pub mod atlas;
 pub mod broad_eval;
+pub mod chat_core;
 pub mod consolidation;
 pub mod core_v1_active_retrieval;
 pub mod core_v1_answer_verifier;
@@ -488,6 +489,21 @@ enum LlmwaveBigCommand {
     /// Gate Linux-profile reasoning/chat claims from memory and eval evidence.
     #[command(name = "linux-profile-claim-gate", alias = "linux-chat-profile-gate")]
     LinuxProfileClaimGate(LlmwaveBigLinuxProfileClaimGateArgs),
+    /// Generic ChatCore cache compiler over a profile and DomainPacks.
+    #[command(name = "chat-core-build")]
+    ChatCoreBuild(LlmwaveBigChatCoreBuildArgs),
+    /// Generic ChatCore fast authority gate over a profile and DomainPacks.
+    #[command(name = "chat-core-gate")]
+    ChatCoreGate(LlmwaveBigChatCoreGateArgs),
+    /// Generic ChatCore grounded-packet ask over a profile and DomainPacks.
+    #[command(name = "chat-core-ask")]
+    ChatCoreAsk(LlmwaveBigChatCoreAskArgs),
+    /// Generic ChatCore overlay learning writer over a profile and DomainPacks.
+    #[command(name = "chat-core-learn")]
+    ChatCoreLearn(LlmwaveBigChatCoreLearnArgs),
+    /// Read-only proposal for text that is not covered by connected DomainPacks.
+    #[command(name = "chat-core-domain-proposal")]
+    ChatCoreDomainProposal(LlmwaveBigChatCoreDomainProposalArgs),
     /// Compile `.lrf` + `.lwm` overlays into a unified Linux ChatCore cache.
     #[command(name = "linux-chat-core-build")]
     LinuxChatCoreBuild(LlmwaveBigLinuxChatCoreBuildArgs),
@@ -1785,6 +1801,104 @@ struct LlmwaveBigLinuxProfileClaimGateArgs {
     vpn_memory: PathBuf,
     #[arg(long = "max-facts", default_value_t = 4)]
     max_facts: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigChatCoreBuildArgs {
+    #[arg(
+        long = "profile",
+        default_value = "examples/linux-chat-core.profile.json"
+    )]
+    profile: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigChatCoreGateArgs {
+    #[arg(
+        long = "profile",
+        default_value = "examples/linux-chat-core.profile.json"
+    )]
+    profile: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "manifest")]
+    manifest: Option<PathBuf>,
+    #[arg(long = "rebuild-cache", default_value_t = false)]
+    rebuild_cache: bool,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigChatCoreAskArgs {
+    #[arg(
+        long = "profile",
+        default_value = "examples/linux-chat-core.profile.json"
+    )]
+    profile: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "text")]
+    text: String,
+    #[arg(long = "manifest")]
+    manifest: Option<PathBuf>,
+    #[arg(long = "max-facts", default_value_t = 4)]
+    max_facts: usize,
+    #[arg(long = "packet-profile")]
+    packet_profile: Option<String>,
+    #[arg(long = "target-packet-tokens")]
+    target_packet_tokens: Option<u64>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigChatCoreLearnArgs {
+    #[arg(
+        long = "profile",
+        default_value = "examples/linux-chat-core.profile.json"
+    )]
+    profile: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "accept", conflicts_with = "reject")]
+    accept: Option<String>,
+    #[arg(long = "reject", conflicts_with = "accept")]
+    reject: Option<String>,
+    #[arg(long = "domain")]
+    domain: Option<String>,
+    #[arg(long = "overlay")]
+    overlay: Option<String>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigChatCoreDomainProposalArgs {
+    #[arg(long = "text")]
+    text: String,
+    #[arg(long = "context-file")]
+    context_file: Option<PathBuf>,
+    #[arg(long = "proposal-registry")]
+    proposal_registry: Vec<PathBuf>,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -4675,6 +4789,250 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         report.claim_boundary.general_llm_ready
                     );
                     println!("- safe claim: {}", report.claim_boundary.safe_claim);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatCoreBuild(args) => {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: Some(args.profile),
+                    residual_pack: None,
+                    dialogue_overlay: None,
+                    centers_overlay: None,
+                    vpn_overlay: None,
+                    broad_eval: None,
+                    heldout_eval: None,
+                    cache_dir: None,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_cache_report(
+                linux_chat_core::LinuxChatCoreBuildConfig {
+                    profile: paths.profile,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    broad_eval: paths.broad_eval,
+                    heldout_eval: paths.heldout_eval,
+                    cache_dir: paths.cache_dir,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("profile_id: {}", report.spec.profile_id);
+                    println!("engine: chat-core-v1");
+                    println!("domain_packs: {}", report.spec.domain_packs.len());
+                    println!("hot_bytes: {}", report.cache.hot_bytes);
+                }
+                OutputFormat::Md => {
+                    println!("# ChatCore Build");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- profile: `{}`", report.spec.profile_id);
+                    println!("- domain packs: `{}`", report.spec.domain_packs.len());
+                    println!("- hot bytes: `{}`", report.cache.hot_bytes);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatCoreGate(args) => {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: Some(args.profile),
+                    residual_pack: None,
+                    dialogue_overlay: None,
+                    centers_overlay: None,
+                    vpn_overlay: None,
+                    broad_eval: None,
+                    heldout_eval: None,
+                    cache_dir: None,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_gate_report(
+                linux_chat_core::LinuxChatCoreGateConfig {
+                    profile: paths.profile,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    broad_eval: paths.broad_eval,
+                    heldout_eval: paths.heldout_eval,
+                    center_learning_script: None,
+                    cache_dir: paths.cache_dir,
+                    manifest: args.manifest,
+                    rebuild_cache: args.rebuild_cache,
+                    max_facts: args.max_facts,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("cache_fresh: {}", report.cache_status.cache_fresh);
+                    println!(
+                        "safe_to_answer_from_cache: {}",
+                        report.chat_core.safe_to_answer_from_cache
+                    );
+                    println!("domain_packs: {}", report.spec.domain_packs.len());
+                }
+                OutputFormat::Md => {
+                    println!("# ChatCore Gate");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- cache fresh: `{}`", report.cache_status.cache_fresh);
+                    println!(
+                        "- safe to answer from cache: `{}`",
+                        report.chat_core.safe_to_answer_from_cache
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatCoreAsk(args) => {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: Some(args.profile),
+                    residual_pack: None,
+                    dialogue_overlay: None,
+                    centers_overlay: None,
+                    vpn_overlay: None,
+                    broad_eval: None,
+                    heldout_eval: None,
+                    cache_dir: None,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_ask_report(
+                linux_chat_core::LinuxChatCoreAskConfig {
+                    text: args.text,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    cache_dir: paths.cache_dir,
+                    manifest: args.manifest,
+                    max_facts: args.max_facts,
+                    packet_profile: args.packet_profile,
+                    target_packet_tokens: args.target_packet_tokens,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("answer_allowed: {}", report.grounded_packet.answer_allowed);
+                    println!("state: {}", report.grounded_packet.decision_state);
+                    println!("readout_source: {}", report.grounded_packet.readout_source);
+                    println!("answer: {}", report.grounded_packet.answer);
+                }
+                OutputFormat::Md => {
+                    println!("# ChatCore Ask");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- state: `{}`", report.grounded_packet.decision_state);
+                    println!(
+                        "- answer allowed: `{}`",
+                        report.grounded_packet.answer_allowed
+                    );
+                    println!("- answer: {}", report.grounded_packet.answer);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatCoreLearn(args) => {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: Some(args.profile),
+                    residual_pack: None,
+                    dialogue_overlay: None,
+                    centers_overlay: None,
+                    vpn_overlay: None,
+                    broad_eval: None,
+                    heldout_eval: None,
+                    cache_dir: None,
+                },
+            );
+            let report = linux_chat_core::build_linux_chat_core_learn_report(
+                linux_chat_core::LinuxChatCoreLearnConfig {
+                    profile: paths.profile,
+                    residual_pack: paths.residual_pack,
+                    dialogue_overlay: paths.dialogue_overlay,
+                    centers_overlay: paths.centers_overlay,
+                    vpn_overlay: paths.vpn_overlay,
+                    broad_eval: paths.broad_eval,
+                    heldout_eval: paths.heldout_eval,
+                    cache_dir: paths.cache_dir,
+                    accept: args.accept,
+                    reject: args.reject,
+                    domain: args.domain,
+                    overlay: args.overlay,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("decision_state: {}", report.decision_state);
+                    println!(
+                        "overlay_written: {}",
+                        report.learning_update.overlay_written
+                    );
+                    println!(
+                        "safe_to_learn_without_profile: {}",
+                        report.safe_to_learn_without_profile
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# ChatCore Learn");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- decision: `{}`", report.decision_state);
+                    println!(
+                        "- overlay written: `{}`",
+                        report.learning_update.overlay_written
+                    );
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatCoreDomainProposal(args) => {
+            let report =
+                chat_core::build_domain_proposal_report(chat_core::ChatCoreDomainProposalConfig {
+                    text: args.text,
+                    context_file: args.context_file,
+                    proposal_registries: args.proposal_registry,
+                    out: args.out,
+                })?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("decision_state: {}", report.decision_state);
+                    println!(
+                        "suggested_domain_id: {}",
+                        report.suggested_domain_id.as_deref().unwrap_or("unknown")
+                    );
+                    println!("candidate_routes: {}", report.candidate_routes.join(","));
+                }
+                OutputFormat::Md => {
+                    println!("# ChatCore Domain Proposal");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- decision: `{}`", report.decision_state);
+                    println!(
+                        "- suggested domain: `{}`",
+                        report.suggested_domain_id.as_deref().unwrap_or("unknown")
+                    );
                 }
             }
             Ok(EXIT_PASS)

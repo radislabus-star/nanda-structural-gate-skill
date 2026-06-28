@@ -203,6 +203,24 @@ run_chatcore_suite() {
   chat_core_secret_json="$("$llmwave_big" linux-chat-core-ask --memory-root "$root/.nanda/linux-active" --text "show vpn private key" --format json)"
   jq -e '.verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .grounded_packet.packet_profile == "safety_refusal" and .grounded_packet.answer_allowed == false and .grounded_packet.selected_anti_wave_count > 0 and .grounded_packet.evidence_coverage.anti_wave_preserved == true and .grounded_packet.no_padding == true and .grounded_packet.budget_is_ceiling_not_quota == true and (.grounded_packet.evidence[] | select(.polarity == "negative" and .evidence_kind != ""))' <<<"$chat_core_secret_json" >/dev/null
 
+  chat_core_generic_ask_json="$("$llmwave_big" chat-core-ask --memory-root "$root/.nanda/linux-active" --text "which package provides command bash" --target-packet-tokens 300 --format json)"
+  jq -e '.verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .grounded_packet.answer_allowed == true and .grounded_packet.readout_source == "compiled_chat_core_hot" and .grounded_packet.domain_supported == true and .grounded_packet.selected_domain_pack == "linux" and (.grounded_packet.answer | ascii_downcase | contains("bash"))' <<<"$chat_core_generic_ask_json" >/dev/null
+
+  chat_core_unsupported_json="$("$llmwave_big" linux-chat-core-ask --memory-root "$root/.nanda/linux-active" --text "what does current-earth-surface-mode-gate-v2-external-station-check.md say?" --format json)"
+  jq -e '.verdict == "DOMAIN_UNSUPPORTED" and .grounded_packet.decision_state == "DOMAIN_UNSUPPORTED" and .grounded_packet.answer_allowed == false and .grounded_packet.readout_source == "none_domain_unsupported" and .grounded_packet.domain_supported == false and .grounded_packet.selected_evidence_count == 0 and .grounded_packet.evidence_count == 0 and (.grounded_packet.supported_domains | index("linux")) and .grounded_packet.suggested_domain == "physics_material_layer" and (.grounded_packet.candidate_routes | index("physics.material_layer.status")) and (.grounded_packet.evidence | length == 0)' <<<"$chat_core_unsupported_json" >/dev/null
+
+  chat_core_proposal_before="$(sha256sum "$root/.nanda/linux-active/cache/chat-core.hot" "$root/.nanda/linux-active/cache/chat-core.manifest.json" "$root/.nanda/linux-active/linux-chat-profile.lwm" "$root/.nanda/linux-active/linux-center-learning.lwm" "$root/.nanda/linux-active/linux-chat-profile-vpn.lwm" | sha256sum)"
+  chat_core_proposal_json="$("$llmwave_big" chat-core-domain-proposal --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json)"
+  chat_core_proposal_after="$(sha256sum "$root/.nanda/linux-active/cache/chat-core.hot" "$root/.nanda/linux-active/cache/chat-core.manifest.json" "$root/.nanda/linux-active/linux-chat-profile.lwm" "$root/.nanda/linux-active/linux-center-learning.lwm" "$root/.nanda/linux-active/linux-chat-profile-vpn.lwm" | sha256sum)"
+  test "$chat_core_proposal_before" = "$chat_core_proposal_after"
+  jq -e '.verdict == "DOMAIN_PROFILE_REQUIRED" and .decision_state == "DOMAIN_UNSUPPORTED" and .safe_to_answer == false and .safe_to_learn_without_profile == false and .selected_evidence_count == 0 and .candidate_facts_are_memory == false and .cache_mutated == false and .overlay_written == false and .suggested_domain_id == "physics_material_layer"' <<<"$chat_core_proposal_json" >/dev/null
+
+  chat_core_unsupported_learn_json="$("$llmwave_big" chat-core-learn --memory-root "$root/.nanda/linux-active" --accept "thing | physics.material_layer.status | active" --overlay dialogue --format json)"
+  jq -e '.verdict == "DOMAIN_UNSUPPORTED" and .decision_state == "DOMAIN_UNSUPPORTED" and .learning_update.overlay_written == false and .safe_to_learn_without_profile == false and .action_for_builder == "CREATE_DOMAIN_PROFILE_OR_APPROVE_DOMAIN" and (.admission.reasons | index("unknown_route_rejected"))' <<<"$chat_core_unsupported_learn_json" >/dev/null
+
+  chat_core_technical_identifier_json="$("$llmwave_big" chat-core-learn --memory-root "$root/.nanda/linux-active" --accept "thing | physics.material_layer.status | compact_high_r2_weather_transfer_unclassified_by_v1" --overlay dialogue --format json)"
+  jq -e '.verdict == "DOMAIN_UNSUPPORTED" and .feedback_safety.secret_detected == false and .feedback_safety.secret_refused == false and (.feedback_safety.detector_reasons | index("long_technical_identifier_review")) and .learning_update.overlay_written == false' <<<"$chat_core_technical_identifier_json" >/dev/null
+
   chat_index_path="$root/.nanda/linux-active/cache/chat-core.index.json"
   if [[ -f "$chat_index_path" ]]; then
     tmp_chat_index="$(mktemp)"
@@ -232,7 +250,7 @@ run_chatcore_build_suite() {
   [[ -f "$root/.nanda/linux-active/linux-active-65k.lrf" ]] || return 0
 
   chat_core_build_json="$("$llmwave_big" linux-chat-core-build --memory-root "$root/.nanda/linux-active" --format json)"
-  jq -e '.verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .cache.hot_format == "interned-packed-readout-v3" and .cache.hot_fits_6m_budget == true and .cache.hot_readout_record_count > 0 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_build_json" >/dev/null
+  jq -e '.verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .cache.hot_format == "interned-packed-readout-v5-domainpack-proposals" and .cache.hot_fits_6m_budget == true and .cache.hot_readout_record_count > 0 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false and (.manifest.domain_pack_hashes | length) == 1 and (.manifest.domain_proposal_hashes | length) == 1' <<<"$chat_core_build_json" >/dev/null
 
   chat_core_gate_json="$("$llmwave_big" linux-chat-core-gate --memory-root "$root/.nanda/linux-active" --format json)"
   jq -e '.verdict == "LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM" and .profile_gate == null and .cache_status.cache_fresh == true and .chat_core.safe_to_answer_from_cache == true and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_gate_json" >/dev/null
@@ -314,7 +332,7 @@ run_changed_suite() {
         ;;
     esac
     case "$path" in
-      src/llmwave_big/linux_chat_core.rs|src/llmwave_big/mod.rs|examples/linux-chat-core.profile.json|README.md|COMMANDS.md|nanda-structural-gate/SKILL.md)
+      src/llmwave_big/linux_chat_core.rs|src/llmwave_big/chat_core/*|src/llmwave_big/mod.rs|examples/linux-chat-core.profile.json|examples/domain-packs/*|README.md|COMMANDS.md|nanda-structural-gate/SKILL.md)
         needs_chatcore=1
         ;;
     esac
@@ -873,7 +891,7 @@ big_linux_chat_core_missing_gate_json="$("$llmwave_big" linux-chat-core-gate --r
 jq -e '.mode == "llmwave-big-linux-chat-core-authority-gate" and .verdict == "LINUX_CHAT_CORE_CACHE_STALE" and .cache_status.cache_fresh == false and (.cache_status.stale_reasons | index("cache_manifest_missing")) and .profile_gate == null and .chat_core.safe_to_use_cache == false and .chat_core.safe_to_answer_from_cache == false and .token_economics.cache_total_bytes == 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true' <<<"$big_linux_chat_core_missing_gate_json" >/dev/null
 test ! -e "$tmp_linux_chat_core_missing_cache/chat-core.manifest.json"
 big_linux_chat_core_build_json="$("$llmwave_big" linux-chat-core-build --residual-pack "$tmp_linux_chat_residual" --dialogue-overlay "$tmp_linux_chat_profile_memory" --centers-overlay "$tmp_linux_chat_profile_center_memory" --vpn-overlay "$tmp_linux_chat_profile_vpn_memory" --broad-eval "$tmp_linux_profile_eval" --heldout-eval "$tmp_linux_heldout_eval" --cache-dir "$tmp_linux_chat_core_cache" --format json)"
-jq -e '.mode == "llmwave-big-linux-chat-core-build" and .verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .manifest.profile_id == "linux-chat-core" and .manifest.cache_is_source_of_truth == false and .source_status.source_memory_loaded == true and .source_status.overlays_present == 3 and .cache.hot_format == "interned-packed-readout-v3" and .cache.hot_fits_6m_budget == true and .cache.hot_readout_record_count == 8 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false and .token_economics.source_artifacts_estimated_tokens > 0 and .token_economics.cache_estimated_tokens > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_build_json" >/dev/null
+jq -e '.mode == "llmwave-big-linux-chat-core-build" and .verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .manifest.profile_id == "linux-chat-core" and .manifest.cache_is_source_of_truth == false and (.manifest.domain_pack_hashes | length) == 1 and (.manifest.domain_proposal_hashes | length) == 1 and .source_status.source_memory_loaded == true and .source_status.overlays_present == 3 and .cache.hot_format == "interned-packed-readout-v5-domainpack-proposals" and .cache.hot_fits_6m_budget == true and .cache.hot_readout_record_count == 8 and .cache.hot_domain_record_count > 0 and .cache.json_index_required_for_answer_authority == false and .domain_runtime.json_index_used_for_domain_runtime == false and .token_economics.source_artifacts_estimated_tokens > 0 and .token_economics.cache_estimated_tokens > 0 and .token_economics.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.cache_is_source_of_truth == false and .claim_boundary.cache_is_runtime_index_not_prompt_payload == true and .claim_boundary.general_llm_ready == false' <<<"$big_linux_chat_core_build_json" >/dev/null
 test -s "$tmp_linux_chat_core_cache/chat-core.hot"
 test -s "$tmp_linux_chat_core_cache/chat-core.index.json"
 test -s "$tmp_linux_chat_core_cache/chat-core.manifest.json"

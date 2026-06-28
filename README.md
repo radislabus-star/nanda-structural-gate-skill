@@ -801,12 +801,15 @@ keeps the Linux-domain eval green, proves
 and proves `spectral_center.verdict = LINUX_SPECTRAL_CENTER_PROVEN`. It is still
 not broad chat readiness and not exposure reasoning.
 
-`linux-chat-core-build` and `linux-chat-core-gate` are the unified Linux
-ChatCore memory/cache layer. The normal entrypoint is `--memory-root
-.nanda/linux-active`; explicit `--profile`, `--residual-pack`, `--*-overlay`,
-`--*-eval`, and `--cache-dir` flags are source overrides for tests or unusual
-layouts. ChatCore treats `.lrf v2` plus `.lwm` overlays as source memory, then
-compiles a packed binary hot cache view:
+`chat-core-build`, `chat-core-gate`, `chat-core-ask`, and `chat-core-learn` are
+the generic ChatCore profile entrypoints. Linux is the first connected
+`DomainPack`, not the engine itself. The compatibility wrappers
+`linux-chat-core-*` call the same profile-scoped path for the Linux profile.
+The normal Linux entrypoint is `--memory-root .nanda/linux-active`; explicit
+`--profile`, `--residual-pack`, `--*-overlay`, `--*-eval`, and `--cache-dir`
+flags are source overrides for tests or unusual layouts. ChatCore treats
+`.lrf v2` plus `.lwm` overlays plus data-driven DomainPacks as source memory,
+then compiles a packed binary hot cache view:
 
 ```text
 .nanda/linux-active/linux-active-65k.lrf
@@ -819,8 +822,10 @@ compiles a packed binary hot cache view:
 ```
 
 The manifest stores hashes for source memory, overlays, profile evals, domain
-registry, and compiler version. The cache is not the source of truth. If any
-source artifact changes, `linux-chat-core-gate` returns stale and blocks answer
+registry, DomainPack files, domain proposal registries, safety policy, packet
+policy, and compiler version.
+The cache is not the source of truth. If any source artifact changes,
+`chat-core-gate` / `linux-chat-core-gate` returns stale and blocks answer
 authority until the cache is rebuilt. The authority gate is read-only and fast:
 it checks manifest/source/hot hashes and does not run broad/profile evals. Use
 `linux-chat-core-build` to write cache artifacts. Use
@@ -829,6 +834,10 @@ intentionally required. The old `linux-chat-profile-gate` remains a
 compatibility gate; the preferred Linux-profile cache entrypoint is:
 
 ```bash
+nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
+nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
+nanda-llmwave-big chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
+nanda-llmwave-big chat-core-learn --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
 nanda-llmwave-big linux-chat-core-build --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-gate --memory-root .nanda/linux-active --format json
 nanda-llmwave-big linux-chat-core-ask --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
@@ -839,6 +848,20 @@ nanda-llmwave-big linux-chat-core-learn-eval --memory-root .nanda/linux-active -
 # Optional heavy profile/eval path:
 nanda-llmwave-big linux-chat-core-profile-gate --memory-root .nanda/linux-active --format json
 ```
+
+If no connected DomainPack supports the inferred domain/intent, ChatCore must
+not fall back to Linux. It returns `DOMAIN_UNSUPPORTED`,
+`answer_allowed=false`, `selected_evidence_count=0`,
+`readout_source="none_domain_unsupported"`, `safe_to_learn_without_profile=false`,
+and candidate routes only as a proposal. Proposal hints come from
+`domain_proposals` registry files such as
+`examples/domain-packs/proposal-seeds.json`, not from hardcoded Rust domain
+branches. Use
+`nanda-llmwave-big chat-core-domain-proposal --text "..." --format json` for a
+read-only builder proposal; it does not write `.lwm`, does not rebuild `.hot`,
+and does not grant answer authority. Adding physics, customs, or another
+discipline should mean adding a profile/DomainPack artifact, not adding a new
+Rust engine branch.
 
 `linux-chat-core-ask` is the intended compact packet surface for Codex/LLM use:
 it refuses stale cache, reads `chat-core.hot` directly, reports
@@ -897,7 +920,11 @@ bash/systemctl routes stay preserved. Its ready verdict is
 
 Learning writes also pass a safety contract before any overlay append. Secret-like
 feedback is refused before parsing and reports only a redacted prompt plus hash.
-The requested route must belong to a registered ChatCore domain, and the selected
+The detector is slot-aware: route-like identifiers such as
+`physics.material_layer.status` are not treated as JWTs by default, and long
+technical snake_case identifiers become review/quarantine signals rather than
+hard secret refusals unless secret markers are present. The requested route must
+belong to a registered ChatCore domain and connected DomainPack, and the selected
 overlay must be allowed by that domain scope. Unknown routes and foreign overlays
 are rejected without writing. Duplicate feedback is a no-op. Conflicting feedback
 is written only as a `WATCH_TRACE` quarantine record that is not projected into
