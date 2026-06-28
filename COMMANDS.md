@@ -632,6 +632,10 @@ checks. Use `chat-core-domain-build --out draft.json` to save the draft and
 `chat-core-domain-gate --draft draft.json` to re-check it. Candidate facts are
 not memory, do not write overlays, do not rebuild cache, and do not grant answer
 authority. Automatic structure is allowed; automatic authority is not.
+In `chat-core-domain-gate`, top-level `maturity` and `authority_rights` are the
+effective sanitized values. Raw draft claims are diagnostic only under
+`draft_claimed_maturity` and `draft_claimed_authority_rights`; do not use them
+as trust/answer authority.
 `chat-core-learn` appends explicit feedback to a source `.lwm` overlay:
 accepted facts become learned overlay records, and rejected shortcuts become
 learned anti-wave records. It never writes query text or answer packets as facts

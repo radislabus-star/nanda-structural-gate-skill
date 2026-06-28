@@ -1007,6 +1007,21 @@ pub(crate) fn build_linux_chat_core_ask_report(
                     &query_wave,
                     &packet_profile,
                 );
+                let underfilled_blocks_answer = selection.packet_underfilled;
+                let decision_state = if underfilled_blocks_answer {
+                    "PACKET_UNDERFILLED_NEEDS_MORE_CONTEXT"
+                } else {
+                    "LEARNED_ANTI_WAVE_SUPPRESSED"
+                }
+                .to_string();
+                let answer = if underfilled_blocks_answer {
+                    format!(
+                        "Grounded packet is underfilled for {}; see missing_evidence.",
+                        packet_profile.profile
+                    )
+                } else {
+                    learned_anti_wave_answer(&learned_anti_wave_hits)
+                };
                 return build_chat_core_ask_report_with_packet(
                     config,
                     manifest,
@@ -1021,8 +1036,8 @@ pub(crate) fn build_linux_chat_core_ask_report(
                             .iter()
                             .map(|domain| domain.domain_id.clone())
                             .collect(),
-                        decision_state: "LEARNED_ANTI_WAVE_SUPPRESSED".to_string(),
-                        answer: learned_anti_wave_answer(&learned_anti_wave_hits),
+                        decision_state,
+                        answer,
                         intent: query_wave.intent,
                         route_priors: query_wave.route_priors,
                         domain_supported: true,
@@ -2512,6 +2527,7 @@ fn infer_packet_profile(text: &str, query: &LinuxQueryWave) -> String {
     }
     match query.intent.as_str() {
         "command_provider" | "file_owner" | "service_exec" => "exact_fact".to_string(),
+        "external_exposure" | "listener_summary" | "bind_scope" => "troubleshooting".to_string(),
         "package_runtime_boundary" | "vulnerability_boundary" => "safety_refusal".to_string(),
         _ => "action_plan".to_string(),
     }
@@ -2616,10 +2632,11 @@ fn select_adaptive_packet_from_learned_anti_wave(
         .collect::<Vec<_>>();
     let available_evidence_count = scored.len();
     let selection = select_ranked_evidence(scored, profile);
+    let missing_evidence = profile_missing_evidence_for_query(query, &selection, &profile.profile);
     finish_packet_selection(
         selection,
         available_evidence_count,
-        Vec::new(),
+        missing_evidence,
         query,
         active_domains,
         profile,
@@ -2898,6 +2915,14 @@ fn profile_missing_evidence(
     selection: &[LinuxChatCoreGroundedEvidence],
     profile: &str,
 ) -> Vec<String> {
+    profile_missing_evidence_for_query(&report.query_wave, selection, profile)
+}
+
+fn profile_missing_evidence_for_query(
+    query: &LinuxQueryWave,
+    selection: &[LinuxChatCoreGroundedEvidence],
+    profile: &str,
+) -> Vec<String> {
     let selected_routes = selection
         .iter()
         .map(|item| item.route.as_str())
@@ -2909,7 +2934,7 @@ fn profile_missing_evidence(
             missing.push("post_action_verification_evidence".to_string());
         }
         "troubleshooting" => {
-            if report.query_wave.intent == "vpn_dns_route" {
+            if query.intent == "vpn_dns_route" {
                 for route in [
                     "runtime_snapshot.resolvectl",
                     "runtime_snapshot.ip_route",
@@ -2919,6 +2944,21 @@ fn profile_missing_evidence(
                     if !selected_routes.contains(route) {
                         missing.push(route.to_string());
                     }
+                }
+            }
+            if query.intent == "external_exposure" {
+                if !selected_routes.contains("linux.socket.runtime") {
+                    missing.push("runtime_socket_snapshot".to_string());
+                }
+                if !selected_routes.contains("linux.firewall.runtime") {
+                    missing.push("firewall_snapshot".to_string());
+                }
+                if !selection.iter().any(|item| {
+                    item.route == "linux.systemd.exec"
+                        || item.subject_role.contains("service")
+                        || item.object_role.contains("service")
+                }) {
+                    missing.push("service_bind_scope".to_string());
                 }
             }
             if selection.len() < 3 {
@@ -5134,6 +5174,42 @@ mod tests {
         assert!(selection
             .missing_evidence
             .contains(&"multi_step_runtime_evidence_chain".to_string()));
+    }
+
+    #[test]
+    fn chat_core_external_exposure_is_supported_but_underfilled_without_runtime_snapshot() {
+        let text = "is ssh externally exposed?";
+        let facts = Vec::new();
+        let report = build_linux_reason_report_from_decoded_facts(
+            test_summary(facts.len()),
+            &facts,
+            text,
+            8,
+        );
+        let profile = packet_profile_spec(None, None, text, &report.query_wave);
+        let selection = select_adaptive_packet_evidence(
+            &report,
+            &[test_domain(
+                "exposure",
+                &["linux.socket.runtime", "linux.firewall.runtime"],
+                &["linux.boundary.socket"],
+            )],
+            text,
+            &profile,
+        );
+
+        assert_eq!(report.query_wave.intent, "external_exposure");
+        assert_eq!(profile.profile, "troubleshooting");
+        assert!(selection.packet_underfilled);
+        assert!(selection
+            .missing_evidence
+            .contains(&"runtime_socket_snapshot".to_string()));
+        assert!(selection
+            .missing_evidence
+            .contains(&"firewall_snapshot".to_string()));
+        assert!(selection
+            .missing_evidence
+            .contains(&"service_bind_scope".to_string()));
     }
 
     #[test]

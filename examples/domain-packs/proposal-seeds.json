@@ -13,7 +13,7 @@
         "external station"
       ],
       "candidate_routes": [
-        "physics.material_layer.status",
+        "physics.material_layer.candidate_status",
         "physics.material_layer.dominant_band",
         "physics.earth_surface.mode_observation",
         "physics.water_layer.residual_mode"

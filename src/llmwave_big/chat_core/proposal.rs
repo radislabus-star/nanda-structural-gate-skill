@@ -156,6 +156,10 @@ pub(crate) struct ChatCoreDomainGateReport {
     pub domain_id: Option<String>,
     pub maturity: Option<String>,
     pub authority_rights: Option<DomainPackAuthorityRights>,
+    pub effective_maturity: Option<String>,
+    pub effective_authority_rights: Option<DomainPackAuthorityRights>,
+    pub draft_claimed_maturity: Option<String>,
+    pub draft_claimed_authority_rights: Option<DomainPackAuthorityRights>,
     pub draft_gate: Option<DomainPackDraftGate>,
     pub safe_to_answer: bool,
     pub safe_to_learn_without_profile: bool,
@@ -196,8 +200,15 @@ pub(crate) fn build_domain_gate_report(
     } else {
         build_domain_builder_report(config)?
     };
+    let connected_packs = connected_packs_for_gate(&proposal)?;
     let draft = proposal.domain_pack_draft;
-    let gate = proposal.draft_gate;
+    let gate = draft
+        .as_ref()
+        .map(|draft| gate_domain_pack_draft(draft, &connected_packs));
+    let draft_claimed_maturity = draft.as_ref().map(|draft| draft.maturity.clone());
+    let draft_claimed_authority_rights = draft.as_ref().map(|draft| draft.authority_rights.clone());
+    let effective_maturity = draft.as_ref().map(|_| "candidate".to_string());
+    let effective_authority_rights = draft.as_ref().map(|_| candidate_authority_rights());
     Ok(ChatCoreDomainGateReport {
         mode: "llmwave-big-chat-core-domain-gate".to_string(),
         verdict: gate
@@ -206,8 +217,12 @@ pub(crate) fn build_domain_gate_report(
             .unwrap_or_else(|| "DOMAIN_PACK_DRAFT_MISSING".to_string()),
         decision_state: "DOMAIN_CANDIDATE_REVIEW".to_string(),
         domain_id: draft.as_ref().map(|draft| draft.domain_id.clone()),
-        maturity: draft.as_ref().map(|draft| draft.maturity.clone()),
-        authority_rights: draft.as_ref().map(|draft| draft.authority_rights.clone()),
+        maturity: effective_maturity.clone(),
+        authority_rights: effective_authority_rights.clone(),
+        effective_maturity,
+        effective_authority_rights,
+        draft_claimed_maturity,
+        draft_claimed_authority_rights,
         draft_gate: gate,
         safe_to_answer: false,
         safe_to_learn_without_profile: false,
@@ -215,6 +230,18 @@ pub(crate) fn build_domain_gate_report(
         overlay_written: false,
         claim_boundary: proposal.claim_boundary,
     })
+}
+
+fn connected_packs_for_gate(
+    proposal: &ChatCoreDomainProposalReport,
+) -> Result<Vec<ChatCoreDomainPackSpec>> {
+    let profile_path = proposal.profile.as_ref().map(PathBuf::from);
+    let memory_root = proposal.memory_root.as_ref().map(PathBuf::from);
+    Ok(
+        proposal_profile_context(profile_path.as_ref(), memory_root.as_ref())?
+            .map(|context| context.domain_packs)
+            .unwrap_or_default(),
+    )
 }
 
 fn build_domain_proposal_report_with_mode(
@@ -423,15 +450,7 @@ fn build_domain_pack_draft(
         parent_domain: domain_family,
         maturity: "candidate".to_string(),
         authority_level: "proposal_only".to_string(),
-        authority_rights: DomainPackAuthorityRights {
-            proposal_only: true,
-            answer_allowed: false,
-            learn_allowed: false,
-            cache_build_allowed: false,
-            overlay_write_allowed: false,
-            cache_mutation_allowed: false,
-            quarantine_write_allowed: false,
-        },
+        authority_rights: candidate_authority_rights(),
         routes: candidate_routes
             .iter()
             .map(|route| draft_route(route))
@@ -441,6 +460,18 @@ fn build_domain_pack_draft(
         anti_wave: anti_wave_seeds(domain_id),
         minimal_eval: minimal_eval(domain_id),
         source: source_label.unwrap_or("prompt").to_string(),
+    }
+}
+
+fn candidate_authority_rights() -> DomainPackAuthorityRights {
+    DomainPackAuthorityRights {
+        proposal_only: true,
+        answer_allowed: false,
+        learn_allowed: false,
+        cache_build_allowed: false,
+        overlay_write_allowed: false,
+        cache_mutation_allowed: false,
+        quarantine_write_allowed: false,
     }
 }
 
@@ -476,6 +507,8 @@ fn relation_type_for_route(route: &str) -> String {
         "mode_observation_binding".to_string()
     } else if route.ends_with(".residual_mode") {
         "residual_classification".to_string()
+    } else if route.ends_with(".candidate_status") {
+        "layer_mode_candidate_status".to_string()
     } else if route.ends_with(".status") {
         "layer_mode_status".to_string()
     } else {
@@ -510,6 +543,7 @@ fn object_role_for_relation(relation_type: &str) -> String {
         "spectral_band_classification" => "band_label",
         "mode_observation_binding" => "observed_mode_label",
         "residual_classification" => "residual_mode_label",
+        "layer_mode_candidate_status" => "maturity_state",
         "layer_mode_status" => "maturity_state",
         _ => "candidate_object",
     }
@@ -531,6 +565,7 @@ fn allowed_subject_types(route: &str) -> Vec<String> {
 
 fn allowed_object_types(relation_type: &str) -> Vec<String> {
     match relation_type {
+        "layer_mode_candidate_status" => vec!["candidate".to_string(), "provisional".to_string()],
         "layer_mode_status" => vec!["candidate".to_string(), "provisional".to_string()],
         "spectral_band_classification" => vec!["dominant_band_label".to_string()],
         "mode_observation_binding" => vec!["mode_label".to_string()],
@@ -636,8 +671,8 @@ fn minimal_eval(domain_id: &str) -> DomainPackMinimalEval {
                 "proxy trace must not become causal model".to_string(),
             ],
             route_collision_cases: vec![
-                "physics.material_layer.status != linux.service.status".to_string(),
-                "physics.material_layer.status != business.deal_status".to_string(),
+                "physics.material_layer.candidate_status != linux.service.status".to_string(),
+                "physics.material_layer.candidate_status != business.deal_status".to_string(),
             ],
             heldout_or_control_cases: vec![
                 "control shuffle keeps candidate route unsupported".to_string(),
@@ -879,7 +914,7 @@ mod tests {
         assert!(gate.structure_complete);
         assert!(!gate.authority_granted);
         assert!(!gate.answer_allowed);
-        assert_eq!(gate.relation_genericity.status, "WATCH");
+        assert_eq!(gate.relation_genericity.status, "PASS");
     }
 
     #[test]
@@ -909,5 +944,87 @@ mod tests {
         assert!(!rights.answer_allowed);
         assert!(!rights.overlay_write_allowed);
         assert!(!rights.cache_mutation_allowed);
+        assert_eq!(
+            report.effective_maturity.as_deref(),
+            report.maturity.as_deref()
+        );
+        assert_eq!(
+            report
+                .effective_authority_rights
+                .as_ref()
+                .unwrap()
+                .answer_allowed,
+            rights.answer_allowed
+        );
+    }
+
+    #[test]
+    fn domain_gate_sanitizes_poisoned_draft_authority_claims() {
+        let mut proposal = build_domain_builder_report(ChatCoreDomainProposalConfig {
+            text: "what is wind_setup_compact_active in gravity-saturation-checks?".to_string(),
+            profile: Some(PathBuf::from(DEFAULT_PROFILE)),
+            memory_root: Some(PathBuf::from(".nanda/linux-active")),
+            context_file: None,
+            proposal_registries: Vec::new(),
+            out: None,
+        })
+        .unwrap();
+        let draft = proposal.domain_pack_draft.as_mut().unwrap();
+        draft.maturity = "ready".to_string();
+        draft.authority_rights.answer_allowed = true;
+        draft.authority_rights.learn_allowed = true;
+        draft.authority_rights.cache_build_allowed = true;
+        draft.authority_rights.overlay_write_allowed = true;
+        draft.authority_rights.cache_mutation_allowed = true;
+        let poisoned_gate = proposal.draft_gate.as_mut().unwrap();
+        poisoned_gate.authority_granted = true;
+        poisoned_gate.answer_allowed = true;
+        poisoned_gate.overlay_write_allowed = true;
+        poisoned_gate.cache_mutation_allowed = true;
+
+        let path = std::env::temp_dir().join(format!(
+            "nanda-poisoned-domain-draft-{}-{}.json",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        std::fs::write(&path, serde_json::to_vec_pretty(&proposal).unwrap()).unwrap();
+        let report = build_domain_gate_report(
+            ChatCoreDomainProposalConfig {
+                text: String::new(),
+                profile: None,
+                memory_root: None,
+                context_file: None,
+                proposal_registries: Vec::new(),
+                out: None,
+            },
+            Some(path.clone()),
+        )
+        .unwrap();
+        let _ = std::fs::remove_file(path);
+
+        assert_eq!(report.maturity.as_deref(), Some("candidate"));
+        assert_eq!(report.effective_maturity.as_deref(), Some("candidate"));
+        assert_eq!(report.draft_claimed_maturity.as_deref(), Some("ready"));
+        let effective = report.effective_authority_rights.as_ref().unwrap();
+        let top_level = report.authority_rights.as_ref().unwrap();
+        let claimed = report.draft_claimed_authority_rights.as_ref().unwrap();
+        assert!(!effective.answer_allowed);
+        assert!(!effective.learn_allowed);
+        assert!(!effective.cache_build_allowed);
+        assert!(!effective.overlay_write_allowed);
+        assert!(!effective.cache_mutation_allowed);
+        assert!(!top_level.answer_allowed);
+        assert!(!top_level.overlay_write_allowed);
+        assert!(!top_level.cache_mutation_allowed);
+        assert!(claimed.answer_allowed);
+        assert!(claimed.learn_allowed);
+        assert!(claimed.cache_build_allowed);
+        assert!(claimed.overlay_write_allowed);
+        assert!(claimed.cache_mutation_allowed);
+        let gate = report.draft_gate.as_ref().unwrap();
+        assert!(!gate.authority_granted);
+        assert!(!gate.answer_allowed);
+        assert!(!gate.overlay_write_allowed);
+        assert!(!gate.cache_mutation_allowed);
     }
 }

@@ -864,6 +864,11 @@ DomainPack creation may create structure only; gate review is required before
 any authority can be promoted. Adding physics, customs, or another discipline
 should mean adding a profile/DomainPack artifact, not adding a new Rust engine
 branch.
+Read `chat-core-domain-gate` top-level `maturity` and `authority_rights` as
+effective/sanitized gate output. If a draft claims stronger rights, those raw
+claims are reported only under `draft_claimed_maturity` and
+`draft_claimed_authority_rights`; trust decisions must use the effective fields
+and `draft_gate`, never the raw draft claim.
 
 `chat-core-ask` is the intended compact packet surface for Codex/LLM use:
 it rebuilds stale/missing compiled cache artifacts from the requested source paths, reads
@@ -927,7 +932,7 @@ unrelated bash/systemctl routes stay preserved. Its ready verdict is
 Learning writes also pass a safety contract before any overlay append. Secret-like
 feedback is refused before parsing and reports only a redacted prompt plus hash.
 The detector is slot-aware: route-like identifiers such as
-`physics.material_layer.status` are not treated as JWTs by default, and long
+`physics.material_layer.candidate_status` are not treated as JWTs by default, and long
 technical snake_case identifiers become review/quarantine signals rather than
 hard secret refusals unless secret markers are present. The requested route must
 belong to a registered ChatCore domain and connected DomainPack, and the selected

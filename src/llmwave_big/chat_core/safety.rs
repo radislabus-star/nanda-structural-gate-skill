@@ -154,7 +154,10 @@ mod tests {
 
     #[test]
     fn route_like_identifier_is_not_jwt_secret() {
-        let scan = scan_slot_for_secret(ChatCoreSlot::Route, "physics.material_layer.status");
+        let scan = scan_slot_for_secret(
+            ChatCoreSlot::Route,
+            "physics.material_layer.candidate_status",
+        );
         assert!(!scan.secret_detected);
         assert!(!scan.secret_refused);
     }

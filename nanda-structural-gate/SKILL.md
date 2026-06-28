@@ -1458,6 +1458,10 @@ instead. Proposal hints are data-driven too: put future builder suggestions in
 profile `domain_proposals` registries such as
 `examples/domain-packs/proposal-seeds.json`, and treat their manifest hashes as
 part of cache authority.
+For `chat-core-domain-gate`, read top-level `maturity` and `authority_rights`
+as effective/sanitized output. Raw draft claims live only under
+`draft_claimed_maturity` and `draft_claimed_authority_rights`; do not use raw
+claims for trust, answer, cache, or overlay authority.
 Grounded packet budgets are adaptive. `--packet-profile` is a hint, not
 authority: ChatCore always computes `inferred_packet_profile`, and a requested
 profile cannot downgrade inferred risk. If a caller tries to force

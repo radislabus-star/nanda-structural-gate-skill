@@ -428,7 +428,7 @@ mod tests {
         let seed = ChatCoreDomainProposalSeed {
             domain_id: "physics_material_layer".to_string(),
             intent_anchors: vec!["earth surface".to_string(), "external station".to_string()],
-            candidate_routes: vec!["physics.material_layer.status".to_string()],
+            candidate_routes: vec!["physics.material_layer.candidate_status".to_string()],
         };
         let report = select_domain_support(
             &[pack],
