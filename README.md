@@ -837,6 +837,7 @@ intentionally required. The Linux-profile cache entrypoint is:
 nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
+nanda-llmwave-big chat-core-metrics --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-learn --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
 nanda-llmwave-big chat-core-learn-eval --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --reset-scratch --format json
 # Optional heavy profile/eval path:
@@ -881,6 +882,16 @@ match. `ask` rechecks the source paths passed on the CLI against the manifest:
 source paths passed on the CLI define the requested memory. If the cache does
 not match them, `ask` rebuilds before answering. Use `--no-auto-rebuild` or an
 explicit `--manifest` only for strict diagnostics.
+Every `chat-core-ask` appends a privacy-safe usage record to
+`cache/usage.jsonl`: it stores query hash/byte count, state, packet profile,
+evidence counts, token-economics counters, and cache/domain status, but it does
+not store the raw prompt or answer. Use `chat-core-metrics --memory-root
+.nanda/linux-active --format json` to aggregate `requests_total`,
+`answers_allowed_total`, `underfilled_total`,
+`estimated_tokens_saved_vs_source_total`, average packet tokens, profile/state
+counts, and rates. The usage log is observability only: it is not source memory,
+does not affect answer authority, and does not prove general LLM/global
+nonlinear claims.
 Grounded packets are adaptive and evidence-driven. `--packet-profile` is only a
 hint: ChatCore always computes `inferred_packet_profile`, and a requested profile
 cannot downgrade inferred risk or complexity. If the request tries to turn a

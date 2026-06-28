@@ -1407,6 +1407,7 @@ a binary hot cache view:
 nanda-llmwave-big chat-core-build --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --text "which package provides command bash" --target-packet-tokens 300 --format json
+nanda-llmwave-big chat-core-metrics --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --format json
 nanda-llmwave-big chat-core-learn --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --accept "foocmd | linux.apt.command.package-command | foopkg" --format json
 nanda-llmwave-big chat-core-domain-proposal --text "what is wind_setup_compact_active in gravity-saturation-checks?" --format json
 nanda-llmwave-big chat-core-learn-eval --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active --reset-scratch --format json
@@ -1439,6 +1440,15 @@ answer state, selected domain suites, structured `evidence[]`, legacy
 the hot cache is a runtime readout, not prompt context; use only the grounded
 packet as the small external memory payload. Use `--no-auto-rebuild` only for
 strict stale diagnostics.
+Each `chat-core-ask` appends a privacy-safe usage record to
+`cache/usage.jsonl`. It records query hash/bytes, decision state, packet
+profile, evidence counts, token-economics savings, and cache/domain status; it
+must not record raw prompt text or answers. Use `chat-core-metrics` for
+cumulative `requests_total`, `answers_allowed_total`, `underfilled_total`,
+`estimated_tokens_saved_vs_source_total`, average packet tokens, and
+profile/state counts. Treat metrics as observability only: usage logs are not
+source memory, do not grant answer authority, and do not prove general
+LLM/global nonlinear readiness.
 If no connected DomainPack supports the inferred domain/intent, `ask` must
 return `DOMAIN_UNSUPPORTED`, `answer_allowed=false`,
 `selected_evidence_count=0`, `readout_source="none_domain_unsupported"`, and

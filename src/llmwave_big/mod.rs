@@ -501,6 +501,9 @@ enum LlmwaveBigCommand {
     /// Generic ChatCore grounded-packet ask over a profile and DomainPacks.
     #[command(name = "chat-core-ask")]
     ChatCoreAsk(LlmwaveBigChatCoreAskArgs),
+    /// Aggregate ChatCore usage/token-economics counters from ask JSONL logs.
+    #[command(name = "chat-core-metrics")]
+    ChatCoreMetrics(LlmwaveBigChatCoreMetricsArgs),
     /// Generic ChatCore overlay learning writer over a profile and DomainPacks.
     #[command(name = "chat-core-learn")]
     ChatCoreLearn(LlmwaveBigChatCoreLearnArgs),
@@ -1902,6 +1905,25 @@ struct LlmwaveBigChatCoreAskArgs {
     packet_profile: Option<String>,
     #[arg(long = "target-packet-tokens")]
     target_packet_tokens: Option<u64>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "json")]
+    format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct LlmwaveBigChatCoreMetricsArgs {
+    #[arg(
+        long = "profile",
+        default_value = "examples/linux-chat-core.profile.json"
+    )]
+    profile: PathBuf,
+    #[arg(long = "memory-root")]
+    memory_root: Option<PathBuf>,
+    #[arg(long = "cache-dir")]
+    cache_dir: Option<PathBuf>,
+    #[arg(long = "usage-log")]
+    usage_log: Option<PathBuf>,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "json")]
@@ -4995,6 +5017,67 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                         report.grounded_packet.answer_allowed
                     );
                     println!("- answer: {}", report.grounded_packet.answer);
+                }
+            }
+            Ok(EXIT_PASS)
+        }
+        LlmwaveBigCommand::ChatCoreMetrics(args) => {
+            let paths = resolve_linux_chat_core_paths(
+                args.memory_root,
+                LinuxChatCorePathOverrides {
+                    profile: Some(args.profile),
+                    residual_pack: None,
+                    dialogue_overlay: None,
+                    centers_overlay: None,
+                    vpn_overlay: None,
+                    broad_eval: None,
+                    heldout_eval: None,
+                    cache_dir: args.cache_dir,
+                },
+            );
+            let usage_log = args
+                .usage_log
+                .map(normalize_existing_path)
+                .unwrap_or_else(|| paths.cache_dir.join("usage.jsonl"));
+            let report = linux_chat_core::build_linux_chat_core_metrics_report(
+                linux_chat_core::LinuxChatCoreMetricsConfig {
+                    usage_log,
+                    out: args.out,
+                },
+            )?;
+            match args.format {
+                OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
+                OutputFormat::Text => {
+                    println!("{}", report.verdict);
+                    println!("requests_total: {}", report.counters.requests_total);
+                    println!(
+                        "answers_allowed_total: {}",
+                        report.counters.answers_allowed_total
+                    );
+                    println!("underfilled_total: {}", report.counters.underfilled_total);
+                    println!(
+                        "tokens_saved_vs_source_total: {}",
+                        report.token_totals.estimated_tokens_saved_vs_source_total
+                    );
+                    println!(
+                        "avg_prompt_payload_tokens: {:.2}",
+                        report.averages.prompt_payload_tokens_per_request
+                    );
+                }
+                OutputFormat::Md => {
+                    println!("# ChatCore Metrics");
+                    println!();
+                    println!("- verdict: `{}`", report.verdict);
+                    println!("- requests: `{}`", report.counters.requests_total);
+                    println!(
+                        "- answers allowed: `{}`",
+                        report.counters.answers_allowed_total
+                    );
+                    println!("- underfilled: `{}`", report.counters.underfilled_total);
+                    println!(
+                        "- tokens saved vs source total: `{}`",
+                        report.token_totals.estimated_tokens_saved_vs_source_total
+                    );
                 }
             }
             Ok(EXIT_PASS)

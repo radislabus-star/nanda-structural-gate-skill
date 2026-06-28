@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -116,6 +117,12 @@ pub(crate) struct LinuxChatCoreLearnEvalConfig {
     pub cache_dir: PathBuf,
     pub reset_scratch: bool,
     pub max_facts: usize,
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Clone)]
+pub(crate) struct LinuxChatCoreMetricsConfig {
+    pub usage_log: PathBuf,
     pub out: Option<PathBuf>,
 }
 
@@ -373,6 +380,7 @@ pub(crate) struct LinuxChatCoreAskReport {
     pub domain_runtime: Option<LinuxChatCoreDomainRuntime>,
     pub grounded_packet: LinuxChatCoreGroundedPacket,
     pub token_economics: LinuxChatCoreAskTokenEconomics,
+    pub usage_logging: LinuxChatCoreUsageLogging,
     pub claim_boundary: LinuxChatCoreClaimBoundary,
 }
 
@@ -410,6 +418,116 @@ pub(crate) struct LinuxChatCoreLearnEvalReport {
     pub safety: LinuxChatCoreLearningSafetyChecks,
     pub regression: LinuxChatCoreLearningRegression,
     pub claim_boundary: LinuxChatCoreLearningClaimBoundary,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreUsageLogging {
+    pub enabled: bool,
+    pub appended: bool,
+    pub path: String,
+    pub error: Option<String>,
+    pub raw_prompt_logged: bool,
+    pub usage_log_is_source_of_truth: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct LinuxChatCoreUsageRecord {
+    pub mode: String,
+    pub version: String,
+    pub timestamp_unix_seconds: u64,
+    pub profile_id: String,
+    pub query_hash: String,
+    pub query_bytes: u64,
+    pub verdict: String,
+    pub cache_fresh: bool,
+    pub answer_allowed: bool,
+    pub decision_state: String,
+    pub readout_source: String,
+    pub domain_supported: bool,
+    pub selected_domain_pack: Option<String>,
+    pub packet_profile: String,
+    pub packet_underfilled: bool,
+    pub packet_truncated: bool,
+    pub packet_prompt_payload_tokens: u64,
+    pub packet_semantic_tokens: u64,
+    pub selected_evidence_count: usize,
+    pub available_evidence_count: usize,
+    pub selected_anti_wave_count: usize,
+    pub missing_evidence_count: usize,
+    pub estimated_tokens_saved_vs_source: u64,
+    pub estimated_tokens_saved_vs_cache_index: u64,
+    pub source_to_packet_reduction_ratio: f32,
+    pub cache_index_to_packet_reduction_ratio: f32,
+    pub no_padding: bool,
+    pub budget_is_ceiling_not_quota: bool,
+    pub cache_is_runtime_index_not_prompt_payload: bool,
+    pub raw_prompt_logged: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreMetricsReport {
+    pub mode: &'static str,
+    pub version: &'static str,
+    pub verdict: &'static str,
+    pub usage_log_path: String,
+    pub usage_log_present: bool,
+    pub records_total: usize,
+    pub records_parsed: usize,
+    pub records_skipped: usize,
+    pub first_timestamp_unix_seconds: Option<u64>,
+    pub last_timestamp_unix_seconds: Option<u64>,
+    pub counters: LinuxChatCoreUsageCounters,
+    pub token_totals: LinuxChatCoreUsageTokenTotals,
+    pub averages: LinuxChatCoreUsageAverages,
+    pub packet_profile_counts: BTreeMap<String, usize>,
+    pub decision_state_counts: BTreeMap<String, usize>,
+    pub readout_source_counts: BTreeMap<String, usize>,
+    pub selected_domain_pack_counts: BTreeMap<String, usize>,
+    pub claim_boundary: LinuxChatCoreUsageClaimBoundary,
+}
+
+#[derive(Serialize, Clone, Default)]
+pub(crate) struct LinuxChatCoreUsageCounters {
+    pub requests_total: usize,
+    pub answers_allowed_total: usize,
+    pub underfilled_total: usize,
+    pub truncated_total: usize,
+    pub domain_unsupported_total: usize,
+    pub stale_total: usize,
+    pub cache_fresh_total: usize,
+    pub anti_wave_evidence_total: usize,
+    pub missing_evidence_total: usize,
+}
+
+#[derive(Serialize, Clone, Default)]
+pub(crate) struct LinuxChatCoreUsageTokenTotals {
+    pub prompt_payload_tokens_total: u64,
+    pub semantic_tokens_total: u64,
+    pub estimated_tokens_saved_vs_source_total: u64,
+    pub estimated_tokens_saved_vs_cache_index_total: u64,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreUsageAverages {
+    pub prompt_payload_tokens_per_request: f32,
+    pub semantic_tokens_per_request: f32,
+    pub estimated_tokens_saved_vs_source_per_request: f32,
+    pub estimated_tokens_saved_vs_cache_index_per_request: f32,
+    pub source_to_packet_reduction_ratio_avg: f32,
+    pub cache_index_to_packet_reduction_ratio_avg: f32,
+    pub answer_allowed_rate: f32,
+    pub underfilled_rate: f32,
+    pub domain_unsupported_rate: f32,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct LinuxChatCoreUsageClaimBoundary {
+    pub usage_log_is_source_of_truth: bool,
+    pub usage_log_affects_answer_authority: bool,
+    pub raw_prompt_logged: bool,
+    pub cache_is_runtime_index_not_prompt_payload: bool,
+    pub general_llm_ready: bool,
+    pub global_nonlinear_memory_proven: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -1236,7 +1354,10 @@ fn build_chat_core_ask_report_with_packet(
     packet: LinuxChatCoreGroundedPacket,
 ) -> Result<LinuxChatCoreAskReport> {
     let token_economics = ask_token_economics(&manifest, &packet)?;
-    let report = LinuxChatCoreAskReport {
+    let usage_log_path = config.cache_dir.join("usage.jsonl");
+    let query_hash = hash_bytes(config.text.as_bytes());
+    let query_bytes = config.text.len() as u64;
+    let mut report = LinuxChatCoreAskReport {
         mode: "llmwave-big-chat-core-ask",
         version: LINUX_CHAT_CORE_VERSION,
         verdict: if packet.decision_state == "DOMAIN_UNSUPPORTED" {
@@ -1251,8 +1372,17 @@ fn build_chat_core_ask_report_with_packet(
         domain_runtime,
         grounded_packet: packet,
         token_economics,
+        usage_logging: LinuxChatCoreUsageLogging {
+            enabled: true,
+            appended: false,
+            path: path_string(&usage_log_path),
+            error: None,
+            raw_prompt_logged: false,
+            usage_log_is_source_of_truth: false,
+        },
         claim_boundary: claim_boundary(cache_status.cache_fresh, true, false),
     };
+    report.usage_logging = append_usage_record(&usage_log_path, &report, query_hash, query_bytes);
     write_json_if_requested(config.out.as_deref(), &report)?;
     Ok(report)
 }
@@ -4658,6 +4788,251 @@ fn claim_boundary(
     }
 }
 
+pub(crate) fn build_linux_chat_core_metrics_report(
+    config: LinuxChatCoreMetricsConfig,
+) -> Result<LinuxChatCoreMetricsReport> {
+    let usage_log_present = config.usage_log.exists();
+    let mut counters = LinuxChatCoreUsageCounters::default();
+    let mut token_totals = LinuxChatCoreUsageTokenTotals::default();
+    let mut packet_profile_counts = BTreeMap::new();
+    let mut decision_state_counts = BTreeMap::new();
+    let mut readout_source_counts = BTreeMap::new();
+    let mut selected_domain_pack_counts = BTreeMap::new();
+    let mut records_total = 0usize;
+    let mut records_parsed = 0usize;
+    let mut records_skipped = 0usize;
+    let mut first_timestamp = None;
+    let mut last_timestamp = None;
+    let mut source_ratio_sum = 0.0f64;
+    let mut cache_ratio_sum = 0.0f64;
+
+    if usage_log_present {
+        let contents = fs::read_to_string(&config.usage_log)
+            .with_context(|| format!("read {}", config.usage_log.display()))?;
+        for line in contents.lines().filter(|line| !line.trim().is_empty()) {
+            records_total += 1;
+            let Ok(record) = serde_json::from_str::<LinuxChatCoreUsageRecord>(line) else {
+                records_skipped += 1;
+                continue;
+            };
+            records_parsed += 1;
+            counters.requests_total += 1;
+            if record.answer_allowed {
+                counters.answers_allowed_total += 1;
+            }
+            if record.packet_underfilled {
+                counters.underfilled_total += 1;
+            }
+            if record.packet_truncated {
+                counters.truncated_total += 1;
+            }
+            if !record.domain_supported {
+                counters.domain_unsupported_total += 1;
+            }
+            if !record.cache_fresh {
+                counters.stale_total += 1;
+            } else {
+                counters.cache_fresh_total += 1;
+            }
+            counters.anti_wave_evidence_total += record.selected_anti_wave_count;
+            counters.missing_evidence_total += record.missing_evidence_count;
+            token_totals.prompt_payload_tokens_total += record.packet_prompt_payload_tokens;
+            token_totals.semantic_tokens_total += record.packet_semantic_tokens;
+            token_totals.estimated_tokens_saved_vs_source_total +=
+                record.estimated_tokens_saved_vs_source;
+            token_totals.estimated_tokens_saved_vs_cache_index_total +=
+                record.estimated_tokens_saved_vs_cache_index;
+            increment_count(&mut packet_profile_counts, &record.packet_profile);
+            increment_count(&mut decision_state_counts, &record.decision_state);
+            increment_count(&mut readout_source_counts, &record.readout_source);
+            increment_count(
+                &mut selected_domain_pack_counts,
+                record.selected_domain_pack.as_deref().unwrap_or("none"),
+            );
+            source_ratio_sum += record.source_to_packet_reduction_ratio as f64;
+            cache_ratio_sum += record.cache_index_to_packet_reduction_ratio as f64;
+            first_timestamp = Some(
+                first_timestamp
+                    .unwrap_or(record.timestamp_unix_seconds)
+                    .min(record.timestamp_unix_seconds),
+            );
+            last_timestamp = Some(
+                last_timestamp
+                    .unwrap_or(record.timestamp_unix_seconds)
+                    .max(record.timestamp_unix_seconds),
+            );
+        }
+    }
+
+    let report = LinuxChatCoreMetricsReport {
+        mode: "llmwave-big-chat-core-metrics",
+        version: LINUX_CHAT_CORE_VERSION,
+        verdict: if records_parsed > 0 {
+            "LLMWAVE_CHAT_CORE_USAGE_METRICS_READY_NOT_AUTHORITY"
+        } else {
+            "LLMWAVE_CHAT_CORE_USAGE_METRICS_EMPTY"
+        },
+        usage_log_path: path_string(&config.usage_log),
+        usage_log_present,
+        records_total,
+        records_parsed,
+        records_skipped,
+        first_timestamp_unix_seconds: first_timestamp,
+        last_timestamp_unix_seconds: last_timestamp,
+        counters: counters.clone(),
+        token_totals: token_totals.clone(),
+        averages: usage_averages(&counters, &token_totals, source_ratio_sum, cache_ratio_sum),
+        packet_profile_counts,
+        decision_state_counts,
+        readout_source_counts,
+        selected_domain_pack_counts,
+        claim_boundary: LinuxChatCoreUsageClaimBoundary {
+            usage_log_is_source_of_truth: false,
+            usage_log_affects_answer_authority: false,
+            raw_prompt_logged: false,
+            cache_is_runtime_index_not_prompt_payload: true,
+            general_llm_ready: false,
+            global_nonlinear_memory_proven: false,
+        },
+    };
+    write_json_if_requested(config.out.as_deref(), &report)?;
+    Ok(report)
+}
+
+fn append_usage_record(
+    usage_log_path: &Path,
+    report: &LinuxChatCoreAskReport,
+    query_hash: String,
+    query_bytes: u64,
+) -> LinuxChatCoreUsageLogging {
+    let record = usage_record_from_report(report, query_hash, query_bytes);
+    let result = append_usage_record_inner(usage_log_path, &record);
+    LinuxChatCoreUsageLogging {
+        enabled: true,
+        appended: result.is_ok(),
+        path: path_string(usage_log_path),
+        error: result.err().map(|error| error.to_string()),
+        raw_prompt_logged: false,
+        usage_log_is_source_of_truth: false,
+    }
+}
+
+fn append_usage_record_inner(
+    usage_log_path: &Path,
+    record: &LinuxChatCoreUsageRecord,
+) -> Result<()> {
+    if let Some(parent) = usage_log_path.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(usage_log_path)
+        .with_context(|| format!("open {}", usage_log_path.display()))?;
+    serde_json::to_writer(&mut file, record)?;
+    file.write_all(b"\n")?;
+    Ok(())
+}
+
+fn usage_record_from_report(
+    report: &LinuxChatCoreAskReport,
+    query_hash: String,
+    query_bytes: u64,
+) -> LinuxChatCoreUsageRecord {
+    LinuxChatCoreUsageRecord {
+        mode: report.mode.to_string(),
+        version: report.version.to_string(),
+        timestamp_unix_seconds: now_unix_seconds(),
+        profile_id: "linux-chat-core".to_string(),
+        query_hash,
+        query_bytes,
+        verdict: report.verdict.to_string(),
+        cache_fresh: report.cache_status.cache_fresh,
+        answer_allowed: report.grounded_packet.answer_allowed,
+        decision_state: report.grounded_packet.decision_state.clone(),
+        readout_source: report.grounded_packet.readout_source.clone(),
+        domain_supported: report.grounded_packet.domain_supported,
+        selected_domain_pack: report.grounded_packet.selected_domain_pack.clone(),
+        packet_profile: report.grounded_packet.packet_profile.clone(),
+        packet_underfilled: report.grounded_packet.packet_underfilled,
+        packet_truncated: report.grounded_packet.packet_truncated,
+        packet_prompt_payload_tokens: report.grounded_packet.packet_prompt_payload_tokens,
+        packet_semantic_tokens: report.grounded_packet.packet_semantic_tokens,
+        selected_evidence_count: report.grounded_packet.selected_evidence_count,
+        available_evidence_count: report.grounded_packet.available_evidence_count,
+        selected_anti_wave_count: report.grounded_packet.selected_anti_wave_count,
+        missing_evidence_count: report.grounded_packet.missing_evidence.len(),
+        estimated_tokens_saved_vs_source: report.token_economics.estimated_tokens_saved_vs_source,
+        estimated_tokens_saved_vs_cache_index: report
+            .token_economics
+            .estimated_tokens_saved_vs_cache_index,
+        source_to_packet_reduction_ratio: report.token_economics.source_to_packet_reduction_ratio,
+        cache_index_to_packet_reduction_ratio: report
+            .token_economics
+            .cache_index_to_packet_reduction_ratio,
+        no_padding: report.grounded_packet.no_padding,
+        budget_is_ceiling_not_quota: report.grounded_packet.budget_is_ceiling_not_quota,
+        cache_is_runtime_index_not_prompt_payload: report
+            .grounded_packet
+            .cache_is_runtime_index_not_prompt_payload,
+        raw_prompt_logged: false,
+    }
+}
+
+fn increment_count(map: &mut BTreeMap<String, usize>, key: &str) {
+    *map.entry(key.to_string()).or_insert(0) += 1;
+}
+
+fn usage_averages(
+    counters: &LinuxChatCoreUsageCounters,
+    totals: &LinuxChatCoreUsageTokenTotals,
+    source_ratio_sum: f64,
+    cache_ratio_sum: f64,
+) -> LinuxChatCoreUsageAverages {
+    let n = counters.requests_total as f64;
+    LinuxChatCoreUsageAverages {
+        prompt_payload_tokens_per_request: avg_u64(totals.prompt_payload_tokens_total, n),
+        semantic_tokens_per_request: avg_u64(totals.semantic_tokens_total, n),
+        estimated_tokens_saved_vs_source_per_request: avg_u64(
+            totals.estimated_tokens_saved_vs_source_total,
+            n,
+        ),
+        estimated_tokens_saved_vs_cache_index_per_request: avg_u64(
+            totals.estimated_tokens_saved_vs_cache_index_total,
+            n,
+        ),
+        source_to_packet_reduction_ratio_avg: avg_f64(source_ratio_sum, n),
+        cache_index_to_packet_reduction_ratio_avg: avg_f64(cache_ratio_sum, n),
+        answer_allowed_rate: avg_usize(counters.answers_allowed_total, n),
+        underfilled_rate: avg_usize(counters.underfilled_total, n),
+        domain_unsupported_rate: avg_usize(counters.domain_unsupported_total, n),
+    }
+}
+
+fn avg_u64(value: u64, n: f64) -> f32 {
+    if n == 0.0 {
+        0.0
+    } else {
+        (value as f64 / n) as f32
+    }
+}
+
+fn avg_usize(value: usize, n: f64) -> f32 {
+    if n == 0.0 {
+        0.0
+    } else {
+        (value as f64 / n) as f32
+    }
+}
+
+fn avg_f64(value: f64, n: f64) -> f32 {
+    if n == 0.0 {
+        0.0
+    } else {
+        (value / n) as f32
+    }
+}
+
 fn manifest_path(config: &LinuxChatCoreGateConfig) -> PathBuf {
     config
         .manifest
@@ -5219,6 +5594,83 @@ mod tests {
         }
     }
 
+    #[test]
+    fn chat_core_usage_metrics_aggregate_jsonl_without_prompt_text() {
+        let dir = test_temp_dir("usage-metrics");
+        let usage_log = dir.join("usage.jsonl");
+        append_usage_record_inner(
+            &usage_log,
+            &test_usage_record(
+                "ANSWER_GROUNDED",
+                true,
+                true,
+                "exact_fact",
+                614,
+                91,
+                1_031_568,
+            ),
+        )
+        .unwrap();
+        append_usage_record_inner(
+            &usage_log,
+            &LinuxChatCoreUsageRecord {
+                decision_state: "DOMAIN_UNSUPPORTED".to_string(),
+                answer_allowed: false,
+                domain_supported: false,
+                packet_profile: "troubleshooting".to_string(),
+                packet_underfilled: true,
+                packet_prompt_payload_tokens: 682,
+                packet_semantic_tokens: 151,
+                selected_anti_wave_count: 1,
+                missing_evidence_count: 4,
+                estimated_tokens_saved_vs_source: 1_031_500,
+                ..test_usage_record(
+                    "DOMAIN_UNSUPPORTED",
+                    false,
+                    false,
+                    "troubleshooting",
+                    682,
+                    151,
+                    1_031_500,
+                )
+            },
+        )
+        .unwrap();
+
+        let report = build_linux_chat_core_metrics_report(LinuxChatCoreMetricsConfig {
+            usage_log: usage_log.clone(),
+            out: None,
+        })
+        .unwrap();
+        assert_eq!(
+            report.verdict,
+            "LLMWAVE_CHAT_CORE_USAGE_METRICS_READY_NOT_AUTHORITY"
+        );
+        assert_eq!(report.records_parsed, 2);
+        assert_eq!(report.counters.requests_total, 2);
+        assert_eq!(report.counters.answers_allowed_total, 1);
+        assert_eq!(report.counters.underfilled_total, 1);
+        assert_eq!(report.counters.domain_unsupported_total, 1);
+        assert_eq!(report.counters.anti_wave_evidence_total, 1);
+        assert_eq!(report.counters.missing_evidence_total, 4);
+        assert_eq!(report.token_totals.prompt_payload_tokens_total, 1_296);
+        assert_eq!(
+            report.token_totals.estimated_tokens_saved_vs_source_total,
+            2_063_068
+        );
+        assert_eq!(report.packet_profile_counts.get("exact_fact"), Some(&1));
+        assert_eq!(
+            report.packet_profile_counts.get("troubleshooting"),
+            Some(&1)
+        );
+        assert!(!report.claim_boundary.usage_log_is_source_of_truth);
+        assert!(!report.claim_boundary.usage_log_affects_answer_authority);
+        assert!(!report.claim_boundary.raw_prompt_logged);
+        let raw = fs::read_to_string(&usage_log).unwrap();
+        assert!(!raw.contains("which package provides command bash"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     fn assert_ask_blocks_source_override_mismatch(mutated_artifact_id: &str) {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -5333,6 +5785,49 @@ mod tests {
             .stale_reasons
             .contains(&"source_memory_path_changed".to_string()));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    fn test_usage_record(
+        decision_state: &str,
+        answer_allowed: bool,
+        domain_supported: bool,
+        packet_profile: &str,
+        prompt_tokens: u64,
+        semantic_tokens: u64,
+        saved_vs_source: u64,
+    ) -> LinuxChatCoreUsageRecord {
+        LinuxChatCoreUsageRecord {
+            mode: "llmwave-big-chat-core-ask".to_string(),
+            version: LINUX_CHAT_CORE_VERSION.to_string(),
+            timestamp_unix_seconds: 100,
+            profile_id: "linux-chat-core".to_string(),
+            query_hash: "hash-only-no-prompt".to_string(),
+            query_bytes: 32,
+            verdict: "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM".to_string(),
+            cache_fresh: true,
+            answer_allowed,
+            decision_state: decision_state.to_string(),
+            readout_source: "compiled_chat_core_hot".to_string(),
+            domain_supported,
+            selected_domain_pack: domain_supported.then(|| "linux".to_string()),
+            packet_profile: packet_profile.to_string(),
+            packet_underfilled: false,
+            packet_truncated: false,
+            packet_prompt_payload_tokens: prompt_tokens,
+            packet_semantic_tokens: semantic_tokens,
+            selected_evidence_count: usize::from(answer_allowed),
+            available_evidence_count: usize::from(answer_allowed),
+            selected_anti_wave_count: 0,
+            missing_evidence_count: 0,
+            estimated_tokens_saved_vs_source: saved_vs_source,
+            estimated_tokens_saved_vs_cache_index: saved_vs_source * 6,
+            source_to_packet_reduction_ratio: 1_000.0,
+            cache_index_to_packet_reduction_ratio: 6_000.0,
+            no_padding: true,
+            budget_is_ceiling_not_quota: true,
+            cache_is_runtime_index_not_prompt_payload: true,
+            raw_prompt_logged: false,
+        }
     }
 
     #[test]

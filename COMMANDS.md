@@ -555,7 +555,7 @@ same command has the alias `linux-chat-profile-gate`. With `--heldout-eval`,
 means Linux-only bounded chat over `.lrf` plus `.lwm` wave/center learning; it
 does not unlock general LLM, open-domain chat, scanner, or exploit claims.
 `chat-core-build`, `chat-core-gate`, `chat-core-ask`, `chat-core-learn`,
-`chat-core-domain-proposal`, `chat-core-domain-build`, and
+`chat-core-metrics`, `chat-core-domain-proposal`, `chat-core-domain-build`, and
 `chat-core-domain-gate` are the generic ChatCore profile commands. Linux is
 the first connected data-driven `DomainPack`, selected by
 `--profile examples/linux-chat-core.profile.json`. There is no separate Linux
@@ -602,6 +602,15 @@ saved versus sending the source artifacts or the full runtime cache.
 runtime readout, not prompt context. Use the grounded packet as a small external
 memory packet, not as a replacement for the LLM and not as global nonlinear-
 memory proof.
+Each `chat-core-ask` also appends one privacy-safe JSONL usage record to
+`cache/usage.jsonl`. It records query hash/bytes, state, profile, evidence
+counts, packet token counters, and estimated savings; it does not record the raw
+prompt or answer. Use `chat-core-metrics --memory-root .nanda/linux-active
+--format json` to read cumulative counters such as `requests_total`,
+`answers_allowed_total`, `underfilled_total`,
+`estimated_tokens_saved_vs_source_total`, average packet size, and profile/state
+counts. The usage log is observability only and cannot grant answer, learning,
+cache, or domain authority.
 `ask` now builds adaptive grounded packets. `--packet-profile` is a hint, not
 authority: the query wave still sets `inferred_packet_profile`, and a requested
 profile cannot downgrade inferred risk. If a caller requests `exact_fact` for a
