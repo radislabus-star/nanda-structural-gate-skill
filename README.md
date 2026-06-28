@@ -906,13 +906,14 @@ global nonlinear-memory proof.
 `chat-core-learn` is the unified ChatCore feedback writer. It appends an
 explicit accepted fact or rejected shortcut to a `.lwm` source overlay; it does
 not write the query text as a fact, does not write the answer packet as a fact,
-and never mutates `chat-core.hot` directly. After a learning write, the authority
-gate and `ask` must return stale until `chat-core-build` recompiles
-`.lrf + .lwm` into a fresh `.hot`. `chat-core-learn-eval` proves the
-scratch loop: target query blocked before learning, overlay written, cache stale,
-ask blocked while stale, hot rebuilt, learned answer read from
-`compiled_chat_core_hot`, learned anti-wave suppresses a shortcut, and unrelated
-bash/systemctl routes stay preserved. Its ready verdict is
+and never mutates `chat-core.hot` directly. After a learning write, the
+read-only authority gate and `ask --no-auto-rebuild` return stale. Normal
+`chat-core-ask` recompiles `.lrf + .lwm` from the requested source paths before
+answering, so it must leave the next `chat-core-gate` fresh. `chat-core-learn-eval`
+proves the scratch loop: target query blocked before learning, overlay written,
+cache stale, strict ask blocked while stale, hot rebuilt, learned answer read
+from `compiled_chat_core_hot`, learned anti-wave suppresses a shortcut, and
+unrelated bash/systemctl routes stay preserved. Its ready verdict is
 `LLMWAVE_CHAT_CORE_LEARNING_READY_NOT_GENERAL_LLM`.
 
 Learning writes also pass a safety contract before any overlay append. Secret-like

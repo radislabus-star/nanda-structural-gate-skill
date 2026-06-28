@@ -167,10 +167,12 @@ Inspect top-level `profile_claims` when the question is profile-scoped
 LLMWave progress: Linux `.lrf v2` memory can be proven by
 `linux-residual-proof`, and bounded Linux chat can be promoted by
 `linux-chat-profile-gate`. For actual Codex/LLM memory use, prefer
-`chat-core-build --profile examples/linux-chat-core.profile.json` -> `chat-core-gate --profile examples/linux-chat-core.profile.json` -> `chat-core-ask --profile examples/linux-chat-core.profile.json`:
-ChatCore resolves the Linux profile from `--memory-root .nanda/linux-active`,
-verifies the compiled binary hot cache against `.lrf` plus `.lwm` source
-memory, and reports token economics before returning a compact grounded packet.
+`chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root .nanda/linux-active`:
+ChatCore resolves the Linux profile, verifies the compiled binary hot cache
+against `.lrf` plus `.lwm` source memory, rebuilds stale/missing cache from the
+requested source paths, and returns a compact grounded packet. Use
+`chat-core-gate` for read-only authority diagnostics and `chat-core-build` only
+for explicit rebuilds.
 Top-level
 `nonlinear_memory_proven` and `global_nonlinear_memory_proven` stay false until
 independent multi-profile evidence exists.
@@ -627,9 +629,10 @@ accepted facts become learned overlay records, and rejected shortcuts become
 learned anti-wave records. It never writes query text or answer packets as facts
 and never mutates `chat-core.hot` directly. The write policy is
 `append_overlay_then_recompile_cache`: after the overlay changes, the authority
-gate and `ask` must report stale until `chat-core-build` rebuilds the hot
-cache. `chat-core-learn-eval` runs a scratch proof of that loop: before
-blocked, overlay written, cache stale, ask blocked while stale, hot rebuilt,
+gate and `ask --no-auto-rebuild` report stale. Normal `chat-core-ask` rebuilds
+from the requested source paths first, then answers from the fresh hot cache.
+`chat-core-learn-eval` runs a scratch proof of that loop: before blocked,
+overlay written, cache stale, strict ask blocked while stale, hot rebuilt,
 target answer lifted from `compiled_chat_core_hot`, learned anti-wave replayed,
 bash/systemctl preserved, and no false-positive regression. Its ready verdict
 remains Linux-profile scoped:

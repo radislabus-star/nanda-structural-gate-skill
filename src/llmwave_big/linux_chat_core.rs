@@ -81,6 +81,8 @@ pub(crate) struct LinuxChatCoreAskConfig {
     pub dialogue_overlay: PathBuf,
     pub centers_overlay: PathBuf,
     pub vpn_overlay: PathBuf,
+    pub broad_eval: Option<PathBuf>,
+    pub heldout_eval: Option<PathBuf>,
     pub cache_dir: PathBuf,
     pub manifest: Option<PathBuf>,
     pub auto_rebuild: bool,
@@ -916,24 +918,24 @@ fn build_linux_chat_core_gate_report_inner(
 pub(crate) fn build_linux_chat_core_ask_report(
     config: LinuxChatCoreAskConfig,
 ) -> Result<LinuxChatCoreAskReport> {
+    let overrides = ChatCoreSpecOverrides {
+        residual_pack: &config.residual_pack,
+        dialogue_overlay: &config.dialogue_overlay,
+        centers_overlay: &config.centers_overlay,
+        vpn_overlay: &config.vpn_overlay,
+        broad_eval: &config.broad_eval,
+        heldout_eval: &config.heldout_eval,
+        cache_dir: &config.cache_dir,
+    };
+    let spec = load_chat_core_spec(&config.profile, &overrides)?;
     let manifest = config
         .manifest
         .clone()
-        .unwrap_or_else(|| config.cache_dir.join("chat-core.manifest.json"));
-    let mut cache_status = evaluate_cache_from_manifest_for_ask(&manifest, &config)?;
+        .unwrap_or_else(|| PathBuf::from(&spec.cache.manifest_path));
+    let mut cache_status = evaluate_cache(&spec, &manifest)?;
     if config.auto_rebuild && config.manifest.is_none() && !cache_status.cache_fresh {
-        let overrides = ChatCoreSpecOverrides {
-            residual_pack: &config.residual_pack,
-            dialogue_overlay: &config.dialogue_overlay,
-            centers_overlay: &config.centers_overlay,
-            vpn_overlay: &config.vpn_overlay,
-            broad_eval: &None,
-            heldout_eval: &None,
-            cache_dir: &config.cache_dir,
-        };
-        let spec = load_chat_core_spec(&config.profile, &overrides)?;
         compile_chat_core_cache(&spec)?;
-        cache_status = evaluate_cache_from_manifest_for_ask(&manifest, &config)?;
+        cache_status = evaluate_cache(&spec, &manifest)?;
     }
     let hot_cache = if cache_status.cache_fresh {
         Some(load_hot_cache_from_manifest(&manifest)?)
@@ -1526,6 +1528,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         dialogue_overlay: dialogue_overlay.clone(),
         centers_overlay: centers_overlay.clone(),
         vpn_overlay: vpn_overlay.clone(),
+        broad_eval: None,
+        heldout_eval: None,
         cache_dir: scratch_cache.clone(),
         manifest: None,
         auto_rebuild: true,
@@ -1556,6 +1560,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         dialogue_overlay: dialogue_overlay.clone(),
         centers_overlay: centers_overlay.clone(),
         vpn_overlay: vpn_overlay.clone(),
+        broad_eval: None,
+        heldout_eval: None,
         cache_dir: scratch_cache.clone(),
         manifest: None,
         auto_rebuild: false,
@@ -1574,6 +1580,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         dialogue_overlay: dialogue_overlay.clone(),
         centers_overlay: centers_overlay.clone(),
         vpn_overlay: vpn_overlay.clone(),
+        broad_eval: None,
+        heldout_eval: None,
         cache_dir: scratch_cache.clone(),
         manifest: None,
         auto_rebuild: true,
@@ -1680,6 +1688,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         dialogue_overlay: dialogue_overlay.clone(),
         centers_overlay: centers_overlay.clone(),
         vpn_overlay: vpn_overlay.clone(),
+        broad_eval: None,
+        heldout_eval: None,
         cache_dir: scratch_cache.clone(),
         manifest: None,
         auto_rebuild: true,
@@ -1695,6 +1705,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         dialogue_overlay: dialogue_overlay.clone(),
         centers_overlay: centers_overlay.clone(),
         vpn_overlay: vpn_overlay.clone(),
+        broad_eval: None,
+        heldout_eval: None,
         cache_dir: scratch_cache.clone(),
         manifest: None,
         auto_rebuild: true,
@@ -1710,6 +1722,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         dialogue_overlay: dialogue_overlay.clone(),
         centers_overlay: centers_overlay.clone(),
         vpn_overlay: vpn_overlay.clone(),
+        broad_eval: None,
+        heldout_eval: None,
         cache_dir: scratch_cache.clone(),
         manifest: None,
         auto_rebuild: true,
@@ -1725,6 +1739,8 @@ pub(crate) fn build_linux_chat_core_learn_eval_report(
         dialogue_overlay,
         centers_overlay,
         vpn_overlay,
+        broad_eval: None,
+        heldout_eval: None,
         cache_dir: scratch_cache.clone(),
         manifest: None,
         auto_rebuild: true,
@@ -3644,6 +3660,9 @@ fn evaluate_cache(
     if current_source_hash != manifest_source_hash {
         stale_reasons.push("source_memory_hash_changed".to_string());
     }
+    if source_artifact_paths_changed(&current_artifacts, &manifest.source_artifacts) {
+        stale_reasons.push("source_memory_path_changed".to_string());
+    }
     if manifest.cache_is_source_of_truth {
         stale_reasons.push("manifest_claims_cache_as_source_of_truth".to_string());
     }
@@ -3668,6 +3687,22 @@ fn evaluate_cache(
     })
 }
 
+fn source_artifact_paths_changed(
+    current: &[LinuxChatCoreArtifactDigest],
+    manifest: &[LinuxChatCoreArtifactDigest],
+) -> bool {
+    let manifest_paths = manifest
+        .iter()
+        .map(|artifact| (artifact.artifact_id.as_str(), artifact.path.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    current.iter().any(|artifact| {
+        manifest_paths
+            .get(artifact.artifact_id.as_str())
+            .is_some_and(|path| *path != artifact.path)
+    })
+}
+
+#[cfg(test)]
 fn evaluate_cache_from_manifest(manifest_path: &Path) -> Result<LinuxChatCoreCacheStatus> {
     if !manifest_path.exists() {
         return Ok(LinuxChatCoreCacheStatus {
@@ -3734,71 +3769,6 @@ fn evaluate_cache_from_manifest(manifest_path: &Path) -> Result<LinuxChatCoreCac
         manifest_source_hash,
         cache_is_source_of_truth: false,
     })
-}
-
-fn evaluate_cache_from_manifest_for_ask(
-    manifest_path: &Path,
-    config: &LinuxChatCoreAskConfig,
-) -> Result<LinuxChatCoreCacheStatus> {
-    let mut status = evaluate_cache_from_manifest(manifest_path)?;
-    if !manifest_path.exists() {
-        return Ok(status);
-    }
-    let manifest: LinuxChatCoreCacheManifest = serde_json::from_slice(
-        &fs::read(manifest_path).with_context(|| format!("read {}", manifest_path.display()))?,
-    )
-    .with_context(|| format!("parse {}", manifest_path.display()))?;
-    let overrides = [
-        ("base-lrf", config.residual_pack.as_path()),
-        ("dialogue", config.dialogue_overlay.as_path()),
-        ("centers", config.centers_overlay.as_path()),
-        ("vpn", config.vpn_overlay.as_path()),
-    ];
-    let mut ask_artifacts = Vec::new();
-    let mut source_path_changed = false;
-    for expected in &manifest.source_artifacts {
-        if let Some((_, override_path)) = overrides
-            .iter()
-            .find(|(artifact_id, _)| *artifact_id == expected.artifact_id)
-        {
-            if path_string(override_path) != expected.path {
-                source_path_changed = true;
-            }
-            ask_artifacts.push(artifact(
-                &expected.artifact_id,
-                &expected.kind,
-                override_path,
-                expected.required,
-            )?);
-        } else {
-            ask_artifacts.push(artifact(
-                &expected.artifact_id,
-                &expected.kind,
-                Path::new(&expected.path),
-                expected.required,
-            )?);
-        }
-    }
-    let ask_source_hash = combined_hash(
-        ask_artifacts
-            .iter()
-            .map(|artifact| artifact.sha256.as_str()),
-    );
-    status.current_source_hash = ask_source_hash;
-    if status.current_source_hash != status.manifest_source_hash {
-        push_unique_stale_reason(&mut status.stale_reasons, "source_memory_hash_changed");
-    }
-    if source_path_changed {
-        push_unique_stale_reason(&mut status.stale_reasons, "source_memory_path_changed");
-    }
-    status.cache_fresh = status.stale_reasons.is_empty();
-    Ok(status)
-}
-
-fn push_unique_stale_reason(reasons: &mut Vec<String>, reason: &str) {
-    if !reasons.iter().any(|existing| existing == reason) {
-        reasons.push(reason.to_string());
-    }
 }
 
 fn source_artifacts(spec: &LinuxChatCoreSpec) -> Result<Vec<LinuxChatCoreArtifactDigest>> {
@@ -5258,12 +5228,14 @@ mod tests {
             vpn
         };
         let report = build_linux_chat_core_ask_report(LinuxChatCoreAskConfig {
-            profile: dir.join("profile.json"),
+            profile: PathBuf::from(DEFAULT_LINUX_CHAT_CORE_PROFILE),
             text: "which package provides command bash".to_string(),
             residual_pack,
             dialogue_overlay,
             centers_overlay,
             vpn_overlay,
+            broad_eval: None,
+            heldout_eval: None,
             cache_dir: dir.clone(),
             manifest: Some(manifest),
             auto_rebuild: false,

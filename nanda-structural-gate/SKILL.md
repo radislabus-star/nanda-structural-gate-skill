@@ -1485,12 +1485,14 @@ profile/eval readiness path. General LLM, open-domain chat, scanner, and global
 nonlinear claims remain blocked.
 For learning, use `chat-core-learn`: feedback writes only to a `.lwm`
 source overlay and must make cache authority stale. Do not write query text or
-answer packets as facts. Do not mutate `chat-core.hot` directly. Rebuild with
-`chat-core-build`, then ask again; only a fresh rebuilt `.hot` may change
-answer behavior. Use `chat-core-learn-eval` to verify the full scratch
-loop: before blocked, overlay written, stale gate, stale ask blocked, rebuild,
-learned answer from `compiled_chat_core_hot`, learned anti-wave replay, and
-unrelated bash/systemctl routes preserved.
+answer packets as facts. Do not mutate `chat-core.hot` directly. The read-only
+gate and `ask --no-auto-rebuild` must report stale after an overlay write.
+Normal `chat-core-ask` rebuilds from the requested source paths before
+answering, and the next gate must see the rebuilt cache as fresh. Use
+`chat-core-learn-eval` to verify the full scratch loop: before blocked, overlay
+written, stale gate, strict stale ask blocked, rebuild, learned answer from
+`compiled_chat_core_hot`, learned anti-wave replay, and unrelated
+bash/systemctl routes preserved.
 Before any append, learning must pass the ChatCore safety contract: refuse and
 redact secret-like feedback, require the route to exist in the domain registry
 and connected DomainPack, require the overlay to be allowed for that domain

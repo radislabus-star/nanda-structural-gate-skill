@@ -1878,6 +1878,10 @@ struct LlmwaveBigChatCoreAskArgs {
     centers_overlay: Option<PathBuf>,
     #[arg(long = "vpn-overlay")]
     vpn_overlay: Option<PathBuf>,
+    #[arg(long = "broad-eval")]
+    broad_eval: Option<PathBuf>,
+    #[arg(long = "heldout-eval")]
+    heldout_eval: Option<PathBuf>,
     #[arg(long = "cache-dir")]
     cache_dir: Option<PathBuf>,
     #[arg(long = "text")]
@@ -4891,8 +4895,8 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     dialogue_overlay: args.dialogue_overlay,
                     centers_overlay: args.centers_overlay,
                     vpn_overlay: args.vpn_overlay,
-                    broad_eval: None,
-                    heldout_eval: None,
+                    broad_eval: args.broad_eval,
+                    heldout_eval: args.heldout_eval,
                     cache_dir: args.cache_dir,
                 },
             );
@@ -4904,6 +4908,8 @@ pub(super) fn cmd(args: LlmwaveBigArgs) -> Result<u8> {
                     dialogue_overlay: paths.dialogue_overlay,
                     centers_overlay: paths.centers_overlay,
                     vpn_overlay: paths.vpn_overlay,
+                    broad_eval: paths.broad_eval,
+                    heldout_eval: paths.heldout_eval,
                     cache_dir: paths.cache_dir,
                     manifest: args.manifest,
                     auto_rebuild: !args.no_auto_rebuild,

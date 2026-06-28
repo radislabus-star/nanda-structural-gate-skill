@@ -255,6 +255,32 @@ run_chatcore_build_suite() {
   chat_core_gate_json="$("$llmwave_big" chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root "$root/.nanda/linux-active" --format json)"
   jq -e '.verdict == "LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM" and .profile_gate == null and .cache_status.cache_fresh == true and .chat_core.safe_to_answer_from_cache == true and .domain_runtime.json_index_used_for_domain_runtime == false' <<<"$chat_core_gate_json" >/dev/null
 
+  tmp_chat_core_root="$(mktemp -d)"
+  tmp_chat_core_memory="$tmp_chat_core_root/linux-active"
+  mkdir -p "$tmp_chat_core_memory"
+  for chat_core_source in \
+    linux-active-65k.lrf \
+    linux-chat-profile.lwm \
+    linux-center-learning.lwm \
+    linux-chat-profile-vpn.lwm \
+    linux-broad-eval.json \
+    linux-heldout-eval.json
+  do
+    cp "$root/.nanda/linux-active/$chat_core_source" "$tmp_chat_core_memory/$chat_core_source"
+  done
+  scratch_chat_core_build_json="$("$llmwave_big" chat-core-build --profile examples/linux-chat-core.profile.json --memory-root "$tmp_chat_core_memory" --format json)"
+  jq -e '.verdict == "LINUX_CHAT_CORE_CACHE_READY_NOT_GENERAL_LLM" and .manifest.profile_id == "linux-chat-core" and .cache.hot_fits_6m_budget == true' <<<"$scratch_chat_core_build_json" >/dev/null
+  scratch_chat_core_gate_json="$("$llmwave_big" chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root "$tmp_chat_core_memory" --format json)"
+  jq -e '.verdict == "LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and (.cache_status.stale_reasons | length) == 0 and .chat_core.safe_to_answer_from_cache == true' <<<"$scratch_chat_core_gate_json" >/dev/null
+  scratch_chat_core_ask_json="$("$llmwave_big" chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root "$tmp_chat_core_memory" --text "which package provides command bash" --format json)"
+  jq -e '.verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .grounded_packet.answer_allowed == true and .grounded_packet.readout_source == "compiled_chat_core_hot"' <<<"$scratch_chat_core_ask_json" >/dev/null
+  printf '\n# scratch auto rebuild parity\n' >>"$tmp_chat_core_memory/linux-chat-profile.lwm"
+  scratch_chat_core_auto_ask_json="$("$llmwave_big" chat-core-ask --profile examples/linux-chat-core.profile.json --memory-root "$tmp_chat_core_memory" --text "which package provides command bash" --format json)"
+  jq -e '.verdict == "LINUX_CHAT_CORE_PACKET_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and .grounded_packet.answer_allowed == true and .grounded_packet.readout_source == "compiled_chat_core_hot"' <<<"$scratch_chat_core_auto_ask_json" >/dev/null
+  scratch_chat_core_post_gate_json="$("$llmwave_big" chat-core-gate --profile examples/linux-chat-core.profile.json --memory-root "$tmp_chat_core_memory" --format json)"
+  jq -e '.verdict == "LLMWAVE_LINUX_CHAT_CORE_AUTHORITY_READY_NOT_GENERAL_LLM" and .cache_status.cache_fresh == true and (.cache_status.stale_reasons | length) == 0 and .chat_core.safe_to_answer_from_cache == true' <<<"$scratch_chat_core_post_gate_json" >/dev/null
+  rm -rf "$tmp_chat_core_root"
+
   run_chatcore_suite
 }
 
