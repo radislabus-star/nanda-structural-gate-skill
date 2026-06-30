@@ -5,6 +5,8 @@ description: "Use when a task involves enough structural relations that an LLM m
 
 # NANDA Structural Gate
 
+Canonical Git repository: https://github.com/radislabus-star/nanda-structural-gate-skill
+
 NANDA is a structural verifier, not a text generator. Use it to force explicit
 relation checking before finalizing answers where role swaps or route mistakes
 matter.
