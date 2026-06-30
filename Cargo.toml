@@ -2,7 +2,7 @@
 name = "nanda-structural-gate"
 version = "6.0.0"
 edition = "2021"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 description = "Sparse-triad structural gate for agent relation checks"
 readme = "README.md"
 repository = "https://github.com/radislabus-star/nanda-structural-gate-skill"

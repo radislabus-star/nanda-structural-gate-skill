@@ -2784,3 +2784,9 @@ lexical route trap -> NANDA interference peak selects the connected route
 
 If simple symbolic rules or ordinary graph checks win, this project should say
 that honestly.
+
+## License
+
+NANDA Structural Gate is licensed under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use requires
+separate permission from the licensor.
