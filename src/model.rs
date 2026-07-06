@@ -372,12 +372,12 @@ pub(crate) fn limit_warnings(
 ) -> Vec<String> {
     let all: Vec<Triad> = source.iter().chain(candidates).cloned().collect();
     let counts = [
-        ("entities", entity_set(&all).len(), 16, 32),
-        ("roles", role_set(&all).len(), 8, 16),
-        ("relations", relation_set(&all).len(), 16, 32),
-        ("triads", all.len(), 32, 64),
-        ("routes", route_set(&all).len(), 4, 8),
-        ("evidence_refs", evidence_set(&all).len(), 32, 64),
+        ("entities", entity_set(&all).len(), 32, 64),
+        ("roles", role_set(&all).len(), 24, 48),
+        ("relations", relation_set(&all).len(), 32, 64),
+        ("triads", all.len(), 64, 128),
+        ("routes", route_set(&all).len(), 8, 16),
+        ("evidence_refs", evidence_set(&all).len(), 64, 128),
         (
             "candidate_answers",
             if packet.candidate_answer.is_empty() {

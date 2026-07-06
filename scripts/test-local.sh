@@ -2386,9 +2386,16 @@ EOF_ATLAS_VERSION
 cat >"$tmp_atlas_repo/extension/gnome/tray_support.js" <<'EOF_ATLAS_VERSION'
 const APP_VERSION = '1.2.3';
 EOF_ATLAS_VERSION
+mkdir -p "$tmp_atlas_repo/src/nanda_wave"
+cat >"$tmp_atlas_repo/src/nanda_wave/l2.rs" <<'EOF_ATLAS_CANDIDATE'
+fn rank_l2_candidate() {}
+EOF_ATLAS_CANDIDATE
+cat >"$tmp_atlas_repo/src/correction_bayes.rs" <<'EOF_ATLAS_CANDIDATE'
+fn score_bayes_candidate() {}
+EOF_ATLAS_CANDIDATE
 atlas_path="$tmp_atlas_repo/.nanda/route-atlas.json"
 atlas_json="$("$build_atlas" "$tmp_atlas_repo" --out "$atlas_path" --format json)"
-jq -e '.mode == "route-atlas" and (.input | length) > 0 and (.output | length) > 0 and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .shared_contracts["shared.manual_toggle_contract"] and .shared_contracts["shared.version_bump_contract"] and .written_to' <<<"$atlas_json" >/dev/null
+jq -e '.mode == "route-atlas" and (.input | length) > 0 and (.output | length) > 0 and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .shared_contracts["shared.manual_toggle_contract"] and .shared_contracts["shared.version_bump_contract"] and .shared_contracts["shared.l2_l3_candidate_arbitration_contract"] and .written_to' <<<"$atlas_json" >/dev/null
 test -s "$atlas_path"
 atlas_file_json="$(cat "$atlas_path")"
 jq -e '(.input | length) > 0 and (.output | length) > 0' <<<"$atlas_file_json" >/dev/null
@@ -2451,6 +2458,22 @@ diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
 EOF_DIFF
 guard_diff_shared="$("$guard_diff" "$atlas_path" --action-id "shared.manual_toggle_contract" --diff "$tmp_atlas_repo/shared.diff" --format json)"
 jq -e '.verdict == "PASS" and .safe_to_edit == true and .reason == "shared_contract_allows_route_crossing" and (.changed_routes | index("source-flow")) and (.changed_routes | index("ime-display-flow")) and (.shared_candidates | index("src/manual_toggle.rs")) and .route_crossing_report.decision == "allowed by shared.manual_toggle_contract"' <<<"$guard_diff_shared" >/dev/null
+cat >"$tmp_atlas_repo/l2-l3-candidate.diff" <<'EOF_DIFF'
+diff --git a/src/nanda_wave/l2.rs b/src/nanda_wave/l2.rs
+--- a/src/nanda_wave/l2.rs
++++ b/src/nanda_wave/l2.rs
+@@ -1 +1 @@
+-fn rank_l2_candidate() {}
++fn rank_l2_candidate() { }
+diff --git a/src/correction_bayes.rs b/src/correction_bayes.rs
+--- a/src/correction_bayes.rs
++++ b/src/correction_bayes.rs
+@@ -1 +1 @@
+-fn score_bayes_candidate() {}
++fn score_bayes_candidate() { }
+EOF_DIFF
+guard_diff_l2_l3="$("$guard_diff" "$atlas_path" --action-id "shared.l2_l3_candidate_arbitration_contract" --diff "$tmp_atlas_repo/l2-l3-candidate.diff" --format json)"
+jq -e '.verdict == "PASS" and .safe_to_edit == true and .reason == "shared_contract_allows_route_crossing" and (.changed_routes | index("nanda-field-flow")) and (.changed_routes | index("space-autocorrect-flow")) and (.shared_candidates | index("src/nanda_wave/l2.rs")) and (.shared_candidates | index("src/correction_bayes.rs")) and .route_crossing_report.contract_scope == "L2/L3 candidate scoring, learned usage prior, phrase memory, and diagnostic eval only" and .route_crossing_report.decision == "allowed by shared.l2_l3_candidate_arbitration_contract"' <<<"$guard_diff_l2_l3" >/dev/null
 set +e
 guard_diff_shared_veto="$("$guard_diff" "$atlas_path" --action-id "ime.show_candidate" --diff "$tmp_atlas_repo/shared.diff" --format json)"
 guard_diff_shared_veto_status=$?

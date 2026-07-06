@@ -583,12 +583,19 @@ unparseable diffs as `WATCH`, not PASS. If `guard-diff` reports
 `diff_source_repo_mismatch`, regenerate the diff from the same repository as
 the atlas. Intentional cross-route edits require explicit shared contract
 actions such as `shared.manual_toggle_contract`, `shared.text_edit_contract`,
-`shared.candidate_contract`, or `shared.layout_sync_contract`; otherwise route
-crossing remains `VETO`. Use `shared.version_bump_contract` only for release
-metadata diffs. It is scoped to `Cargo.toml`, `Cargo.lock`, `VERSIONING.md`,
-extension metadata/version JS, and explicitly versioned README/HOW_IT_WORKS
-edits. It must verify Cargo, lockfile, extension `version-name`, numeric
-metadata version, JS `APP_VERSION`, and stale version tokens before PASS.
+`shared.candidate_contract`,
+`shared.l2_l3_candidate_arbitration_contract`, or
+`shared.layout_sync_contract`; otherwise route crossing remains `VETO`.
+Use `shared.l2_l3_candidate_arbitration_contract` when learned candidate
+scoring intentionally bridges NANDA L2/L3 field scoring, Bayes/usage priors,
+space/autocorrect ranking, and diagnostic candidate eval without owning IME
+output mechanics. It may allow internal `pub(crate)`/`pub(super)` helper growth
+for this bridge, but external public API growth remains `WATCH`.
+Use `shared.version_bump_contract` only for release metadata
+diffs. It is scoped to `Cargo.toml`, `Cargo.lock`, `VERSIONING.md`, extension
+metadata/version JS, and explicitly versioned README/HOW_IT_WORKS edits. It
+must verify Cargo, lockfile, extension `version-name`, numeric metadata
+version, JS `APP_VERSION`, and stale version tokens before PASS.
 Inspect `boundary_diff_kernel` first: it is owned by
 `field_core::boundary::diff`, reports `DIFF_KEEP`, `DIFF_WATCH`, `DIFF_VETO`,
 `DIFF_SHARED_CONTRACT_REQUIRED`, or `DIFF_TESTS_REQUIRED`, and must keep

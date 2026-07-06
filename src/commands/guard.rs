@@ -341,6 +341,24 @@ fn shared_contracts() -> Value {
             "shared_candidates": ["candidate_contract", "candidate", "suggestion"],
             "reason": "candidate contract may bridge display, scoring, and correction candidates"
         },
+        "shared.l2_l3_candidate_arbitration_contract": {
+            "allowed_routes": ["source-flow", "ime-display-flow", "nanda-field-flow", "space-autocorrect-flow", "test-flow"],
+            "shared_candidates": [
+                "correction_bayes",
+                "candidate_gate",
+                "nanda_wave/l2",
+                "nanda_wave/l3",
+                "l3_phrase_gate",
+                "llmwave",
+                "usage_prior",
+                "lay_nanda_wave_eval",
+                "candidate_quality",
+                "ime_hit_rate"
+            ],
+            "contract_scope": "L2/L3 candidate scoring, learned usage prior, phrase memory, and diagnostic eval only",
+            "allow_internal_api_growth": true,
+            "reason": "L2/L3 candidate arbitration intentionally bridges learned NANDA field scoring and space/autocorrect ranking without owning IME output mechanics"
+        },
         "shared.layout_sync_contract": {
             "allowed_routes": ["source-flow", "ime-display-flow", "runtime-flow", "config-flow", "test-flow"],
             "shared_candidates": ["layout_sync", "layout_controller", "backend_hint"],

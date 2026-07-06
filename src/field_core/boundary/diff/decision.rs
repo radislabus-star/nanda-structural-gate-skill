@@ -29,7 +29,7 @@ pub(super) fn decide_diff(facts: &BoundaryDiffFacts) -> BoundaryDiffDecision {
             "DIFF_TESTS_REQUIRED",
             "runtime_side_effect_requires_test",
         )
-    } else if !facts.added_public_api.is_empty() {
+    } else if !facts.added_public_api.is_empty() && !facts.internal_api_growth_allowed() {
         ("WATCH", "DIFF_WATCH", "public_api_growth_requires_review")
     } else if facts.route_crossing && facts.shared_allows_crossing {
         ("PASS", "DIFF_KEEP", "shared_contract_allows_route_crossing")

@@ -10,6 +10,11 @@ pub(super) fn diff_report(
     decision: &BoundaryDiffDecision,
     diff_error: Option<String>,
 ) -> Value {
+    let contract_scope = facts
+        .shared_contract
+        .as_ref()
+        .map(|contract| contract["contract_scope"].clone())
+        .unwrap_or(Value::Null);
     let route_crossing_decision =
         if facts.action_id == "shared.version_bump_contract" && decision.verdict == "PASS" {
             "allowed by shared.version_bump_contract".to_string()
@@ -72,7 +77,7 @@ pub(super) fn diff_report(
             "changed_routes": facts.changed_routes,
             "shared_candidates": facts.shared_candidates,
             "suggested_shared_actions": facts.suggested_shared_actions,
-            "contract_scope": if facts.action_id == "shared.version_bump_contract" { json!("version metadata only") } else { Value::Null },
+            "contract_scope": contract_scope,
             "decision": route_crossing_decision
         },
         "boundary_diff_kernel": {

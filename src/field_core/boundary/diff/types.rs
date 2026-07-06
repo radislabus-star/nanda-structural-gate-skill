@@ -28,6 +28,26 @@ pub(super) struct BoundaryDiffFacts {
     pub(super) route_crossing: bool,
 }
 
+impl BoundaryDiffFacts {
+    pub(super) fn internal_api_growth_allowed(&self) -> bool {
+        let Some(contract) = self.shared_contract.as_ref() else {
+            return false;
+        };
+        if !contract["allow_internal_api_growth"]
+            .as_bool()
+            .unwrap_or(false)
+        {
+            return false;
+        }
+        !self.added_public_api.is_empty()
+            && self.added_public_api.iter().all(|item| {
+                item.contains(":pub(crate)")
+                    || item.contains(":pub(super)")
+                    || item.contains(":pub(in ")
+            })
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(super) struct BoundaryDiffDecision {
     pub(super) verdict: &'static str,

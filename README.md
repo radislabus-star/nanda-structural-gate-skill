@@ -1715,10 +1715,17 @@ diffs return `WATCH` with `safe_to_edit=false`, not PASS. Diff files from a
 different git repository return `WATCH` with `reason=diff_source_repo_mismatch`.
 Intentional cross-route edits must use an explicit shared contract action such
 as `shared.manual_toggle_contract`, `shared.text_edit_contract`,
-`shared.candidate_contract`, or `shared.layout_sync_contract`; otherwise route
-crossing is `VETO` and the report names changed routes, shared candidates, and
-suggested shared actions. Added public API is `WATCH` until reviewed, and
-runtime side effects without a changed route test are `DIFF_TESTS_REQUIRED`.
+`shared.candidate_contract`,
+`shared.l2_l3_candidate_arbitration_contract`, or
+`shared.layout_sync_contract`; otherwise route crossing is `VETO` and the
+report names changed routes, shared candidates, and suggested shared actions.
+Use `shared.l2_l3_candidate_arbitration_contract` when learned candidate
+scoring intentionally bridges NANDA L2/L3 field scoring, Bayes/usage priors,
+space/autocorrect ranking, and diagnostic candidate eval without owning IME
+output mechanics. It may allow internal `pub(crate)`/`pub(super)` helper growth
+for this bridge, but external public API growth is still `WATCH` until reviewed.
+Added public API is `WATCH` until reviewed, and runtime side
+effects without a changed route test are `DIFF_TESTS_REQUIRED`.
 Use `shared.version_bump_contract` only for release metadata diffs. It is scoped
 to `Cargo.toml`, `Cargo.lock`, `VERSIONING.md`, extension metadata/version JS,
 and explicitly versioned README/HOW_IT_WORKS edits. The guard checks Cargo,
