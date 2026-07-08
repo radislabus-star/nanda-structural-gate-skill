@@ -108,7 +108,7 @@ fn diff_anti_waves(
             2,
         ));
     }
-    if !facts.added_public_api.is_empty() && !facts.internal_api_growth_allowed() {
+    if !facts.public_api_growth_allowed() {
         lanes.push(diff_anti_wave_lane(
             lanes.len(),
             "diff_public_api",

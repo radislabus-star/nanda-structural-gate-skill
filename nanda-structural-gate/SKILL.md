@@ -591,6 +591,10 @@ scoring intentionally bridges NANDA L2/L3 field scoring, Bayes/usage priors,
 space/autocorrect ranking, and diagnostic candidate eval without owning IME
 output mechanics. It may allow internal `pub(crate)`/`pub(super)` helper growth
 for this bridge, but external public API growth remains `WATCH`.
+`shared.text_edit_contract` may allow a tested public bridge API, but only when
+the atlas contract explicitly enables tested public API growth, the added symbol
+matches the shared text-edit candidates, and a route/contract test changes in
+the same diff. Other external public API growth remains `WATCH`.
 Use `shared.version_bump_contract` only for release metadata
 diffs. It is scoped to `Cargo.toml`, `Cargo.lock`, `VERSIONING.md`, extension
 metadata/version JS, and explicitly versioned README/HOW_IT_WORKS edits. It

@@ -214,6 +214,35 @@ diff --git a/src/ime/display.rs b/src/ime/display.rs\n\
     }
 
     #[test]
+    fn boundary_diff_shared_contract_can_allow_tested_public_bridge_api() {
+        let repo = temp_repo("tested-public-bridge");
+        let mut atlas = atlas(&repo);
+        atlas["routes"]["source-flow"]["allowed_files"] =
+            json!(["Cargo.toml", "src/manual_toggle.rs", "src/text_edit.rs"]);
+        atlas["shared_contracts"]["shared.text_edit_contract"] = json!({
+            "allowed_routes": ["source-flow", "test-flow"],
+            "shared_candidates": ["text_edit"],
+            "allow_internal_api_growth": true,
+            "allow_tested_public_api_growth": true,
+            "reason": "text edit bridge contract"
+        });
+        let diff = "\
+diff --git a/src/text_edit.rs b/src/text_edit.rs\n\
+--- a/src/text_edit.rs\n\
++++ b/src/text_edit.rs\n\
+@@ -1 +1 @@\n\
++pub fn authorize_text_edit_bridge() {}\n\
+diff --git a/tests/runtime.rs b/tests/runtime.rs\n\
+--- a/tests/runtime.rs\n\
++++ b/tests/runtime.rs\n\
+@@ -1 +1 @@\n\
++#[test] fn text_edit_bridge_is_contract_gated() {}\n";
+        let out = boundary_guard_diff(&atlas, "shared.text_edit_contract", diff, None);
+        assert_eq!(out["verdict"], "PASS");
+        assert_eq!(out["reason"], "shared_contract_allows_route_crossing");
+    }
+
+    #[test]
     fn boundary_diff_runtime_side_effect_requires_test() {
         let repo = temp_repo("runtime");
         let diff = "\

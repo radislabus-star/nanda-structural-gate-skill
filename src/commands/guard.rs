@@ -334,6 +334,9 @@ fn shared_contracts() -> Value {
         "shared.text_edit_contract": {
             "allowed_routes": ["source-flow", "ime-display-flow", "space-autocorrect-flow", "runtime-flow", "test-flow"],
             "shared_candidates": ["text_edit", "edit_contract", "composition_edit", "word_buffer"],
+            "contract_scope": "text edit contract may expose tested public bridge APIs needed by package binaries, but only when a route/contract test is changed in the same diff",
+            "allow_internal_api_growth": true,
+            "allow_tested_public_api_growth": true,
             "reason": "text edit contract may bridge visible edit state and correction/runtime state"
         },
         "shared.candidate_contract": {

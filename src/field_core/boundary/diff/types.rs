@@ -29,22 +29,38 @@ pub(super) struct BoundaryDiffFacts {
 }
 
 impl BoundaryDiffFacts {
-    pub(super) fn internal_api_growth_allowed(&self) -> bool {
+    pub(super) fn public_api_growth_allowed(&self) -> bool {
+        if self.added_public_api.is_empty() {
+            return true;
+        }
         let Some(contract) = self.shared_contract.as_ref() else {
             return false;
         };
-        if !contract["allow_internal_api_growth"]
+        let internal_allowed = contract["allow_internal_api_growth"]
+            .as_bool()
+            .unwrap_or(false);
+        let tested_public_allowed = contract["allow_tested_public_api_growth"]
             .as_bool()
             .unwrap_or(false)
-        {
-            return false;
-        }
-        !self.added_public_api.is_empty()
-            && self.added_public_api.iter().all(|item| {
-                item.contains(":pub(crate)")
-                    || item.contains(":pub(super)")
-                    || item.contains(":pub(in ")
+            && !self.changed_tests.is_empty();
+        let needles = contract["shared_candidates"]
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|candidate| candidate.as_str())
+                    .collect::<Vec<_>>()
             })
+            .unwrap_or_default();
+
+        self.added_public_api.iter().all(|item| {
+            (internal_allowed && Self::is_internal_public_api(item))
+                || (tested_public_allowed && needles.iter().any(|needle| item.contains(needle)))
+        })
+    }
+
+    fn is_internal_public_api(item: &str) -> bool {
+        item.contains(":pub(crate)") || item.contains(":pub(super)") || item.contains(":pub(in ")
     }
 }
 
