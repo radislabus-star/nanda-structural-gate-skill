@@ -329,6 +329,8 @@ fn shared_contracts() -> Value {
         "shared.manual_toggle_contract": {
             "allowed_routes": ["source-flow", "manual-trigger-flow", "ime-display-flow", "runtime-flow", "test-flow"],
             "shared_candidates": ["src/manual_toggle.rs", "src/manual_toggle/", "manual_toggle"],
+            "contract_scope": "manual-toggle bridges may expose internal Rust APIs across input, runtime, display, and test routes; external public API remains review-only",
+            "allow_internal_api_growth": true,
             "reason": "manual toggle is a shared contract between input/runtime and display adapters"
         },
         "shared.text_edit_contract": {
@@ -676,6 +678,18 @@ impl<T> Pipe for T {}
 #[cfg(test)]
 mod tests {
     use super::shared_contracts;
+
+    #[test]
+    fn manual_toggle_contract_allows_internal_but_not_external_api_growth() {
+        let contracts = shared_contracts();
+        let contract = &contracts["shared.manual_toggle_contract"];
+
+        assert_eq!(contract["allow_internal_api_growth"], true);
+        assert_ne!(contract["allow_tested_public_api_growth"], true);
+        assert!(contract["contract_scope"]
+            .as_str()
+            .is_some_and(|scope| scope.contains("external public API remains review-only")));
+    }
 
     #[test]
     fn candidate_contract_allows_only_test_backed_bridge_api_growth() {

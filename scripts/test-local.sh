@@ -2395,7 +2395,7 @@ fn score_bayes_candidate() {}
 EOF_ATLAS_CANDIDATE
 atlas_path="$tmp_atlas_repo/.nanda/route-atlas.json"
 atlas_json="$("$build_atlas" "$tmp_atlas_repo" --out "$atlas_path" --format json)"
-jq -e '.mode == "route-atlas" and (.input | length) > 0 and (.output | length) > 0 and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .shared_contracts["shared.manual_toggle_contract"] and .shared_contracts["shared.version_bump_contract"] and .shared_contracts["shared.l2_l3_candidate_arbitration_contract"] and .written_to' <<<"$atlas_json" >/dev/null
+jq -e '.mode == "route-atlas" and (.input | length) > 0 and (.output | length) > 0 and .routes["runtime-flow"] and .routes["ime-display-flow"] and .routes["manual-trigger-flow"] and .shared_contracts["shared.manual_toggle_contract"].allow_internal_api_growth == true and .shared_contracts["shared.manual_toggle_contract"].allow_tested_public_api_growth != true and .shared_contracts["shared.version_bump_contract"] and .shared_contracts["shared.l2_l3_candidate_arbitration_contract"] and .written_to' <<<"$atlas_json" >/dev/null
 test -s "$atlas_path"
 atlas_file_json="$(cat "$atlas_path")"
 jq -e '(.input | length) > 0 and (.output | length) > 0' <<<"$atlas_file_json" >/dev/null
@@ -2458,6 +2458,38 @@ diff --git a/src/bin/lay_ibus_engine.rs b/src/bin/lay_ibus_engine.rs
 EOF_DIFF
 guard_diff_shared="$("$guard_diff" "$atlas_path" --action-id "shared.manual_toggle_contract" --diff "$tmp_atlas_repo/shared.diff" --format json)"
 jq -e '.verdict == "PASS" and .safe_to_edit == true and .reason == "shared_contract_allows_route_crossing" and (.changed_routes | index("source-flow")) and (.changed_routes | index("ime-display-flow")) and (.shared_candidates | index("src/manual_toggle.rs")) and .route_crossing_report.decision == "allowed by shared.manual_toggle_contract"' <<<"$guard_diff_shared" >/dev/null
+cat >"$tmp_atlas_repo/manual-internal-api.diff" <<'EOF_DIFF'
+diff --git a/src/manual_toggle.rs b/src/manual_toggle.rs
+--- a/src/manual_toggle.rs
++++ b/src/manual_toggle.rs
+@@ -0,0 +1 @@
++pub(crate) fn observe_manual_toggle() {}
+diff --git a/tests/manual_toggle.rs b/tests/manual_toggle.rs
+--- a/tests/manual_toggle.rs
++++ b/tests/manual_toggle.rs
+@@ -0,0 +1 @@
++#[test] fn manual_toggle_bridge_is_internal() {}
+EOF_DIFF
+guard_diff_manual_internal="$("$guard_diff" "$atlas_path" --action-id "shared.manual_toggle_contract" --diff "$tmp_atlas_repo/manual-internal-api.diff" --format json)"
+jq -e '.verdict == "PASS" and .safe_to_edit == true and .reason == "shared_contract_allows_route_crossing" and .boundary_diff_kernel.field_equivalence.field_not_more_permissive == true' <<<"$guard_diff_manual_internal" >/dev/null
+cat >"$tmp_atlas_repo/manual-external-api.diff" <<'EOF_DIFF'
+diff --git a/src/manual_toggle.rs b/src/manual_toggle.rs
+--- a/src/manual_toggle.rs
++++ b/src/manual_toggle.rs
+@@ -0,0 +1 @@
++pub fn observe_manual_toggle() {}
+diff --git a/tests/manual_toggle.rs b/tests/manual_toggle.rs
+--- a/tests/manual_toggle.rs
++++ b/tests/manual_toggle.rs
+@@ -0,0 +1 @@
++#[test] fn manual_toggle_bridge_is_external() {}
+EOF_DIFF
+set +e
+guard_diff_manual_external="$("$guard_diff" "$atlas_path" --action-id "shared.manual_toggle_contract" --diff "$tmp_atlas_repo/manual-external-api.diff" --format json)"
+guard_diff_manual_external_status=$?
+set -e
+test "$guard_diff_manual_external_status" -eq 3
+jq -e '.verdict == "WATCH" and .safe_to_edit == false and .reason == "public_api_growth_requires_review"' <<<"$guard_diff_manual_external" >/dev/null
 cat >"$tmp_atlas_repo/l2-l3-candidate.diff" <<'EOF_DIFF'
 diff --git a/src/nanda_wave/l2.rs b/src/nanda_wave/l2.rs
 --- a/src/nanda_wave/l2.rs

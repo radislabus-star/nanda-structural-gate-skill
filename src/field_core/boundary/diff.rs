@@ -95,8 +95,9 @@ mod tests {
             },
             "shared_contracts": {
                 "shared.manual_toggle_contract": {
-                    "allowed_routes": ["source-flow", "ime-display-flow"],
+                    "allowed_routes": ["source-flow", "ime-display-flow", "test-flow"],
                     "shared_candidates": ["manual_toggle"],
+                    "allow_internal_api_growth": true,
                     "reason": "manual toggle bridges source and display"
                 },
                 "shared.version_bump_contract": {
@@ -180,6 +181,48 @@ diff --git a/src/ime/display.rs b/src/ime/display.rs\n\
         let out = boundary_guard_diff(&atlas(&repo), "shared.manual_toggle_contract", diff, None);
         assert_eq!(out["verdict"], "PASS");
         assert_eq!(out["reason"], "shared_contract_allows_route_crossing");
+    }
+
+    #[test]
+    fn boundary_diff_manual_contract_allows_internal_api_growth() {
+        let repo = temp_repo("manual-internal-api");
+        let diff = "\
+diff --git a/src/manual_toggle.rs b/src/manual_toggle.rs\n\
+--- a/src/manual_toggle.rs\n\
++++ b/src/manual_toggle.rs\n\
+@@ -0,0 +1 @@\n\
++pub(crate) fn observe_manual_toggle() {}\n\
+diff --git a/tests/runtime.rs b/tests/runtime.rs\n\
+--- a/tests/runtime.rs\n\
++++ b/tests/runtime.rs\n\
+@@ -0,0 +1 @@\n\
++#[test] fn manual_toggle_bridge_is_internal() {}\n";
+        let out = boundary_guard_diff(&atlas(&repo), "shared.manual_toggle_contract", diff, None);
+        assert_eq!(out["verdict"], "PASS");
+        assert_eq!(out["reason"], "shared_contract_allows_route_crossing");
+        assert_eq!(
+            out["boundary_diff_kernel"]["field_equivalence"]["field_not_more_permissive"],
+            true
+        );
+    }
+
+    #[test]
+    fn boundary_diff_manual_contract_keeps_external_api_growth_on_watch() {
+        let repo = temp_repo("manual-external-api");
+        let diff = "\
+diff --git a/src/manual_toggle.rs b/src/manual_toggle.rs\n\
+--- a/src/manual_toggle.rs\n\
++++ b/src/manual_toggle.rs\n\
+@@ -0,0 +1 @@\n\
++pub fn observe_manual_toggle() {}\n\
+diff --git a/tests/runtime.rs b/tests/runtime.rs\n\
+--- a/tests/runtime.rs\n\
++++ b/tests/runtime.rs\n\
+@@ -0,0 +1 @@\n\
++#[test] fn manual_toggle_bridge_is_external() {}\n";
+        let out = boundary_guard_diff(&atlas(&repo), "shared.manual_toggle_contract", diff, None);
+        assert_eq!(out["verdict"], "WATCH");
+        assert_eq!(out["reason"], "public_api_growth_requires_review");
     }
 
     #[test]

@@ -1719,6 +1719,10 @@ as `shared.manual_toggle_contract`, `shared.text_edit_contract`,
 `shared.l2_l3_candidate_arbitration_contract`, or
 `shared.layout_sync_contract`; otherwise route crossing is `VETO` and the
 report names changed routes, shared candidates, and suggested shared actions.
+`shared.manual_toggle_contract` may expose internal Rust bridge APIs such as
+`pub(crate)`, `pub(super)`, or `pub(in ...)` across its allowed input, runtime,
+display, and test routes. It does not authorize an external `pub` API; that
+remains `WATCH` until separately reviewed.
 Use `shared.l2_l3_candidate_arbitration_contract` when learned candidate
 scoring intentionally bridges NANDA L2/L3 field scoring, Bayes/usage priors,
 space/autocorrect ranking, and diagnostic candidate eval without owning IME
