@@ -341,8 +341,18 @@ fn shared_contracts() -> Value {
         },
         "shared.candidate_contract": {
             "allowed_routes": ["source-flow", "ime-display-flow", "nanda-field-flow", "space-autocorrect-flow", "test-flow"],
-            "shared_candidates": ["candidate_contract", "candidate", "suggestion"],
-            "reason": "candidate contract may bridge display, scoring, and correction candidates"
+            "shared_candidates": [
+                "candidate_contract",
+                "candidate",
+                "suggestion",
+                "typing_pipeline",
+                "text_metrics",
+                "word_reader"
+            ],
+            "contract_scope": "candidate/readout contracts may expose tested public bridge APIs needed by package binaries, but only when a route/contract test is changed in the same diff",
+            "allow_internal_api_growth": true,
+            "allow_tested_public_api_growth": true,
+            "reason": "candidate contract may bridge display, scoring, correction candidates, and their shared readout primitives"
         },
         "shared.l2_l3_candidate_arbitration_contract": {
             "allowed_routes": ["source-flow", "ime-display-flow", "nanda-field-flow", "space-autocorrect-flow", "test-flow"],
@@ -662,3 +672,20 @@ trait Pipe: Sized {
     }
 }
 impl<T> Pipe for T {}
+
+#[cfg(test)]
+mod tests {
+    use super::shared_contracts;
+
+    #[test]
+    fn candidate_contract_allows_only_test_backed_bridge_api_growth() {
+        let contracts = shared_contracts();
+        let contract = &contracts["shared.candidate_contract"];
+
+        assert_eq!(contract["allow_internal_api_growth"], true);
+        assert_eq!(contract["allow_tested_public_api_growth"], true);
+        assert!(contract["shared_candidates"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item == "candidate_contract")));
+    }
+}
