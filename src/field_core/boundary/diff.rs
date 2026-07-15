@@ -45,10 +45,20 @@ pub(super) fn boundary_guard_diff_unreadable(
 
 #[cfg(test)]
 mod tests {
+    use super::parser::diff_runtime_side_effects;
     use super::*;
     use serde_json::{json, Value};
     use std::fs;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn runtime_side_effect_parser_ignores_generated_docs_but_keeps_source_code() {
+        let docs = "diff --git a/graphify-out/GRAPH_REPORT.md b/graphify-out/GRAPH_REPORT.md\n+spawn(worker) is documented here\n";
+        let source = "diff --git a/src/runtime.rs b/src/runtime.rs\n+std::process::Command::new(\"worker\");\n";
+
+        assert!(diff_runtime_side_effects(docs).is_empty());
+        assert_eq!(diff_runtime_side_effects(source).len(), 1);
+    }
 
     fn atlas(repo: &Path) -> Value {
         json!({

@@ -53,9 +53,17 @@ pub(super) fn diff_added_public_api(diff: &str) -> Vec<String> {
 pub(super) fn diff_runtime_side_effects(diff: &str) -> Vec<String> {
     diff_added_lines(diff)
         .into_iter()
-        .filter(|(_, line)| is_runtime_side_effect_line(line))
+        .filter(|(file, line)| is_runtime_source_file(file) && is_runtime_side_effect_line(line))
         .map(|(file, line)| format!("{file}:{}", line.trim()))
         .collect()
+}
+
+fn is_runtime_source_file(file: &str) -> bool {
+    ![
+        ".md", ".json", ".toml", ".lock", ".txt", ".csv", ".yaml", ".yml",
+    ]
+    .iter()
+    .any(|suffix| file.ends_with(suffix))
 }
 
 fn diff_added_lines(diff: &str) -> Vec<(String, String)> {
