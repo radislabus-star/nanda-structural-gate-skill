@@ -590,6 +590,9 @@ actions such as `shared.manual_toggle_contract`, `shared.text_edit_contract`,
 `pub(crate)`, `pub(super)`, or `pub(in ...)` across its allowed input, runtime,
 display, and test routes. It does not authorize an external `pub` API; that
 remains `WATCH` until separately reviewed.
+`shared.candidate_contract` may bridge candidate/readout state into a tested
+runtime consumer. It does not authorize text mutation or backend output, and
+public API growth still requires a route/contract test in the same diff.
 Use `shared.l2_l3_candidate_arbitration_contract` when learned candidate
 scoring intentionally bridges NANDA L2/L3 field scoring, Bayes/usage priors,
 space/autocorrect ranking, and diagnostic candidate eval without owning IME

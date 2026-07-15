@@ -342,7 +342,7 @@ fn shared_contracts() -> Value {
             "reason": "text edit contract may bridge visible edit state and correction/runtime state"
         },
         "shared.candidate_contract": {
-            "allowed_routes": ["source-flow", "ime-display-flow", "nanda-field-flow", "space-autocorrect-flow", "test-flow"],
+            "allowed_routes": ["source-flow", "ime-display-flow", "nanda-field-flow", "space-autocorrect-flow", "runtime-flow", "test-flow"],
             "shared_candidates": [
                 "candidate_contract",
                 "candidate",
@@ -351,7 +351,7 @@ fn shared_contracts() -> Value {
                 "text_metrics",
                 "word_reader"
             ],
-            "contract_scope": "candidate/readout contracts may expose tested public bridge APIs needed by package binaries, but only when a route/contract test is changed in the same diff",
+            "contract_scope": "candidate/readout contracts may bridge tested runtime consumers, but do not authorize text mutation or backend output; public bridge APIs require a route/contract test in the same diff",
             "allow_internal_api_growth": true,
             "allow_tested_public_api_growth": true,
             "reason": "candidate contract may bridge display, scoring, correction candidates, and their shared readout primitives"
@@ -701,5 +701,11 @@ mod tests {
         assert!(contract["shared_candidates"]
             .as_array()
             .is_some_and(|items| items.iter().any(|item| item == "candidate_contract")));
+        assert!(contract["allowed_routes"]
+            .as_array()
+            .is_some_and(|routes| routes.iter().any(|route| route == "runtime-flow")));
+        assert!(contract["contract_scope"].as_str().is_some_and(
+            |scope| scope.contains("do not authorize text mutation or backend output")
+        ));
     }
 }
