@@ -47,16 +47,18 @@ pub(crate) fn make_report(
         !candidates.is_empty() && wave["weak"].as_array().is_some_and(|x| !x.is_empty());
     let has_candidate_watch = alias_watch || !gaps.is_empty() || !weak_conf.is_empty();
 
-    let verdict = if failure_verdict == "HARD_STOP" || failure_verdict == "VETO" {
+    let verdict = if failure_verdict == "HARD_STOP"
+        || failure_verdict == "VETO"
+        || !conflicts.is_empty()
+        || has_foreign_pull
+        || has_owner_conflict
+        || has_negative_routes
+    {
         "VETO"
     } else if failure_verdict == "ANALYSIS_INSUFFICIENT"
-        || limits.iter().any(|x| x.contains("hard limit"))
+        || !limits.is_empty()
+        || has_candidate_watch
     {
-        "WATCH"
-    } else if !conflicts.is_empty() || has_foreign_pull || has_owner_conflict || has_negative_routes
-    {
-        "VETO"
-    } else if has_candidate_watch {
         "WATCH"
     } else if has_weak_route || has_weak_wave {
         "VETO"
@@ -1066,5 +1068,43 @@ pub(crate) fn action_for_report(report: &Report) -> &'static str {
         "PASS" => "SEND_OK",
         "WATCH" => "DRAFT_OK_REVIEW_REQUIRED",
         _ => "REPAIR_REQUIRED",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn size_only_packet() -> Packet {
+        serde_json::from_str(include_str!(
+            "../examples/triad-packet.hgate-size-only.json"
+        ))
+        .expect("size-only fixture must remain valid")
+    }
+
+    #[test]
+    fn target_size_limit_is_watch_until_hierarchical_split() {
+        let packet = size_only_packet();
+        let source = normalize_ids(packet.triads.clone(), "t");
+        let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+        let report = make_report(&packet, &source, &candidates).expect("report");
+
+        assert_eq!(report.verdict, "WATCH");
+        assert_eq!(report.limits, ["entities target limit exceeded: 34>32"]);
+        assert!(report.conflicts.is_empty());
+    }
+
+    #[test]
+    fn target_size_limit_does_not_hide_structural_conflict() {
+        let mut packet = size_only_packet();
+        let candidate = &mut packet.candidate_triads[0];
+        std::mem::swap(&mut candidate.subject, &mut candidate.object);
+        std::mem::swap(&mut candidate.subject_role, &mut candidate.object_role);
+        let source = normalize_ids(packet.triads.clone(), "t");
+        let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+        let report = make_report(&packet, &source, &candidates).expect("report");
+
+        assert_eq!(report.verdict, "VETO");
+        assert!(!report.conflicts.is_empty());
     }
 }
