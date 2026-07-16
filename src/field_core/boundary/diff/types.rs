@@ -43,19 +43,8 @@ impl BoundaryDiffFacts {
             .as_bool()
             .unwrap_or(false)
             && !self.changed_tests.is_empty();
-        let needles = contract["shared_candidates"]
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .filter_map(|candidate| candidate.as_str())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
         self.added_public_api.iter().all(|item| {
-            (internal_allowed && Self::is_internal_public_api(item))
-                || (tested_public_allowed && needles.iter().any(|needle| item.contains(needle)))
+            (internal_allowed && Self::is_internal_public_api(item)) || tested_public_allowed
         })
     }
 

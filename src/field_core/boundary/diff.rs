@@ -296,6 +296,59 @@ diff --git a/tests/runtime.rs b/tests/runtime.rs\n\
     }
 
     #[test]
+    fn boundary_diff_tested_public_bridge_does_not_depend_on_symbol_name() {
+        let repo = temp_repo("tested-public-unrelated-symbol-name");
+        let mut atlas = atlas(&repo);
+        atlas["routes"]["source-flow"]["allowed_files"] =
+            json!(["Cargo.toml", "src/manual_toggle.rs", "src/hot_field.rs"]);
+        atlas["shared_contracts"]["shared.candidate_contract"] = json!({
+            "allowed_routes": ["source-flow", "test-flow"],
+            "shared_candidates": ["candidate", "readout"],
+            "allow_internal_api_growth": true,
+            "allow_tested_public_api_growth": true,
+            "reason": "candidate bridge contract"
+        });
+        let diff = "\
+diff --git a/src/hot_field.rs b/src/hot_field.rs\n\
+--- a/src/hot_field.rs\n\
++++ b/src/hot_field.rs\n\
+@@ -1 +1 @@\n\
++pub fn learning_surface_is_attested() {}\n\
+diff --git a/tests/runtime.rs b/tests/runtime.rs\n\
+--- a/tests/runtime.rs\n\
++++ b/tests/runtime.rs\n\
+@@ -1 +1 @@\n\
++#[test] fn compact_l2_uses_the_shared_owner() {}\n";
+        let out = boundary_guard_diff(&atlas, "shared.candidate_contract", diff, None);
+        assert_eq!(out["verdict"], "PASS");
+        assert_eq!(out["reason"], "shared_contract_allows_route_crossing");
+    }
+
+    #[test]
+    fn boundary_diff_public_bridge_without_test_remains_watch() {
+        let repo = temp_repo("untested-public-bridge");
+        let mut atlas = atlas(&repo);
+        atlas["routes"]["source-flow"]["allowed_files"] =
+            json!(["Cargo.toml", "src/manual_toggle.rs", "src/hot_field.rs"]);
+        atlas["shared_contracts"]["shared.candidate_contract"] = json!({
+            "allowed_routes": ["source-flow", "test-flow"],
+            "shared_candidates": ["candidate", "readout"],
+            "allow_internal_api_growth": true,
+            "allow_tested_public_api_growth": true,
+            "reason": "candidate bridge contract"
+        });
+        let diff = "\
+diff --git a/src/hot_field.rs b/src/hot_field.rs\n\
+--- a/src/hot_field.rs\n\
++++ b/src/hot_field.rs\n\
+@@ -1 +1 @@\n\
++pub fn learning_surface_is_attested() {}\n";
+        let out = boundary_guard_diff(&atlas, "shared.candidate_contract", diff, None);
+        assert_eq!(out["verdict"], "WATCH");
+        assert_eq!(out["reason"], "public_api_growth_requires_review");
+    }
+
+    #[test]
     fn boundary_diff_runtime_side_effect_requires_test() {
         let repo = temp_repo("runtime");
         let diff = "\
