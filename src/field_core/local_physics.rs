@@ -27,6 +27,7 @@ pub(crate) struct FieldLocalPhysicsTotals {
     pub field_core_owned: usize,
     pub field_core_backed_wrappers: usize,
     pub packed_numeric_kernels: usize,
+    pub structural_proof_boundaries: usize,
     pub structural_legacy_readouts: usize,
     pub domain_fixture_readouts: usize,
     pub local_physics_candidates: usize,
@@ -168,6 +169,13 @@ fn classify_physics_file(
             "nanda_6m numeric hot kernel",
             "low-level packed arithmetic is allowed only as numeric kernel; verdict authority stays in field_core",
         )
+    } else if is_structural_proof_boundary(path) {
+        (
+            "structural_proof_boundary",
+            "LOW",
+            "trusted structural proof",
+            "proof verdicts bind structural authority and do not implement field scoring or field physics",
+        )
     } else if is_structural_legacy_readout(path) {
         (
             "structural_legacy_readout",
@@ -206,11 +214,16 @@ fn bump_total(totals: &mut FieldLocalPhysicsTotals, category: &str) {
         "field_core_owned" => totals.field_core_owned += 1,
         "field_core_backed_wrapper" => totals.field_core_backed_wrappers += 1,
         "packed_numeric_kernel" => totals.packed_numeric_kernels += 1,
+        "structural_proof_boundary" => totals.structural_proof_boundaries += 1,
         "structural_legacy_readout" => totals.structural_legacy_readouts += 1,
         "domain_fixture_readout" => totals.domain_fixture_readouts += 1,
         "local_physics_candidate" => totals.local_physics_candidates += 1,
         _ => {}
     }
+}
+
+fn is_structural_proof_boundary(path: &str) -> bool {
+    path == "src/trusted_proof.rs"
 }
 
 fn is_structural_legacy_readout(path: &str) -> bool {
@@ -320,5 +333,18 @@ mod tests {
 
         assert_eq!(finding.category, "structural_legacy_readout");
         assert_eq!(finding.risk, "MIGRATION_DEBT");
+    }
+
+    #[test]
+    fn local_physics_classifier_separates_trusted_proof_from_field_physics() {
+        let finding = classify_physics_file(
+            "src/trusted_proof.rs",
+            "let verdict = validate_externally_pinned_manifest();",
+            vec!["verdict"],
+        );
+
+        assert_eq!(finding.category, "structural_proof_boundary");
+        assert_eq!(finding.owner, "trusted structural proof");
+        assert_eq!(finding.risk, "LOW");
     }
 }
