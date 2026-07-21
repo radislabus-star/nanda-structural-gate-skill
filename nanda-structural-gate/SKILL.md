@@ -14,6 +14,19 @@ matter.
 The bundled commands are stable wrappers around one Rust CLI binary. Treat
 their JSON output as the primary agent interface.
 
+Structural and proof authority are separate. A plain `nanda-check` may return
+`PASS`, but it must be treated as coherence-only while
+`authority_ready=false`. Never use structural `PASS` to promote, deploy, send,
+or execute an authority-bearing action.
+
+Authority requires the same packet to pass with `--proof-manifest` and an exact
+`--trusted-manifest-root` pinned by an external trust owner. The command
+`nanda proof-manifest-draft` only creates deterministic untrusted bytes; its
+`UNTRUSTED_DRAFT_REQUIRES_EXTERNAL_PIN` result is not authority. The manifest
+root proves binding to the selected trust owner, not real-world truth. Empty
+candidate sets are always `WATCH`; foreign, tampered, mismatched, or reused
+source evidence is `VETO`.
+
 When adding or changing public commands, update the human-facing command index
 in `COMMANDS.md` and keep this runtime instruction file aligned.
 
@@ -75,6 +88,19 @@ For live agent work, prefer:
 scripts/nanda-init-md --task-id local-check --domain general --query "short task"
 scripts/nanda-gate-md nanda-task-local-check.md --task-id local-check --domain general
 ```
+
+For an authority-bearing machine check after an external owner has pinned the
+manifest bytes:
+
+```bash
+scripts/nanda-check \
+  --triads packet.json \
+  --proof-manifest manifest.json \
+  --trusted-manifest-root <externally-pinned-sha256> \
+  --format json
+```
+
+Require both `verdict=PASS` and `authority_ready=true`.
 
 For large worksheets, split first:
 

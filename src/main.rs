@@ -33,6 +33,7 @@ mod pattern_store;
 mod proof;
 mod report;
 mod search;
+mod trusted_proof;
 
 use aliases::{canonicalize_packet, inherit_aliases_if_needed, AliasRule, CanonicalizationReport};
 pub(crate) use dataset_doctor::*;
@@ -48,10 +49,11 @@ pub(crate) use pattern_eval::*;
 pub(crate) use pattern_store::*;
 pub(crate) use report::*;
 pub(crate) use search::*;
+pub(crate) use trusted_proof::*;
 
 const WAVE_DIM: usize = 1024;
-const CORE_VERSION: &str = "sparse-triad-v6.0-llmwave-proof";
-const ENGINE_ID: &str = "nanda-check sparse-triad-v6.0-rust";
+const CORE_VERSION: &str = "sparse-triad-v6.1-trusted-proof";
+const ENGINE_ID: &str = "nanda-check sparse-triad-v6.1-rust";
 const MANDATORY_COMPLEXITY: i64 = 12;
 const EXIT_PASS: u8 = 0;
 const EXIT_VETO: u8 = 1;
@@ -65,8 +67,8 @@ const EXIT_WATCH: u8 = 3;
     version,
     long_version = concat!(
         env!("CARGO_PKG_VERSION"),
-        "\ncore_version: sparse-triad-v6.0-llmwave-proof",
-        "\nengine: nanda-check sparse-triad-v6.0-rust",
+        "\ncore_version: sparse-triad-v6.1-trusted-proof",
+        "\nengine: nanda-check sparse-triad-v6.1-rust",
         "\nnanda_6m: nanda-6m-v40-llmwave-pattern-runtime",
         "\nwave_dim: 1024"
     )
@@ -80,6 +82,7 @@ struct Cli {
 enum Command {
     Check(CheckArgs),
     Gate(CheckArgs),
+    ProofManifestDraft(ProofManifestDraftArgs),
     InitTask(InitTaskArgs),
     InitMd(InitMdArgs),
     PackFromMd(PackArgs),
@@ -144,8 +147,28 @@ enum Command {
 struct CheckArgs {
     #[arg(long)]
     triads: Option<PathBuf>,
+    #[arg(long, requires = "trusted_manifest_root")]
+    proof_manifest: Option<PathBuf>,
+    #[arg(long, requires = "proof_manifest")]
+    trusted_manifest_root: Option<String>,
     #[arg(long, value_enum, default_value = "text")]
     format: OutputFormat,
+}
+
+#[derive(Parser)]
+struct ProofManifestDraftArgs {
+    #[arg(long)]
+    triads: PathBuf,
+    #[arg(long)]
+    source_provenance_root: String,
+    #[arg(long)]
+    candidate_extraction_root: String,
+    #[arg(long)]
+    source_producer_root: String,
+    #[arg(long)]
+    candidate_producer_root: String,
+    #[arg(long)]
+    out: PathBuf,
 }
 
 #[derive(Parser)]
@@ -1253,6 +1276,7 @@ fn run() -> Result<u8> {
     match cli.command {
         Command::Check(args) => run_check(args, false),
         Command::Gate(args) => run_check(args, true),
+        Command::ProofManifestDraft(args) => proof_manifest_draft_cmd(args),
         Command::InitTask(args) => init_task(args),
         Command::InitMd(args) => init_md(args),
         Command::PackFromMd(args) => pack_from_md(args),
@@ -1315,7 +1339,13 @@ fn run_check(args: CheckArgs, strict: bool) -> Result<u8> {
     let packet = load_packet(args.triads.as_deref())?;
     let source = normalize_ids(packet.triads.clone(), "t");
     let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
-    let report = make_report(&packet, &source, &candidates)?;
+    let proof = match (&args.proof_manifest, &args.trusted_manifest_root) {
+        (Some(manifest), Some(root)) => {
+            validate_trusted_proof_manifest(&packet, &source, &candidates, manifest, root)
+        }
+        _ => TrustedProofValidation::structural_only(),
+    };
+    let report = make_report_with_proof(&packet, &source, &candidates, proof)?;
     print_report(&report, &args.format)?;
     if strict && report.verdict != "PASS" {
         return Ok(verdict_code(&report.verdict));

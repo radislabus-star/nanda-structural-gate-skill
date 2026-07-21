@@ -10,4 +10,9 @@ script_dir="$(cd -P "$(dirname "$script_path")" && pwd)"
 if [[ -x "$script_dir/../bin/nanda" ]]; then
   exec "$script_dir/../bin/nanda" gate "$@"
 fi
-exec cargo run --quiet --manifest-path "$script_dir/../../Cargo.toml" -- gate "$@"
+manifest="$script_dir/../../Cargo.toml"
+if [[ -f "$manifest" ]]; then
+  exec cargo "+${NANDA_RUST_TOOLCHAIN:-1.97.0}" run --quiet --manifest-path "$manifest" -- gate "$@"
+fi
+echo "error: nanda binary missing and source manifest not found: $manifest" >&2
+exit 2

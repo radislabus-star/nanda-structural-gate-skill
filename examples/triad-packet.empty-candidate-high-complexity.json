@@ -1,0 +1,52 @@
+{
+  "task_id": "empty-candidate-high-complexity",
+  "domain": "code",
+  "query": "An empty candidate must never pass because the source is large.",
+  "triads": [
+    {
+      "id": "t1",
+      "subject": "owner 1",
+      "relation": "controls",
+      "object": "artifact 1",
+      "evidence": "source.rs:1",
+      "subject_role": "owner",
+      "object_role": "artifact",
+      "route": "route-1",
+      "group": "group-1"
+    },
+    {
+      "id": "t2",
+      "subject": "owner 2",
+      "relation": "controls",
+      "object": "artifact 2",
+      "evidence": "source.rs:2",
+      "subject_role": "owner",
+      "object_role": "artifact",
+      "route": "route-2",
+      "group": "group-2"
+    },
+    {
+      "id": "t3",
+      "subject": "owner 3",
+      "relation": "controls",
+      "object": "artifact 3",
+      "evidence": "source.rs:3",
+      "subject_role": "owner",
+      "object_role": "artifact",
+      "route": "route-3",
+      "group": "group-3"
+    },
+    {
+      "id": "t4",
+      "subject": "owner 4",
+      "relation": "controls",
+      "object": "artifact 4",
+      "evidence": "source.rs:4",
+      "subject_role": "owner",
+      "object_role": "artifact",
+      "route": "route-4",
+      "group": "group-4"
+    }
+  ],
+  "candidate_triads": []
+}

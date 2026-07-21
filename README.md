@@ -7,12 +7,13 @@ It is not a chatbot and not a replacement for retrieval, graph search, source
 checking, or LLM reasoning. The goal is narrower:
 
 ```text
-LLM extracts triads -> nanda-check verifies bindings -> agent answers with PASS/WATCH/VETO awareness
+LLM extracts triads -> nanda-check checks structure -> trusted proof binds authority -> agent acts
 ```
 
-The current version includes a small deterministic Rust V0 checker. It is not
-a full NANDA runtime yet, but it can already compare source triads against
-candidate triads and return `PASS`, `WATCH`, or `VETO`.
+The current version includes a deterministic Rust structural checker. It can
+compare source triads against candidate triads and return `PASS`, `WATCH`, or
+`VETO`. A structural `PASS` means coherence only: without an externally pinned
+proof manifest the report keeps `authority_ready=false`.
 
 For the planned cache-resident runtime, see
 [`ARCHITECTURE_NANDA_6M.md`](ARCHITECTURE_NANDA_6M.md). NANDA-6M is specified
@@ -85,6 +86,54 @@ complexity >= 12
 
 Small one-hop facts do not need the gate. Multi-party, multi-route, or
 evidence-conflict tasks do.
+
+## Structural And Proof Authority
+
+The normal structural check is intentionally non-authoritative:
+
+```bash
+nanda check --triads examples/triad-packet.trusted-proof.json --format json
+```
+
+It can return `verdict=PASS`, but it also returns:
+
+```text
+trusted_proof.mode = STRUCTURAL_ONLY
+trusted_proof.verdict = NOT_REQUESTED
+authority_ready = false
+```
+
+Authority requires a proof manifest whose exact file SHA-256 root is supplied
+by an external trust owner:
+
+```bash
+nanda check \
+  --triads packet.json \
+  --proof-manifest manifest.json \
+  --trusted-manifest-root <externally-pinned-sha256> \
+  --format json
+```
+
+The manifest binds the exact source triads, candidate triads, candidate answer,
+engine identity, provenance roots, and producer roots. Source and candidate
+provenance and producer roots must be distinct, and candidate evidence cannot
+reuse source evidence. Empty candidate sets always return `WATCH`.
+
+Use `nanda proof-manifest-draft` only to produce deterministic manifest bytes:
+
+```bash
+nanda proof-manifest-draft \
+  --triads packet.json \
+  --source-provenance-root <sha256> \
+  --candidate-extraction-root <sha256> \
+  --source-producer-root <sha256> \
+  --candidate-producer-root <sha256> \
+  --out manifest.json
+```
+
+The draft reports `UNTRUSTED_DRAFT_REQUIRES_EXTERNAL_PIN`. Hashing or generating
+the manifest locally does not create trust and does not prove real-world truth;
+it only prepares bytes that a separate trust owner may inspect and pin.
 
 ## Repository Layout
 
@@ -2471,7 +2520,7 @@ Core version fields:
 
 ```text
 nanda --version
-core_version: sparse-triad-v6.0-llmwave-proof
+core_version: sparse-triad-v6.1-trusted-proof
 wave_dim: 1024
 ```
 

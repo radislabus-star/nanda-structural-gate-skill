@@ -166,7 +166,7 @@ run_rust_baseline() {
 run_version_readiness() {
   version_text="$("$root/target/debug/nanda" --version)"
   grep -q '^nanda ' <<<"$version_text"
-  grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
+  grep -q 'core_version: sparse-triad-v6.1-trusted-proof' <<<"$version_text"
   grep -q 'nanda_6m:' <<<"$version_text"
 
   skill_readiness_json="$("$skill_readiness" --format json)"
@@ -180,6 +180,7 @@ run_smoke_suite() {
   cargo build --manifest-path "$root/Cargo.toml" >/dev/null
   run_version_readiness
   "$root/scripts/test-edge-cases.sh" >/dev/null
+  "$root/scripts/test-trusted-proof.sh" >/dev/null
 }
 
 run_chatcore_suite() {
@@ -434,7 +435,7 @@ run_changed_suite() {
         ;;
     esac
     case "$path" in
-      examples/triad-*|scripts/test-edge-cases.sh)
+      examples/triad-*|scripts/test-edge-cases.sh|scripts/test-trusted-proof.sh)
         needs_edges=1
         ;;
     esac
@@ -470,6 +471,7 @@ run_changed_suite() {
   fi
   if ((needs_edges)); then
     "$root/scripts/test-edge-cases.sh" >/dev/null
+    "$root/scripts/test-trusted-proof.sh" >/dev/null
   fi
 }
 
@@ -527,7 +529,7 @@ cargo check --manifest-path "$root/Cargo.toml" >/dev/null
 cargo test --manifest-path "$root/Cargo.toml" >/dev/null
 version_text="$("$root/target/debug/nanda" --version)"
 grep -q '^nanda ' <<<"$version_text"
-grep -q 'core_version: sparse-triad-v6.0-llmwave-proof' <<<"$version_text"
+grep -q 'core_version: sparse-triad-v6.1-trusted-proof' <<<"$version_text"
 grep -q 'nanda_6m:' <<<"$version_text"
 skill_readiness_json="$("$skill_readiness" --format json)"
 jq -e '.mode == "nanda-skill-readiness" and .verdict == "PUBLIC_V1_READY" and .public_v1_ready == true and (.blockers | length) == 0' <<<"$skill_readiness_json" >/dev/null
@@ -1370,6 +1372,8 @@ jq empty "$root/examples/triad-packet.route-splice.json"
 jq empty "$root/examples/triad-packet.evidence-conflict.json"
 jq empty "$root/examples/triad-packet.watch-missing-evidence.json"
 jq empty "$root/examples/triad-packet.watch-low-complexity.json"
+jq empty "$root/examples/triad-packet.trusted-proof.json"
+jq empty "$root/examples/triad-packet.empty-candidate-high-complexity.json"
 jq empty "$root/examples/triad-packet.interference-search.json"
 jq empty "$root/examples/triad-packet.interference-search-noisy.json"
 jq empty "$root/examples/triad-packet.interference-search-route-trap.json"
@@ -1527,7 +1531,7 @@ if [[ "$code_splice_status" -ne 1 ]]; then
 fi
 
 map_json="$("$mapper" "$root/examples/triads.code-flow-splice.md" --task-id code-map --domain code)"
-grep -q '"core_version": "sparse-triad-v6.0-llmwave-proof"' <<<"$map_json"
+grep -q '"core_version": "sparse-triad-v6.1-trusted-proof"' <<<"$map_json"
 grep -q '"wave_dim": 1024' <<<"$map_json"
 grep -q '"mixed_candidate_groups"' <<<"$map_json"
 grep -q '"candidate-code-flow"' <<<"$map_json"
@@ -2828,6 +2832,7 @@ fi
 
 "$root/scripts/benchmark-v0.sh" >/dev/null
 "$root/scripts/test-edge-cases.sh" >/dev/null
+"$root/scripts/test-trusted-proof.sh" >/dev/null
 tmp_field_report="$(mktemp -d)"
 cat >"$tmp_field_report/structural.json" <<'EOF_FIELD'
 {

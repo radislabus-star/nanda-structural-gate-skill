@@ -10,6 +10,20 @@ pub(crate) fn make_report(
     source: &[Triad],
     candidates: &[Triad],
 ) -> Result<Report> {
+    make_report_with_proof(
+        packet,
+        source,
+        candidates,
+        TrustedProofValidation::structural_only(),
+    )
+}
+
+pub(crate) fn make_report_with_proof(
+    packet: &Packet,
+    source: &[Triad],
+    candidates: &[Triad],
+    trusted_proof: TrustedProofValidation,
+) -> Result<Report> {
     let complexity = complexity_score(source, candidates);
     let gaps = evidence_gaps(source, candidates);
     let weak_conf = low_confidence(source, candidates);
@@ -47,7 +61,8 @@ pub(crate) fn make_report(
         !candidates.is_empty() && wave["weak"].as_array().is_some_and(|x| !x.is_empty());
     let has_candidate_watch = alias_watch || !gaps.is_empty() || !weak_conf.is_empty();
 
-    let verdict = if failure_verdict == "HARD_STOP"
+    let verdict = if trusted_proof.verdict == "VETO"
+        || failure_verdict == "HARD_STOP"
         || failure_verdict == "VETO"
         || !conflicts.is_empty()
         || has_foreign_pull
@@ -62,7 +77,7 @@ pub(crate) fn make_report(
         "WATCH"
     } else if has_weak_route || has_weak_wave {
         "VETO"
-    } else if (complexity < MANDATORY_COMPLEXITY && candidates.is_empty()) || source.is_empty() {
+    } else if candidates.is_empty() || source.is_empty() {
         "WATCH"
     } else {
         "PASS"
@@ -93,6 +108,7 @@ pub(crate) fn make_report(
             .collect()
     };
 
+    let authority_ready = verdict == "PASS" && trusted_proof.authority_ready;
     let mut report = Report {
         verdict,
         engine: ENGINE_ID.to_string(),
@@ -109,6 +125,8 @@ pub(crate) fn make_report(
         evidence_gaps: gaps,
         canonicalization: packet.canonicalization.clone(),
         baseline_summary: baselines,
+        trusted_proof,
+        authority_ready,
         wave_summary: wave,
         route_coherence: routes,
         structural_map,
@@ -135,6 +153,9 @@ pub(crate) fn print_report(report: &Report, format: &OutputFormat) -> Result<()>
             println!("task_id: {}", report.task_id);
             println!("complexity_score: {}", report.complexity_score);
             println!("mandatory_gate: {}", report.mandatory_gate);
+            println!("authority_ready: {}", report.authority_ready);
+            println!("proof_mode: {}", report.trusted_proof.mode);
+            println!("proof_verdict: {}", report.trusted_proof.verdict);
             println!(
                 "agent_action: {}",
                 report.agent_decision["action"]
@@ -1106,5 +1127,50 @@ mod tests {
 
         assert_eq!(report.verdict, "VETO");
         assert!(!report.conflicts.is_empty());
+    }
+
+    #[test]
+    fn empty_candidate_never_passes_even_when_complexity_is_mandatory() {
+        let packet: Packet = serde_json::from_value(json!({
+            "task_id": "empty-high-complexity",
+            "domain": "code",
+            "triads": (0..4).map(|index| json!({
+                "id": format!("t{index}"),
+                "subject": format!("owner{index}"),
+                "relation": "controls",
+                "object": format!("artifact{index}"),
+                "evidence": format!("source.rs:{index}"),
+                "subject_role": "owner",
+                "object_role": "artifact",
+                "route": format!("route{index}"),
+                "group": format!("group{index}")
+            })).collect::<Vec<_>>(),
+            "candidate_triads": []
+        }))
+        .expect("packet");
+        let source = normalize_ids(packet.triads.clone(), "t");
+        let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+        let report = make_report(&packet, &source, &candidates).expect("report");
+
+        assert!(report.complexity_score >= MANDATORY_COMPLEXITY);
+        assert_eq!(report.verdict, "WATCH");
+        assert!(!report.authority_ready);
+    }
+
+    #[test]
+    fn structural_pass_is_explicitly_not_authority() {
+        let packet: Packet =
+            serde_json::from_str(include_str!("../examples/triad-packet.example.json"))
+                .expect("packet");
+        let source = normalize_ids(packet.triads.clone(), "t");
+        let candidates = normalize_ids(packet.candidate_triads.clone(), "c");
+        let report = make_report(&packet, &source, &candidates).expect("report");
+
+        assert_eq!(report.verdict, "PASS");
+        assert!(!report.authority_ready);
+        assert_eq!(report.trusted_proof.verdict, "NOT_REQUESTED");
+        assert!(report
+            .repair_prompt
+            .contains("Do not use this PASS for authority"));
     }
 }

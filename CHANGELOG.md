@@ -4,6 +4,15 @@
 
 ### Changed
 
+- v6.1.0 separates structural coherence from authority. Plain structural
+  `PASS` reports `authority_ready=false`; authority requires an externally
+  pinned trusted proof manifest that binds exact source/candidate triads,
+  candidate answer, engine identity, independent provenance, and independent
+  producers. Empty candidates are always `WATCH`, and reused source evidence,
+  foreign roots, or tampered manifests are `VETO`.
+- Added `nanda proof-manifest-draft`. It emits deterministic manifest bytes and
+  explicitly reports `UNTRUSTED_DRAFT_REQUIRES_EXTERNAL_PIN`; the draft cannot
+  grant itself trust.
 - v158-v160 start the LLMWave-Big track with `nanda-llmwave-big contract`.
   The command reports the Big Model Contract, required bigness metrics, L2 Word
   Field vs L3 Schema Field separation, and an explicit claim firewall. Its

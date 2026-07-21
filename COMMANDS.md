@@ -31,11 +31,35 @@ nanda-self-check
 ```bash
 nanda-init-md --task-id local-check --domain general --query "check routes"
 nanda-gate-md nanda-task-local-check.md --task-id local-check --domain general
-nanda-check --triads examples/triad-packet.route-splice.json --input-format json
+nanda-check --triads examples/triad-packet.route-splice.json --format json
 nanda-map examples/triads.code-flow-splice.md --domain code --normalize-paths
 nanda-split-md examples/triads.code-flow-splice.md --by linked-group --out-dir split/
 nanda-split examples/triad-packet.route-splice.json --input-format json --by linked-group --out-dir split-json/
 ```
+
+A structural `PASS` is a coherence result, not authority. Without trusted proof
+the JSON report has `authority_ready=false`. For an authority-bearing check,
+the trust owner must pin the exact manifest file root outside this command:
+
+```bash
+nanda proof-manifest-draft \
+  --triads packet.json \
+  --source-provenance-root <sha256> \
+  --candidate-extraction-root <sha256> \
+  --source-producer-root <sha256> \
+  --candidate-producer-root <sha256> \
+  --out manifest.json
+
+nanda check \
+  --triads packet.json \
+  --proof-manifest manifest.json \
+  --trusted-manifest-root <externally-pinned-sha256> \
+  --format json
+```
+
+`proof-manifest-draft` never grants trust. Empty candidate sets return `WATCH`,
+and a missing, foreign, tampered, self-reused, or mismatched proof returns
+`VETO` with `authority_ready=false`.
 
 ## Repo Guard
 

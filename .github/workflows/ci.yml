@@ -26,6 +26,9 @@ jobs:
       - name: Run edge-case tests
         run: scripts/test-edge-cases.sh
 
+      - name: Run trusted proof tests
+        run: scripts/test-trusted-proof.sh
+
       - name: Run benchmark smoke
         run: scripts/benchmark-v0.sh
 

@@ -1,0 +1,46 @@
+{
+  "task_id": "trusted-proof-example",
+  "domain": "code",
+  "query": "Check a candidate statement with independently pinned provenance.",
+  "triads": [
+    {
+      "id": "t1",
+      "subject": "capture owner",
+      "relation": "seals",
+      "object": "support prefix",
+      "evidence": "src/capture_owner.rs:10",
+      "confidence": 1.0,
+      "subject_role": "owner",
+      "object_role": "artifact",
+      "route": "support-freeze",
+      "group": "source",
+      "layer": "proof",
+      "owner": "capture-owner",
+      "entrypoint": "freeze",
+      "output": "support-freeze",
+      "evidence_path": "src/capture_owner.rs",
+      "scope": "source"
+    }
+  ],
+  "candidate_triads": [
+    {
+      "id": "c1",
+      "subject": "capture owner",
+      "relation": "seals",
+      "object": "support prefix",
+      "evidence": "candidate-answer:1",
+      "confidence": 1.0,
+      "subject_role": "owner",
+      "object_role": "artifact",
+      "route": "support-freeze",
+      "group": "candidate",
+      "layer": "proof",
+      "owner": "capture-owner",
+      "entrypoint": "freeze",
+      "output": "support-freeze",
+      "evidence_path": "candidate-answer.json",
+      "scope": "candidate"
+    }
+  ],
+  "candidate_answer": "The capture owner seals the support prefix."
+}

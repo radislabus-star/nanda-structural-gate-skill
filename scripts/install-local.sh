@@ -2,13 +2,14 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+toolchain="${NANDA_RUST_TOOLCHAIN:-1.97.0}"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 skill_name="nanda-structural-gate"
 runtime_skill_dir="$codex_home/skills/$skill_name"
 bin_dir="$HOME/.local/bin"
 
 mkdir -p "$codex_home/skills" "$bin_dir"
-cargo build --release --manifest-path "$root/Cargo.toml"
+cargo "+$toolchain" build --release --manifest-path "$root/Cargo.toml"
 rm -rf "$runtime_skill_dir"
 cp -a "$root/$skill_name" "$runtime_skill_dir"
 mkdir -p "$runtime_skill_dir/bin"

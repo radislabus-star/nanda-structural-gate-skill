@@ -730,6 +730,12 @@ pub(crate) fn build_explanation(report: &Report) -> Vec<String> {
     let mut notes = vec![];
     if report.verdict == "PASS" {
         notes.push("Candidate structure is coherent with source triads.".to_string());
+        if !report.authority_ready {
+            notes.push(
+                "Structural coherence only: trusted proof was not established and authority is false."
+                    .to_string(),
+            );
+        }
     }
     if !report.conflicts.is_empty() {
         notes.push("Structural conflicts were detected.".to_string());
@@ -775,7 +781,13 @@ pub(crate) fn build_explanation(report: &Report) -> Vec<String> {
 
 pub(crate) fn build_repair_prompt(report: &Report) -> String {
     if report.verdict == "PASS" {
-        return "No repair needed. Preserve the checked source/candidate bindings.".to_string();
+        return if report.authority_ready {
+            "No repair needed. Preserve the checked source/candidate bindings and trusted proof roots."
+                .to_string()
+        } else {
+            "No structural repair needed. Do not use this PASS for authority; rerun with an externally pinned trusted proof manifest."
+                .to_string()
+        };
     }
     let mut lines = vec![
         "Repair the candidate answer using only one coherent structural route.".to_string(),
@@ -2976,6 +2988,8 @@ pub(crate) struct Report {
     pub(crate) evidence_gaps: Vec<String>,
     pub(crate) canonicalization: CanonicalizationReport,
     pub(crate) baseline_summary: Value,
+    pub(crate) trusted_proof: TrustedProofValidation,
+    pub(crate) authority_ready: bool,
     pub(crate) wave_summary: Value,
     pub(crate) route_coherence: Value,
     pub(crate) structural_map: Value,
